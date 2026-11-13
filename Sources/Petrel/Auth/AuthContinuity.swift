@@ -154,7 +154,7 @@ struct AuthContinuityState {
     }
 
     var snapshot: AuthContinuitySnapshot {
-        let did: String? = if isExhausted || mode != .gateway {
+        let did: String? = if isExhausted || !mode.isGateway {
             nil
         } else if case let .observed(identity) = observation {
             identity?.did
@@ -180,7 +180,7 @@ struct AuthContinuityState {
 
     mutating func commitMode(_ newMode: AuthMode) {
         mode = newMode
-        if newMode != .gateway {
+        if !newMode.isGateway {
             observation = .invalidated
         }
     }
@@ -189,7 +189,7 @@ struct AuthContinuityState {
     /// Tracked mutations have already incremented the generation and leave the
     /// state in `.invalidated`; out-of-band replacements increment here.
     mutating func observeGatewayIdentity(_ identity: GatewayAuthIdentity?) {
-        guard mode == .gateway, !isExhausted else { return }
+        guard mode.isGateway, !isExhausted else { return }
 
         switch observation {
         case .unobserved, .invalidated:
@@ -205,7 +205,7 @@ struct AuthContinuityState {
     }
 
     func wouldChangeWhenObservingGatewayIdentity(_ identity: GatewayAuthIdentity?) -> Bool {
-        guard mode == .gateway, !isExhausted else { return false }
+        guard mode.isGateway, !isExhausted else { return false }
         guard case let .observed(previous) = observation else { return false }
         return previous != identity
     }

@@ -4,7 +4,7 @@
     import Security
     import Synchronization
     import Testing
-    @testable import Petrel
+    @_spi(Fixtures) @testable import Petrel
 
     /// F68: a macOS runtime-fixture launch keeps keychain items in its own profile, never in the
     /// user's login keychain, and separate launches share nothing.

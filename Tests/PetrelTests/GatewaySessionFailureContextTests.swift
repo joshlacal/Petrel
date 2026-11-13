@@ -22,7 +22,7 @@ final class GatewaySessionFailureContextTests: XCTestCase {
             let client = try await ATProtoClient(
                 oauthConfig: OAuthConfig(clientId: "https://client.example/client-metadata.json",
                                          redirectUri: "blue.catbird:/oauth/callback", scope: "atproto"),
-                namespace: namespace, authMode: .gateway, gatewayURL: gateway
+                namespace: namespace, authMode: .gateway(.legacyEquivalent(gatewayURL: gateway))
             )
             let storage = KeychainStorage(namespace: namespace)
             let accounts = await AccountManager(storage: storage)

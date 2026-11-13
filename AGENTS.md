@@ -105,7 +105,7 @@ Petrel supports multiple authentication strategies unified under the `AuthStrate
   - `.none`: Unauthenticated mode for public XRPC endpoints.
   - `.legacy`: Password-based authentication using App Passwords (`LegacyPasswordStrategy`).
   - `.publicOAuth`: Standard public OAuth with PAR (Pushed Authorization Requests), PKCE, and DPoP token binding (`PublicOAuthStrategy`). Recommended for native mobile and desktop clients.
-  - `.gateway`: Confidential OAuth delegation via a backend gateway (`ConfidentialGatewayStrategy`).
+  - `.gateway(GatewayConfiguration)`: Confidential OAuth delegation through an app-operated gateway (`ConfidentialGatewayStrategy`). Gateway URL and exact callback URLs are caller-supplied; Petrel has no built-in hosts.
   - `.cab(backendURL: URL)`: Client Assertion Backend mode using DPoP-bound assertions for confidential clients (`CABOAuthStrategy`).
 - `struct OAuthConfig`: Configuration for OAuth flows. The `scope` parameter takes a single space-delimited string (for example, `scope: "atproto transition:generic"`), not an array.
 - `actor TokenRefreshCoordinator`: Coordinates automatic token refresh with concurrency deduplication, exponential backoff, and DPoP key rotation.

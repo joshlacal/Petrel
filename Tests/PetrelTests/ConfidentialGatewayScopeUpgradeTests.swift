@@ -182,7 +182,7 @@ private final class ThrowingStorageBackend: SecureStorage, @unchecked Sendable {
 
 final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
     private static let gatewayURL = URL(string: "https://gateway.catbird.test")!
-    private static let validCallbackBase = ConfidentialGatewayStrategy.permissionCallbackURL
+    private static let validCallbackBase = GatewayConfiguration.legacyPermissionCallbackURL
     private static let aliceDID = "did:plc:alice123456789012345678"
     private static let bobDID = "did:plc:bob9876543210987654321"
 
@@ -219,8 +219,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 scope: "atproto transition:generic"
             ),
             namespace: namespace,
-            authMode: .gateway,
-            gatewayURL: gatewayURL
+            authMode: .gateway(.legacyEquivalent(gatewayURL: gatewayURL))
         )
 
         let account = Account(
@@ -352,6 +351,56 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             _ = try await first.value
             _ = try await second.value
             XCTAssertEqual(overlapped.values, [true], "Gateway requests must not hold the lifecycle lease until response")
+        }
+    }
+
+    // MARK: - 0. Mode switching
+
+    /// Gateway mode routes every request to the gateway the client was created with, so a
+    /// switch may change callbacks but never the gateway itself.
+    func testSwitchingToADifferentGatewayIsRefused() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.switch.other.\(UUID().uuidString)"
+            let (client, _) = try await self.makeClient(namespace: namespace)
+
+            let other = try GatewayConfiguration(
+                gatewayURL: URL(string: "https://other-gateway.example.test")!,
+                callbackURL: GatewayConfiguration.legacyCallbackURL,
+                permissionCallbackURL: GatewayConfiguration.legacyPermissionCallbackURL
+            )
+            do {
+                try await client.switchAuthMode(.gateway(other))
+                XCTFail("switching to another gateway must be refused")
+            } catch {
+                XCTAssertEqual(error as? AuthError, .invalidOAuthConfiguration)
+            }
+
+            let sameGatewayNewCallbacks = try GatewayConfiguration(
+                gatewayURL: self.gatewayURL,
+                callbackURL: URL(string: "https://app.example.com/cb")!,
+                permissionCallbackURL: URL(string: "https://app.example.com/pcb")!
+            )
+            try await client.switchAuthMode(.gateway(sameGatewayNewCallbacks))
+        }
+    }
+
+    func testSwitchingIntoGatewayModeFromAnotherModeIsRefused() async throws {
+        try await withInMemoryBackend { _ in
+            let client = try await ATProtoClient(
+                oauthConfig: OAuthConfig(
+                    clientId: "https://client.example/client-metadata.json",
+                    redirectUri: "https://client.example/oauth/callback",
+                    scope: "atproto"
+                ),
+                namespace: "test.gateway.switch.into.\(UUID().uuidString)",
+                authMode: .publicOAuth
+            )
+            do {
+                try await client.switchAuthMode(.gateway(.legacyEquivalent(gatewayURL: self.gatewayURL)))
+                XCTFail("switching into gateway mode must be refused")
+            } catch {
+                XCTAssertEqual(error as? AuthError, .invalidOAuthConfiguration)
+            }
         }
     }
 
@@ -1034,8 +1083,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                     scope: "atproto transition:generic"
                 ),
                 namespace: namespace,
-                authMode: .gateway,
-                gatewayURL: self.gatewayURL
+                authMode: .gateway(.legacyEquivalent(gatewayURL: self.gatewayURL))
             )
 
             let account = Account(
@@ -1091,8 +1139,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                     scope: "atproto transition:generic"
                 ),
                 namespace: namespace,
-                authMode: .gateway,
-                gatewayURL: self.gatewayURL
+                authMode: .gateway(.legacyEquivalent(gatewayURL: self.gatewayURL))
             )
 
             // Recovery runs automatically on client startup via refreshTokenIfNeeded, or can be explicitly driven

@@ -17,8 +17,10 @@ public enum AuthMode: Sendable, Equatable {
     case legacy
     /// Public OAuth for mobile/native apps (PAR + PKCE + DPoP).
     case publicOAuth
-    /// Confidential gateway authentication via a backend service.
-    case gateway
+    /// Confidential gateway authentication, for apps that run their own confidential-client
+    /// gateway. The configuration names the gateway and the exact web callbacks it redirects
+    /// to; Petrel has no built-in gateway or callback hosts. All requests go to the gateway.
+    case gateway(GatewayConfiguration)
     /// Client Assertion Backend — DPoP-bound client assertions for confidential browser-based apps.
     case cab(backendURL: URL)
 }
@@ -155,7 +157,6 @@ public actor ATProtoClient {
     ///   - oauthConfig: The OAuth configuration.
     ///   - namespace: The namespace for storage.
     ///   - authMode: The authentication mode to use (default: publicOAuth).
-    ///   - gatewayURL: The gateway URL for confidential client mode (required if authMode is .gateway).
     ///   - userAgent: Optional user agent string for requests.
     ///   - didResolver: Optional custom DID resolver implementation.
     ///   - bskyAppViewDID: Optional custom Bluesky AppView service DID (default: did:web:api.bsky.app#bsky_appview).
@@ -166,7 +167,6 @@ public actor ATProtoClient {
         oauthConfig: OAuthConfig,
         namespace: String,
         authMode: AuthMode = .publicOAuth,
-        gatewayURL: URL? = nil,
         userAgent: String? = nil,
         didResolver: (any DIDResolving)? = nil,
         bskyAppViewDID: String = "did:web:api.bsky.app#bsky_appview",
@@ -175,7 +175,7 @@ public actor ATProtoClient {
     ) async throws {
         try await self.init(
             baseURL: baseURL, oauthConfig: oauthConfig, namespace: namespace,
-            authMode: authMode, gatewayURL: gatewayURL, userAgent: userAgent,
+            authMode: authMode, userAgent: userAgent,
             didResolver: didResolver, bskyAppViewDID: bskyAppViewDID,
             bskyChatDID: bskyChatDID, accessGroup: accessGroup,
             credentialStorage: .platformDefault
@@ -189,7 +189,6 @@ public actor ATProtoClient {
         oauthConfig: OAuthConfig,
         namespace: String,
         authMode: AuthMode = .publicOAuth,
-        gatewayURL: URL? = nil,
         userAgent: String? = nil,
         didResolver: (any DIDResolving)? = nil,
         bskyAppViewDID: String = "did:web:api.bsky.app#bsky_appview",
@@ -210,11 +209,13 @@ public actor ATProtoClient {
         // For gateway mode, always use the gateway URL as the base URL
         // Otherwise use the provided baseURL (defaults to bsky.social)
         let effectiveBaseURL: URL
-        self.isGatewayMode = authMode == .gateway && gatewayURL != nil
-        if self.isGatewayMode, let gateway = gatewayURL {
+        if case let .gateway(configuration) = authMode {
+            self.isGatewayMode = true
+            let gateway = configuration.gatewayURL
             effectiveBaseURL = gateway
             LogManager.logInfo("ATProtoClient - Using gateway URL as base URL: \(gateway)")
         } else {
+            self.isGatewayMode = false
             effectiveBaseURL = baseURL
         }
 
@@ -253,8 +254,8 @@ public actor ATProtoClient {
             managerMode = .legacy
         case .publicOAuth:
             managerMode = .publicOAuth
-        case .gateway:
-            managerMode = .gateway
+        case let .gateway(configuration):
+            managerMode = .gateway(configuration)
         case .cab(let backendURL):
             managerMode = .cab(backendURL: backendURL)
         }
@@ -266,8 +267,7 @@ public actor ATProtoClient {
             accountManager: theAccountManager,
             networkService: networkService,
             oauthConfig: oauthConfig,
-            didResolver: theDidResolver,
-            gatewayBaseURL: gatewayURL
+            didResolver: theDidResolver
         )
         self.authManager = theAuthManager
 
@@ -575,7 +575,8 @@ public actor ATProtoClient {
     #if DEBUG && canImport(Network) && canImport(Security)
     /// DEBUG qualification only: adopts a synthetic session from the local client runtime gateway.
     /// Refused unless an installed `DebugFixtureTransport` origin is exactly this client's gateway.
-    public func adoptFixtureGatewaySession(_ session: String) async throws {
+    /// Part of the `Fixtures` SPI (`@_spi(Fixtures) import Petrel`).
+    @_spi(Fixtures) public func adoptFixtureGatewaySession(_ session: String) async throws {
         guard let authManager else {
             throw APIError.unauthenticatedClient("Cannot adopt a fixture session on an unauthenticated client")
         }
@@ -598,7 +599,13 @@ public actor ATProtoClient {
     }
 
     /// Switches the authentication mode at runtime.
+    ///
+    /// A gateway client sends every request to the gateway it was created with, so switching to
+    /// ``AuthMode/gateway(_:)`` is allowed only on a client created in gateway mode and only for a
+    /// configuration with the same `gatewayURL` (its callbacks may differ). Create a new client to
+    /// use a different gateway.
     /// - Parameter mode: The new authentication mode to use.
+    /// - Throws: `AuthError.invalidOAuthConfiguration` when the switch would change the gateway.
     public func switchAuthMode(_ mode: AuthMode) async throws {
         guard let authManager else {
             throw APIError.unauthenticatedClient("Cannot switch auth mode on an unauthenticated client")
@@ -611,8 +618,11 @@ public actor ATProtoClient {
             managerMode = .legacy
         case .publicOAuth:
             managerMode = .publicOAuth
-        case .gateway:
-            managerMode = .gateway
+        case let .gateway(configuration):
+            guard case let .gateway(current) = authMode, current.gatewayURL == configuration.gatewayURL else {
+                throw AuthError.invalidOAuthConfiguration
+            }
+            managerMode = .gateway(configuration)
         case .cab(let backendURL):
             managerMode = .cab(backendURL: backendURL)
         }
@@ -752,19 +762,18 @@ public actor ATProtoClient {
     }
     // MARK: - Gateway Scope Upgrade
 
-    /// The exact canonical permission callback URL for confidential gateway progressive scope upgrades.
-    public static let gatewayPermissionCallbackURL = URL(string: "https://catbird.blue/oauth/permission-callback")!
-
     /// Initiates a progressive OAuth scope upgrade through the confidential gateway.
     /// - Parameters:
     ///   - requesting: The additional scopes requested for upgrade.
     ///   - expectedDID: The DID of the account being upgraded.
-    ///   - callbackURL: The client-side callback URL binding for this flow.
+    ///   - callbackURL: The exact permission callback for this flow; `nil` (the default) uses the
+    ///     ``GatewayConfiguration/permissionCallbackURL`` the client was created with. Any other
+    ///     URL must equal it in scheme, host, port and path.
     /// - Returns: The authorization URL to present to the user in a browser.
     public func startGatewayScopeUpgrade(
         requesting: Set<String>,
         for expectedDID: String,
-        callbackURL: URL = ATProtoClient.gatewayPermissionCallbackURL
+        callbackURL: URL? = nil
     ) async throws -> URL {
         guard let authManager else {
             throw APIError.serviceNotInitialized

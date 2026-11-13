@@ -4,11 +4,44 @@
     import Network
     import Security
 
-    /// Explicit, process-local qualification transport. No environment or manifest is
-    /// consumed automatically, and this entire facility is absent from release builds.
+    /// Explicit, process-local qualification transport for an app's own end-to-end fixtures.
+    /// No environment or manifest is consumed automatically, nothing activates until the app
+    /// calls ``install(manifest:certificateDER:hostPolicy:)``, and this entire facility is
+    /// absent from release builds. It is test infrastructure, published only as the
+    /// `Fixtures` SPI (`@_spi(Fixtures) import Petrel`).
     // @unchecked Sendable: DEBUG only. `tunnels` is confined to `queue`, the ready state to `readyLock`, the statics to `installationLock`.
-    public final class DebugFixtureTransport: @unchecked Sendable {
+    @_spi(Fixtures) public final class DebugFixtureTransport: @unchecked Sendable {
         public enum Failure: Error { case invalidConfiguration, alreadyInstalled, unavailable, rejected, connection }
+
+        /// Which hosts a fixture manifest may name. Petrel has no built-in fixture hosts.
+        public struct HostPolicy: Sendable, Equatable {
+            /// The DNS domain every fixture host lives under, without a leading dot (for
+            /// example `request-fixture.example.com`). The manifest's gateway origin must be
+            /// `https://gateway-<id>.<fixtureDomain>`, and each account's `did:web` host
+            /// `<label>-<id>.<fixtureDomain>`.
+            public let fixtureDomain: String
+            /// Exact extra hosts (outside `fixtureDomain`) the fixture serves, such as a chat
+            /// service or AppView the app talks to directly. The manifest's `hosts` must list
+            /// exactly the gateway, the two account hosts and these.
+            public let additionalHosts: Set<String>
+
+            /// Creates a host policy.
+            /// - Throws: ``Failure/invalidConfiguration`` when a name is not a lowercase DNS name.
+            public init(fixtureDomain: String, additionalHosts: Set<String>) throws {
+                guard DebugFixtureTransport.isLowercaseDNSName(fixtureDomain),
+                      additionalHosts.allSatisfy(DebugFixtureTransport.isLowercaseDNSName),
+                      !additionalHosts.contains(where: { $0 == fixtureDomain || $0.hasSuffix("." + fixtureDomain) })
+                else {
+                    throw Failure.invalidConfiguration
+                }
+                self.fixtureDomain = fixtureDomain
+                self.additionalHosts = additionalHosts
+            }
+
+            func isFixtureHost(_ host: String) -> Bool {
+                host.count < 254 && host.hasSuffix("." + fixtureDomain) && DebugFixtureTransport.isLowercaseDNSName(host)
+            }
+        }
         public struct Account: Sendable {
             public let label: String
             public let did: String
@@ -20,7 +53,7 @@
         public let accounts: [Account]
         let ports: [String: UInt16]
         private let certificate: SecCertificate
-        private let queue = DispatchQueue(label: "blue.catbird.debug-fixture-tunnel")
+        private let queue = DispatchQueue(label: "Petrel.DebugFixtureTransport.tunnel")
         private let listener: NWListener
         private var tunnels: [UUID: FixtureTunnel] = [:] // queue-confined
         private let readyLock = NSLock()
@@ -32,12 +65,16 @@
 
         /// One immutable manifest for the process lifetime. Call before constructing
         /// fixture clients; attempting replacement, including after failure, is rejected.
-        public static func install(manifest: Data, certificateDER: Data) async throws -> DebugFixtureTransport {
+        public static func install(
+            manifest: Data,
+            certificateDER: Data,
+            hostPolicy: HostPolicy
+        ) async throws -> DebugFixtureTransport {
             try installationLock.withLock {
                 guard !installationStarted else { throw Failure.alreadyInstalled }
                 installationStarted = true
             }
-            let transport = try DebugFixtureTransport(manifest: manifest, certificateDER: certificateDER)
+            let transport = try DebugFixtureTransport(manifest: manifest, certificateDER: certificateDER, hostPolicy: hostPolicy)
             try await transport.start()
             installationLock.withLock { installed = transport }
             return transport
@@ -47,7 +84,7 @@
             installationLock.withLock { installed }
         }
 
-        init(manifest: Data, certificateDER: Data) throws {
+        init(manifest: Data, certificateDER: Data, hostPolicy: HostPolicy) throws {
             guard #available(macOS 14, iOS 17, tvOS 17, *) else { throw Failure.unavailable }
             guard manifest.count <= 16384, certificateDER.count <= 16384,
                   let certificate = SecCertificateCreateWithData(nil, certificateDER as CFData)
@@ -60,7 +97,7 @@
                   object["fixtureOnly"] as? Bool == true,
                   let originString = object["origin"] as? String,
                   let origin = URL(string: originString), let host = origin.host,
-                  originString == "https://\(host)", Self.isFixtureHost(host), host.hasPrefix("gateway-"),
+                  originString == "https://\(host)", hostPolicy.isFixtureHost(host), host.hasPrefix("gateway-"),
                   let caPath = object["caPem"] as? String, caPath.hasPrefix("/"),
                   let leafPath = object["tlsCertificatePem"] as? String, leafPath.hasPrefix("/"),
                   let spki = object["tlsSpkiSha256"] as? String,
@@ -71,12 +108,13 @@
                   corsURL.user == nil, corsURL.password == nil, corsURL.query == nil, corsURL.fragment == nil,
                   corsURL.path.isEmpty,
                   let rawAccounts = object["accounts"] as? [[String: Any]], rawAccounts.count == 2,
-                  let rawHosts = object["hosts"] as? [String: String], rawHosts.count == 5
+                  let rawHosts = object["hosts"] as? [String: String], rawHosts.count == 3 + hostPolicy.additionalHosts.count,
+                  !hostPolicy.additionalHosts.contains(host)
             else {
                 throw Failure.invalidConfiguration
             }
             var accounts: [Account] = []
-            var allowedHosts: Set<String> = [host, "chat.catbird.blue", "public.api.bsky.app"]
+            var allowedHosts: Set<String> = hostPolicy.additionalHosts.union([host])
             for row in rawAccounts {
                 guard Set(row.keys) == Set(["label", "did", "deviceId"]),
                       let label = row["label"] as? String, ["alice", "bob"].contains(label),
@@ -87,7 +125,7 @@
                     throw Failure.invalidConfiguration
                 }
                 let accountHost = String(did.dropFirst(8))
-                guard Self.isFixtureHost(accountHost), accountHost.hasPrefix(label + "-"),
+                guard hostPolicy.isFixtureHost(accountHost), accountHost.hasPrefix(label + "-"),
                       !allowedHosts.contains(accountHost) else { throw Failure.invalidConfiguration }
                 allowedHosts.insert(accountHost)
                 accounts.append(Account(label: label, did: did, deviceId: device))
@@ -111,10 +149,10 @@
             listener = try NWListener(using: parameters)
         }
 
-        private static func isFixtureHost(_ host: String) -> Bool {
-            host.count < 254 && host.hasSuffix(".request-fixture.catbird.blue") &&
+        static func isLowercaseDNSName(_ host: String) -> Bool {
+            !host.isEmpty && host.count < 254 &&
                 host == host.lowercased() && host.utf8.allSatisfy { (97 ... 122).contains($0) || (48 ... 57).contains($0) || $0 == 45 || $0 == 46 } &&
-                !host.contains("..") && !host.hasPrefix(".") && !host.hasPrefix("-")
+                !host.contains("..") && !host.hasPrefix(".") && !host.hasPrefix("-") && !host.hasSuffix(".")
         }
 
         public func permits(_ url: URL) -> Bool {

@@ -12,13 +12,3 @@ Sources/PetrelFirehose/RelaySemanticVerifier.swift|swan|deprecated verify(relay:
 # Kotlin port: published package id blue.catbird.petrel (renaming it is a Kotlin-port break, tracked separately).
 generator/templates/kotlin/|blue.catbird.petrel|Kotlin package id
 generator/main.py|blue.catbird.petrel|Kotlin package id in overlay namespace output
-
-# Pending the gateway/fixture de-branding change (sdk-green/hygiene-gateway); removed there.
-Sources/Petrel/Auth/ConfidentialGatewayStrategy.swift|*|pending gateway configuration
-Sources/Petrel/Generated/Client/ATProtoClient+Generated.swift|catbird.blue|pending gateway configuration
-generator/templates/ATProtoClientGeneratedMain.jinja|catbird.blue|pending gateway configuration
-Sources/Petrel/Generated/Core/Types/ATProtocolValueContainer.swift|blue.catbird.mlsChat|pending template doc example
-generator/templates/ATProtocolValueContainer.jinja|blue.catbird.mlsChat|pending template doc example
-Sources/Petrel/Network/DebugFixtureTransport.swift|*|pending fixture opt-in
-Sources/Petrel/Storage/FixtureKeychain.swift|*|pending fixture opt-in
-Sources/Petrel/Storage/KeychainSecItem.swift|*|pending fixture opt-in
