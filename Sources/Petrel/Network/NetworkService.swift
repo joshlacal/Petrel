@@ -142,97 +142,101 @@ enum ContentDecoding {
         return try decompressIfNeeded(data, contentEncoding: encoding, limits: limits)
     }
 
-
     #if canImport(Compression)
-    private static func decompressAlgorithm(_ data: Data, algorithm: compression_algorithm, limits: NetworkResponseLimits) throws -> Data? {
-        guard !data.isEmpty else { return data }
-        let maxAllowedDecoded = min(limits.maximumDecodedBytes, data.count * limits.maximumExpansionRatio)
-        var outputSize = min(max(data.count * 4, 65536), maxAllowedDecoded)
-        var outputData = Data(count: outputSize)
+        private static func decompressAlgorithm(_ data: Data, algorithm: compression_algorithm, limits: NetworkResponseLimits) throws -> Data? {
+            guard !data.isEmpty else { return data }
+            let maxAllowedDecoded = min(limits.maximumDecodedBytes, data.count * limits.maximumExpansionRatio)
+            var outputSize = min(max(data.count * 4, 65536), maxAllowedDecoded)
+            var outputData = Data(count: outputSize)
 
-        for _ in 0 ..< 6 {
-            let result = data.withUnsafeBytes { sourceBuffer -> Int in
-                guard let sourcePtr = sourceBuffer.baseAddress else { return 0 }
-                return outputData.withUnsafeMutableBytes { destBuffer -> Int in
-                    guard let destPtr = destBuffer.baseAddress else { return 0 }
-                    return compression_decode_buffer(
-                        destPtr.assumingMemoryBound(to: UInt8.self),
-                        outputSize,
-                        sourcePtr.assumingMemoryBound(to: UInt8.self),
-                        data.count,
-                        nil,
-                        algorithm
-                    )
+            for _ in 0 ..< 6 {
+                let result = data.withUnsafeBytes { sourceBuffer -> Int in
+                    guard let sourcePtr = sourceBuffer.baseAddress else { return 0 }
+                    return outputData.withUnsafeMutableBytes { destBuffer -> Int in
+                        guard let destPtr = destBuffer.baseAddress else { return 0 }
+                        return compression_decode_buffer(
+                            destPtr.assumingMemoryBound(to: UInt8.self),
+                            outputSize,
+                            sourcePtr.assumingMemoryBound(to: UInt8.self),
+                            data.count,
+                            nil,
+                            algorithm
+                        )
+                    }
+                }
+
+                if result > 0, result < outputSize {
+                    outputData.count = result
+                    if outputData.count > limits.maximumDecodedBytes {
+                        throw NetworkError.responseLimitExceeded("Decoded bytes (\(outputData.count)) exceeded limit (\(limits.maximumDecodedBytes))")
+                    }
+                    if data.count > 0 && (Double(outputData.count) / Double(data.count) > Double(limits.maximumExpansionRatio)) {
+                        throw NetworkError.responseLimitExceeded("Decompression expansion ratio (\(outputData.count)/\(data.count)) exceeded limit (\(limits.maximumExpansionRatio)x)")
+                    }
+                    return outputData
+                } else if result == outputSize {
+                    let nextSize = outputSize * 2
+                    if nextSize > maxAllowedDecoded {
+                        throw NetworkError.responseLimitExceeded("Decoded bytes exceeded limit during decompression")
+                    }
+                    outputSize = nextSize
+                    outputData = Data(count: outputSize)
+                } else {
+                    break
                 }
             }
+            return nil
+        }
 
-            if result > 0, result < outputSize {
-                outputData.count = result
-                if outputData.count > limits.maximumDecodedBytes {
-                    throw NetworkError.responseLimitExceeded("Decoded bytes (\(outputData.count)) exceeded limit (\(limits.maximumDecodedBytes))")
-                }
-                if data.count > 0 && (Double(outputData.count) / Double(data.count) > Double(limits.maximumExpansionRatio)) {
-                    throw NetworkError.responseLimitExceeded("Decompression expansion ratio (\(outputData.count)/\(data.count)) exceeded limit (\(limits.maximumExpansionRatio)x)")
-                }
-                return outputData
-            } else if result == outputSize {
-                let nextSize = outputSize * 2
-                if nextSize > maxAllowedDecoded {
-                    throw NetworkError.responseLimitExceeded("Decoded bytes exceeded limit during decompression")
-                }
-                outputSize = nextSize
-                outputData = Data(count: outputSize)
-            } else {
-                break
+        private static func decompressBrotli(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
+            try decompressAlgorithm(data, algorithm: COMPRESSION_BROTLI, limits: limits)
+        }
+
+        private static func decompressZlib(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
+            try decompressAlgorithm(data, algorithm: COMPRESSION_ZLIB, limits: limits)
+        }
+
+        private static func decompressDeflate(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
+            if let raw = try decompressAlgorithm(data, algorithm: COMPRESSION_ZLIB, limits: limits) { return raw }
+            guard data.count > 6 else { return nil }
+            return try decompressAlgorithm(Data(data.dropFirst(2).dropLast(4)), algorithm: COMPRESSION_ZLIB, limits: limits)
+        }
+
+        private static func decompressGzip(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
+            guard data.count >= 18, data[0] == 0x1F, data[1] == 0x8B, data[2] == 8 else { return nil }
+            var index = 10
+            let flags = data[3]
+            if flags & 4 != 0 {
+                guard index + 2 <= data.count else { return nil }
+                let length = Int(data[index]) | Int(data[index + 1]) << 8
+                index += 2 + length
             }
+            if flags & 8 != 0 { while index < data.count && data[index] != 0 {
+                index += 1
+            }; index += 1 }
+            if flags & 16 != 0 { while index < data.count && data[index] != 0 {
+                index += 1
+            }; index += 1 }
+            if flags & 2 != 0 { index += 2 }
+            guard index < data.count - 8 else { return nil }
+            return try decompressAlgorithm(Data(data[index ..< data.count - 8]), algorithm: COMPRESSION_ZLIB, limits: limits)
         }
-        return nil
-    }
-
-    private static func decompressBrotli(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
-        try decompressAlgorithm(data, algorithm: COMPRESSION_BROTLI, limits: limits)
-    }
-
-    private static func decompressZlib(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
-        try decompressAlgorithm(data, algorithm: COMPRESSION_ZLIB, limits: limits)
-    }
-    private static func decompressDeflate(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
-        if let raw = try decompressAlgorithm(data, algorithm: COMPRESSION_ZLIB, limits: limits) { return raw }
-        guard data.count > 6 else { return nil }
-        return try decompressAlgorithm(Data(data.dropFirst(2).dropLast(4)), algorithm: COMPRESSION_ZLIB, limits: limits)
-    }
-
-    private static func decompressGzip(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
-        guard data.count >= 18, data[0] == 0x1f, data[1] == 0x8b, data[2] == 8 else { return nil }
-        var index = 10
-        let flags = data[3]
-        if flags & 4 != 0 {
-            guard index + 2 <= data.count else { return nil }
-            let length = Int(data[index]) | Int(data[index + 1]) << 8
-            index += 2 + length
-        }
-        if flags & 8 != 0 { while index < data.count && data[index] != 0 { index += 1 }; index += 1 }
-        if flags & 16 != 0 { while index < data.count && data[index] != 0 { index += 1 }; index += 1 }
-        if flags & 2 != 0 { index += 2 }
-        guard index < data.count - 8 else { return nil }
-        return try decompressAlgorithm(Data(data[index ..< data.count - 8]), algorithm: COMPRESSION_ZLIB, limits: limits)
-    }
     #else
-    private static func decompressBrotli(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
-        nil
-    }
+        private static func decompressBrotli(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
+            nil
+        }
 
-    private static func decompressZlib(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
-        nil
-    }
+        private static func decompressZlib(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
+            nil
+        }
 
-    private static func decompressDeflate(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
-        nil
-    }
+        private static func decompressDeflate(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
+            nil
+        }
 
-    private static func decompressGzip(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
-        nil
-    }
+        private static func decompressGzip(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
+            nil
+        }
     #endif
 }
 
@@ -291,6 +295,7 @@ public struct AuthContext: Sendable {
         lease?.release()
     }
 }
+
 /// An internal container carrying a prepared streaming URLRequest and its authentication lifecycle lease.
 public struct PreparedStreamingRequest: Sendable {
     public let request: URLRequest
@@ -305,7 +310,6 @@ public struct PreparedStreamingRequest: Sendable {
         authContext?.releaseAuthenticationLease()
     }
 }
-
 
 public protocol AuthenticationProvider: Sendable {
     /// Prepares a request with authentication headers
@@ -332,8 +336,12 @@ public protocol AuthenticationProvider: Sendable {
         async throws -> (Data, HTTPURLResponse)
 
     /// Handles a response using the immutable principal captured with its credential.
-    func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest,
-                                    context: AuthContext?) async throws -> (Data, HTTPURLResponse)
+    func handleUnauthorizedResponse(
+        _ response: HTTPURLResponse,
+        data: Data,
+        for request: URLRequest,
+        context: AuthContext?
+    ) async throws -> (Data, HTTPURLResponse)
 
     func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool
 
@@ -353,12 +361,18 @@ public protocol AuthenticationProvider: Sendable {
 }
 
 public extension AuthenticationProvider {
-    func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest,
-                                    context: AuthContext?) async throws -> (Data, HTTPURLResponse) {
+    func handleUnauthorizedResponse(
+        _ response: HTTPURLResponse,
+        data: Data,
+        for request: URLRequest,
+        context: AuthContext?
+    ) async throws -> (Data, HTTPURLResponse) {
         try await handleUnauthorizedResponse(response, data: data, for: request)
     }
 
-    func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool { false }
+    func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool {
+        false
+    }
 
     func withCurrentGatewaySessionFailure(
         _ context: GatewaySessionFailureContext,
@@ -514,9 +528,9 @@ public actor NetworkService: NetworkServiceProtocol {
     public let limits: NetworkResponseLimits
     private var authProvider: AuthenticationProvider?
     private var headers: [String: String] = [:]
-    nonisolated package let sessionDelegate: HardenedURLSessionDelegate
-    nonisolated package let exactAuthSessionDelegate: HardenedURLSessionDelegate
-    nonisolated package let session: URLSession
+    package nonisolated let sessionDelegate: HardenedURLSessionDelegate
+    package nonisolated let exactAuthSessionDelegate: HardenedURLSessionDelegate
+    package nonisolated let session: URLSession
     private let exactAuthSession: URLSession
     /// Carries requests to third-party origins that are sent no account credentials. It adds no
     /// default headers and has no cookies, credential storage or cache; redirects stay bounded
@@ -529,12 +543,14 @@ public actor NetworkService: NetworkServiceProtocol {
         encoder.dateEncodingStrategy = .iso8601
         return encoder
     }()
+
     private let jsonDecoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .useDefaultKeys
         decoder.dateDecodingStrategy = .iso8601
         return decoder
     }()
+
     private let maxRetries = 3
     private var userAgent: String?
     private(set) var protectedResourceMetadata: ProtectedResourceMetadata?
@@ -547,6 +563,7 @@ public actor NetworkService: NetworkServiceProtocol {
         queue.maxConcurrentOperationCount = 6
         return queue
     }()
+
     #if DEBUG
         package nonisolated(unsafe) static var dnsResolutionHook: (@Sendable (String, @Sendable () -> Bool) -> Void)?
         package nonisolated(unsafe) static var dnsResolverOverride: (@Sendable (String) -> [String]?)?
@@ -886,7 +903,7 @@ public actor NetworkService: NetworkServiceProtocol {
     ///   - limits: Network response limits for wire/decoded bytes and expansion ratios.
     public init(baseURL: URL, authService: AuthenticationProvider? = nil, limits: NetworkResponseLimits = .default) {
         self.baseURL = baseURL
-        self.authProvider = authService
+        authProvider = authService
         self.limits = limits
 
         // Configure URL session
@@ -914,9 +931,9 @@ public actor NetworkService: NetworkServiceProtocol {
         let sessionDelegate = HardenedURLSessionDelegate(allowsRedirects: true, limits: limits)
         self.sessionDelegate = sessionDelegate
         #if DEBUG && canImport(Network) && canImport(Security)
-        if let fixture = sessionDelegate.fixtureTransport {
-            do { try fixture.configure(config) } catch { preconditionFailure("Invalid debug fixture session") }
-        }
+            if let fixture = sessionDelegate.fixtureTransport {
+                do { try fixture.configure(config) } catch { preconditionFailure("Invalid debug fixture session") }
+            }
         #endif
         session = URLSession(configuration: config, delegate: sessionDelegate, delegateQueue: nil)
         let exactConfig = URLSessionConfiguration.ephemeral
@@ -934,11 +951,11 @@ public actor NetworkService: NetworkServiceProtocol {
             }
         #endif
         let exactAuthDelegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: limits)
-        self.exactAuthSessionDelegate = exactAuthDelegate
+        exactAuthSessionDelegate = exactAuthDelegate
         #if DEBUG && canImport(Network) && canImport(Security)
-        if let fixture = exactAuthDelegate.fixtureTransport {
-            do { try fixture.configure(exactConfig) } catch { preconditionFailure("Invalid debug fixture session") }
-        }
+            if let fixture = exactAuthDelegate.fixtureTransport {
+                do { try fixture.configure(exactConfig) } catch { preconditionFailure("Invalid debug fixture session") }
+            }
         #endif
         exactAuthSession = URLSession(
             configuration: exactConfig,
@@ -970,6 +987,7 @@ public actor NetworkService: NetworkServiceProtocol {
         baseURL = url
         LogManager.logInfo("Network Service - Base URL updated to: \(LogManager.sanitizeURLForLogging(url))")
     }
+
     public func setGatewayMode(_ enabled: Bool) async {
         gatewayMode = enabled
         LogManager.logInfo("🔍 [GATEWAY DEBUG] setGatewayMode called with: \(enabled)")
@@ -1210,7 +1228,7 @@ public actor NetworkService: NetworkServiceProtocol {
         guard let url = request.url else {
             throw NetworkError.invalidURL
         }
-        if !(try await validateURL(url)) {
+        if try !(await validateURL(url)) {
             LogManager.logError("Security validation failed for URL: \(LogManager.sanitizeURLForLogging(url))")
             throw NetworkError.securityViolation
         }
@@ -1305,7 +1323,7 @@ public actor NetworkService: NetworkServiceProtocol {
             throw NetworkError.invalidURL
         }
         // One final policy gate: validate URL before any send (including exact auth continuity)
-        if !(try await validateURL(requestURL)) {
+        if try !(await validateURL(requestURL)) {
             LogManager.logError("Security validation failed for URL: \(LogManager.sanitizeURLForLogging(requestURL))")
             throw NetworkError.securityViolation
         }
@@ -1736,6 +1754,7 @@ public actor NetworkService: NetworkServiceProtocol {
                         }
                         throw NetworkError.authenticationRequired // Cannot handle this 401
                     }
+
                 // Handle 400 responses - check for ExpiredToken error which needs token refresh
                 case 400:
                     let maxDiag = NetworkResponseLimits.default.maximumDiagnosticBytes
@@ -1985,6 +2004,7 @@ public actor NetworkService: NetworkServiceProtocol {
         }
         return (data, httpResponse)
     }
+
     /// `limits` replaces the delegate's response limits for this request only.
     static func executeDataTask(
         _ request: URLRequest,
@@ -2000,13 +2020,13 @@ public actor NetworkService: NetworkServiceProtocol {
         let isLocal = host == "localhost" || host == "127.0.0.1" || host == "::1"
         let addresses: Set<String>
         #if DEBUG && canImport(Network) && canImport(Security)
-        if let fixture = delegate.fixtureTransport {
-            addresses = try fixture.approvedAddresses(for: url)
-        } else {
-            addresses = try await Self.resolveApprovedAddresses(host: host, isLocal: isLocal)
-        }
+            if let fixture = delegate.fixtureTransport {
+                addresses = try fixture.approvedAddresses(for: url)
+            } else {
+                addresses = try await Self.resolveApprovedAddresses(host: host, isLocal: isLocal)
+            }
         #else
-        addresses = try await Self.resolveApprovedAddresses(host: host, isLocal: isLocal)
+            addresses = try await Self.resolveApprovedAddresses(host: host, isLocal: isLocal)
         #endif
         let task = targetSession.dataTask(with: request)
         // Register before anything can cancel the task. URLSession reports a task cancelled
@@ -2034,8 +2054,8 @@ public actor NetworkService: NetworkServiceProtocol {
         } onCancel: {
             task.cancel()
         }
-        return (
-            try ContentDecoding.normalizeResponse(rawResult.0, response: rawResult.1, limits: limits ?? delegate.limits),
+        return try (
+            ContentDecoding.normalizeResponse(rawResult.0, response: rawResult.1, limits: limits ?? delegate.limits),
             rawResult.1
         )
     }
@@ -2091,6 +2111,7 @@ public actor NetworkService: NetworkServiceProtocol {
             limits: Self.scopedResponseLimits
         )
     }
+
     private func isActiveExactAuthRequestScope(_ scope: ExactAuthGeneratedRequestScope) -> Bool {
         guard scope.networkServiceID == exactAuthRequestScopeServiceID,
               activeExactAuthRequestScope?.id == scope.id,
@@ -2324,7 +2345,7 @@ public actor NetworkService: NetworkServiceProtocol {
         }
 
         // Validate URL for security
-        if !(try await validateURL(resolvedURL)) {
+        if try !(await validateURL(resolvedURL)) {
             LogManager.logError("Security validation failed for URL: \(LogManager.sanitizeURLForLogging(resolvedURL)). This may be due to DNS resolution to private IP ranges or network configuration issues.")
             throw NetworkError.securityViolation
         }
@@ -2474,7 +2495,7 @@ public actor NetworkService: NetworkServiceProtocol {
     /// transport checks are unchanged.
     ///
     /// Requests that `SpaceCredentialManager` and `SpaceHostResolver` send on
-    /// their own sessions do not read this scope. The `getSpaceCredential`
+    /// their own sessions do not read this scope. The `authorizeSpaceSync`
     /// exchange passes no per-request limits, so it gets those of the
     /// manager's session: `NetworkResponseLimits.default` (10 MiB) when the
     /// manager created that session itself. The signed request of
@@ -2554,7 +2575,7 @@ public actor NetworkService: NetworkServiceProtocol {
             throw NetworkError.invalidURL
         }
 
-        if !(try await validateURL(url)) {
+        if try !(await validateURL(url)) {
             LogManager.logError("Security validation failed for streaming URL: \(LogManager.sanitizeURLForLogging(url))")
             throw NetworkError.securityViolation
         }
@@ -2673,7 +2694,7 @@ public actor NetworkService: NetworkServiceProtocol {
         }
 
         // Validate WebSocket URL for security
-        if !(try await validateURL(resolvedURL)) {
+        if try !(await validateURL(resolvedURL)) {
             LogManager.logError("Security validation failed for WebSocket URL: \(LogManager.sanitizeURLForLogging(resolvedURL))")
             throw NetworkError.securityViolation
         }
@@ -2703,9 +2724,9 @@ public actor NetworkService: NetworkServiceProtocol {
         authCtx = authedCtx
         let webSocketTask: any WebSocketTaskProtocol = {
             #if DEBUG
-            if let override = Self.webSocketTaskOverride {
-                return override(request)
-            }
+                if let override = Self.webSocketTaskOverride {
+                    return override(request)
+                }
             #endif
             return session.webSocketTask(with: request)
         }()
@@ -2807,6 +2828,7 @@ public actor NetworkService: NetworkServiceProtocol {
             }
         }
     }
+
     /// Decode a subscription WebSocket frame containing two DAG-CBOR objects.
     ///
     /// Returns `nil` for a frame the consumer must skip, as the event-stream
@@ -2882,7 +2904,7 @@ public actor NetworkService: NetworkServiceProtocol {
 
     private func validateURL(_ url: URL) async throws -> Bool {
         #if DEBUG && canImport(Network) && canImport(Security)
-        if let fixture = sessionDelegate.fixtureTransport { return fixture.permits(url) }
+            if let fixture = sessionDelegate.fixtureTransport { return fixture.permits(url) }
         #endif
         return try await Self.validateURL(url)
     }
@@ -3028,8 +3050,8 @@ public actor NetworkService: NetworkServiceProtocol {
                     cont.resume(throwing: CancellationError())
                     op.cancel()
                 } else {
-                    self.continuation = cont
-                    self.operation = op
+                    continuation = cont
+                    operation = op
                 }
             }
 
@@ -3135,7 +3157,6 @@ public actor NetworkService: NetworkServiceProtocol {
         }
         return results
     }
-
 }
 
 /// Extension to help with task value extraction

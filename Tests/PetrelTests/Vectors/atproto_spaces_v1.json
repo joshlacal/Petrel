@@ -34,26 +34,30 @@
     "author_kem_did_key": "did:key:zDnaeQa8zprPhHA7Yuxcgc2Uh6XNQgaKjmFZE4EaA9fk5svmJ",
     "ephemeral_secret_hex": "2222222222222222222222222222222222222222222222222222222222222222",
     "key_share_did_key": "did:key:zDnaex62me84JZnkEzmeYRa8FCLNe7y1asoSwBMK26GBYpL7c",
-    "shared_secret_hex": "76bccf1264f5f7f5b7df0b78b6c1037f2e22fb513288207ad2dede881710d4c3",
-    "want_commit_mac_header": "type=\"atproto-space-repo\", ver=1, key_share=\"did:key:zDnaex62me84JZnkEzmeYRa8FCLNe7y1asoSwBMK26GBYpL7c\"",
-    "want_record_mac_header": "type=\"atproto-space-record\", ver=1, key_share=\"did:key:zDnaex62me84JZnkEzmeYRa8FCLNe7y1asoSwBMK26GBYpL7c\""
+    "shared_secret_hex": "19ac581c03a25905d77bbcad0b8f9b3eca96089a62b7e7d2984a502a913516d1",
+    "want_commit_mac_header": "mac=(\"atproto-space-commit\";sf);keyid=\"did:key:zDnaex62me84JZnkEzmeYRa8FCLNe7y1asoSwBMK26GBYpL7c\";tag=\"atproto-space-commit\"",
+    "want_record_mac_header": "mac=(\"atproto-space-record\";sf);keyid=\"did:key:zDnaex62me84JZnkEzmeYRa8FCLNe7y1asoSwBMK26GBYpL7c\";tag=\"atproto-space-record\""
   },
   "commit_mac": {
-    "shared_secret_hex": "76bccf1264f5f7f5b7df0b78b6c1037f2e22fb513288207ad2dede881710d4c3",
+    "shared_secret_hex": "19ac581c03a25905d77bbcad0b8f9b3eca96089a62b7e7d2984a502a913516d1",
     "space": "at://did:web:ds.catbird.blue/space/blue.catbird.mlsChat/3l2aaaaaaaaaa",
     "repo": "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
     "rev": "3l2aaaaaaaaac",
     "data_hex": "79372b9e8d4040f8574075c30cc7513e841f7942e22da7b29d6bb473f1147d85",
-    "mac_hex": "e4b5189ffe0c1ba685d942a3bd3253bdfea2309882883e9a0a6f37939d020be4",
-    "header_value": "type=\"atproto-space-repo\", ver=1, mac=:5LUYn/4MG6aF2UKjvTJTvf6iMJiCiD6aCm83k50CC+Q=:"
+    "mac_hex": "e6d44207f065e3017281c3712496acb101e42a2073bce2fcc9be6562f393d90d",
+    "covered_header": "ver=1, repo=\"did:plc:ewvi7nxzyoun6zhxrhs64oiz\", space=\"at://did:web:ds.catbird.blue/space/blue.catbird.mlsChat/3l2aaaaaaaaaa\", rev=\"3l2aaaaaaaaac\", data=:eTcrno1AQPhXQHXDDMdRPoQfeULiLaeynWu0c/EUfYU=:",
+    "signature_input": "mac=(\"atproto-space-commit\";sf);keyid=\"did:key:zDnaex62me84JZnkEzmeYRa8FCLNe7y1asoSwBMK26GBYpL7c\";tag=\"atproto-space-commit\"",
+    "signature": "mac=:5tRCB/Bl4wFygcNxJJassQHkKiBzvOL8yb5lYvOT2Q0=:"
   },
   "record_mac": {
-    "shared_secret_hex": "76bccf1264f5f7f5b7df0b78b6c1037f2e22fb513288207ad2dede881710d4c3",
+    "shared_secret_hex": "19ac581c03a25905d77bbcad0b8f9b3eca96089a62b7e7d2984a502a913516d1",
     "record_uri": "at://did:web:ds.catbird.blue/space/blue.catbird.mlsChat/3l2aaaaaaaaaa/did:plc:ewvi7nxzyoun6zhxrhs64oiz/blue.catbird.mlsChat.message/3l2aaaaaaaaac",
     "cid": "bafyreiewlrd6gvs3if3asi65l65ajstk7o5oyzh3m5fnbrngumaht5hq7m",
     "cid_bytes_hex": "01711220965c47e3565b41760923dd5fba04ca6afbbaec64fb674ad0c5a6a30079f4f0fb",
-    "mac_hex": "39ab53027cf85dff1dfecdf1bec807d4b19965006e31ac12cac2a3a589d5b185",
-    "header_value": "type=\"atproto-space-record\", ver=1, mac=:OatTAnz4Xf8d/s3xvsgH1LGZZQBuMawSysKjpYnVsYU=:"
+    "mac_hex": "8ff004b54534dc15d0cd03d083ccf72ebb3abf6eff91bd5c9a742ad7103941da",
+    "covered_header": "uri=\"at://did:web:ds.catbird.blue/space/blue.catbird.mlsChat/3l2aaaaaaaaaa/did:plc:ewvi7nxzyoun6zhxrhs64oiz/blue.catbird.mlsChat.message/3l2aaaaaaaaac\", cid=\"bafyreiewlrd6gvs3if3asi65l65ajstk7o5oyzh3m5fnbrngumaht5hq7m\"",
+    "signature_input": "mac=(\"atproto-space-record\";sf);keyid=\"did:key:zDnaex62me84JZnkEzmeYRa8FCLNe7y1asoSwBMK26GBYpL7c\";tag=\"atproto-space-record\"",
+    "signature": "mac=:j/AEtUU03BXQzQPQg8z3Lrs6v27/kb1cmnQq1xA5Qdo=:"
   },
   "rfc9421_low_s": {
     "cnf_secret_hex": "5555555555555555555555555555555555555555555555555555555555555555",
@@ -109,11 +113,11 @@
     "empty_swan_space": "at://did:plc:alice/space/app.bsky.bookmarks/self",
     "empty_swan_repo": "did:plc:alice",
     "empty_swan_rev": "2222222222222",
-    "empty_swan_archive_hex": "2a6c0100a301a6637265766d32323232323232323232323232637665720164646174615820e5a00aa9991ac8a5ee3109844d84a55583bd20572ad3ffcd42792f3c36b183ad647265706f6d6469643a706c633a616c69636565247479706572617470726f746f2d73706163652d7265706f657370616365783061743a2f2f6469643a706c633a616c6963652f73706163652f6170702e62736b792e626f6f6b6d61726b732f73656c66",
+    "empty_swan_archive_hex": "2a6c0100a301a6637265766d32323232323232323232323232637665720164646174615820e5a00aa9991ac8a5ee3109844d84a55583bd20572ad3ffcd42792f3c36b183ad647265706f6d6469643a706c633a616c69636565247479706572617470726f746f2d73706163652d7265706f657370616365783061743a2f2f6469643a706c633a616c6963652f73706163652f6170702e62736b792e626f6f6b6d61726b732f73656c6600",
     "populated_space": "at://did:web:ds.catbird.blue/space/blue.catbird.mlsChat/3l2aaaaaaaaaa",
     "populated_repo": "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
     "populated_rev": "3l2aaaaaaaaac",
     "populated_data_hex": "79372b9e8d4040f8574075c30cc7513e841f7942e22da7b29d6bb473f1147d85",
-    "populated_archive_hex": "2a6c0100cc01a6637265766d336c326161616161616161616363766572016464617461582079372b9e8d4040f8574075c30cc7513e841f7942e22da7b29d6bb473f1147d85647265706f78206469643a706c633a65777669376e787a796f756e367a687872687336346f697a65247479706572617470726f746f2d73706163652d7265706f657370616365784561743a2f2f6469643a7765623a64732e636174626972642e626c75652f73706163652f626c75652e636174626972642e6d6c73436861742f336c3261616161616161616161206170702e62736b792e666565642e706f73742f336c32616161616161616161622ba264746578746b68656c6c6f207370616365652474797065726170702e62736b792e666565642e706f73742a626c75652e636174626972642e6d6c73436861742e6d6573736167652f336c32616161616161616161633ca3652474797065781c626c75652e636174626972642e6d6c73436861742e6d6573736167656565706f6368016a6369706865727465787444deadbeef"
+    "populated_archive_hex": "2a6c0100cc01a6637265766d336c326161616161616161616363766572016464617461582079372b9e8d4040f8574075c30cc7513e841f7942e22da7b29d6bb473f1147d85647265706f78206469643a706c633a65777669376e787a796f756e367a687872687336346f697a65247479706572617470726f746f2d73706163652d7265706f657370616365784561743a2f2f6469643a7765623a64732e636174626972642e626c75652f73706163652f626c75652e636174626972642e6d6c73436861742f336c326161616161616161616101206170702e62736b792e666565642e706f73742f336c32616161616161616161622ba264746578746b68656c6c6f207370616365652474797065726170702e62736b792e666565642e706f7374012a626c75652e636174626972642e6d6c73436861742e6d6573736167652f336c32616161616161616161633ca3652474797065781c626c75652e636174626972642e6d6c73436861742e6d6573736167656565706f6368016a6369706865727465787444deadbeef00"
   }
 }

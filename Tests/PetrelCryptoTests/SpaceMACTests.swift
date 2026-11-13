@@ -3,7 +3,7 @@ import Foundation
 @testable import PetrelCrypto
 import Testing
 
-@Suite("October 22 Space MAC")
+@Suite("November 12 Space MAC")
 struct SpaceMACTests {
     func bytes(_ hex: String) -> Data {
         Data(stride(from: 0, to: hex.count, by: 2).map { offset in
@@ -12,12 +12,33 @@ struct SpaceMACTests {
         })
     }
 
-    @Test("DHKEM matches upstream RFC 9180 A.3.1 vector")
-    func rfc9180() throws {
-        // packages/space/tests/kem.test.ts at ac0c9f15; independently specified RFC vector.
-        let sender = try P256.Signing.PublicKey(x963Representation: bytes("04a92719c6195d5085104f469a8b9814d5838ff72b60501e2c4466e5e67b325ac98536d7b61a1af4b78e5b7f951c0900be863c403ce65c9bfcb9382657222d18c4"))
-        let recipient = try P256.KeyAgreement.PrivateKey(rawRepresentation: bytes("f3ce7fdae57e1a310d87f1ebbde6f328be0a99cdbcadf4d6589cf29de4b8ffd2"))
-        #expect(try SpaceMAC.decapsulate(privateKey: recipient, keyShare: P256DIDKey(publicKey: sender).value) == bytes("c0d26aeab536609a572b07695d933b589dcf363ff9d93c93adea537aeabb8cb8"))
+    @Test("HPKE secret export matches the RFC 9180 export-only P-256 vector")
+    func rfc9180ExportOnly() throws {
+        // The keys are from RFC 9180's export-only DHKEM(P-256, HKDF-SHA256)
+        // vector. The expected export uses this protocol's "atproto-mac" info
+        // and an empty exporter context, as independently computed in Go.
+        let sender = try P256.KeyAgreement.PrivateKey(
+            rawRepresentation: bytes("2f18b059576a0ec5a17121c0fe7ec8f00ea86f7b046fa3889ac8f21f89dbd484")
+        )
+        let author = try P256.KeyAgreement.PrivateKey(
+            rawRepresentation: bytes("62c3868357a464f8461d03aa0182c7cebcde841036aea7230ddc7339f1088346")
+        )
+        let expectedSender = try P256.Signing.PublicKey(
+            x963Representation: bytes("04d804370b7e24b94749eb1dc8df6d4d4a5d75f9effad01739ebcad5c54a40d57aaa8b4190fc124dbde2e4f1e1d1b012a3bc4038157dc29b55533a932306d8d38d")
+        )
+        let expectedSecret = bytes("2060e0558d1b34c10086bc137f849bb79ba59fcdc30544418e35c9cd301f0d0d")
+        let keyShare = P256DIDKey(publicKey: expectedSender).value
+        let authorSigningKey = try P256.Signing.PublicKey(
+            compressedRepresentation: author.publicKey.compressedRepresentation
+        )
+
+        let encapsulation = try SpaceMAC.encapsulate(
+            authorKey: P256DIDKey(publicKey: authorSigningKey).value,
+            ephemeralKey: sender
+        )
+        #expect(encapsulation.keyShare == keyShare)
+        #expect(encapsulation.sharedSecret == expectedSecret)
+        #expect(try SpaceMAC.decapsulate(privateKey: author, keyShare: keyShare) == expectedSecret)
     }
 
     @Test("Every encapsulation uses fresh keys and binds recipient")
@@ -32,24 +53,5 @@ struct SpaceMACTests {
         #expect(try SpaceMAC.decapsulate(privateKey: recipient, keyShare: first.keyShare) == first.sharedSecret)
         #expect(try SpaceMAC.decapsulate(privateKey: P256.KeyAgreement.PrivateKey(), keyShare: first.keyShare) != first.sharedSecret)
         #expect(throws: (any Error).self) { try SpaceMAC.encapsulate(authorKey: "did:key:zInvalid") }
-    }
-
-    @Test("MAC independently computed with Python hashlib over upstream test inputs")
-    func independentMAC() throws {
-        let secret = Data(0 ..< 32)
-        let space = "at://did:example:space/space/app.bsky.group/test"
-        let repo = "did:example:alice"
-        let rev = "3kbcq3p7ad400"
-        let digest = Data(repeating: 1, count: 32)
-        let mac = try SpaceMAC.commit(sharedSecret: secret, space: space, repo: repo, rev: rev, data: digest)
-        #expect(mac == bytes("3b38727ea60248c55e0c549faa9a6738a14342eb57d779e6b300784f8b8d6acc"))
-        for (wrongSpace, wrongRepo, wrongRev) in [(space + "x", repo, rev), (space, repo + "x", rev), (space, repo, rev + "x")] {
-            let wrong = try SpaceMAC.commit(sharedSecret: secret, space: wrongSpace, repo: wrongRepo, rev: wrongRev, data: digest)
-            #expect(throws: SpaceMAC.Failure.mismatch) { try SpaceMAC.verify(mac: mac, expected: wrong) }
-        }
-        let cid = bytes("017112206428f02304b8db8cb107c89336481f0fead728bf374ca80168d2c71938cefae7")
-        let uri = "at://did:example:alice/space/app.bsky.group/test/app.bsky.feed.post/1"
-        #expect(try SpaceMAC.record(sharedSecret: secret, uri: uri, cid: cid) == bytes("b1000cbab95db1e15987c90d63eb3bdc76dbd64b921ca0ef5af842ad588da4c9"))
-        #expect(throws: SpaceMAC.Failure.invalidKey) { try SpaceMAC.commit(sharedSecret: Data(), space: space, repo: repo, rev: rev, data: digest) }
     }
 }

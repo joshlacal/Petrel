@@ -16,6 +16,9 @@ public struct SpaceCredential: Sendable {
     public let token: String
     public let expiresAt: Date
     public let keyRawRepresentation: Data
+    /// The space revision returned when this credential was authorized, if the
+    /// space has had an update.
+    public let spaceRev: TID?
     /// When the manager stops reusing this credential, fixed at exchange time
     /// from the credential's own lifetime (see `SpaceCredentialManager.refreshDeadline`).
     let refreshAt: Date
@@ -27,13 +30,13 @@ public enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
     case missingDelegationToken
     case spaceDeleted(host: String, message: String?)
     /// The authority refused to issue a credential. `error` is the XRPC error
-    /// name, such as `UserNotAuthorized`, `AppNotAuthorized` or `NotAuthorized`
-    /// (or `HTTP 403`), or `SpaceNotFound` at HTTP 400 (the reference host) or
-    /// 404 (Swan), which means "not found or not authorized": the authority
-    /// does not host the space, does not authorize this user (an authority may
-    /// answer `SpaceNotFound` in place of `UserNotAuthorized`), or, without a
-    /// delegation token, the space is not public. None of these means the
-    /// space was deleted.
+    /// name, such as `AccountNotAuthorized`, `AppNotAuthorized` or
+    /// `NotAuthorized` (or `HTTP 403`), or `SpaceNotFound` at HTTP 400 (the
+    /// reference host) or 404 (Swan), which means "not found or not
+    /// authorized": the authority does not host the space, does not authorize
+    /// this account (an authority may answer `SpaceNotFound` in place of
+    /// `AccountNotAuthorized`), or, without a delegation token, the space is
+    /// not public. None of these means the space was deleted.
     case authorizationRefused(host: String, error: String, message: String?)
     /// The authority rejected a presented token as invalid: the delegation
     /// token (`InvalidDelegationToken` and similar) or, when `error` is
@@ -93,7 +96,7 @@ public enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
 /// DPoP is unrelated and unchanged.
 ///
 /// Credential presentation covers the exact Authorization and audience values,
-/// with the mandatory October 22 label/tag. Credential exchange uses JSON only.
+/// with the mandatory credential tag. Credential exchange uses JSON only.
 enum SpaceHTTPSignature {
     static let label = "atproto-space-credential"
 
@@ -254,7 +257,7 @@ public actor SpaceCredentialManager {
     ) {
         self.client = client
         self.clientAttestationProvider = clientAttestationProvider
-        self.customAuthoritySigningKeyProvider = authoritySigningKeyProvider
+        customAuthoritySigningKeyProvider = authoritySigningKeyProvider
         self.authorityDIDDocumentFetcher = authorityDIDDocumentFetcher
         self.authorKEMKeyProvider = authorKEMKeyProvider ?? { repo, _ in
             let document = try await SpaceHostResolver.fetchDIDDocument(for: repo)
@@ -510,10 +513,13 @@ public actor SpaceCredentialManager {
         }
 
         if let context {
-            let type = method == "getRecord" ? "atproto-space-record" : "atproto-space-repo"
-            request.setValue("type=\"\(type)\", ver=1, key_share=\"\(context.keyShare)\"", forHTTPHeaderField: "Atproto-Space-Want-Mac")
+            let profile: SpaceMACHeader.Profile = method == "getRecord" ? .record : .commit
+            request.setValue(
+                SpaceMACHeader.request(profile: profile, keyShare: context.keyShare),
+                forHTTPHeaderField: "Accept-Signature"
+            )
         }
-        if method == "getRepo" { request.setValue("application/octet-stream", forHTTPHeaderField: "Accept") }
+        if method == "getRepo" { request.setValue("application/vnd.dasl.star", forHTTPHeaderField: "Accept") }
         let data: Data
         let response: URLResponse
         if let sessionDelegate {
@@ -539,15 +545,45 @@ public actor SpaceCredentialManager {
         try Task.checkCancellation()
         guard generations[space, default: 0] == generation else { throw CancellationError() }
         if (200 ... 299).contains(httpResponse.statusCode), let context {
-            let header = httpResponse.value(forHTTPHeaderField: "Atproto-Space-Mac")
             if method == "getRepo" {
-                let mac = try SpaceMACHeader.parse(header, type: "atproto-space-repo")
-                _ = try SpaceSTAR.verify(
-                    archive: data, space: space, repo: audience, sharedSecret: context.sharedSecret, mac: mac,
+                let repository = try SpaceSTAR.verify(
+                    archive: data,
+                    space: space,
+                    repo: audience,
                     maximumArchiveBytes: responseLimits?.maximumDecodedBytes ?? SpaceSTAR.defaultMaximumArchiveBytes
                 )
+                try SpaceMACHeader.verifyCommit(
+                    response: httpResponse,
+                    keyShare: context.keyShare,
+                    sharedSecret: context.sharedSecret,
+                    space: space,
+                    repo: audience,
+                    revision: repository.revision,
+                    data: repository.data
+                )
             } else {
-                try SpaceResponseVerifier.verifyJSON(data, method: method, url: url, space: space, repo: audience, secret: context.sharedSecret, macHeader: header)
+                switch try SpaceResponseVerifier.verifyJSON(
+                    data, method: method, url: url, space: space, repo: audience
+                ) {
+                case let .commit(revision, commitData):
+                    try SpaceMACHeader.verifyCommit(
+                        response: httpResponse,
+                        keyShare: context.keyShare,
+                        sharedSecret: context.sharedSecret,
+                        space: space,
+                        repo: audience,
+                        revision: revision,
+                        data: commitData
+                    )
+                case let .record(uri, cid):
+                    try SpaceMACHeader.verifyRecord(
+                        response: httpResponse,
+                        keyShare: context.keyShare,
+                        sharedSecret: context.sharedSecret,
+                        uri: uri,
+                        cid: cid
+                    )
+                }
             }
         }
         return (data, httpResponse)
@@ -577,9 +613,9 @@ public actor SpaceCredentialManager {
 
         let exchangeURL: URL
         if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
-            exchangeURL = spaceHost.appending(path: "xrpc/com.atproto.space.getSpaceCredential")
+            exchangeURL = spaceHost.appending(path: "xrpc/com.atproto.space.authorizeSpaceSync")
         } else {
-            exchangeURL = spaceHost.appendingPathComponent("xrpc/com.atproto.space.getSpaceCredential")
+            exchangeURL = spaceHost.appendingPathComponent("xrpc/com.atproto.space.authorizeSpaceSync")
         }
 
         guard Self.isSecureOrLoopback(exchangeURL) else {
@@ -592,10 +628,10 @@ public actor SpaceCredentialManager {
         var request = URLRequest(url: exchangeURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let requestedCredentialKid = SpaceHTTPSignature.keyID(for: ephemeralKey)
-        let input = try ComAtprotoSpaceGetSpaceCredential.Input(
+        let requestedCredentialKey = SpaceHTTPSignature.keyID(for: ephemeralKey)
+        let input = try ComAtprotoSpaceAuthorizeSpaceSync.Input(
             space: space,
-            credentialKid: requestedCredentialKid,
+            credentialKey: requestedCredentialKey,
             delegationToken: delegationToken,
             clientAttestation: await clientAttestationProvider?(space)
         )
@@ -629,8 +665,8 @@ public actor SpaceCredentialManager {
             }
 
             // Not a deletion: "not found or not authorized". The authority does
-            // not host the space, does not authorize this user (it may answer
-            // SpaceNotFound in place of UserNotAuthorized), or, without a
+            // not host the space, does not authorize this account (it may answer
+            // SpaceNotFound in place of AccountNotAuthorized), or, without a
             // delegation token, the space is not public. The reference host
             // answers 400 and Swan answers 404; both keep the error name.
             if httpResponse.statusCode == 400 || httpResponse.statusCode == 404, errorName == "SpaceNotFound" {
@@ -659,7 +695,7 @@ public actor SpaceCredentialManager {
             }
 
             let isAuthRefused = httpResponse.statusCode == 403 ||
-                errorName == "UserNotAuthorized" ||
+                errorName == "AccountNotAuthorized" ||
                 errorName == "AppNotAuthorized" ||
                 errorName == "NotAuthorized" ||
                 errorName == "AccessDenied" ||
@@ -673,12 +709,13 @@ public actor SpaceCredentialManager {
             throw SpaceCredentialError.exchangeFailed(statusCode: httpResponse.statusCode, message: message)
         }
 
-        let output = try JSONDecoder().decode(ComAtprotoSpaceGetSpaceCredential.Output.self, from: data)
+        let output = try JSONDecoder().decode(ComAtprotoSpaceAuthorizeSpaceSync.Output.self, from: data)
         return try await verifyIssuedCredential(
             token: output.credential,
+            spaceRev: output.spaceRev,
             space: space,
             authorityDID: authorityDID,
-            expectedCredentialKid: requestedCredentialKid,
+            expectedCredentialKey: requestedCredentialKey,
             ephemeralKey: ephemeralKey,
             receivedAt: receivedAt
         )
@@ -730,9 +767,10 @@ public actor SpaceCredentialManager {
 
     private func verifyIssuedCredential(
         token: String,
+        spaceRev: TID?,
         space: SpaceRef,
         authorityDID: String,
-        expectedCredentialKid: String,
+        expectedCredentialKey: String,
         ephemeralKey: P256.Signing.PrivateKey,
         receivedAt: Date
     ) async throws -> SpaceCredential {
@@ -790,14 +828,14 @@ public actor SpaceCredentialManager {
         guard claims.sub == space.uriString() else {
             throw SpaceCredentialError.invalidToken("Credential subject does not match requested space")
         }
-        guard claims.cnf.kid == expectedCredentialKid,
+        guard claims.cnf.kid == expectedCredentialKey,
               (try? P256DIDKey(claims.cnf.kid)) != nil
         else {
             throw SpaceCredentialError.invalidToken("Credential cnf.kid does not match holder key")
         }
         guard !claims.jti.isEmpty,
               claims.jti.utf8.count <= 512,
-              claims.jti.utf8.allSatisfy({ $0 >= 0x20 && $0 != 0x7f })
+              claims.jti.utf8.allSatisfy({ $0 >= 0x20 && $0 != 0x7F })
         else {
             throw SpaceCredentialError.invalidToken("Invalid jti claim in credential JWT")
         }
@@ -850,6 +888,7 @@ public actor SpaceCredentialManager {
             token: token,
             expiresAt: expiresAt,
             keyRawRepresentation: ephemeralKey.rawRepresentation,
+            spaceRev: spaceRev,
             refreshAt: Self.refreshDeadline(expiresAt: expiresAt, issuedAt: iatSeconds, receivedAt: receivedAt)
         )
     }

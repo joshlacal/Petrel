@@ -44,7 +44,7 @@ private func makeSignedCredentialJWT(
 ) throws -> String {
     let rawBody = try #require(request.httpBody)
     let bodyObj = try #require(JSONSerialization.jsonObject(with: rawBody) as? [String: Any])
-    let credentialKid = try #require(bodyObj["credentialKid"] as? String)
+    let credentialKey = try #require(bodyObj["credentialKey"] as? String)
     let now = Int(Date().timeIntervalSince1970)
     let actualIat = iat ?? max(exp - 3600, min(now, exp - 600))
     let headerObj: [String: Any] = [
@@ -58,7 +58,7 @@ private func makeSignedCredentialJWT(
         "iat": actualIat,
         "exp": exp,
         "jti": jti,
-        "cnf": ["kid": credentialKid],
+        "cnf": ["kid": credentialKey],
     ]
     let headerB64 = try makeB64URL(JSONSerialization.data(withJSONObject: headerObj, options: [.sortedKeys]))
     let payloadB64 = try makeB64URL(JSONSerialization.data(withJSONObject: payloadObj, options: [.sortedKeys]))
@@ -146,6 +146,54 @@ private func withSpaceTestSession<T>(_ body: () async throws -> T) async throws 
     }
 }
 
+private struct TestSpaceMACRequest {
+    let keyShare: String
+    let signatureParameters: String
+}
+
+private func parseSpaceMACRequest(
+    _ request: URLRequest,
+    profile: SpaceMACHeader.Profile
+) throws -> TestSpaceMACRequest {
+    let value = try #require(request.value(forHTTPHeaderField: "Accept-Signature"))
+    let prefix = "mac="
+    let marker = #";keyid=""#
+    guard value.hasPrefix(prefix),
+          let keyStart = value.range(of: marker)?.upperBound,
+          let keyEnd = value[keyStart...].firstIndex(of: "\"")
+    else {
+        throw SpaceVerificationError.malformedHeader
+    }
+    let keyShare = String(value[keyStart ..< keyEnd])
+    #expect(value == SpaceMACHeader.request(profile: profile, keyShare: keyShare))
+    return TestSpaceMACRequest(
+        keyShare: keyShare,
+        signatureParameters: String(value.dropFirst(prefix.count))
+    )
+}
+
+private func makeSpaceMACResponseHeaders(
+    profile: SpaceMACHeader.Profile,
+    coveredHeader: String,
+    request: TestSpaceMACRequest,
+    sharedSecret: Data
+) throws -> [String: String] {
+    let base = Data(
+        "\"\(profile.rawValue)\";sf: \(coveredHeader)\n\"@signature-params\": \(request.signatureParameters)".utf8
+    )
+    let mac = Data(
+        Crypto.HMAC<Crypto.SHA256>.authenticationCode(
+            for: base,
+            using: Crypto.SymmetricKey(data: sharedSecret)
+        )
+    )
+    return [
+        profile.responseHeader: coveredHeader,
+        "Signature-Input": "mac=\(request.signatureParameters)",
+        "Signature": "mac=:\(mac.base64EncodedString()):",
+    ]
+}
+
 // MARK: - SpaceHTTPSignature Tests
 
 private func spaceSignatureBytes(_ header: String?) -> Data? {
@@ -189,7 +237,7 @@ struct SpaceHTTPSignatureTests {
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
         let repoURL = try #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getRecord?space=at://did:plc:auth123/space/com.example.drive/self&repo=did:plc:writer&collection=a.b.c&rkey=self"))
         #expect(SpaceHTTPSignature.audience(for: repoURL, space: space) == "did:plc:writer")
-        let hostURL = try #require(URL(string: "https://space.test/xrpc/com.atproto.space.listRepos?space=at://did:plc:auth123/space/com.example.drive/self"))
+        let hostURL = try #require(URL(string: "https://space.test/xrpc/com.atproto.space.listWriters?space=at://did:plc:auth123/space/com.example.drive/self"))
         #expect(SpaceHTTPSignature.audience(for: hostURL, space: space) == "did:plc:auth123")
     }
 
@@ -255,6 +303,7 @@ struct SpaceCredentialManagerTests {
 
             let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
             let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
+            let spaceRev = "3kbcq3p7ad422"
             let lastIssuedJWT = Mutex<String>("")
 
             let capturedRequests = Mutex<[URLRequest]>([])
@@ -273,7 +322,7 @@ struct SpaceCredentialManagerTests {
                     return (resp, Data(self.didDocJSON.utf8))
                 }
 
-                if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if urlString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     let jwt = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
                     lastIssuedJWT.withLock { $0 = jwt }
                     let resp = HTTPURLResponse(
@@ -282,7 +331,7 @@ struct SpaceCredentialManagerTests {
                         httpVersion: nil,
                         headerFields: ["Content-Type": "application/json"]
                     )!
-                    let body = try JSONEncoder().encode(["credential": jwt])
+                    let body = try JSONEncoder().encode(["credential": jwt, "spaceRev": spaceRev])
                     return (resp, body)
                 }
 
@@ -303,8 +352,9 @@ struct SpaceCredentialManagerTests {
             #expect(cred1.token == lastIssuedJWT.withLock { $0 })
             #expect(abs(cred1.expiresAt.timeIntervalSince1970 - Double(expTime)) < 2.0)
             #expect(!cred1.keyRawRepresentation.isEmpty)
+            #expect(cred1.spaceRev?.toString() == spaceRev)
 
-            // 2. Second call should hit cache (no additional getSpaceCredential request)
+            // 2. Second call should hit cache (no additional authorizeSpaceSync request)
             let cred2 = try await manager.credential(for: space)
             #expect(cred2.token == cred1.token)
             #expect(cred2.expiresAt == cred1.expiresAt)
@@ -312,7 +362,7 @@ struct SpaceCredentialManagerTests {
 
             let requests = capturedRequests.withLock { $0 }
             let exchangeRequests = requests.filter {
-                $0.url?.absoluteString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential"
+                $0.url?.absoluteString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync"
             }
             #expect(exchangeRequests.count == 1)
 
@@ -330,7 +380,7 @@ struct SpaceCredentialManagerTests {
             #expect(req.value(forHTTPHeaderField: "Signature") == nil)
             let body = try #require(req.httpBody)
             let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: String])
-            #expect(object["credentialKid"] == keyID)
+            #expect(object["credentialKey"] == keyID)
             #expect(object["delegationToken"] == "mock-delegation-token-123")
             #expect(object["space"] == space.uriString())
         }
@@ -365,7 +415,7 @@ struct SpaceCredentialManagerTests {
                     return (resp, Data(self.didDocJSON.utf8))
                 }
 
-                if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if urlString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     let jwt = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
                     lastIssuedJWT.withLock { $0 = jwt }
                     let resp = HTTPURLResponse(
@@ -431,7 +481,7 @@ struct SpaceCredentialManagerTests {
 
             // Space-host operations (no repo) are addressed to the bare authority DID;
             // an explicit audience overrides derivation.
-            _ = try await manager.get(url: #require(URL(string: "https://repo.test/xrpc/com.atproto.space.listRepos?space=x")), space: space)
+            _ = try await manager.get(url: #require(URL(string: "https://repo.test/xrpc/com.atproto.space.listWriters?space=x")), space: space)
             _ = try await manager.get(url: #require(URL(string: "https://repo.test/xrpc/x")), space: space, audience: "did:plc:explicit")
             let audiences = capturedRequests.withLock { $0 }
                 .filter { $0.url?.host == "repo.test" }
@@ -481,7 +531,7 @@ struct SpaceCredentialManagerTests {
 
             SpaceMockURLProtocol.setHandler { request in
                 let urlString = request.url?.absoluteString ?? ""
-                if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if urlString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     let n = exchangeCount.withLock { count -> Int in
                         count += 1
                         return count
@@ -543,7 +593,7 @@ struct SpaceCredentialManagerTests {
             let exchangeCount = Mutex<Int>(0)
 
             SpaceMockURLProtocol.setHandler { request in
-                if request.url?.absoluteString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if request.url?.absoluteString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     exchangeCount.withLock { $0 += 1 }
                     let jwt = try makeSignedCredentialJWT(
                         for: request,
@@ -624,7 +674,7 @@ struct SpaceCredentialManagerTests {
                     return (resp, Data(self.didDocJSON.utf8))
                 }
 
-                if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if urlString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     exchangeCount.withLock { $0 += 1 }
                     let credentialJWT = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
                     let resp = HTTPURLResponse(
@@ -693,7 +743,7 @@ struct SpaceCredentialManagerTests {
                     return (resp, Data(self.didDocJSON.utf8))
                 }
 
-                if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if urlString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     exchangeCount.withLock { $0 += 1 }
                     let credentialJWT = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
                     _ = issuedTokens.withLock { $0.insert(credentialJWT) }
@@ -791,7 +841,7 @@ struct SpaceCredentialManagerTests {
                     return (resp, Data(self.didDocJSON.utf8))
                 }
 
-                if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if urlString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     let current = exchangeCount.withLock { count -> Int in
                         count += 1
                         return count
@@ -852,7 +902,7 @@ struct SpaceCredentialManagerTests {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     return (resp, Data(self.didDocJSON.utf8))
                 }
-                if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if urlString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     let body = #"{"error":"InvalidDelegationToken","message":"Delegation token signature invalid"}"#.data(using: .utf8)!
                     return (resp, body)
@@ -911,7 +961,7 @@ struct SpaceCredentialManagerTests {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     return (resp, Data(self.didDocJSON.utf8))
                 }
-                if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if urlString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     let body = #"{"error":"InvalidDelegationToken","message":"Delegation token signature invalid"}"#.data(using: .utf8)!
                     return (resp, body)
@@ -970,7 +1020,7 @@ struct SpaceCredentialManagerTests {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     return (resp, Data(self.didDocJSON.utf8))
                 }
-                if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if urlString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     let body = #"{"error":"InvalidDelegationToken","message":"Expired delegation token"}"#.data(using: .utf8)!
                     return (resp, body)
@@ -1010,7 +1060,7 @@ struct SpaceCredentialManagerTests {
         }
     }
 
-    @Test("exchange classifies 403 UserNotAuthorized as authorizationRefused")
+    @Test("exchange classifies 403 AccountNotAuthorized as authorizationRefused")
     func exchangeClassifiesAuthorizationRefused() async throws {
         try await withSpaceTestSession {
             let session = makeMockSession()
@@ -1026,9 +1076,9 @@ struct SpaceCredentialManagerTests {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     return (resp, Data(self.didDocJSON.utf8))
                 }
-                if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if urlString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 403, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
-                    let body = #"{"error":"UserNotAuthorized","message":"User is not a member of this space"}"#.data(using: .utf8)!
+                    let body = #"{"error":"AccountNotAuthorized","message":"User is not a member of this space"}"#.data(using: .utf8)!
                     return (resp, body)
                 }
                 let resp = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!
@@ -1052,7 +1102,7 @@ struct SpaceCredentialManagerTests {
                     return
                 }
                 #expect(host == "space.test")
-                #expect(error == "UserNotAuthorized")
+                #expect(error == "AccountNotAuthorized")
                 #expect(msg == "User is not a member of this space")
                 let desc = err.errorDescription ?? ""
                 #expect(desc.contains("You no longer have access to this space"))
@@ -1079,7 +1129,7 @@ struct SpaceCredentialManagerTests {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     return (resp, Data(self.didDocJSON.utf8))
                 }
-                if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if urlString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     let body = #"{"error":"SpaceDeleted","message":"The space was deleted"}"#.data(using: .utf8)!
                     return (resp, body)
@@ -1130,7 +1180,7 @@ struct SpaceCredentialManagerTests {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     return (resp, Data(self.didDocJSON.utf8))
                 }
-                if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if urlString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: ["Content-Type": "text/plain"])!
                     let body = "Internal Server Error".data(using: .utf8)!
                     return (resp, body)
@@ -1182,7 +1232,7 @@ struct SpaceCredentialManagerTests {
             SpaceMockURLProtocol.setHandler { request in
                 capturedRequests.withLock { $0.append(request) }
                 let urlString = request.url?.absoluteString ?? ""
-                if urlString == "https://custom-space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if urlString == "https://custom-space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     let credentialJWT = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
                     lastIssuedJWT.withLock { $0 = credentialJWT }
                     let resp = HTTPURLResponse(
@@ -1216,7 +1266,7 @@ struct SpaceCredentialManagerTests {
 
             let requests = capturedRequests.withLock { $0 }
             let exchangeRequests = requests.filter {
-                $0.url?.absoluteString == "https://custom-space.test/xrpc/com.atproto.space.getSpaceCredential"
+                $0.url?.absoluteString == "https://custom-space.test/xrpc/com.atproto.space.authorizeSpaceSync"
             }
             #expect(exchangeRequests.count == 1)
             #expect(exchangeRequests[0].value(forHTTPHeaderField: "Authorization") == nil)
@@ -1247,7 +1297,7 @@ struct SpaceCredentialManagerTests {
                     )!
                     return (resp, Data(self.didDocJSON.utf8))
                 }
-                if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if urlString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     let credentialJWT = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
                     lastIssuedJWT.withLock { $0 = credentialJWT }
                     let resp = HTTPURLResponse(
@@ -1289,7 +1339,7 @@ struct SpaceCredentialManagerTests {
 
             SpaceMockURLProtocol.setHandler { request in
                 let urlString = request.url?.absoluteString ?? ""
-                if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if urlString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     let credentialJWT = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
                     let resp = HTTPURLResponse(
                         url: request.url!,
@@ -1363,13 +1413,14 @@ extension SpaceCredentialManagerTests {
             }
             let stale = try didKey(staleKey), current = try didKey(currentKey)
             let refreshes = Mutex<[Bool]>([])
+            let hasRefreshedKey = Mutex(false)
             let shares = Mutex<[String]>([])
             let lastIssuedJWT = Mutex<String>("")
             let digest = Data(repeating: 1, count: 32)
             let revision = "3kbcq3p7ad422"
             SpaceMockURLProtocol.setHandler { request in
                 let url = request.url!
-                if url.lastPathComponent == "com.atproto.space.getSpaceCredential" {
+                if url.lastPathComponent == "com.atproto.space.authorizeSpaceSync" {
                     #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
                     #expect(request.value(forHTTPHeaderField: "Signature") == nil)
                     let token = try makeSignedCredentialJWT(
@@ -1380,18 +1431,38 @@ extension SpaceCredentialManagerTests {
                     lastIssuedJWT.withLock { $0 = token }
                     return try (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, JSONEncoder().encode(["credential": token]))
                 }
-                let want = try #require(request.value(forHTTPHeaderField: "Atproto-Space-Want-Mac"))
-                let share = try #require(want.components(separatedBy: "key_share=\"").last?.split(separator: "\"").first.map(String.init))
-                shares.withLock { $0.append(share) }
+                let macRequest = try parseSpaceMACRequest(request, profile: .commit)
+                shares.withLock { $0.append(macRequest.keyShare) }
                 #expect(request.value(forHTTPHeaderField: "Authorization") == "Atproto-Space-Credential " + lastIssuedJWT.withLock { $0 })
                 #expect(request.value(forHTTPHeaderField: "Signature-Input") == "atproto-space-credential=" + SpaceHTTPSignature.signatureParams())
+                let sharedSecret = try SpaceMAC.decapsulate(
+                    privateKey: currentKey,
+                    keyShare: macRequest.keyShare
+                )
+                let covered = "ver=1, repo=\"\(repo)\", space=\"\(space.uriString())\", rev=\"\(revision)\", data=:\(digest.base64EncodedString()):"
+                let headers = try makeSpaceMACResponseHeaders(
+                    profile: .commit,
+                    coveredHeader: covered,
+                    request: macRequest,
+                    sharedSecret: sharedSecret
+                )
+                var body: [String: Any] = [
+                    "commit": [
+                        "ver": 1,
+                        "space": space.uriString(),
+                        "repo": repo,
+                        "rev": revision,
+                        "data": ["$bytes": digest.base64EncodedString().replacingOccurrences(of: "=", with: "")],
+                    ],
+                ]
                 if url.lastPathComponent == "com.atproto.space.listRepoOps" {
-                    return (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(#"{"ops":[],"cursor":"next"}"#.utf8))
+                    body["ops"] = [Any]()
+                    body["cursor"] = "next"
                 }
-                let secret = try SpaceMAC.decapsulate(privateKey: currentKey, keyShare: share)
-                let mac = try SpaceMAC.commit(sharedSecret: secret, space: space.uriString(), repo: repo, rev: revision, data: digest)
-                let body: [String: Any] = ["commit": ["ver": 1, "space": space.uriString(), "repo": repo, "rev": revision, "data": ["$bytes": digest.base64EncodedString().replacingOccurrences(of: "=", with: "")]]]
-                return try (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: ["Atproto-Space-Mac": "type=\"atproto-space-repo\", ver=1, mac=:\(mac.base64EncodedString()):"])!, JSONSerialization.data(withJSONObject: body))
+                return try (
+                    HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: headers)!,
+                    JSONSerialization.data(withJSONObject: body)
+                )
             }
             defer { SpaceMockURLProtocol.setHandler(nil) }
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
@@ -1402,7 +1473,10 @@ extension SpaceCredentialManagerTests {
                 delegationTokenProvider: { _ in "delegation" },
                 authorKEMKeyProvider: { _, forceRefresh in
                     refreshes.withLock { $0.append(forceRefresh) }
-                    return forceRefresh ? current : stale
+                    return hasRefreshedKey.withLock {
+                        if forceRefresh { $0 = true }
+                        return $0 ? current : stale
+                    }
                 },
                 authoritySigningKeyProvider: testAuthoritySigningKeyProvider
             )
@@ -1486,7 +1560,7 @@ extension SpaceCredentialManagerTests {
             let pinnedNow = Date()
 
             SpaceMockURLProtocol.setHandler { request in
-                if request.url?.absoluteString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                if request.url?.absoluteString == "https://space.test/xrpc/com.atproto.space.authorizeSpaceSync" {
                     exchangeCount.withLock { $0 += 1 }
                     // Swan's conversation-space policy issues exp = iat + 60.
                     let iat = Int(pinnedNow.timeIntervalSince1970)
@@ -1771,7 +1845,7 @@ extension SpaceCredentialManagerTests {
         let base = NetworkResponseLimits(maximumExpansionRatio: 7, maximumDiagnosticBytes: 99)
         let twentyMiB = 20 * 1_048_576
         #expect(SpaceCredentialManager.archiveResponseLimits(nil, method: "getRepo", base: base) == nil)
-        for method in ["getRecord", "getLatestCommit", "listRepoOps", "getBlob", "listRepos"] {
+        for method in ["getRecord", "getLatestCommit", "listRepoOps", "getBlob", "listWriters"] {
             #expect(SpaceCredentialManager.archiveResponseLimits(twentyMiB, method: method, base: base) == nil)
         }
         #expect(SpaceCredentialManager.archiveResponseLimits(twentyMiB, method: "getRepo", base: base) == NetworkResponseLimits(
@@ -1806,29 +1880,38 @@ extension SpaceCredentialManagerTests {
                 let path = "com.example.drive.file/a\(index < 10 ? "0" : "")\(index)"
                 let value = try DAGCBOR.encodeValue(["blob": Data(repeating: UInt8(index), count: 1_000_000)])
                 set.add(path: path, cid: CID.fromDAGCBOR(value).string)
-                records += starFrame(Data(path.utf8)) + starFrame(value)
+                records += Data([1]) + starFrame(Data(path.utf8)) + starFrame(value)
             }
             let digest = set.digest
             let metadata: [String: Any] = ["$type": "atproto-space-repo", "ver": 1, "repo": repo, "space": space.uriString(), "rev": rev, "data": digest]
-            let archive = try Data([0x2A, 0x6C, 1, 0]) + starFrame(DAGCBOR.encodeValue(metadata)) + records
+            let archive = try Data([0x2A, 0x6C, 1, 0]) + starFrame(DAGCBOR.encodeValue(metadata)) + records + Data([0])
             #expect(archive.count > NetworkResponseLimits.default.maximumWireBytes)
             let expTime = Int(Date().addingTimeInterval(600).timeIntervalSince1970)
 
             SpaceMockURLProtocol.setHandler { request in
                 let url = request.url!
-                if url.lastPathComponent == "com.atproto.space.getSpaceCredential" {
+                if url.lastPathComponent == "com.atproto.space.authorizeSpaceSync" {
                     let token = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
                     return try (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, JSONEncoder().encode(["credential": token]))
                 }
-                let want = try #require(request.value(forHTTPHeaderField: "Atproto-Space-Want-Mac"))
-                let share = try #require(want.components(separatedBy: "key_share=\"").last?.split(separator: "\"").first.map(String.init))
-                let secret = try SpaceMAC.decapsulate(privateKey: kemKey, keyShare: share)
-                let mac = try SpaceMAC.commit(sharedSecret: secret, space: space.uriString(), repo: repo, rev: rev, data: digest)
-                let headers = [
-                    "Content-Type": "application/octet-stream",
-                    "Atproto-Space-Mac": "type=\"atproto-space-repo\", ver=1, mac=:\(mac.base64EncodedString()):",
-                ]
-                return (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: headers)!, archive)
+                #expect(request.value(forHTTPHeaderField: "Accept") == "application/vnd.dasl.star")
+                let macRequest = try parseSpaceMACRequest(request, profile: .commit)
+                let sharedSecret = try SpaceMAC.decapsulate(
+                    privateKey: kemKey,
+                    keyShare: macRequest.keyShare
+                )
+                let covered = "ver=1, repo=\"\(repo)\", space=\"\(space.uriString())\", rev=\"\(rev)\", data=:\(digest.base64EncodedString()):"
+                var headers = try makeSpaceMACResponseHeaders(
+                    profile: .commit,
+                    coveredHeader: covered,
+                    request: macRequest,
+                    sharedSecret: sharedSecret
+                )
+                headers["Content-Type"] = "application/vnd.dasl.star"
+                return (
+                    HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: headers)!,
+                    archive
+                )
             }
             defer { SpaceMockURLProtocol.setHandler(nil) }
 
@@ -1868,7 +1951,7 @@ extension SpaceCredentialManagerTests {
         let base = NetworkResponseLimits(maximumExpansionRatio: 7, maximumDiagnosticBytes: 99)
         let twentyMiB = 20 * 1_048_576
         #expect(SpaceCredentialManager.blobResponseLimits(nil, method: "getBlob", base: base) == nil)
-        for method in ["getRepo", "getRecord", "getLatestCommit", "listRepoOps", "listBlobs", "listRepos"] {
+        for method in ["getRepo", "getRecord", "getLatestCommit", "listRepoOps", "listBlobs", "listWriters"] {
             #expect(SpaceCredentialManager.blobResponseLimits(twentyMiB, method: method, base: base) == nil)
         }
         #expect(SpaceCredentialManager.blobResponseLimits(twentyMiB, method: "getBlob", base: base) == NetworkResponseLimits(
@@ -1897,12 +1980,12 @@ extension SpaceCredentialManagerTests {
 
             SpaceMockURLProtocol.setHandler { request in
                 let url = request.url!
-                if url.lastPathComponent == "com.atproto.space.getSpaceCredential" {
+                if url.lastPathComponent == "com.atproto.space.authorizeSpaceSync" {
                     let token = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
                     return try (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, JSONEncoder().encode(["credential": token]))
                 }
                 guard url.lastPathComponent == "com.atproto.space.getBlob",
-                      request.value(forHTTPHeaderField: "Atproto-Space-Want-Mac") == nil
+                      request.value(forHTTPHeaderField: "Accept-Signature") == nil
                 else {
                     return (HTTPURLResponse(url: url, statusCode: 400, httpVersion: nil, headerFields: nil)!, Data())
                 }
