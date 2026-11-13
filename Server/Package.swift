@@ -82,6 +82,7 @@ let package = Package(
         "petrel-oauth-server-example",
         .product(name: "PetrelOAuthServer", package: "Petrel"),
         .product(name: "HummingbirdTesting", package: "hummingbird"),
+        .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
         .product(name: "NIOCore", package: "swift-nio"),
         .product(name: "NIOPosix", package: "swift-nio"),
         .product(name: "NIOHTTP1", package: "swift-nio"),

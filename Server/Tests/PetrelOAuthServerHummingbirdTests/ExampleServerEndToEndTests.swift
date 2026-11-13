@@ -324,10 +324,53 @@ struct ExampleServerEndToEndTests {
     #expect(OAuthClientAddressPolicy.connection.clientAddress(peer: proxy, headers: forwarded) == proxy)
   }
 
+  /// The server discovers a client it has never seen: it fetches the
+  /// client's metadata document over https, through the pinned transport,
+  /// from a TLS host whose certificate chains to a test authority.
+  @Test("a discoverable https client is fetched through the pinned transport")
+  func discoverableClient() async throws {
+    let clientID = "https://client.example.test/client-metadata.json"
+    let metadata = Data("""
+      {"client_id":"\(clientID)","application_type":"web","grant_types":["authorization_code","refresh_token"],
+      "response_types":["code"],"redirect_uris":["https://client.example.test/callback"],
+      "scope":"atproto transition:generic","token_endpoint_auth_method":"none","dpop_bound_access_tokens":true}
+      """.utf8)
+    let host = try await TLSFixtureServer(name: "client.example.test", documents: ["/client-metadata.json": metadata])
+    defer { Task { try? await host.close() } }
+    let example = try ExampleServer(
+      origin: #require(URL(string: Self.origin)),
+      clientFetcher: TLSFixtures.fetcher(reaching: host.port)
+    )
+    let app = Application(router: example.router())
+    try await app.test(.router) { http in
+      let client = try Client(http)
+      let verifier = (UUID().uuidString + UUID().uuidString).replacingOccurrences(of: "-", with: "")
+      let par = try await client.post(Self.origin + "/oauth/par", [
+        ("client_id", clientID),
+        ("response_type", "code"),
+        ("code_challenge", OAuthPKCE.s256Challenge(for: verifier)),
+        ("code_challenge_method", "S256"),
+        ("state", UUID().uuidString),
+        ("redirect_uri", "https://client.example.test/callback"),
+        ("scope", "atproto transition:generic"),
+      ])
+      #expect(par.status == .created, "\(String(buffer: par.body))")
+    }
+    #expect(host.requestedPaths == ["/client-metadata.json"])
+  }
+
   /// Runs `Scripts/ts-client-interop/run.mjs`: the reference TypeScript client
-  /// (`@atproto/oauth-client-node`) against the example, for a public and a
-  /// confidential client. Needs node and an installed `node_modules`, so it
-  /// runs only when `PETREL_TS_INTEROP_DIR` points at that directory.
+  /// (`@atproto/oauth-client-node`) against the example, for three client
+  /// shapes: a public `http://localhost` client, a public https client and a
+  /// confidential `private_key_jwt` client whose keys are at its `jwks_uri`.
+  /// The server has no registrations: it fetches both https clients' metadata,
+  /// and the JWKS, through the pinned transport from a TLS host whose
+  /// certificate chains to a test authority.
+  ///
+  /// Needs node and an installed `node_modules`, so it runs only when
+  /// `PETREL_TS_INTEROP_DIR` points at that directory. `PETREL_INTEROP_COMMIT`
+  /// (or `GITHUB_SHA`) is written to the transcript, and
+  /// `PETREL_TS_INTEROP_TRANSCRIPT` names where to keep it.
   @Test(
     "the reference TypeScript client completes the flow against the example",
     .enabled(if: ProcessInfo.processInfo.environment["PETREL_TS_INTEROP_DIR"] != nil)
@@ -338,22 +381,34 @@ struct ExampleServerEndToEndTests {
     let port = Int(environment["PETREL_TS_INTEROP_PORT"] ?? "") ?? 18788
     let origin = "http://127.0.0.1:\(port)"
     let work = FileManager.default.temporaryDirectory.appendingPathComponent("petrel-ts-interop-\(UUID().uuidString)").path
+    let transcript = environment["PETREL_TS_INTEROP_TRANSCRIPT"] ?? work + "/transcript.log"
+    let commit = environment["PETREL_INTEROP_COMMIT"] ?? environment["GITHUB_SHA"] ?? "unrecorded"
 
     #expect(try await Self.run("node", [script, "--prepare", work]) == 0)
-    let confidential = try ExampleServer.loadClient(at: work + "/client-metadata.json")
-    let example = try ExampleServer(origin: #require(URL(string: origin)), clients: [confidential])
+    var documents: [String: Data] = [:]
+    for name in ["public-client-metadata.json", "confidential-client-metadata.json", "jwks.json"] {
+      documents["/" + name] = try Data(contentsOf: URL(fileURLWithPath: work + "/discovery/" + name))
+    }
+    let host = try await TLSFixtureServer(name: "ts-interop.example.test", documents: documents)
+    defer { Task { try? await host.close() } }
+    let example = try ExampleServer(
+      origin: #require(URL(string: origin)),
+      clientFetcher: TLSFixtures.fetcher(reaching: host.port)
+    )
     let app = Application(
       router: example.router(),
       configuration: .init(address: .hostname("127.0.0.1", port: port))
     )
     try await withThrowingTaskGroup(of: Void.self) { group in
       group.addTask { try await app.runService() }
-      let status = try await Self.run(
-        "node", [script, "--origin", origin, "--client-dir", work, "--log", work + "/transcript.log"]
-      )
-      #expect(status == 0, "see \(work)/transcript.log")
+      let status = try await Self.run("node", [
+        script, "--origin", origin, "--client-dir", work, "--discovery", "--commit", commit, "--log", transcript,
+      ])
+      #expect(status == 0, "see \(transcript)")
       group.cancelAll()
     }
+    // Every https document came through the pinned transport.
+    #expect(Set(host.requestedPaths) == Set(documents.keys), "\(host.requestedPaths)")
   }
 
   private static func run(_ tool: String, _ arguments: [String]) async throws -> Int32 {
