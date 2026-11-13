@@ -27,22 +27,30 @@ actor RequestDeduplicator {
         let headers: [String]
 
         /// Headers that differ between otherwise identical requests without changing the
-        /// answer: per-request credentials (identity is `authIdentity`) and request ids.
+        /// answer: per-request credentials (identity is `authIdentity`). The request-id header,
+        /// if the app configured one, is passed per call as `ignoringHeaders`.
         static let ignoredHeaderNames: Set<String> = [
-            "authorization", "dpop", "x-catbird-request-id",
+            "authorization", "dpop",
         ]
 
-        init?(from request: URLRequest, authIdentity: String? = nil) {
+        init?(from request: URLRequest, authIdentity: String? = nil, ignoringHeaders: Set<String> = []) {
             guard let httpMethod = request.httpMethod else { return nil }
             self.init(
                 method: httpMethod,
                 url: request.url?.absoluteString ?? "",
                 authIdentity: authIdentity ?? request.value(forHTTPHeaderField: "Authorization"),
-                headers: request.allHTTPHeaderFields ?? [:]
+                headers: request.allHTTPHeaderFields ?? [:],
+                ignoringHeaders: ignoringHeaders
             )
         }
 
-        init?(method: String, url: String, authIdentity: String? = nil, headers: [String: String] = [:]) {
+        init?(
+            method: String,
+            url: String,
+            authIdentity: String? = nil,
+            headers: [String: String] = [:],
+            ignoringHeaders: Set<String> = []
+        ) {
             guard method == "GET" || method == "HEAD" else {
                 return nil
             }
@@ -52,9 +60,10 @@ actor RequestDeduplicator {
             self.authIdentity = authIdentity
             self.method = method
             self.url = url
+            let ignored = Self.ignoredHeaderNames.union(ignoringHeaders.map { $0.lowercased() })
             self.headers = headers.compactMap { name, value in
                 let name = name.lowercased()
-                return Self.ignoredHeaderNames.contains(name) ? nil : "\(name):\(value)"
+                return ignored.contains(name) ? nil : "\(name):\(value)"
             }.sorted()
         }
     }
@@ -93,16 +102,19 @@ actor RequestDeduplicator {
     /// - Parameters:
     ///   - request: The URLRequest to deduplicate
     ///   - authIdentity: Optional auth identity (e.g. account DID or authorization token)
+    ///   - ignoringHeaders: Extra header names (any case) that do not distinguish requests, such as
+    ///     the configured request-id header
     ///   - onJoinExisting: Called when this caller joins an identical in-flight request instead of launching one
     ///   - work: The async work to perform if this is the first request
     /// - Returns: The result of the network request
     func deduplicate(
         request: URLRequest,
         authIdentity: String? = nil,
+        ignoringHeaders: Set<String> = [],
         onJoinExisting: (@Sendable () -> Void)? = nil,
         work: @escaping @Sendable () async throws -> (Data, URLResponse)
     ) async throws -> (Data, URLResponse) {
-        guard let key = RequestKey(from: request, authIdentity: authIdentity) else {
+        guard let key = RequestKey(from: request, authIdentity: authIdentity, ignoringHeaders: ignoringHeaders) else {
             return try await work()
         }
 
@@ -167,8 +179,8 @@ actor RequestDeduplicator {
     ///   - request: The request to check
     ///   - authIdentity: Optional auth identity
     /// - Returns: True if an identical request is in progress
-    func isRequestInFlight(_ request: URLRequest, authIdentity: String? = nil) -> Bool {
-        guard let key = RequestKey(from: request, authIdentity: authIdentity) else {
+    func isRequestInFlight(_ request: URLRequest, authIdentity: String? = nil, ignoringHeaders: Set<String> = []) -> Bool {
+        guard let key = RequestKey(from: request, authIdentity: authIdentity, ignoringHeaders: ignoringHeaders) else {
             return false
         }
         if let existing = inFlightRequests[key] {

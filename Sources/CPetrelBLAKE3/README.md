@@ -7,7 +7,7 @@ https://github.com/BLAKE3-team/BLAKE3/archive/refs/tags/1.8.7.tar.gz is
 SIMD is deliberately disabled for deterministic first-lab behavior; enable it
 only after the cross-language vector suite proves the optimized build.
 
-Petrel copies the exact Swan vendored source and namespaces C identifiers with `petrel_` to coexist with hosts linking their own BLAKE3. Header filenames remain unchanged.
+Petrel copies the upstream source unchanged except that it namespaces C identifiers with `petrel_` to coexist with hosts linking their own BLAKE3. Header filenames remain unchanged.
 
 The vendored files are `c/blake3.c`, `c/blake3_dispatch.c`, `c/blake3_portable.c`,
 `c/blake3.h`, `c/blake3_impl.h` and the three license files. Removing the `petrel_`

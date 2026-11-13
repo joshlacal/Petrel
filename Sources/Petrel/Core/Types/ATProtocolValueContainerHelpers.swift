@@ -979,7 +979,8 @@ public extension CodingUserInfoKey {
     /// optional fields instead of dropping them. See ``ATProtoDecoding``.
     static var atprotoStrictDecoding: CodingUserInfoKey {
         // The raw value is a non-empty literal, so the failable initializer cannot fail.
-        CodingUserInfoKey(rawValue: "blue.catbird.petrel.atprotoStrictDecoding")!
+        // Only the key's identity matters; it is never persisted or sent.
+        CodingUserInfoKey(rawValue: "Petrel.atprotoStrictDecoding")!
     }
 }
 

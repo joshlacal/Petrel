@@ -889,7 +889,7 @@ final class PublicRelayVerifierTests: XCTestCase {
       records: ["app.bsky.feed.post/a": sampleCID(3)],
       mstDigest: "mst-a"
     )
-    XCTAssertNoThrow(try RelayFinalStateVerifier.verify(relay: relay, swan: relay))
+    XCTAssertNoThrow(try RelayFinalStateVerifier.verify(relay: relay, reference: relay))
     let cases: [(RelayRepositorySnapshot, RelayVerifierError)] = [
       (relay.replacing(revision: rev0), .finalRevisionMismatch),
       (relay.replacing(commitCID: sampleCID(4)), .finalCommitCIDMismatch),
@@ -897,8 +897,8 @@ final class PublicRelayVerifierTests: XCTestCase {
       (relay.replacing(records: [:]), .finalProjectionMismatch),
       (relay.replacing(mstDigest: "mst-b"), .finalMSTMismatch),
     ]
-    for (swan, expected) in cases {
-      XCTAssertThrowsError(try RelayFinalStateVerifier.verify(relay: relay, swan: swan)) {
+    for (reference, expected) in cases {
+      XCTAssertThrowsError(try RelayFinalStateVerifier.verify(relay: relay, reference: reference)) {
         XCTAssertEqual($0 as? RelayVerifierError, expected)
       }
     }

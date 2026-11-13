@@ -32,7 +32,7 @@ public enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
     /// The authority refused to issue a credential. `error` is the XRPC error
     /// name, such as `AccountNotAuthorized`, `AppNotAuthorized` or
     /// `NotAuthorized` (or `HTTP 403`), or `SpaceNotFound` at HTTP 400 (the
-    /// reference host) or 404 (Swan), which means "not found or not
+    /// reference host) or 404 (other hosts), which means "not found or not
     /// authorized": the authority does not host the space, does not authorize
     /// this account (an authority may answer `SpaceNotFound` in place of
     /// `AccountNotAuthorized`), or, without a delegation token, the space is
@@ -670,7 +670,7 @@ public actor SpaceCredentialManager {
             // not host the space, does not authorize this account (it may answer
             // SpaceNotFound in place of AccountNotAuthorized), or, without a
             // delegation token, the space is not public. The reference host
-            // answers 400 and Swan answers 404; both keep the error name.
+            // answers 400 and other hosts may answer 404; both keep the error name.
             if httpResponse.statusCode == 400 || httpResponse.statusCode == 404, errorName == "SpaceNotFound" {
                 throw SpaceCredentialError.authorizationRefused(host: host, error: "SpaceNotFound", message: serverMessage ?? (rawBody.isEmpty ? nil : rawBody))
             }
@@ -954,7 +954,6 @@ public actor SpaceCredentialManager {
 
         var citations: [String] = []
         let prioritizedKeys = [
-            "swanProfile",
             "profile",
             "serverProfile",
             "version",

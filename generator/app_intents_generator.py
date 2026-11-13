@@ -1017,7 +1017,7 @@ def resolve_record_write(lex_index: LexiconIndex, intent_cfg: dict, entities_by_
             'record_nsid': nsid,
             'success_dialog': success_dialog,
             'already_dialog': already_dialog,
-            'missing_message': _escape_swift_string(f"Catbird couldn't load that {noun}."),
+            'missing_message': _escape_swift_string(f"Couldn't load that {noun}."),
         },
     }
 

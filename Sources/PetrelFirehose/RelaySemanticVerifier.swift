@@ -176,27 +176,42 @@ public enum RelayGetRepoPolicy {
   }
 }
 
+/// Checks that a relay's final view of a repository equals a reference view
+/// (normally the repository read directly from its PDS).
 public enum RelayFinalStateVerifier {
+  /// Throws the first difference between the relay's snapshot and the reference snapshot.
+  /// - Parameters:
+  ///   - relay: The repository state observed through the relay.
+  ///   - reference: The authoritative repository state, such as the PDS's own copy.
+  public static func verify(
+    relay: RelayRepositorySnapshot,
+    reference: RelayRepositorySnapshot
+  ) throws {
+    guard relay.did == reference.did else { throw RelayVerifierError.repositoryDIDMismatch }
+    guard relay.revision == reference.revision else {
+      throw RelayVerifierError.finalRevisionMismatch
+    }
+    guard relay.commitCID == reference.commitCID else {
+      throw RelayVerifierError.finalCommitCIDMismatch
+    }
+    guard relay.dataCID == reference.dataCID else {
+      throw RelayVerifierError.finalDataCIDMismatch
+    }
+    guard relay.records == reference.records else {
+      throw RelayVerifierError.finalProjectionMismatch
+    }
+    guard relay.mstDigest == reference.mstDigest else {
+      throw RelayVerifierError.finalMSTMismatch
+    }
+  }
+
+  /// Deprecated spelling of ``verify(relay:reference:)``.
+  @available(*, deprecated, renamed: "verify(relay:reference:)")
   public static func verify(
     relay: RelayRepositorySnapshot,
     swan: RelayRepositorySnapshot
   ) throws {
-    guard relay.did == swan.did else { throw RelayVerifierError.repositoryDIDMismatch }
-    guard relay.revision == swan.revision else {
-      throw RelayVerifierError.finalRevisionMismatch
-    }
-    guard relay.commitCID == swan.commitCID else {
-      throw RelayVerifierError.finalCommitCIDMismatch
-    }
-    guard relay.dataCID == swan.dataCID else {
-      throw RelayVerifierError.finalDataCIDMismatch
-    }
-    guard relay.records == swan.records else {
-      throw RelayVerifierError.finalProjectionMismatch
-    }
-    guard relay.mstDigest == swan.mstDigest else {
-      throw RelayVerifierError.finalMSTMismatch
-    }
+    try verify(relay: relay, reference: swan)
   }
 }
 
