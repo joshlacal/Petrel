@@ -8,7 +8,6 @@ let package = Package(
     .executable(name: "petrel-cab-server", targets: ["petrel-cab-server"]),
     .executable(name: "petrel-cab-demo", targets: ["petrel-cab-demo"]),
     .library(name: "PetrelCABServerCore", targets: ["PetrelCABServerCore"]),
-    .library(name: "PetrelOAuthServerHummingbird", targets: ["PetrelOAuthServerHummingbird"]),
     .executable(name: "petrel-oauth-server-example", targets: ["petrel-oauth-server-example"]),
   ],
   dependencies: [
@@ -21,7 +20,7 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-nio.git", from: "2.105.0"),
     .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.37.6"),
     .package(url: "https://github.com/apple/swift-certificates.git", from: "1.21.1"),
-    .package(name: "Petrel", path: ".."),
+    .package(name: "Petrel", path: "..", traits: ["OAuthServerHummingbird"]),
   ],
   targets: [
     .target(
@@ -52,22 +51,10 @@ let package = Package(
       ],
       swiftSettings: [.swiftLanguageMode(.v6)]
     ),
-    .target(
-      name: "PetrelOAuthServerHummingbird",
-      dependencies: [
-        .product(name: "Hummingbird", package: "hummingbird"),
-        .product(name: "PetrelOAuthServer", package: "Petrel"),
-        .product(name: "NIOCore", package: "swift-nio"),
-        .product(name: "NIOPosix", package: "swift-nio"),
-        .product(name: "NIOHTTP1", package: "swift-nio"),
-        .product(name: "NIOSSL", package: "swift-nio-ssl"),
-      ],
-      swiftSettings: [.swiftLanguageMode(.v6)]
-    ),
     .executableTarget(
       name: "petrel-oauth-server-example",
       dependencies: [
-        "PetrelOAuthServerHummingbird",
+        .product(name: "PetrelOAuthServerHummingbird", package: "Petrel"),
         .product(name: "PetrelOAuthServer", package: "Petrel"),
         .product(name: "PetrelOAuthServerLexicon", package: "Petrel"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
@@ -78,7 +65,7 @@ let package = Package(
     .testTarget(
       name: "PetrelOAuthServerHummingbirdTests",
       dependencies: [
-        "PetrelOAuthServerHummingbird",
+        .product(name: "PetrelOAuthServerHummingbird", package: "Petrel"),
         "petrel-oauth-server-example",
         .product(name: "PetrelOAuthServer", package: "Petrel"),
         .product(name: "HummingbirdTesting", package: "hummingbird"),

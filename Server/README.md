@@ -158,9 +158,18 @@ sudo journalctl -u petrel-cab-server -f
 
 ## OAuth authorization server adapter and example
 
-This package also hosts the Hummingbird side of `PetrelOAuthServer`, the framework-agnostic AT Protocol OAuth authorization server that ships as a product of the root Petrel package. It lives here so that applications depending on Petrel do not resolve Hummingbird and SwiftNIO.
+`PetrelOAuthServer`, the framework-agnostic AT Protocol OAuth authorization server, and `PetrelOAuthServerHummingbird`, its Hummingbird adapter and pinned SwiftNIO transport, are products of the root Petrel package. The adapter needs the `OAuthServerHummingbird` package trait, which brings in Hummingbird and SwiftNIO:
 
-- `PetrelOAuthServerHummingbird` registers every authorization-server endpoint on a Hummingbird router (`OAuthServerHummingbird.addRoutes(to:server:)`) and adapts a Hummingbird request for the resource-server verifier (`OAuthServerHummingbird.authenticate(_:verifier:publicOrigin:)`).
+```swift
+.package(url: "https://github.com/joshlacal/Petrel.git", from: "…", traits: ["OAuthServerHummingbird"])
+```
+
+Without the trait, those dependencies are not built, and the adapter's types are unavailable with a message naming the trait. Swift 6.2 and later do not fetch them either. Swift 6.1 fetches and pins them but builds nothing from them.
+
+- `OAuthServerHummingbird.addRoutes(to:server:)` registers every authorization-server endpoint on a Hummingbird router. `OAuthServerHummingbird.authenticate(_:verifier:publicOrigin:)` adapts a Hummingbird request for the resource-server verifier.
+- `PinnedNIOOAuthRemoteTransport` is the pinning transport that `OAuthRemoteDocumentFetcher` requires for client metadata, JWKS and lexicon fetches.
+
+This package holds what uses them:
 - `petrel-oauth-server-example` is a complete, runnable server: in-memory stores, one demo account, loopback development clients accepted, and one DPoP-protected XRPC route.
 
 ```
