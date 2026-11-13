@@ -67,6 +67,12 @@ while IFS= read -r LINE; do
     "$ROOT"/Plugins/*|\
     "$ROOT"/Sources/*|\
     "$ROOT"/Tests/*|\
+    "$ROOT"/Server/Package.swift|\
+    "$ROOT"/Server/Sources/*|\
+    "$ROOT"/Server/Tests/*|\
+    Server/Package.swift|\
+    Server/Sources/*|\
+    Server/Tests/*|\
     Package.swift|\
     Package@swift-*.swift|\
     Plugins/*|\

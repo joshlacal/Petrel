@@ -5,7 +5,7 @@ import NIOCore
 import NIOHTTP1
 import NIOPosix
 import NIOSSL
-import PetrelOAuthServer
+@testable import PetrelOAuthServer
 import PetrelOAuthServerHummingbird
 import X509
 
@@ -155,13 +155,22 @@ enum TLSFixtures {
     )
   }
 
+  /// The default fetch policy, except that loopback is allowed and the
+  /// timeout is ``exchangeTimeout``, above the public 30 second ceiling.
+  static func stubbedPolicy() throws -> OAuthRemoteFetchPolicy {
+    try OAuthRemoteFetchPolicy.stubbed(
+      networkAllowlist: .init(addresses: [OAuthIPAddress(literal: "127.0.0.1")!]),
+      timeout: exchangeTimeout
+    )
+  }
+
   /// A fetcher with the default policy, except that loopback is allowed and
   /// every name resolves to 127.0.0.1, over the pinned transport. Requests
   /// for `https://<name>/<path>` (no port, as client IDs must be) reach the
   /// fixture server on `port`.
   static func fetcher(reaching port: Int) throws -> OAuthRemoteDocumentFetcher {
     try OAuthRemoteDocumentFetcher(
-      policy: OAuthRemoteFetchPolicy(networkAllowlist: .init(addresses: [OAuthIPAddress(literal: "127.0.0.1")!])),
+      policy: stubbedPolicy(),
       resolver: LoopbackResolver(),
       transport: PortMappingTransport(inner: transport(), port: port)
     )

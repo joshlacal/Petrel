@@ -56,8 +56,15 @@ let package = Package(
             name: "PetrelOAuthServerLexicon",
             targets: ["PetrelOAuthServerLexicon"]
         ),
-        // Needs the OAuthServerHummingbird trait; without it the module's
-        // types are declared unavailable and none of its dependencies build.
+        // Needs the OAuthServerNIO trait; without it the module's types are
+        // declared unavailable and none of its dependencies build.
+        .library(
+            name: "PetrelOAuthServerNIO",
+            targets: ["PetrelOAuthServerNIO"]
+        ),
+        // Needs the OAuthServerHummingbird trait (which enables OAuthServerNIO);
+        // without it the module's types are declared unavailable and none of its
+        // dependencies build.
         .library(
             name: "PetrelOAuthServerHummingbird",
             targets: ["PetrelOAuthServerHummingbird"]
@@ -82,11 +89,20 @@ let package = Package(
     ],
     traits: [
         .trait(
+            name: "OAuthServerNIO",
+            description: """
+            Builds PetrelOAuthServerNIO, the pinned SwiftNIO transport that PetrelOAuthServer's \
+            remote document fetcher requires, for any server framework. Brings in swift-nio and \
+            swift-nio-ssl.
+            """
+        ),
+        .trait(
             name: "OAuthServerHummingbird",
             description: """
-            Builds PetrelOAuthServerHummingbird, the Hummingbird adapter and the pinned SwiftNIO \
-            transport for PetrelOAuthServer. Brings in hummingbird, swift-nio and swift-nio-ssl.
-            """
+            Builds PetrelOAuthServerHummingbird, the Hummingbird adapter for PetrelOAuthServer, \
+            and enables OAuthServerNIO. Brings in hummingbird, swift-nio and swift-nio-ssl.
+            """,
+            enabledTraits: ["OAuthServerNIO"]
         ),
         .default(enabledTraits: []),
     ],
@@ -107,10 +123,10 @@ let package = Package(
         .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1.git", .upToNextMinor(from: "0.25.0")),
         // Pinned to 1.5.7: release tag ships Package.swift with the `libzstd` product.
         .package(url: "https://github.com/facebook/zstd.git", .upToNextMinor(from: "1.5.7")),
-        // Used only with the OAuthServerHummingbird trait (see the
-        // PetrelOAuthServerHummingbird target). Swift 6.2 and later do not fetch
-        // them when the trait is off; Swift 6.1 fetches and pins them but builds
-        // nothing from them.
+        // Used only with the OAuthServerNIO and OAuthServerHummingbird traits
+        // (see the PetrelOAuthServerNIO and PetrelOAuthServerHummingbird
+        // targets). Swift 6.2 and later do not fetch them when the traits are
+        // off; Swift 6.1 fetches them but builds nothing from them.
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.26.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.105.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.37.6"),
@@ -258,14 +274,25 @@ let package = Package(
             ]
         ),
         .target(
+            name: "PetrelOAuthServerNIO",
+            dependencies: [
+                "PetrelOAuthServer",
+                .product(name: "NIOCore", package: "swift-nio", condition: .when(traits: ["OAuthServerNIO"])),
+                .product(name: "NIOPosix", package: "swift-nio", condition: .when(traits: ["OAuthServerNIO"])),
+                .product(name: "NIOHTTP1", package: "swift-nio", condition: .when(traits: ["OAuthServerNIO"])),
+                .product(name: "NIOSSL", package: "swift-nio-ssl", condition: .when(traits: ["OAuthServerNIO"])),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
+        .target(
             name: "PetrelOAuthServerHummingbird",
             dependencies: [
                 "PetrelOAuthServer",
+                "PetrelOAuthServerNIO",
                 .product(name: "Hummingbird", package: "hummingbird", condition: .when(traits: ["OAuthServerHummingbird"])),
                 .product(name: "NIOCore", package: "swift-nio", condition: .when(traits: ["OAuthServerHummingbird"])),
-                .product(name: "NIOPosix", package: "swift-nio", condition: .when(traits: ["OAuthServerHummingbird"])),
-                .product(name: "NIOHTTP1", package: "swift-nio", condition: .when(traits: ["OAuthServerHummingbird"])),
-                .product(name: "NIOSSL", package: "swift-nio-ssl", condition: .when(traits: ["OAuthServerHummingbird"])),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

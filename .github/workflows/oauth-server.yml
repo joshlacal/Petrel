@@ -1,9 +1,19 @@
 name: OAuth server
 
-# The nested Server package: the Hummingbird adapter for PetrelOAuthServer, the
-# pinned NIO transport, the runnable example authorization server and its HTTP
-# end-to-end tests, and the CAB server. It depends on the root package by path,
-# so it is built against this commit.
+# The OAuth server's trait-guarded products and the nested Server package.
+#
+# The root package ships PetrelOAuthServerNIO (trait OAuthServerNIO) and
+# PetrelOAuthServerHummingbird (trait OAuthServerHummingbird, which enables
+# OAuthServerNIO). Both traits are off by default, so the other workflows only
+# ever build their unavailable stubs. These jobs build the root with the traits
+# on under the owned-warnings gate, build the trait products' DocC, check the
+# consumer contract through a repository URL
+# (Scripts/tests/oauth-server-traits-contract.sh), and check that the committed
+# Package.resolved is what default traits resolve.
+#
+# The nested Server package holds the runnable example authorization server and
+# its HTTP end-to-end tests, and the CAB server. It depends on the root package
+# by path with the trait on, so it is built against this commit.
 #
 # The TypeScript interop job runs the reference client (@atproto/oauth-client-node)
 # against the example authorization server: PAR, the Authorization Interface,
@@ -38,12 +48,42 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
-      - name: Build and test the Server package
+      - name: Package.resolved is what default traits resolve
+        # Swift 6.2 and later leave trait-guarded dependencies out of the
+        # resolution when the trait is off, so the committed file holds no
+        # SwiftNIO or Hummingbird pins. Runs before any trait-on build, which
+        # would add them.
         shell: bash
         run: |
           set -euo pipefail
           xcrun swift --version
-          xcrun swift build --package-path Server --build-tests
+          xcrun swift package resolve
+          git diff --exit-code -- Package.resolved
+      - name: Build the root package with the OAuth server traits on
+        shell: bash
+        run: |
+          set -euo pipefail
+          Scripts/verify-owned-warnings.sh oauth-traits-build -- \
+            xcrun swift build --traits OAuthServerHummingbird --scratch-path .build/oauth-traits
+      - name: Build DocC for the trait products with the traits on
+        # The default-trait DocC run sees only the unavailable stubs.
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun swift package --traits OAuthServerHummingbird --scratch-path .build/oauth-traits-docc \
+            generate-documentation \
+            --target PetrelOAuthServerNIO \
+            --target PetrelOAuthServerHummingbird \
+            --warnings-as-errors
+      - name: Consumer contract through a repository URL
+        shell: bash
+        run: Scripts/tests/oauth-server-traits-contract.sh
+      - name: Build and test the Server package
+        shell: bash
+        run: |
+          set -euo pipefail
+          Scripts/verify-owned-warnings.sh server-build -- \
+            xcrun swift build --package-path Server --build-tests
           xcrun swift test --package-path Server --skip-build
 
   server-linux:
@@ -71,12 +111,28 @@ jobs:
           done
           echo "apt-get could not install system dependencies after 6 attempts" >&2
           exit 1
+      - name: Verify pinned Swift
+        run: test "$(swift --version | head -n 1)" = 'Swift version 6.1.2 (swift-6.1.2-RELEASE)'
+      - name: Build the root package with the OAuth server traits on
+        shell: bash
+        run: |
+          set -euo pipefail
+          Scripts/verify-owned-warnings.sh oauth-traits-build -- \
+            swift build --traits OAuthServerHummingbird --scratch-path .build/oauth-traits
+      - name: Consumer contract through a repository URL
+        # The script snapshots the checkout with git, which refuses a
+        # repository owned by another user (the container runs as root).
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          Scripts/tests/oauth-server-traits-contract.sh
       - name: Build and test the Server package
         shell: bash
         run: |
           set -euo pipefail
-          test "$(swift --version | head -n 1)" = 'Swift version 6.1.2 (swift-6.1.2-RELEASE)'
-          swift build --package-path Server --build-tests
+          Scripts/verify-owned-warnings.sh server-build -- \
+            swift build --package-path Server --build-tests
           swift test --package-path Server --skip-build
 
   ts-client-interop:
@@ -124,10 +180,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          echo "::notice title=TypeScript interop commit::${GITHUB_SHA}"
           echo "commit under test: ${GITHUB_SHA}"
           node --version
           export PETREL_TS_INTEROP_DIR="$GITHUB_WORKSPACE/Server/Scripts/ts-client-interop"
+          # In the workspace, not $RUNNER_TEMP: inside a container job the
+          # runner.temp context names the host path, not the container's.
+          export PETREL_TS_INTEROP_TRANSCRIPT="$GITHUB_WORKSPACE/ts-interop-transcript-${GITHUB_SHA}.log"
           swift test --package-path Server --filter typeScriptClientInterop
+      - name: Keep the interop transcript
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ts-interop-transcript-${{ github.sha }}
+          path: ts-interop-transcript-${{ github.sha }}.log
+          if-no-files-found: error
+          retention-days: 90
 
   ts-repo-interop:
     # Repositories Petrel writes (secp256k1 and P-256), checked by the reference

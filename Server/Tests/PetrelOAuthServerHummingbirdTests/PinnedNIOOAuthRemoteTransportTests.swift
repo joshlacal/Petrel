@@ -67,7 +67,7 @@ struct PinnedNIOOAuthRemoteTransportTests {
     let server = try await TLSFixtureServer(name: "pinned.example.test", body: body)
     defer { Task { try? await server.close() } }
     let fetcher = try OAuthRemoteDocumentFetcher(
-      policy: OAuthRemoteFetchPolicy(networkAllowlist: .init(addresses: loopback)),
+      policy: TLSFixtures.stubbedPolicy(),
       resolver: FixedResolver(),
       transport: TLSFixtures.transport()
     )

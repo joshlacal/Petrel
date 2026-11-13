@@ -1,4 +1,4 @@
-#if OAuthServerHummingbird
+#if OAuthServerNIO
     import Foundation
     import NIOCore
     import NIOHTTP1
