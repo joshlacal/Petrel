@@ -3,47 +3,123 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.listSpaces
 
-/// List the spaces the authenticated user holds a repo in (i.e. spaces the user has written data to) or is the authority of, optionally filtered by type and/or authority DID. Note this is not 'spaces I'm a member of' — a member's PDS only tracks spaces its user has written to. Requires auth, implemented by PDS.
+/// List spaces that the authenticated account has written to or is the authority for. Requires auth, implemented by PDS.
 public enum ComAtprotoSpaceListSpaces {
     public static let typeIdentifier = "com.atproto.space.listSpaces"
 
     public struct SpaceView: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.space.listSpaces#spaceView"
 
-        /// URI of the space.
-        public let uri: SpaceRef
+        public let space: SpaceRef
+        /// The current revision of the account's repo in the space, if it has one.
+        public let repoRev: TID?
+        /// The current commit data of the account's repo in the space, if it has one.
+        public let data: Bytes?
+        /// The current revision of the space. Only included if the account is the space's authority.
+        public let spaceRev: TID?
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            uri: SpaceRef,
+            space: SpaceRef,
+            repoRev: TID? = nil,
+            data: Bytes? = nil,
+            spaceRev: TID? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
-            self.uri = uri
+            self.space = space
+            self.repoRev = repoRev
+            self.data = data
+            self.spaceRev = spaceRev
             self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            uri = try container.decode(SpaceRef.self, forKey: .uri)
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
+            space = try container.decode(SpaceRef.self, forKey: .space)
+            do {
+                repoRev = try container.decodeIfPresent(TID.self, forKey: .repoRev, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'repoRev' — degrading to nil: \(error)")
+                repoRev = nil
+                malformedFields.insert("repoRev")
+            }
+            do {
+                data = try container.decodeIfPresent(Bytes.self, forKey: .data, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'data' — degrading to nil: \(error)")
+                data = nil
+                malformedFields.insert("data")
+            }
+            do {
+                spaceRev = try container.decodeIfPresent(TID.self, forKey: .spaceRev, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'spaceRev' — degrading to nil: \(error)")
+                spaceRev = nil
+                malformedFields.insert("spaceRev")
+            }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(uri, forKey: .uri)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try container.encode(space, forKey: .space)
+            try container.encodeIfPresent(repoRev, forKey: .repoRev)
+            try container.encodeIfPresent(data, forKey: .data)
+            try container.encodeIfPresent(spaceRev, forKey: .spaceRev)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
-            hasher.combine(uri)
+            hasher.combine(space)
+            if let value = repoRev {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = data {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = spaceRev {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if uri != other.uri {
+            if space != other.space {
+                return false
+            }
+            if repoRev != other.repoRev {
+                return false
+            }
+            if data != other.data {
+                return false
+            }
+            if spaceRev != other.spaceRev {
                 return false
             }
             return extraFields == other.extraFields
@@ -55,32 +131,59 @@ public enum ComAtprotoSpaceListSpaces {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            let spaceValue = try space.toCBORValue()
+            map = map.adding(key: "space", value: spaceValue)
+            if let value = repoRev {
+                let repoRevValue = try value.toCBORValue()
+                map = map.adding(key: "repoRev", value: repoRevValue)
+            }
+            if let value = data {
+                let dataValue = try value.toCBORValue()
+                map = map.adding(key: "data", value: dataValue)
+            }
+            if let value = spaceRev {
+                let spaceRevValue = try value.toCBORValue()
+                map = map.adding(key: "spaceRev", value: spaceRevValue)
+            }
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "space", "repoRev", "data", "spaceRev"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "space": return true
+            case "repoRev": return repoRev != nil
+            case "data": return data != nil
+            case "spaceRev": return spaceRev != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
-            case uri
+            case space
+            case repoRev
+            case data
+            case spaceRev
         }
     }
 
     public struct Parameters: Parametrizable {
+        public let spaceDid: DID?
         public let spaceType: NSID?
-        public let did: DID?
         public let limit: Int?
         public let cursor: String?
 
         public init(
+            spaceDid: DID? = nil,
             spaceType: NSID? = nil,
-            did: DID? = nil,
             limit: Int? = 50,
             cursor: String? = nil
         ) {
+            self.spaceDid = spaceDid
             self.spaceType = spaceType
-            self.did = did
             self.limit = limit
             self.cursor = cursor
         }
@@ -137,6 +240,17 @@ public enum ComAtprotoSpaceListSpaces {
         }
     }
 
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case invalidCursor = "InvalidCursor"
+        public var description: String {
+            return rawValue
+        }
+
+        public var errorName: String {
+            return rawValue
+        }
+    }
+
     public struct XRPCMethodDescriptor: Sendable, Equatable {
         public let nsid: String
         public let kind: String
@@ -148,7 +262,7 @@ public enum ComAtprotoSpaceListSpaces {
     public static let endpointDescriptor = XRPCMethodDescriptor(
         nsid: "com.atproto.space.listSpaces", kind: "query",
         inputEncoding: nil, outputEncoding: "application/json",
-        declaredErrors: []
+        declaredErrors: ["InvalidCursor"]
     )
 
     public protocol ServerHandler: Sendable {
@@ -162,11 +276,11 @@ public enum ComAtprotoSpaceListSpaces {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - listSpaces
 
-    /// List the spaces the authenticated user holds a repo in (i.e. spaces the user has written data to) or is the authority of, optionally filtered by type and/or authority DID. Note this is not 'spaces I'm a member of' — a member's PDS only tracks spaces its user has written to. Requires auth, implemented by PDS.
+    /// List spaces that the authenticated account has written to or is the authority for. Requires auth, implemented by PDS.
     ///
     /// - Parameter input: The input parameters for the request
     /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
-    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
+    /// - Throws: `ATProtoError<ComAtprotoSpaceListSpaces.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func listSpaces(input: ComAtprotoSpaceListSpaces.Parameters) async throws -> (responseCode: Int, data: ComAtprotoSpaceListSpaces.Output?) {
         let endpoint = "com.atproto.space.listSpaces"
 
@@ -187,7 +301,7 @@ public extension ATProtoClient.Com.Atproto.Space {
         let responseCode = response.statusCode
 
         guard (200 ... 299).contains(responseCode) else {
-            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSpaceListSpaces.Error.self)
         }
 
         guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
@@ -209,7 +323,7 @@ public extension ATProtoClient.Com.Atproto.Space {
 
 extension ComAtprotoSpaceListSpaces.Parameters: XRPCCursorPaginatedParameters {
     public func withCursor(_ cursor: String?) -> Self {
-        Self(spaceType: spaceType, did: did, limit: limit, cursor: cursor)
+        Self(spaceDid: spaceDid, spaceType: spaceType, limit: limit, cursor: cursor)
     }
 }
 

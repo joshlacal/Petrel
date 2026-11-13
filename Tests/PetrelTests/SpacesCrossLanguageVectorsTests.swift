@@ -59,7 +59,9 @@ private struct AtprotoSpacesVectorsV1: Decodable {
         let rev: String
         let data_hex: String
         let mac_hex: String
-        let header_value: String
+        let covered_header: String
+        let signature_input: String
+        let signature: String
     }
 
     struct RecordMacVector: Decodable {
@@ -68,7 +70,9 @@ private struct AtprotoSpacesVectorsV1: Decodable {
         let cid: String
         let cid_bytes_hex: String
         let mac_hex: String
-        let header_value: String
+        let covered_header: String
+        let signature_input: String
+        let signature: String
     }
 
     struct Rfc9421Vector: Decodable {
@@ -244,8 +248,13 @@ private final class Gate7MockURLProtocol: URLProtocol {
         handler = newHandler
     }
 
-    override class func canInit(with _: URLRequest) -> Bool { true }
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override class func canInit(with _: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
 
     override func startLoading() {
         Self.lock.lock()
@@ -337,28 +346,60 @@ struct SpacesCrossLanguageVectorsTests {
 
         // 3. Commit MAC & 4. Record MAC
         let commitData = try hexDecode(vectors.commit_mac.data_hex)
-        let computedCommitMac = try SpaceMAC.commit(
+        #expect(vectors.commit_mac.shared_secret_hex == vectors.kem_p256.shared_secret_hex)
+        #expect(
+            SpaceMACHeader.request(
+                profile: .commit,
+                keyShare: vectors.kem_p256.key_share_did_key
+            ) == vectors.kem_p256.want_commit_mac_header
+        )
+        let responseURL = try #require(URL(string: "https://repo.example"))
+        let commitResponse = try #require(HTTPURLResponse(
+            url: responseURL,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: [
+                "Atproto-Space-Commit": vectors.commit_mac.covered_header,
+                "Signature-Input": vectors.commit_mac.signature_input,
+                "Signature": vectors.commit_mac.signature,
+            ]
+        ))
+        try SpaceMACHeader.verifyCommit(
+            response: commitResponse,
+            keyShare: vectors.kem_p256.key_share_did_key,
             sharedSecret: decapped,
-            space: vectors.commit_mac.space,
+            space: SpaceRef(uriString: vectors.commit_mac.space),
             repo: vectors.commit_mac.repo,
-            rev: vectors.commit_mac.rev,
+            revision: vectors.commit_mac.rev,
             data: commitData
         )
-        #expect(Hex.encode(computedCommitMac) == vectors.commit_mac.mac_hex)
-        #expect(
-            "type=\"atproto-space-repo\", ver=1, mac=:\(computedCommitMac.base64EncodedString()):"
-                == vectors.commit_mac.header_value
-        )
 
-        let computedRecordMac = try SpaceMAC.record(
+        #expect(vectors.record_mac.shared_secret_hex == vectors.kem_p256.shared_secret_hex)
+        #expect(
+            SpaceMACHeader.request(
+                profile: .record,
+                keyShare: vectors.kem_p256.key_share_did_key
+            ) == vectors.kem_p256.want_record_mac_header
+        )
+        let recordCID = try CID.parse(vectors.record_mac.cid)
+        let recordCIDBytes = try hexDecode(vectors.record_mac.cid_bytes_hex)
+        #expect(recordCID.bytes == recordCIDBytes)
+        let recordResponse = try #require(HTTPURLResponse(
+            url: responseURL,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: [
+                "Atproto-Space-Record": vectors.record_mac.covered_header,
+                "Signature-Input": vectors.record_mac.signature_input,
+                "Signature": vectors.record_mac.signature,
+            ]
+        ))
+        try SpaceMACHeader.verifyRecord(
+            response: recordResponse,
+            keyShare: vectors.kem_p256.key_share_did_key,
             sharedSecret: decapped,
             uri: vectors.record_mac.record_uri,
-            cid: hexDecode(vectors.record_mac.cid_bytes_hex)
-        )
-        #expect(Hex.encode(computedRecordMac) == vectors.record_mac.mac_hex)
-        #expect(
-            "type=\"atproto-space-record\", ver=1, mac=:\(computedRecordMac.base64EncodedString()):"
-                == vectors.record_mac.header_value
+            cid: recordCID
         )
 
         // 5. RFC 9421 Low-S and WebCrypto High-S
@@ -406,9 +447,7 @@ struct SpacesCrossLanguageVectorsTests {
         let verifiedPop = try SpaceSTAR.verify(
             archive: hexDecode(vectors.star_repo.populated_archive_hex),
             space: popSpace,
-            repo: vectors.star_repo.populated_repo,
-            sharedSecret: decapped,
-            mac: computedCommitMac
+            repo: vectors.star_repo.populated_repo
         )
         #expect(verifiedPop.records.count == 2)
         #expect(verifiedPop.revision == vectors.star_repo.populated_rev)
@@ -482,7 +521,7 @@ struct SpacesCrossLanguageVectorsTests {
                         try requireGate7CredentialExchange(url)
                         let rawBody = try #require(request.httpBody)
                         let bodyObj = try #require(JSONSerialization.jsonObject(with: rawBody) as? [String: Any])
-                        let requestedKid = try #require(bodyObj["credentialKid"] as? String)
+                        let requestedKid = try #require(bodyObj["credentialKey"] as? String)
                         let now = Int(Date().timeIntervalSince1970)
                         let jwt: String
                         switch neg {
@@ -564,7 +603,7 @@ struct SpacesCrossLanguageVectorsTests {
                     try requireGate7CredentialExchange(url)
                     let rawBody = try #require(request.httpBody)
                     let bodyObj = try #require(JSONSerialization.jsonObject(with: rawBody) as? [String: Any])
-                    let requestedKid = try #require(bodyObj["credentialKid"] as? String)
+                    let requestedKid = try #require(bodyObj["credentialKey"] as? String)
                     let now = Int(Date().timeIntervalSince1970)
                     let jwt = try signSpaceCredentialForTest(
                         key: activeKey,

@@ -63,9 +63,9 @@ class BinaryResponseDecodingTest {
     }
 
     @Test
-    fun `exportSpaceMeta returns octet-stream body as bytes`() = runTest {
+    fun `exportSpaceMeta returns STAR body as bytes`() = runTest {
         val captured = Captured()
-        val client = clientServing("application/octet-stream", captured = captured)
+        val client = clientServing("application/vnd.dasl.star", captured = captured)
 
         val response = client.com.atproto.space.exportSpaceMeta(
             ComAtprotoSpaceExportSpaceMetaParameters(
@@ -76,7 +76,7 @@ class BinaryResponseDecodingTest {
         assertEquals(200, response.responseCode)
         val data = assertNotNull(response.data, "binary 200 must not decode to null")
         assertContentEquals(body, data.data)
-        assertEquals("application/octet-stream", captured.accept)
+        assertEquals("application/vnd.dasl.star", captured.accept)
         assertEquals("/xrpc/com.atproto.space.exportSpaceMeta", captured.path)
     }
 

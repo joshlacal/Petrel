@@ -3,14 +3,12 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.clearRecords
 
-/// Delete every record in the authenticated account's space repo. The repo advances to a new revision with the empty repo's digest, and its oplog is cleared. In the space authority's own repo, the records the host publishes from the space's configuration (com.atproto.space.policy and com.atproto.memberspace.member) are kept, and the digest is that of the records that remain. Succeeds whether or not the repo held any records to delete. Requires auth, implemented by PDS.
+/// Delete all records in the authenticated account's space repo. In the space authority's repo, records published from the space's configuration (such as its policy) are kept. Requires auth, implemented by PDS.
 public enum ComAtprotoSpaceClearRecords {
     public static let typeIdentifier = "com.atproto.space.clearRecords"
 
     public struct Input: ATProtocolCodable {
-        /// Reference to the space.
         public let space: SpaceRef
-        /// The DID of the repo to clear (the authenticated member).
         public let repo: DID
 
         public init(
@@ -91,7 +89,7 @@ public enum ComAtprotoSpaceClearRecords {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - clearRecords
 
-    /// Delete every record in the authenticated account's space repo. The repo advances to a new revision with the empty repo's digest, and its oplog is cleared. In the space authority's own repo, the records the host publishes from the space's configuration (com.atproto.space.policy and com.atproto.memberspace.member) are kept, and the digest is that of the records that remain. Succeeds whether or not the repo held any records to delete. Requires auth, implemented by PDS.
+    /// Delete all records in the authenticated account's space repo. In the space authority's repo, records published from the space's configuration (such as its policy) are kept. Requires auth, implemented by PDS.
     ///
     /// - Parameters:
     ///   - input: The request body

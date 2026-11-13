@@ -3,20 +3,22 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.listRepoOps
 
-/// List the operation log for an account's permissioned repo within a space, returning operations after a given revision. Primary incremental sync mechanism. By default each created or updated operation inlines the record's current value; set excludeValues for metadata-only entries. Note the oplog is a transport optimization with no history guarantee: a host may compact it or drop it, and it does not survive account migration, so omitting `since` returns the retained window rather than the repo's full history. Use getRepo for an initial sync or when a `since` revision is no longer available. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services). When called with a space credential, the caller must send an Atproto-Space-Want-Mac header, and a response that includes the commit carries its MAC in the Atproto-Space-Mac response header.
+/// List operations on a space repo after a given revision. Used for incremental sync. Hosts may truncate the log, so use getRepo for a full sync. Responses are authenticated with a MAC. Requires auth as the repo's account or with a space credential; implemented by PDS.
 public enum ComAtprotoSpaceListRepoOps {
     public static let typeIdentifier = "com.atproto.space.listRepoOps"
 
-    /// A single operation in a permissioned repo's oplog. cid is null for deletes; prev is null for creates. Operations sharing the same rev belong to the same batch. value carries the record's current value for creates and updates, unless excludeValues was set or the value is stale (superseded by a later operation).
+    /// Operations that share a rev were applied in the same commit.
     public struct OpEntry: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.space.listRepoOps#opEntry"
 
         public let rev: TID
         public let collection: NSID
         public let rkey: RecordKey
+        /// CID of the record after the operation. Null for deletes.
         public let cid: CIDString?
+        /// CID of the record before the operation. Null for creates.
         public let prev: CIDString?
-        /// The record's current value, inlined for create and update operations. Omitted when excludeValues is set, for deletes, or when the value has been superseded by a later operation.
+        /// Omitted for deletes, if excludeValues is set, or if the record has since changed.
         public let value: ATProtocolValueContainer?
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
@@ -222,14 +224,13 @@ public enum ComAtprotoSpaceListRepoOps {
 
     public struct Output: ATProtocolCodable {
         public let ops: [OpEntry]
-        /// The account's current commit. Included when the response reaches the head of the oplog; omitted on backfill responses.
-        public let commit: ComAtprotoSpaceDefs.Commit?
-        /// Pass as `cursor` to fetch the next page. Absent once the response reaches the head of the oplog.
+        /// The repo's current commit. A syncer compares it against its own set hash once it has applied the last page, which has no cursor.
+        public let commit: ComAtprotoSpaceDefs.Commit
         public let cursor: String?
 
         public init(
             ops: [OpEntry],
-            commit: ComAtprotoSpaceDefs.Commit? = nil,
+            commit: ComAtprotoSpaceDefs.Commit,
             cursor: String? = nil
         ) {
             self.ops = ops
@@ -241,16 +242,7 @@ public enum ComAtprotoSpaceListRepoOps {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             ops = try container.decode([OpEntry].self, forKey: .ops)
-            do {
-                commit = try container.decodeIfPresent(ComAtprotoSpaceDefs.Commit.self, forKey: .commit, rejectingNull: strict)
-            } catch {
-                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
-                // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
-                guard !strict else { throw error }
-                LogManager.logWarning("Decoding error for optional property 'commit' — degrading to nil: \(error)")
-                commit = nil
-            }
+            commit = try container.decode(ComAtprotoSpaceDefs.Commit.self, forKey: .commit)
             do {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor, rejectingNull: strict)
             } catch {
@@ -266,7 +258,7 @@ public enum ComAtprotoSpaceListRepoOps {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(ops, forKey: .ops)
-            try container.encodeIfPresent(commit, forKey: .commit)
+            try container.encode(commit, forKey: .commit)
             try container.encodeIfPresent(cursor, forKey: .cursor)
         }
 
@@ -274,10 +266,8 @@ public enum ComAtprotoSpaceListRepoOps {
             var map = OrderedCBORMap()
             let opsValue = try ops.toCBORValue()
             map = map.adding(key: "ops", value: opsValue)
-            if let value = commit {
-                let commitValue = try value.toCBORValue()
-                map = map.adding(key: "commit", value: commitValue)
-            }
+            let commitValue = try commit.toCBORValue()
+            map = map.adding(key: "commit", value: commitValue)
             if let value = cursor {
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
@@ -293,13 +283,14 @@ public enum ComAtprotoSpaceListRepoOps {
     }
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        /// The Atproto-Space-Want-Mac header is missing or malformed, names an unsupported type or version, or carries an invalid key share.
-        case badSpaceMac = "BadSpaceMac"
+        /// The MAC requested in the Accept-Signature header is missing or invalid.
+        case invalidSpaceMac = "InvalidSpaceMac"
         case spaceNotFound = "SpaceNotFound"
         case repoNotFound = "RepoNotFound"
         case repoTakendown = "RepoTakendown"
         case repoSuspended = "RepoSuspended"
         case repoDeactivated = "RepoDeactivated"
+        case invalidCursor = "InvalidCursor"
         public var description: String {
             return rawValue
         }
@@ -320,7 +311,7 @@ public enum ComAtprotoSpaceListRepoOps {
     public static let endpointDescriptor = XRPCMethodDescriptor(
         nsid: "com.atproto.space.listRepoOps", kind: "query",
         inputEncoding: nil, outputEncoding: "application/json",
-        declaredErrors: ["BadSpaceMac", "SpaceNotFound", "RepoNotFound", "RepoTakendown", "RepoSuspended", "RepoDeactivated"]
+        declaredErrors: ["InvalidSpaceMac", "SpaceNotFound", "RepoNotFound", "RepoTakendown", "RepoSuspended", "RepoDeactivated", "InvalidCursor"]
     )
 
     public protocol ServerHandler: Sendable {
@@ -334,7 +325,7 @@ public enum ComAtprotoSpaceListRepoOps {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - listRepoOps
 
-    /// List the operation log for an account's permissioned repo within a space, returning operations after a given revision. Primary incremental sync mechanism. By default each created or updated operation inlines the record's current value; set excludeValues for metadata-only entries. Note the oplog is a transport optimization with no history guarantee: a host may compact it or drop it, and it does not survive account migration, so omitting `since` returns the retained window rather than the repo's full history. Use getRepo for an initial sync or when a `since` revision is no longer available. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services). When called with a space credential, the caller must send an Atproto-Space-Want-Mac header, and a response that includes the commit carries its MAC in the Atproto-Space-Mac response header.
+    /// List operations on a space repo after a given revision. Used for incremental sync. Hosts may truncate the log, so use getRepo for a full sync. Responses are authenticated with a MAC. Requires auth as the repo's account or with a space credential; implemented by PDS.
     ///
     /// - Parameter input: The input parameters for the request
     /// - Returns: The HTTP status code (always 2xx) and the decoded response body.

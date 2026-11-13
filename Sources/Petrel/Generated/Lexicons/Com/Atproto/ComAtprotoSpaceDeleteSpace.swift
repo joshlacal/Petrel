@@ -3,12 +3,11 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.deleteSpace
 
-/// Delete a space. Requires auth as the space owner. Deletes the owner's own repo in the space; other members' repos are left in place. Afterwards, reads and writes fail with SpaceNotFound and getSpaceCredential returns SpaceDeleted. Idempotent. Implemented by PDS.
+/// Delete a space, along with the authority's space repo. Requires auth as the space authority, implemented by PDS.
 public enum ComAtprotoSpaceDeleteSpace {
     public static let typeIdentifier = "com.atproto.space.deleteSpace"
 
     public struct Input: ATProtocolCodable {
-        /// Reference to the space to delete.
         public let space: SpaceRef
 
         public init(
@@ -41,7 +40,7 @@ public enum ComAtprotoSpaceDeleteSpace {
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
         case spaceNotFound = "SpaceNotFound"
-        case notSpaceOwner = "NotSpaceOwner"
+        case notAuthorized = "NotAuthorized"
         public var description: String {
             return rawValue
         }
@@ -62,7 +61,7 @@ public enum ComAtprotoSpaceDeleteSpace {
     public static let endpointDescriptor = XRPCMethodDescriptor(
         nsid: "com.atproto.space.deleteSpace", kind: "procedure",
         inputEncoding: "application/json", outputEncoding: nil,
-        declaredErrors: ["SpaceNotFound", "NotSpaceOwner"]
+        declaredErrors: ["SpaceNotFound", "NotAuthorized"]
     )
 
     public protocol ServerHandler: Sendable {
@@ -76,7 +75,7 @@ public enum ComAtprotoSpaceDeleteSpace {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - deleteSpace
 
-    /// Delete a space. Requires auth as the space owner. Deletes the owner's own repo in the space; other members' repos are left in place. Afterwards, reads and writes fail with SpaceNotFound and getSpaceCredential returns SpaceDeleted. Idempotent. Implemented by PDS.
+    /// Delete a space, along with the authority's space repo. Requires auth as the space authority, implemented by PDS.
     ///
     /// - Parameters:
     ///   - input: The request body

@@ -17,17 +17,47 @@ object ComAtprotoSpaceDefsDefs {
 }
 
     /**
-     * A commit over the current state of a permissioned repo. Carries no signature: the repo host authenticates it to a syncer with a MAC in the Atproto-Space-Mac response header.
+     * Commit to the current state of a space repo. Not signed; authenticated by the repo host with a MAC instead.
      */
     @Serializable
     data class ComAtprotoSpaceDefsCommit(
 /** Commit format version, currently 1. */        @SerialName("ver")
-        val ver: Int,/** The author DID of the repo. */        @SerialName("repo")
-        val repo: DID,/** Reference to the space. */        @SerialName("space")
-        val space: SpaceRef,/** Commit revision (TID). */        @SerialName("rev")
-        val rev: String,/** sha256 digest of the LtHash state (32 bytes). */        @SerialName("data")
+        val ver: Int,        @SerialName("repo")
+        val repo: DID,        @SerialName("space")
+        val space: SpaceRef,        @SerialName("rev")
+        val rev: String,/** SHA-256 digest of the repo's LtHash state. */        @SerialName("data")
         val `data`: Bytes    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoSpaceDefsCommit"
+        }
+    }
+
+    /**
+     * A repo in the space advanced to a new revision.
+     */
+    @Serializable
+    data class ComAtprotoSpaceDefsRepoWrite(
+        @SerialName("repo")
+        val repo: DID,        @SerialName("repoRev")
+        val repoRev: String,        @SerialName("data")
+        val `data`: Bytes,/** The space revision at which this update was sequenced. */        @SerialName("spaceRev")
+        val spaceRev: String,/** The space revision before this update, if any. Set in notifySpaceUpdate, where a gap indicates missed notifications, which can be recovered with listWriters. */        @SerialName("prevSpaceRev")
+        val prevSpaceRev: String? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#comAtprotoSpaceDefsRepoWrite"
+        }
+    }
+
+    /**
+     * A repo was removed from the writer set.
+     */
+    @Serializable
+    data class ComAtprotoSpaceDefsRepoRemoved(
+        @SerialName("repo")
+        val repo: DID,/** The space revision at which this update was sequenced. */        @SerialName("spaceRev")
+        val spaceRev: String,/** The space revision before this update, if any. Set in notifySpaceUpdate, where a gap indicates missed notifications, which can be recovered with listWriters. */        @SerialName("prevSpaceRev")
+        val prevSpaceRev: String? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#comAtprotoSpaceDefsRepoRemoved"
         }
     }

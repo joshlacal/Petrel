@@ -3,14 +3,14 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.policy
 
-/// The policy governing a space, optionally published in the space so that syncers can view a description of the space's policy. Written to the space authority's own repo in the space, and kept in sync with the policy. Only authoritative in the authority's repo.
+/// A published copy of a space's policy. Only authoritative in the space authority's repo.
 public struct ComAtprotoSpacePolicy: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "com.atproto.space.policy"
 
     /// The record key type this collection declares (`key` in the Lexicon).
     public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "literal:self")
 
-    /// The current policy governing the space, including its configuration.
+    /// PDSes must support all of the listed policies. Other space hosts may support only some of them, and any host may support policies beyond those listed.
     public let policy: ComAtprotoSpacePolicyPolicyUnion
     /// Wire fields this Lexicon revision does not declare. They are kept on decode and
     /// written back on encode, so re-serializing data never drops them.

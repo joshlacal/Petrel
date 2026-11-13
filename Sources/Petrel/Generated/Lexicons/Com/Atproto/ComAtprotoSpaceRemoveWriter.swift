@@ -3,54 +3,52 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.removeWriter
 
-/// Remove an account from a space's writer set, so that listRepos no longer lists it. The account is tracked again if it later writes while still authorized. Idempotent: succeeds whether or not the account was in the writer set. Requires auth as an account that may manage the space.
+/// Remove an account from a space's writer set, as returned by listWriters. The removal is sent to registered syncers. The account is added back if it makes another authorized write to the space. Does nothing if the account is not in the writer set. Requires auth as the space authority, implemented by PDS.
 public enum ComAtprotoSpaceRemoveWriter {
     public static let typeIdentifier = "com.atproto.space.removeWriter"
 
     public struct Input: ATProtocolCodable {
-        /// Reference to the space.
         public let space: SpaceRef
-        /// The DID of the writer to remove.
-        public let did: DID
+        public let repo: DID
 
         public init(
             space: SpaceRef,
-            did: DID
+            repo: DID
         ) {
             self.space = space
-            self.did = did
+            self.repo = repo
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             space = try container.decode(SpaceRef.self, forKey: .space)
-            did = try container.decode(DID.self, forKey: .did)
+            repo = try container.decode(DID.self, forKey: .repo)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(space, forKey: .space)
-            try container.encode(did, forKey: .did)
+            try container.encode(repo, forKey: .repo)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
             let spaceValue = try space.toCBORValue()
             map = map.adding(key: "space", value: spaceValue)
-            let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            let repoValue = try repo.toCBORValue()
+            map = map.adding(key: "repo", value: repoValue)
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case space
-            case did
+            case repo
         }
     }
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
         case spaceNotFound = "SpaceNotFound"
-        case notSpaceOwner = "NotSpaceOwner"
+        case notAuthorized = "NotAuthorized"
         public var description: String {
             return rawValue
         }
@@ -71,7 +69,7 @@ public enum ComAtprotoSpaceRemoveWriter {
     public static let endpointDescriptor = XRPCMethodDescriptor(
         nsid: "com.atproto.space.removeWriter", kind: "procedure",
         inputEncoding: "application/json", outputEncoding: nil,
-        declaredErrors: ["SpaceNotFound", "NotSpaceOwner"]
+        declaredErrors: ["SpaceNotFound", "NotAuthorized"]
     )
 
     public protocol ServerHandler: Sendable {
@@ -85,7 +83,7 @@ public enum ComAtprotoSpaceRemoveWriter {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - removeWriter
 
-    /// Remove an account from a space's writer set, so that listRepos no longer lists it. The account is tracked again if it later writes while still authorized. Idempotent: succeeds whether or not the account was in the writer set. Requires auth as an account that may manage the space.
+    /// Remove an account from a space's writer set, as returned by listWriters. The removal is sent to registered syncers. The account is added back if it makes another authorized write to the space. Does nothing if the account is not in the writer set. Requires auth as the space authority, implemented by PDS.
     ///
     /// - Parameters:
     ///   - input: The request body

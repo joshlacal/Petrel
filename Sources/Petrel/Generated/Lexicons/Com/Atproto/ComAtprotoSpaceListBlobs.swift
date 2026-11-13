@@ -3,27 +3,24 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.listBlobs
 
-/// List the CIDs of blobs referenced by an account's records within a permissioned space, optionally since some revision of that repo. Lets a syncer discover which blobs to fetch via getBlob, and lets an account enumerate the blobs it must carry when migrating a permissioned repo. Scoped to one space: blobs behind permissioned records are never enumerated by com.atproto.sync.listBlobs, which is unauthenticated. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services).
+/// List blob CIDs referenced by records in a space repo. Requires auth as the repo's account or with a space credential; implemented by PDS.
 public enum ComAtprotoSpaceListBlobs {
     public static let typeIdentifier = "com.atproto.space.listBlobs"
 
     public struct Parameters: Parametrizable {
         public let space: SpaceRef
         public let repo: DID
-        public let since: TID?
         public let limit: Int?
         public let cursor: String?
 
         public init(
             space: SpaceRef,
             repo: DID,
-            since: TID? = nil,
             limit: Int? = 500,
             cursor: String? = nil
         ) {
             self.space = space
             self.repo = repo
-            self.since = since
             self.limit = limit
             self.cursor = cursor
         }
@@ -120,7 +117,7 @@ public enum ComAtprotoSpaceListBlobs {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - listBlobs
 
-    /// List the CIDs of blobs referenced by an account's records within a permissioned space, optionally since some revision of that repo. Lets a syncer discover which blobs to fetch via getBlob, and lets an account enumerate the blobs it must carry when migrating a permissioned repo. Scoped to one space: blobs behind permissioned records are never enumerated by com.atproto.sync.listBlobs, which is unauthenticated. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services).
+    /// List blob CIDs referenced by records in a space repo. Requires auth as the repo's account or with a space credential; implemented by PDS.
     ///
     /// - Parameter input: The input parameters for the request
     /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
@@ -167,7 +164,7 @@ public extension ATProtoClient.Com.Atproto.Space {
 
 extension ComAtprotoSpaceListBlobs.Parameters: XRPCCursorPaginatedParameters {
     public func withCursor(_ cursor: String?) -> Self {
-        Self(space: space, repo: repo, since: since, limit: limit, cursor: cursor)
+        Self(space: space, repo: repo, limit: limit, cursor: cursor)
     }
 }
 

@@ -1,9 +1,13 @@
 import Crypto
 import Foundation
 
-/// October 22 Spaces response authentication (DHKEM P-256 / HKDF-SHA256).
+/// Spaces response authentication with HPKE secret export
+/// (DHKEM P-256 / HKDF-SHA256 / Export-only).
+///
 /// Secrets belong to one HTTP request, independently of credential binding keys.
 public enum SpaceMAC {
+    private static let hashByteCount = 32
+
     public enum Failure: Error, Sendable, Equatable {
         case invalidKey
         case invalidContext
@@ -50,46 +54,108 @@ public enum SpaceMAC {
         sender: P256.KeyAgreement.PublicKey,
         recipient: P256.KeyAgreement.PublicKey
     ) throws -> Data {
-        let dh = try privateKey.sharedSecretFromKeyAgreement(with: publicKey)
-        let prefix = Data("HPKE-v1KEM".utf8) + Data([0, 0x10])
-        let input = prefix + Data("eae_prk".utf8) + dh.withUnsafeBytes { Data($0) }
-        let info = Data([0, 32]) + prefix + Data("shared_secret".utf8)
-            + sender.x963Representation + recipient.x963Representation
-        let secret = HKDF<SHA256>.deriveKey(
-            inputKeyMaterial: SymmetricKey(data: input), salt: Data(), info: info, outputByteCount: 32
+        let dh = try privateKey.sharedSecretFromKeyAgreement(with: publicKey).withUnsafeBytes { Data($0) }
+        let kemID = concatenating(Data("KEM".utf8), uint16(0x0010))
+        let suiteID = concatenating(
+            Data("HPKE".utf8), uint16(0x0010), uint16(0x0001), uint16(0xFFFF)
         )
-        return secret.withUnsafeBytes { Data($0) }
+
+        let eaePRK = labeledExtract(id: kemID, salt: Data(), label: "eae_prk", input: dh)
+        let kemContext = concatenating(sender.x963Representation, recipient.x963Representation)
+        let kemSecret = try labeledExpand(
+            id: kemID, pseudorandomKey: eaePRK, label: "shared_secret",
+            info: kemContext, outputByteCount: 32
+        )
+
+        let pskIDHash = labeledExtract(id: suiteID, salt: Data(), label: "psk_id_hash", input: Data())
+        let infoHash = labeledExtract(
+            id: suiteID, salt: Data(), label: "info_hash", input: Data("atproto-mac".utf8)
+        )
+        let keyScheduleContext = concatenating(Data([0]), pskIDHash, infoHash)
+        let secret = labeledExtract(id: suiteID, salt: kemSecret, label: "secret", input: Data())
+        let exporterSecret = try labeledExpand(
+            id: suiteID, pseudorandomKey: secret, label: "exp",
+            info: keyScheduleContext, outputByteCount: 32
+        )
+        return try labeledExpand(
+            id: suiteID, pseudorandomKey: exporterSecret, label: "sec",
+            info: Data(), outputByteCount: 32
+        )
     }
 
-    public static func commit(sharedSecret: Data, space: String, repo: String, rev: String, data: Data) throws -> Data {
-        guard data.count == 32 else { throw Failure.invalidContext }
-        let context = try Data("atproto-space-repo-v1".utf8) + field(space) + field(repo) + field(rev) + data
-        return try authenticate(context, sharedSecret: sharedSecret)
+    package static func authenticationCode(for message: Data, sharedSecret: Data) throws -> Data {
+        guard sharedSecret.count == 32 else { throw Failure.invalidKey }
+        return Data(HMAC<SHA256>.authenticationCode(for: message, using: SymmetricKey(data: sharedSecret)))
     }
 
-    public static func record(sharedSecret: Data, uri: String, cid: Data) throws -> Data {
-        guard !cid.isEmpty else { throw Failure.invalidContext }
-        return try authenticate(Data("atproto-space-record-v1".utf8) + field(uri) + cid, sharedSecret: sharedSecret)
-    }
-
-    public static func verify(mac: Data, expected: Data) throws {
-        guard mac.count == 32, expected.count == 32 else { throw Failure.mismatch }
-        // Fixed-length comparison; never short-circuit on a mismatching byte.
+    package static func verify(authenticationCode: Data, message: Data, sharedSecret: Data) throws {
+        guard authenticationCode.count == 32 else { throw Failure.mismatch }
+        let expected = try self.authenticationCode(for: message, sharedSecret: sharedSecret)
         var difference: UInt8 = 0
-        for (left, right) in zip(mac, expected) {
+        for (left, right) in zip(authenticationCode, expected) {
             difference |= left ^ right
         }
         guard difference == 0 else { throw Failure.mismatch }
     }
 
-    private static func field(_ string: String) throws -> Data {
-        let bytes = Data(string.utf8)
-        guard bytes.count <= Int(UInt16.max) else { throw Failure.invalidContext }
-        return Data([UInt8(bytes.count >> 8), UInt8(bytes.count & 0xFF)]) + bytes
+    private static func labeledExtract(id: Data, salt: Data, label: String, input: Data) -> Data {
+        hkdfExtract(
+            salt: salt,
+            input: concatenating(Data("HPKE-v1".utf8), id, Data(label.utf8), input)
+        )
     }
 
-    private static func authenticate(_ context: Data, sharedSecret: Data) throws -> Data {
-        guard sharedSecret.count == 32 else { throw Failure.invalidKey }
-        return Data(HMAC<SHA256>.authenticationCode(for: context, using: SymmetricKey(data: sharedSecret)))
+    private static func labeledExpand(
+        id: Data,
+        pseudorandomKey: Data,
+        label: String,
+        info: Data,
+        outputByteCount: Int
+    ) throws -> Data {
+        guard (0 ... Int(UInt16.max)).contains(outputByteCount) else { throw Failure.invalidContext }
+        return try hkdfExpand(
+            pseudorandomKey: pseudorandomKey,
+            info: concatenating(
+                uint16(UInt16(outputByteCount)), Data("HPKE-v1".utf8), id, Data(label.utf8), info
+            ),
+            outputByteCount: outputByteCount
+        )
+    }
+
+    private static func hkdfExtract(salt: Data, input: Data) -> Data {
+        let key = SymmetricKey(data: salt.isEmpty ? Data(repeating: 0, count: hashByteCount) : salt)
+        return Data(HMAC<SHA256>.authenticationCode(for: input, using: key))
+    }
+
+    private static func hkdfExpand(
+        pseudorandomKey: Data,
+        info: Data,
+        outputByteCount: Int
+    ) throws -> Data {
+        guard outputByteCount <= 255 * hashByteCount else { throw Failure.invalidContext }
+        guard outputByteCount > 0 else { return Data() }
+
+        let key = SymmetricKey(data: pseudorandomKey)
+        var output = Data()
+        output.reserveCapacity(outputByteCount)
+        var previous = Data()
+        for counter in UInt8(1) ... UInt8((outputByteCount + hashByteCount - 1) / hashByteCount) {
+            let input = concatenating(previous, info, Data([counter]))
+            previous = Data(HMAC<SHA256>.authenticationCode(for: input, using: key))
+            output.append(previous.prefix(outputByteCount - output.count))
+        }
+        return output
+    }
+
+    private static func uint16(_ value: UInt16) -> Data {
+        Data([UInt8(value >> 8), UInt8(value & 0xFF)])
+    }
+
+    private static func concatenating(_ values: Data...) -> Data {
+        var output = Data(capacity: values.reduce(0) { $0 + $1.count })
+        for value in values {
+            output.append(value)
+        }
+        return output
     }
 }
