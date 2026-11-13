@@ -7,6 +7,10 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 build/
+dist/
+*.egg-info/
+.pytest_cache/
+uv.lock
 Generator/__pycache__/
 __pycache__/
 *.py[cod]
@@ -60,6 +64,8 @@ Server/keys/
 /docs/index/
 /docs/index.html
 /docs/js/
+/docs/link-hierarchy.json
+/docs/linkable-entities.json
 /docs/metadata.json
 /docs/theme-settings.json
 /docs/videos/

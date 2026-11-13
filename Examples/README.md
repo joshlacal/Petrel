@@ -1,82 +1,65 @@
-# Petrel examples
+# Petrel 2.0 Runnable Examples
 
-This directory contains executable example scripts and projects demonstrating how to interact with AT Protocol and Bluesky using Swift.
+This directory contains self-contained, runnable Swift 6 starter projects and scripts demonstrating AT Protocol OAuth, custom Lexicon overlays, real-time Jetstream/Firehose streaming, and Bluesky posting with `Petrel`.
 
-## Available examples
+## Example Matrix
 
-| Example | Type | Description | Authentication |
-|---|---|---|---|
-| `FirehoseDemo.swift` | Package executable (`swift run FirehoseDemo`) | Streams the relay firehose, a labeler, or Jetstream with `PetrelFirehose` and `PetrelJetstream` | None required |
-| `SimplePostCLI.swift` | Standalone script | Posts to Bluesky using direct HTTPS XRPC requests via Foundation | App password |
-| `PostCLIDemo/` | Swift Package CLI | Interactive CLI that uses the Petrel SDK to authenticate, post messages, and inspect profiles | App password |
+| Example | Type | What It Demonstrates | Credentials Required |
+| :--- | :--- | :--- | :--- |
+| [`LoopbackOAuthSwiftUI/`](LoopbackOAuthSwiftUI/) | SwiftUI App Package | Zero-deploy `OAuthConfig.loopback(port: 8765)` + `NWListener`, `WebAuthenticationSession` custom-scheme mode, Keychain session restore, paginated `getTimeline`, and live `RichText` facet composer | Any ATProto / Bluesky account (OAuth) |
+| [`StatusphereOverlay/`](StatusphereOverlay/) | Overlay Library + CLI | Custom `xyz.statusphere.*` Lexicons, `"kind": "overlay"` manifest, generated `PetrelStatusphere` Swift package, `PetrelStatusphereLexicons.register()`, `CIDv1` DAG-CBOR hashing, and live PDS record read/write | None for `--demo` & `list`; App Password for `post` |
+| [`JetstreamLiveCLI/`](JetstreamLiveCLI/) | Swift 6 CLI Package | Filtered live `PetrelJetstream` streaming, `zstd` dictionary compression, keyword filtering, custom collection wildcards (`xyz.statusphere.*`), and durable file-backed `FirehoseCursorStorage` | None |
+| [`FirehoseDemo.swift`](FirehoseDemo.swift) | Root Package Executable | Binary `com.atproto.sync.subscribeRepos` (`PetrelFirehose`), labeler streams (`com.atproto.label.subscribeLabels`), and Jetstream in ~120 lines | None |
+| [`PostCLIDemo/`](PostCLIDemo/) | Swift 6 CLI Package | Interactive terminal client demonstrating `AuthMode.legacy` App Password login, profile lookup, and posting | App Password |
+| [`SimplePostCLI.swift`](SimplePostCLI.swift) | Single-File Script | Raw Foundation `URLSession` XRPC requests (`createSession` + `createRecord`) showing the wire protocol underneath Petrel | App Password |
 
-## Requirements
+---
 
-- Swift 6.0 or later
-- macOS 15.0 or later (or Linux with Swift 6.0 toolchain installed)
+## Quick Run Commands
 
-## Run the firehose monitor
-
-`FirehoseDemo.swift` is an executable target of the Petrel package. It uses the public `PetrelFirehose` and `PetrelJetstream` APIs and needs no account.
-
-From the package root:
+### 1. Custom `xyz.statusphere.*` Lexicon Overlay (`StatusphereOverlay`)
 
 ```bash
-swift run FirehoseDemo firehose                # relay firehose (com.atproto.sync.subscribeRepos), bsky.network
-swift run FirehoseDemo labels                  # labeler stream (com.atproto.label.subscribeLabels), mod.bsky.app
-swift run FirehoseDemo jetstream               # Jetstream v2, posts only
-swift run FirehoseDemo jetstream wss://jetstream2.us-east.bsky.network/subscribe   # legacy Jetstream API
+cd Examples/StatusphereOverlay
+swift run StatusphereCLI --demo
+swift run StatusphereCLI list --actor atproto.com
 ```
 
-Each mode takes an optional service URL and `--count N` (default 25 events, then it exits).
-
-## Run the standalone poster
-
-`SimplePostCLI.swift` demonstrates direct HTTP XRPC requests against Bluesky servers without depending on the Petrel package. It creates a session via `com.atproto.server.createSession` and creates a record via `com.atproto.repo.createRecord`.
-
-To run the script:
+### 2. Live Jetstream Streaming & Filtering (`JetstreamLiveCLI`)
 
 ```bash
-swift Examples/SimplePostCLI.swift
+cd Examples/JetstreamLiveCLI
+swift run JetstreamLiveCLI --keyword swift --compress --limit 10
 ```
 
-When prompted:
-1. Enter your handle (for example, `alice.bsky.social`).
-2. Enter an app password generated from your account settings (passwords are entered securely without terminal echo).
-3. Enter your post text.
+### 3. Zero-Deploy OAuth + SwiftUI Reference App (`LoopbackOAuthSwiftUI`)
 
-## Run the Petrel CLI application
+```bash
+cd Examples/LoopbackOAuthSwiftUI
+swift build
+swift run LoopbackOAuthSwiftUI
+```
 
-`PostCLIDemo` is a full Swift Package executable that depends on the local `Petrel` library target. It demonstrates client initialization, password authentication (`loginWithPassword`), record creation with `AppBskyFeedPost`, and profile lookup with `app.bsky.actor.getProfile`.
+### 4. Binary Relay Firehose & Labeler Stream (`FirehoseDemo`)
 
-To build and run `PostCLIDemo`:
+From the repository root:
+
+```bash
+swift run FirehoseDemo firehose --count 15
+swift run FirehoseDemo labels --count 15
+swift run FirehoseDemo jetstream --count 15
+```
+
+### 5. Interactive App-Password CLI (`PostCLIDemo`)
 
 ```bash
 cd Examples/PostCLIDemo
 swift run PostCLIDemo
 ```
 
-The interactive menu lets you:
-1. Compose and submit a post to Bluesky.
-2. View your profile information (display name, description, followers count, follows count, posts count).
-3. Exit the application.
+---
 
-## Obtain an app password
+## Security Notes
 
-Posting examples require an app-specific password rather than your primary account credentials.
-
-To create an app password:
-1. Open your account settings at <https://bsky.app/settings/app-passwords>.
-2. Select **Add App Password**.
-3. Enter a label (for example, `Petrel CLI Demo`).
-4. Copy the generated password token (`xxxx-xxxx-xxxx-xxxx`).
-
-App passwords can be revoked at any time from the same settings page without modifying your main account password.
-
-### Security note
-
-Interactive example scripts prompt for secrets securely on standard input with terminal echo disabled (`termios`). Do not pass passwords or credentials via command-line arguments, environment variables, or shell scripts where they may be exposed in process listings or shell history.
-
-## Production authentication
-
-These command-line demos use app password authentication (`AuthMode.legacy`). For production user-facing applications, use OAuth with DPoP (`AuthMode.publicOAuth` or `AuthMode.gateway`). See `Sources/Petrel/Petrel.docc/Authentication.md` and `GETTING_STARTED.md` for details on configuring OAuth flows.
+- **Prefer OAuth 2.1 + DPoP (`AuthMode.publicOAuth`, `.gateway(_:)`, or `.cab`)** for all user-facing iOS, macOS, and web applications — start from [`LoopbackOAuthSwiftUI/`](LoopbackOAuthSwiftUI/).
+- **Scoped App Passwords (`AuthMode.legacy`)** are intended only for headless scripts and developer CLIs. Interactive examples in this folder read App Passwords from standard input with terminal echo disabled (`termios`) so credentials never appear in shell history or process arguments.

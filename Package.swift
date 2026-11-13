@@ -82,6 +82,10 @@ let package = Package(
             name: "PetrelLexgen",
             targets: ["PetrelLexgen"]
         ),
+        .plugin(
+            name: "PetrelCodegenPlugin",
+            targets: ["PetrelCodegenPlugin"]
+        ),
     ],
     traits: [
         .trait(
@@ -327,12 +331,34 @@ let package = Package(
             name: "PetrelLoad",
             dependencies: ["Petrel"]
         ),
+        .plugin(
+            name: "PetrelCodegenPlugin",
+            capability: .command(
+                intent: .custom(
+                    verb: "petrel-codegen",
+                    description: "Generate Swift 6 and Kotlin Lexicon overlay sources from petrel-manifest.json"
+                ),
+                permissions: [
+                    .writeToPackageDirectory(
+                        reason: "Writes generated Lexicon models and ATProtoClient extensions to the output directories configured in petrel-manifest.json."
+                    ),
+                ]
+            ),
+            path: "Plugins/PetrelCodegenPlugin"
+        ),
         // Compiled example for the event-stream consumers: `swift run FirehoseDemo`.
         .executableTarget(
             name: "FirehoseDemo",
             dependencies: ["Petrel", "PetrelFirehose", "PetrelJetstream"],
             path: "Examples",
-            exclude: ["README.md", "SimplePostCLI.swift", "PostCLIDemo"],
+            exclude: [
+                "README.md",
+                "SimplePostCLI.swift",
+                "PostCLIDemo",
+                "StatusphereOverlay",
+                "JetstreamLiveCLI",
+                "LoopbackOAuthSwiftUI",
+            ],
             sources: ["FirehoseDemo.swift"],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

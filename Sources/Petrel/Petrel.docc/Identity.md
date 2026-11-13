@@ -9,16 +9,19 @@ Turn a handle or a DID into a verified identity: the DID document, the PDS endpo
 specifications. It needs no ``ATProtoClient``, no account and no keychain, and it runs on Apple
 platforms and Linux, so it works in a server as well as in an app.
 
+<!-- compile-example: identity-overview -->
 ```swift
 import Petrel
 
-let resolver = IdentityResolver()
+func resolveVerifiedIdentity() async throws {
+    let resolver = IdentityResolver()
 
-let identity = try await resolver.resolveIdentity("atproto.com")
-identity.did                  // did:plc:ewvi7nxzyoun6zhxrhs64oiz
-identity.handle               // atproto.com
-identity.pdsEndpoint          // the account's PDS
-try identity.signingKey()     // the #atproto key, for verifying signatures
+    let identity = try await resolver.resolveIdentity("atproto.com")
+    _ = identity.did                // did:plc:ewvi7nxzyoun6zhxrhs64oiz
+    _ = identity.handle             // atproto.com
+    _ = identity.pdsEndpoint        // the account's PDS
+    _ = try identity.signingKey()   // the #atproto key, for verifying signatures
+}
 ```
 
 ### Handle to DID
@@ -27,8 +30,13 @@ try identity.signingKey()     // the #atproto key, for verifying signatures
 holds in both directions: the handle's domain names the DID, and the DID's document claims the
 handle.
 
+<!-- compile-example: identity-handle-to-did -->
 ```swift
-let did = try await resolver.resolveHandle("atproto.com")
+import Petrel
+
+func resolveHandleOnly(resolver: IdentityResolver) async throws -> DID {
+    try await resolver.resolveHandle("atproto.com")
+}
 ```
 
 The handle's domain is asked two ways at once, as the handle specification describes:
@@ -61,20 +69,27 @@ the protocol blesses:
   ``IdentityError/unsupportedDIDWebPath(_:)``, and a port is accepted only on `localhost`, which
   is itself accepted only with ``IdentityResolver/Options/allowsDevelopmentIdentifiers``.
 
+DID document fetches do not follow redirects.
+
 Any other method fails with ``IdentityError/unsupportedDIDMethod(did:method:)``, and a string
 that is not a DID fails with ``IdentityError/invalidDIDSyntax(_:)``. The returned document's `id`
 always equals the DID that was asked for; a document that names another DID fails with
 ``IdentityError/documentIDMismatch(expected:actual:)``.
 
+<!-- compile-example: identity-did-document -->
 ```swift
-let document = try await resolver.resolveDIDDocument("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
+import Petrel
 
-document.claimedHandle               // the first valid at:// entry in alsoKnownAs (unverified)
-document.pdsEndpoint                 // #atproto_pds, type AtprotoPersonalDataServer
-try document.atprotoSigningKey()     // #atproto: Multikey or a legacy 2019 key type
-try document.atprotoSigningDIDKey()  // the same key as a did:key string
-try document.serviceEndpoint(.labeler)        // #atproto_labeler
-try document.serviceEndpoint(.feedGenerator)  // #bsky_fg
+func inspectDIDDocument(resolver: IdentityResolver) async throws {
+    let document = try await resolver.resolveDIDDocument("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
+
+    _ = document.claimedHandle                    // the first valid at:// entry in alsoKnownAs (unverified)
+    _ = document.pdsEndpoint                      // #atproto_pds, type AtprotoPersonalDataServer
+    _ = try document.atprotoSigningKey()          // #atproto: Multikey or a legacy 2019 key type
+    _ = try document.atprotoSigningDIDKey()       // the same key as a did:key string
+    _ = try document.serviceEndpoint(.labeler)        // #atproto_labeler
+    _ = try document.serviceEndpoint(.feedGenerator)  // #bsky_fg
+}
 ```
 
 ``DIDDocument`` applies the rules of the DID specification for you: the first matching entry
@@ -88,15 +103,20 @@ wins, a signing key must be controlled by the DID itself, and a service endpoint
 account is still usable, so the identity is returned with the handle `handle.invalid`, and
 ``ResolvedIdentity/handleVerification`` says why.
 
+<!-- compile-example: identity-handle-invalid -->
 ```swift
-let identity = try await resolver.resolveIdentity("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
+import Petrel
 
-if identity.isHandleVerified {
-    show("@\(identity.handle)")
-} else {
-    // identity.handle is "handle.invalid". Do not display identity.claimedHandle as if it
-    // were the account's handle.
-    show(identity.did.didString())
+func displayVerifiedHandleOrDID(resolver: IdentityResolver) async throws -> String {
+    let identity = try await resolver.resolveIdentity("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
+
+    if identity.isHandleVerified {
+        return "@\(identity.handle)"
+    } else {
+        // identity.handle is "handle.invalid". Do not display identity.claimedHandle as if it
+        // were the account's handle.
+        return identity.did.didString()
+    }
 }
 ```
 
@@ -105,30 +125,48 @@ if identity.isHandleVerified {
 Service authentication and repository verification need an account's signing key, or the
 endpoint of one of its services.
 
+<!-- compile-example: identity-signing-key -->
 ```swift
-let key = try await resolver.resolveSigningKey(for: issuerDID)
-let pds = try await resolver.resolveServiceEndpoint(for: issuerDID, service: .pds)
+import Foundation
+import Petrel
+
+func fetchPeerKeyAndPDS(resolver: IdentityResolver, issuerDID: String) async throws {
+    let key = try await resolver.resolveSigningKey(for: issuerDID)
+    let pds = try await resolver.resolveServiceEndpoint(for: issuerDID, service: .pds)
+    _ = (key, pds)
+}
 ```
 
 Keys rotate. When a signature does not verify against the cached key, ask again with
 `forceRefresh: true` before rejecting it.
 
+<!-- compile-example: identity-signing-key-refresh -->
 ```swift
-let currentKey = try await resolver.resolveSigningKey(for: issuerDID, forceRefresh: true)
+import Petrel
+
+func refreshPeerSigningKey(resolver: IdentityResolver, issuerDID: String) async throws -> ATProtoJWTVerificationKey {
+    try await resolver.resolveSigningKey(for: issuerDID, forceRefresh: true)
+}
 ```
 
 ### Configuration
 
+<!-- compile-example: identity-configuration -->
 ```swift
-let resolver = IdentityResolver(
-    options: IdentityResolver.Options(
-        plcDirectoryURL: URL(string: "https://plc.example.net")!,
-        handleStrategy: .direct,
-        timeout: 3,
-        cachePolicy: IdentityCachePolicy(freshFor: 15 * 60, maximumAge: 6 * 60 * 60)
-    ),
-    cache: InMemoryIdentityCache(capacity: 50_000)
-)
+import Foundation
+import Petrel
+
+func buildConfiguredIdentityResolver() -> IdentityResolver {
+    IdentityResolver(
+        options: IdentityResolver.Options(
+            plcDirectoryURL: URL(string: "https://plc.example.net")!,
+            handleStrategy: .direct,
+            timeout: 3,
+            cachePolicy: IdentityCachePolicy(freshFor: 15 * 60, maximumAge: 6 * 60 * 60)
+        ),
+        cache: InMemoryIdentityCache(capacity: 50_000)
+    )
+}
 ```
 
 - ``HandleResolutionStrategy/direct`` asks the handle's own domain. A client that would rather
@@ -159,7 +197,10 @@ every one of them as untrusted:
 To send lookups through your own HTTP client, DNS over HTTPS, or test doubles, supply an
 ``IdentityHTTPTransport`` and an ``IdentityDNSResolver``.
 
+<!-- compile-example: identity-custom-dns -->
 ```swift
+import Petrel
+
 struct FixedDNS: IdentityDNSResolver {
     let records: [String: [String]]
 
@@ -168,9 +209,11 @@ struct FixedDNS: IdentityDNSResolver {
     }
 }
 
-let resolver = IdentityResolver(dnsResolver: FixedDNS(records: [
-    "_atproto.alice.example.com": ["did=did:plc:ewvi7nxzyoun6zhxrhs64oiz"],
-]))
+func makeResolverWithFixedDNS() -> IdentityResolver {
+    IdentityResolver(dnsResolver: FixedDNS(records: [
+        "_atproto.alice.example.com": ["did=did:plc:ewvi7nxzyoun6zhxrhs64oiz"],
+    ]))
+}
 ```
 
 ### With ATProtoClient
@@ -179,22 +222,34 @@ let resolver = IdentityResolver(dnsResolver: FixedDNS(records: [
 first asks the service it is connected to (`com.atproto.identity.resolveHandle`), falls back to
 the handle's domain, and verifies the answer against the DID document in every case.
 
+<!-- compile-example: identity-with-client -->
 ```swift
-let client = await ATProtoClient(baseURL: URL(string: "https://public.api.bsky.app")!)
+import Foundation
+import Petrel
 
-let did = try await client.resolveHandleToDID(handle: "atproto.com")
-let identity = try await client.resolveIdentity(did)
+func resolveThroughClient() async throws -> ResolvedIdentity {
+    let client = await ATProtoClient(baseURL: URL(string: "https://public.api.bsky.app")!)
+
+    let did = try await client.resolveHandleToDID(handle: "atproto.com")
+    return try await client.resolveIdentity(did)
+}
 ```
 
 To make a client resolve handles directly, or to share one resolver and its cache between
 clients, pass your own.
 
+<!-- compile-example: identity-shared-resolver -->
 ```swift
-let resolver = IdentityResolver()
-let client = await ATProtoClient(
-    baseURL: URL(string: "https://public.api.bsky.app")!,
-    didResolver: resolver
-)
+import Foundation
+import Petrel
+
+func shareResolverWithClient() async -> ATProtoClient {
+    let resolver = IdentityResolver()
+    return await ATProtoClient(
+        baseURL: URL(string: "https://public.api.bsky.app")!,
+        didResolver: resolver
+    )
+}
 ```
 
 ### Errors
@@ -203,17 +258,25 @@ Every failure is an ``IdentityError``. The cases separate what the specification
 implementations to tell apart: invalid syntax, an unsupported method, an identifier that does not
 exist, and a lookup that could not be completed.
 
+<!-- compile-example: identity-errors -->
 ```swift
-do {
-    _ = try await resolver.resolveHandle(input)
-} catch IdentityError.invalidHandleSyntax {
-    // not a handle
-} catch IdentityError.handleNotFound {
-    // no DNS record and no well-known file
-} catch IdentityError.handleNotClaimedByDID {
-    // the DID document does not claim this handle
-} catch IdentityError.handleLookupFailed {
-    // DNS or the handle's web server could not be reached; try again later
+import Petrel
+
+func classifyHandleLookup(resolver: IdentityResolver, input: String) async -> String {
+    do {
+        let did = try await resolver.resolveHandle(input)
+        return did.didString()
+    } catch IdentityError.invalidHandleSyntax {
+        return "not a handle"
+    } catch IdentityError.handleNotFound {
+        return "no DNS record and no well-known file"
+    } catch IdentityError.handleNotClaimedByDID {
+        return "the DID document does not claim this handle"
+    } catch IdentityError.handleLookupFailed {
+        return "DNS or web server unreachable; retry later"
+    } catch {
+        return "other identity error: \(error)"
+    }
 }
 ```
 

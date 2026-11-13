@@ -9,7 +9,9 @@ JSON over WebSocket, with server-side filtering by collection and DID. It needs 
 or MST handling, at the cost of the cryptographic material that makes the firehose
 verifiable.
 
-- ``JetstreamSubscription`` is the live stream. Start with <doc:Jetstream>.
+- ``JetstreamSubscription`` is the live stream. It reports frames it cannot use as
+  ``JetstreamSubscriptionEvent/ignoredFrame(_:)`` rather than dropping them. Start with
+  <doc:Jetstream>.
 - ``JetstreamClient`` adds archive backfill on hosts that offer it, then cuts over to live.
 
 ## Topics
@@ -20,6 +22,7 @@ verifiable.
 - ``JetstreamSubscription``
 - ``JetstreamSubscriptionConfiguration``
 - ``JetstreamSubscriptionEvent``
+- ``JetstreamIgnoredFrame``
 - ``JetstreamSubscriptionError``
 - ``JetstreamAPIVersion``
 - ``JetstreamOptionsUpdate``

@@ -1,0 +1,44 @@
+{
+  "lexicon": 1,
+  "id": "xyz.statusphere.status",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A single emoji status broadcast to the ATmosphere.",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": ["status", "createdAt"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "maxGraphemes": 5,
+            "maxLength": 32,
+            "description": "An emoji or short symbol representing the user's current status."
+          },
+          "mood": {
+            "type": "string",
+            "description": "An extensible mood tag using ATProto open knownValues.",
+            "knownValues": [
+              "xyz.statusphere.status#shipping",
+              "xyz.statusphere.status#caffeinated",
+              "xyz.statusphere.status#exploring",
+              "xyz.statusphere.status#offline"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxGraphemes": 140,
+            "maxLength": 560,
+            "description": "Optional short caption accompanying the status emoji."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

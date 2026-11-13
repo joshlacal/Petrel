@@ -6,37 +6,42 @@ Read the account's Bluesky preferences as one parsed value and change them with 
 
 Bluesky stores a user's settings (saved feeds, muted words, content filters, labeler subscriptions, thread and feed view options) as an array of loosely typed entries on the PDS. ``BskyAgent/getPreferences()`` parses that array into a ``BskyPreferences`` value with the official client's defaults filled in, and each setter performs a read-modify-write of the stored array.
 
+<!-- compile-example: bsky-preferences-overview -->
 ```swift
-// Read everything at once.
-let prefs = try await client.bsky.getPreferences()
-let pinnedFeeds = prefs.savedFeeds.filter(\.pinned)
-let hidesReposts = prefs.feedViewPrefs["home"]?.hideReposts ?? false
+import Foundation
+import Petrel
 
-// Mute a word in post text and tags for a week.
-try await client.bsky.addMutedWord(
-    "spoilers",
-    targets: [.content, .tag],
-    expiresAt: Date().addingTimeInterval(7 * 24 * 60 * 60)
-)
+func configureUserPreferences(client: ATProtoClient) async throws -> ModerationPrefs {
+    // Read everything at once.
+    let prefs = try await client.bsky.getPreferences()
+    let pinnedFeeds = prefs.savedFeeds.filter(\.pinned)
+    let hidesReposts = prefs.feedViewPrefs["home"]?.hideReposts ?? false
+    _ = (pinnedFeeds, hidesReposts)
 
-// Hide graphic media instead of warning about it.
-try await client.bsky.setContentLabelPref("graphic-media", .hide)
+    // Mute a word in post text and tags for a week.
+    try await client.bsky.addMutedWord(
+        "spoilers",
+        targets: [.content, .tag],
+        expiresAt: Date().addingTimeInterval(7 * 24 * 60 * 60)
+    )
 
-// Subscribe to a labeler and tune one of its labels.
-let labeler = try DID(didString: "did:plc:labelerexample")
-try await client.bsky.addLabeler(labeler)
-try await client.bsky.setContentLabelPref("spam", .warn, labelerDid: labeler)
+    // Hide graphic media instead of warning about it.
+    try await client.bsky.setContentLabelPref("graphic-media", .hide)
 
-// The updated settings feed straight into moderation decisions.
-let moderationPrefs = try await client.bsky.getPreferences().moderationPrefs
+    // Subscribe to a labeler and tune one of its labels.
+    let labeler = try DID(didString: "did:plc:ar7c4by46qjdydhdevvrndac")
+    try await client.bsky.addLabeler(labeler)
+    try await client.bsky.setContentLabelPref("spam", .warn, labelerDid: labeler)
+
+    // The updated settings feed straight into moderation decisions.
+    return try await client.bsky.getPreferences().moderationPrefs
+}
 ```
-
-This example is compiled by `Tests/PetrelTests/BskyPreferencesDocumentationTests.swift`, which also runs the same steps against an in-memory store.
 
 ### What the setters guarantee
 
 - **Nothing is dropped.** Setters rewrite the raw stored array. Entries of a type this SDK does not know, and unknown fields inside entries it does know, are written back unchanged.
-- **Concurrent setters do not overwrite each other.** All read-modify-write cycles of one client are serialized, including the migration that ``BskyAgent/getPreferences()`` may perform.
+- **Concurrent setters do not overwrite each other.** All read-modify-write cycles of agents that share a client's network service are serialized, including the migration that ``BskyAgent/getPreferences()`` may perform.
 - **Invalid input is rejected, not repaired.** A saved feed whose type does not match its URI, an over-long onboarding identifier and similar mistakes throw ``BskyAgentError/invalidInput(_:)``.
 
 ### Behaviour inherited from the official client

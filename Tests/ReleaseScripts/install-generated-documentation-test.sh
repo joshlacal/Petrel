@@ -33,6 +33,8 @@ make_output() {
   printf 'fresh-index\n' > "$output/index.html"
   printf 'fresh-docs\n' > "$output/documentation/petrel/index.html"
   printf 'fresh-css\n' > "$output/css/site.css"
+  printf '{}\n' > "$output/link-hierarchy.json"
+  printf '[]\n' > "$output/linkable-entities.json"
   printf '{}\n' > "$output/theme-settings.json"
 }
 
@@ -47,6 +49,8 @@ test "$(cat "$repository/docs/.nojekyll")" = hand-authored-marker
 test "$(cat "$repository/docs/index.html")" = fresh-index
 test "$(cat "$repository/docs/documentation/petrel/index.html")" = fresh-docs
 test "$(cat "$repository/docs/css/site.css")" = fresh-css
+test "$(cat "$repository/docs/link-hierarchy.json")" = '{}'
+test "$(cat "$repository/docs/linkable-entities.json")" = '[]'
 test "$(cat "$repository/docs/theme-settings.json")" = '{}'
 test ! -e "$repository/docs/documentation/stale.html"
 

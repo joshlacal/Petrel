@@ -570,10 +570,13 @@ public struct OAuthRemoteDocumentFetcher: Sendable {
 
     /// Creates a fetcher.
     ///
-    /// - Parameter transport: performs the GET. It must pin its connection to
-    ///   the approved addresses (``OAuthRemoteTransport/pinsConnectionsToApprovedPeers``)
-    ///   unless `policy` sets ``OAuthRemoteFetchPolicy/allowsUnpinnedTransport``;
-    ///   otherwise every fetch fails before any network access.
+    /// - Parameters:
+    ///   - policy: bounds scheme, address range, size, and timeout for every fetch.
+    ///   - resolver: resolves hostnames to candidate IP addresses before and after transport access.
+    ///   - transport: performs the GET. It must pin its connection to
+    ///     the approved addresses (``OAuthRemoteTransport/pinsConnectionsToApprovedPeers``)
+    ///     unless `policy` sets ``OAuthRemoteFetchPolicy/allowsUnpinnedTransport``;
+    ///     otherwise every fetch fails before any network access.
     public init(
         policy: OAuthRemoteFetchPolicy,
         resolver: any OAuthHostnameResolving = SystemOAuthHostnameResolver(),

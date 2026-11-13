@@ -12,3 +12,5 @@ Sources/PetrelFirehose/RelaySemanticVerifier.swift|swan|deprecated verify(relay:
 # Kotlin port: published package id blue.catbird.petrel (renaming it is a Kotlin-port break, tracked separately).
 generator/templates/kotlin/|blue.catbird.petrel|Kotlin package id
 generator/main.py|blue.catbird.petrel|Kotlin package id in overlay namespace output
+generator/cli.py|blue/catbird/petrel|Kotlin package directory in scaffolded overlay manifest
+generator/cli.py|blue.catbird.petrel|Kotlin package id in scaffolded overlay build.gradle.kts

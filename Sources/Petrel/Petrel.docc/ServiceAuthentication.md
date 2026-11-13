@@ -25,22 +25,32 @@ parts that need a client or a DID document.
 
 ## Proxy requests through the PDS
 
-``ATProtoClient`` attaches `atproto-proxy` by lexicon namespace. An OAuth or
-app-password client starts with `app.bsky` routed to the Bluesky AppView
-(`did:web:api.bsky.app#bsky_appview`) and `chat.bsky` to the Bluesky chat
-service (`did:web:api.bsky.chat#bsky_chat`). Change a route, or add one for a
-single endpoint, with ``ATProtoClient/setServiceProxy(_:for:)``:
+``ATProtoClient`` attaches `atproto-proxy` by lexicon namespace. A client
+created with an `OAuthConfig` (for any `AuthMode`) starts with `app.bsky`
+routed to the Bluesky AppView (`did:web:api.bsky.app#bsky_appview`) and
+`chat.bsky` to the Bluesky chat service (`did:web:api.bsky.chat#bsky_chat`).
+Those initializers take `bskyAppViewDID` and `bskyChatDID` to change the two
+defaults, and ``ATProtoClient/updateServiceDIDs(bskyAppViewDID:bskyChatDID:)``
+changes them later. The unauthenticated `init(baseURL:userAgent:didResolver:)`
+sets no routes. Change a route, or add one
+for a single endpoint, with ``ATProtoClient/setServiceProxy(_:for:)``:
 
+<!-- compile-example: service-auth-proxying -->
 ```swift
-// Everything under app.bsky goes to a self-hosted AppView…
-try await client.setServiceProxy(
-    ATProtoServiceReference("did:web:appview.example.com#bsky_appview"), for: "app.bsky"
-)
-// …and one endpoint goes to a labeler.
-try await client.setServiceProxy(
-    ATProtoServiceReference(did: "did:web:labeler.example.com", serviceID: "atproto_labeler"),
-    for: "com.atproto.label.queryLabels"
-)
+import Petrel
+
+func configureServiceProxies(client: ATProtoClient) async throws {
+    // Everything under app.bsky goes to a self-hosted AppView…
+    try await client.setServiceProxy(
+        ATProtoServiceReference("did:web:appview.example.com#bsky_appview"),
+        for: "app.bsky"
+    )
+    // …and one endpoint goes to a labeler.
+    try await client.setServiceProxy(
+        ATProtoServiceReference(did: "did:web:labeler.example.com", serviceID: "atproto_labeler"),
+        for: "com.atproto.label.queryLabels"
+    )
+}
 ```
 
 The longest matching prefix wins. `app.bsky.actor.getPreferences` and
@@ -53,13 +63,19 @@ and the identifier of an entry in its DID document's `service` array.
 
 ## Request a token for a direct call
 
+<!-- compile-example: service-auth-direct-token -->
 ```swift
-let token = try await client.getServiceAuthToken(
-    audience: ATProtoServiceReference("did:web:video.example.com#video_service"),
-    lexiconMethod: "com.atproto.repo.uploadBlob",
-    lifetime: 30 * 60
-)
-request.setValue(token.authorizationHeaderValue, forHTTPHeaderField: "Authorization")
+import Foundation
+import Petrel
+
+func authorizeDirectUploadRequest(client: ATProtoClient, request: inout URLRequest) async throws {
+    let token = try await client.getServiceAuthToken(
+        audience: ATProtoServiceReference("did:web:video.example.com#video_service"),
+        lexiconMethod: "com.atproto.repo.uploadBlob",
+        lifetime: 30 * 60
+    )
+    request.setValue(token.authorizationHeaderValue, forHTTPHeaderField: "Authorization")
+}
 ```
 
 ``ATProtoClient/getServiceAuthToken(audience:lexiconMethod:lifetime:now:)``
@@ -70,8 +86,10 @@ when it expires (``ServiceAuthToken/expiresAt``,
 the PDS issued for a different service or endpoint.
 
 Bind the token to the endpoint you are about to call. A PDS issues method-less
-tokens (`lexiconMethod: nil`) only for a lifetime of at most one minute, and
-grants at most one hour with a method.
+tokens (`lexiconMethod: nil`) only for a lifetime of at most one minute. With
+`lifetime: nil` the PDS chooses (60 seconds); the reference PDS grants at most
+one hour. A lifetime the PDS refuses comes back as the endpoint's declared
+`BadExpiration` error.
 
 ## Authenticate callers in a Swift service
 
@@ -80,31 +98,50 @@ a verified caller. It needs the issuer's public key, which is published in the
 issuer's DID document. ``IdentityResolver`` resolves DID documents and can be
 used as the verifier's key source directly:
 
+<!-- compile-example: service-auth-verify-caller -->
 ```swift
-let verifier = ServiceAuthVerifier(
-    audience: .service(did: "did:web:feed.example.com", id: "bsky_fg", acceptBareDID: true),
-    keyResolver: CachingServiceAuthKeyResolver(upstream: IdentityResolver())
-)
-let caller = try await verifier.verify(
-    authorizationHeader: request.headers["Authorization"],
-    method: .exactly("app.bsky.feed.getFeedSkeleton")
-)
+import Petrel
+
+/// Create one per service and keep it for the life of the process: the key
+/// cache and the replay store only protect requests that share them.
+struct FeedSkeletonAuthenticator {
+    let verifier = ServiceAuthVerifier(
+        audience: .service(did: "did:web:feed.example.com", id: "bsky_fg", acceptBareDID: true),
+        keyResolver: CachingServiceAuthKeyResolver(upstream: IdentityResolver()),
+        replayStore: InMemoryServiceAuthReplayStore()
+    )
+
+    func callerDID(authorizationHeader: String?) async throws -> String {
+        let caller = try await verifier.verify(
+            authorizationHeader: authorizationHeader,
+            method: .exactly("app.bsky.feed.getFeedSkeleton")
+        )
+        return caller.issuer
+    }
+}
 ```
 
 `CachingServiceAuthKeyResolver` limits how often a failed signature can make
 the resolver fetch a DID document again; anyone can send a token with a bad
-signature.
+signature. The replay store refuses a token whose `jti` it has already seen.
 
 To read keys from a document source of your own — a PLC mirror, a database —
 use ``DIDDocumentServiceAuthKeyResolver`` and give it any way of fetching a
 DID document:
 
+<!-- compile-example: service-auth-feed-generator -->
 ```swift
+import Petrel
+
+protocol DIDDocumentDirectory: Sendable {
+    func document(for did: String, forceRefresh: Bool) async throws -> DIDDocument
+}
+
 struct FeedGenerator {
     static let serviceDID = "did:web:feed.example.com"
     let verifier: ServiceAuthVerifier
 
-    init(directory: Directory) {
+    init(directory: any DIDDocumentDirectory) {
         // DID documents → keys, cached, with forced refreshes rate-limited.
         let keys = CachingServiceAuthKeyResolver(
             upstream: DIDDocumentServiceAuthKeyResolver { did, forceRefresh in
@@ -145,11 +182,6 @@ On failure, answer with HTTP 401 and an XRPC error body built from the
 
 A labeler authenticates the same way, with its own audience
 (`.service(did: labelerDID, id: "atproto_labeler")`) and method NSIDs.
-
-The proxying and token snippets on this page are exercised on the wire by
-`Tests/PetrelTests/ServiceAuth/ServiceAuthClientTests.swift`; the identity
-resolver snippet by `ServiceAuthIdentityResolverTests.swift` and the feed
-generator by `ServiceAuthDIDDocumentTests.swift`, in the same directory.
 
 ## Topics
 

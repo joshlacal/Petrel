@@ -17,12 +17,18 @@ value is `did=` followed by the DID of the publishing repository.
 
 <!-- Mirrors DocumentationSnippetTests.documentationAuthorityName -->
 
+<!-- compile-example: lexicon-authority-name -->
 ```swift
-let name = try LexiconAuthority.dnsName(for: "edu.university.dept.lab.blogging.getBlogPost")
-// "_lexicon.blogging.lab.dept.university.edu"
+import PetrelLexicon
 
-let did = try LexiconAuthority.did(fromTXT: ["did=did:plc:ewvi7nxzyoun6zhxrhs64oiz"], name: name)
-// "did:plc:ewvi7nxzyoun6zhxrhs64oiz"
+func authority() throws -> String {
+    let name = try LexiconAuthority.dnsName(for: "edu.university.dept.lab.blogging.getBlogPost")
+    // "_lexicon.blogging.lab.dept.university.edu"
+
+    let did = try LexiconAuthority.did(fromTXT: ["did=did:plc:ewvi7nxzyoun6zhxrhs64oiz"], name: name)
+    // "did:plc:ewvi7nxzyoun6zhxrhs64oiz"
+    return did
+}
 ```
 
 Resolution is not hierarchical. Exactly that one name is queried; if it has no
@@ -38,13 +44,20 @@ a credential-free HTTP transport for the record.
 
 <!-- Mirrors DocumentationSnippetTests.documentationResolveWithIdentity -->
 
+<!-- compile-example: lexicon-resolve-with-identity -->
 ```swift
-let resolver = DefaultLexiconResolver(
-    identity: IdentityResolver(),
-    cache: LexiconResolutionCache(timeToLive: 300)
-)
+import Petrel
+import PetrelLexicon
 
-let resolved = try await resolver.resolve("com.example.note")
+func resolveNoteSchema() async throws -> ResolvedLexicon {
+    let resolver = DefaultLexiconResolver(
+        identity: IdentityResolver(),
+        cache: LexiconResolutionCache(timeToLive: 300)
+    )
+
+    let resolved = try await resolver.resolve("com.example.note")
+    return resolved
+}
 ```
 
 ``IdentityLexiconDNSResolver`` and ``IdentityLexiconDIDResolver`` are the two
@@ -64,7 +77,11 @@ each step can use whatever the application already has:
 
 <!-- Mirrors DocumentationSnippetTests.documentationResolve -->
 
+<!-- compile-example: lexicon-resolve-custom-steps -->
 ```swift
+import Foundation
+import PetrelLexicon
+
 struct ExampleDNS: LexiconDNSTXTResolving {
     func resolveTXT(_ name: String) async throws -> [String] {
         // Query your DNS resolver for the TXT records of `name`.
@@ -79,17 +96,20 @@ struct ExampleDIDResolver: LexiconDIDDocumentResolving {
     }
 }
 
-let resolver = DefaultLexiconResolver(
-    dns: ExampleDNS(),
-    didResolver: ExampleDIDResolver(),
-    fetcher: ExampleFetcher(), // omit to use LexiconHTTPRecordFetcher
-    cache: LexiconResolutionCache(timeToLive: 300)
-)
+func resolveAndLoad(fetcher: any LexiconRecordFetching) async throws -> LexiconCatalog {
+    let resolver = DefaultLexiconResolver(
+        dns: ExampleDNS(),
+        didResolver: ExampleDIDResolver(),
+        fetcher: fetcher, // omit to use LexiconHTTPRecordFetcher
+        cache: LexiconResolutionCache(timeToLive: 300)
+    )
 
-let resolved = try await resolver.resolve("com.example.note")
+    let resolved = try await resolver.resolve("com.example.note")
 
-var catalog = LexiconCatalog()
-try catalog.add(resolved.doc)
+    var catalog = LexiconCatalog()
+    try catalog.add(resolved.doc)
+    return catalog
+}
 ```
 
 The fetched record is not trusted as found. Before a ``ResolvedLexicon`` is

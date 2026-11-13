@@ -24,6 +24,34 @@ def get_namespace_path(lexicon_id: str) -> str:
 
 DEFAULT_EXCLUDED_NAMESPACES = ('tools.ozone',)
 
+BUNDLED_CORE_LEXICONS_TOKEN = '@petrel/core-lexicons'
+BUNDLED_LEXICONS_ALIASES = frozenset({
+    BUNDLED_CORE_LEXICONS_TOKEN,
+    'petrel:core-lexicons',
+    '@bundled',
+})
+
+
+def get_bundled_core_lexicons_dir() -> str:
+    """Return the core AT Protocol lexicons directory bundled inside generator/."""
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lexicons')
+
+
+def resolve_lexicon_dirs(dirs: Sequence[str]) -> list[str]:
+    """Expand bundled core lexicon tokens while leaving ordinary filesystem paths untouched."""
+    resolved = []
+    for entry in dirs:
+        if entry in BUNDLED_LEXICONS_ALIASES:
+            bundled = get_bundled_core_lexicons_dir()
+            if not os.path.isdir(bundled):
+                raise ValueError(
+                    f"Bundled Petrel core lexicons directory not found at {bundled}"
+                )
+            resolved.append(bundled)
+        else:
+            resolved.append(entry)
+    return resolved
+
 CORE_NAMESPACE_ROOT_PATTERN = re.compile(r'^[a-z][a-z0-9]{0,62}$')
 SWIFT_RESERVED_IDENTIFIERS = frozenset({
     'actor', 'any', 'as', 'associatedtype', 'async', 'await', 'break',
@@ -166,7 +194,7 @@ def resolve_reference_dirs(reference_dirs, exclude_namespaces):
     resolved = []
     exclude = list(exclude_namespaces)
     for entry in reference_dirs:
-        if entry == CORE_REFERENCE_TOKEN:
+        if entry == CORE_REFERENCE_TOKEN or entry in BUNDLED_LEXICONS_ALIASES:
             resolved.append(CORE_LEXICON_DIR)
             core_exclude = load_manifest(CORE_MANIFEST_PATH).get('lexicons', {}).get('exclude_namespaces', [])
             exclude.extend(ns for ns in core_exclude if ns not in exclude)
@@ -184,7 +212,7 @@ async def load_lexicons(dirs, exclude_namespaces, cycle_detector, skip_ids=()):
     types for cross-package type resolution.
     """
     loaded = []
-    for folder_path in dirs:
+    for folder_path in resolve_lexicon_dirs(dirs):
         for root, dirnames, files in os.walk(folder_path):
             dirnames.sort()   # deterministic traversal so generated output is byte-stable
             files.sort()
@@ -833,7 +861,12 @@ def _resolve_kotlin_output():
     )
 
 
-async def run_manifest(manifest_path, language='both', graph_path=None):
+async def run_manifest(
+    manifest_path,
+    language='both',
+    graph_path=None,
+    default_core_namespace_roots: Sequence[str] = (),
+):
     """Generate from a manifest file (see Generator/manifests/*.json).
 
     When ``graph_path`` is given, an overlay inherits the core package's owned
@@ -873,8 +906,16 @@ async def run_manifest(manifest_path, language='both', graph_path=None):
         source='package.core_namespace_roots',
     )
     inherited_roots = resolve_owned_namespace_roots(graph_path) if kind == 'overlay' else ()
+    fallback_roots = (
+        normalize_core_namespace_roots(
+            default_core_namespace_roots,
+            source='default_core_namespace_roots',
+        )
+        if kind == 'overlay'
+        else ()
+    )
     core_namespace_roots = normalize_core_namespace_roots(
-        declared_roots + inherited_roots,
+        declared_roots + inherited_roots + fallback_roots,
         source='package.core_namespace_roots',
     )
     if kind not in ('core', 'overlay'):

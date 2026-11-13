@@ -28,7 +28,8 @@ is_generated_entry() {
   case $1 in
     .nojekyll | css | data | developer-og-twitter.jpg | developer-og.jpg | \
       documentation | downloads | favicon.ico | favicon.svg | images | img | \
-      index | index.html | js | metadata.json | theme-settings.json | videos)
+      index | index.html | js | link-hierarchy.json | linkable-entities.json | \
+      metadata.json | theme-settings.json | videos)
       return 0
       ;;
     *)
@@ -61,6 +62,8 @@ generated_entries=(
   index
   index.html
   js
+  link-hierarchy.json
+  linkable-entities.json
   metadata.json
   theme-settings.json
   videos

@@ -10,7 +10,7 @@ SHA-256, sign the hash with ECDSA, and encode the result as 64 bytes
 and `k256`. ``ATProtoSigner`` produces such signatures and
 ``ATProtoPublicKey`` checks them, whichever curve the key is on.
 
-Each example below is compiled and run by
+Each example below is also exercised by
 `Tests/PetrelCryptoTests/CryptographyDocumentationTests.swift`.
 
 ### Generate a key and sign
@@ -18,14 +18,19 @@ Each example below is compiled and run by
 ``ATProtoCrypto/generateKeypair(curve:)`` defaults to K-256, as the reference
 implementation does for new keys. Pass `.p256` for the other curve.
 
+<!-- compile-example: crypto-generate-and-sign -->
 ```swift
+import Foundation
 import PetrelCrypto
 
-let keypair = ATProtoCrypto.generateKeypair()          // K-256
-let message = Data("hello world".utf8)
+func generateAndSign() async throws -> (didKey: String, message: Data, signature: Data) {
+    let keypair = ATProtoCrypto.generateKeypair()          // K-256
+    let message = Data("hello world".utf8)
 
-let signature = try await keypair.sign(message)        // 64 bytes, low-S
-let didKey = keypair.didKey                            // "did:key:zQ3sh…"
+    let signature = try await keypair.sign(message)        // 64 bytes, low-S
+    let didKey = keypair.didKey                            // "did:key:zQ3sh…"
+    return (didKey, message, signature)
+}
 ```
 
 `sign` takes the bytes to be signed, not their hash; hashing is part of the
@@ -34,12 +39,18 @@ than `any ATProtoSigner`, `sign` is synchronous.
 
 ### Verify a signature
 
+<!-- compile-example: crypto-verify-did-key -->
 ```swift
-let valid = try ATProtoCrypto.verifySignature(
-    didKey: didKey,
-    data: message,
-    signature: signature
-)
+import Foundation
+import PetrelCrypto
+
+func verify(didKey: String, message: Data, signature: Data) throws -> Bool {
+    try ATProtoCrypto.verifySignature(
+        didKey: didKey,
+        data: message,
+        signature: signature
+    )
+}
 ```
 
 The curve comes from the `did:key`. The call returns `false` for a wrong or
@@ -47,9 +58,15 @@ malformed signature and throws only when the key itself is unusable.
 
 If you already hold the key, verify with it directly:
 
+<!-- compile-example: crypto-verify-public-key -->
 ```swift
-let publicKey = try ATProtoPublicKey(didKey: didKey)
-let alsoValid = publicKey.isValidSignature(signature, for: message)
+import Foundation
+import PetrelCrypto
+
+func verifyWithKey(didKey: String, message: Data, signature: Data) throws -> Bool {
+    let publicKey = try ATProtoPublicKey(didKey: didKey)
+    return publicKey.isValidSignature(signature, for: message)
+}
 ```
 
 ### Strict by default, lax on request
@@ -64,10 +81,17 @@ The same section of the specification exempts JWTs, whose signers (WebCrypto,
 Secure Enclave, HSMs) do not normalize S. Use
 ``ATProtoSignatureVerificationOptions/jwt`` for those:
 
+<!-- compile-example: crypto-strict-and-jwt -->
 ```swift
-// `highS` is the same signature with s replaced by n - s.
-publicKey.isValidSignature(highS, for: message)                  // false
-publicKey.isValidSignature(highS, for: message, options: .jwt)   // true
+import Foundation
+import PetrelCrypto
+
+// `highS` is a valid signature over `message` with s replaced by n - s.
+func compareVerificationPolicies(publicKey: ATProtoPublicKey, message: Data, highS: Data) {
+    let strict = publicKey.isValidSignature(highS, for: message)                // false
+    let lax = publicKey.isValidSignature(highS, for: message, options: .jwt)    // true
+    assert(!strict && lax)
+}
 ```
 
 ``ATProtoSignatureVerificationOptions/allowMalleable`` additionally accepts
@@ -78,15 +102,22 @@ DER, matching `allowMalleableSig` in `@atproto/crypto`.
 The specification does not mandate a private-key encoding. Raw bytes, hex and
 a self-describing multibase form are supported.
 
+<!-- compile-example: crypto-import-export -->
 ```swift
-let imported = try K256Keypair(
-    hex: "9085d2bef69286a6cbb51623c8fa258629945cd55ca705cc4e66700396894e0c"
-)
-// imported.didKey == "did:key:zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme"
+import Foundation
+import PetrelCrypto
 
-let raw = imported.exportRawRepresentation()           // 32 bytes
-let multibase = try imported.exportMultibase()         // "z…", names its curve
-let restored = try ATProtoCrypto.importKeypair(privateMultibase: multibase)
+func importAndExport() throws {
+    let imported = try K256Keypair(
+        hex: "9085d2bef69286a6cbb51623c8fa258629945cd55ca705cc4e66700396894e0c"
+    )
+    // imported.didKey == "did:key:zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme"
+
+    let raw = imported.exportRawRepresentation()           // 32 bytes
+    let multibase = try imported.exportMultibase()         // "z…", names its curve
+    let restored = try ATProtoCrypto.importKeypair(privateMultibase: multibase)
+    assert(raw.count == 32 && restored.didKey == imported.didKey)
+}
 ```
 
 Importing rejects anything that is not a scalar in `1 ..< n`.
@@ -99,17 +130,22 @@ string with a `did:key:` prefix. Older DID documents use a legacy form with
 no prefix and an uncompressed point, where the curve is named by the
 verification method's `type`.
 
+<!-- compile-example: crypto-public-key-encodings -->
 ```swift
-let key = try ATProtoPublicKey(multikey: "zQ3shXjHeiBuRCKmM36cuYnm7YEMzhGnCmCyW92sRJ9pribSF")
-key.curve                                              // .k256
-key.didKey                                             // "did:key:zQ3shXjH…"
+import PetrelCrypto
 
-// The same key as an older DID document wrote it.
-let legacy = try ATProtoPublicKey(
-    verificationMethodType: "EcdsaSecp256k1VerificationKey2019",
-    publicKeyMultibase: "zQYEBzXeuTM9UR3rfvNag6L3RNAs5pQZyYPsomTsgQhsxLdEgCrPTLgFna8yqCnxPpNT7DBk6Ym3dgPKNu86vt9GR"
-)
-legacy == key                                          // true
+func publicKeyEncodings() throws {
+    let key = try ATProtoPublicKey(multikey: "zQ3shXjHeiBuRCKmM36cuYnm7YEMzhGnCmCyW92sRJ9pribSF")
+    assert(key.curve == .k256)
+    assert(key.didKey == "did:key:zQ3shXjHeiBuRCKmM36cuYnm7YEMzhGnCmCyW92sRJ9pribSF")
+
+    // The same key as an older DID document wrote it.
+    let legacy = try ATProtoPublicKey(
+        verificationMethodType: "EcdsaSecp256k1VerificationKey2019",
+        publicKeyMultibase: "zQYEBzXeuTM9UR3rfvNag6L3RNAs5pQZyYPsomTsgQhsxLdEgCrPTLgFna8yqCnxPpNT7DBk6Ym3dgPKNu86vt9GR"
+    )
+    assert(legacy == key)
+}
 ```
 
 Every initializer checks that the point is on its curve. A key is stored in
@@ -123,38 +159,69 @@ accepts compact or DER output with either S value, converts it to the wire
 form, and verifies it against the declared public key before returning, so a
 misconfigured backend fails immediately.
 
+<!-- compile-example: crypto-external-signer -->
 ```swift
-let remote = ATProtoExternalSigner(publicKey: rotationKey) { request in
-    // `request.message` is the bytes; `request.sha256Digest` is their hash.
-    try await keyService.sign(digest: request.sha256Digest)
+import Foundation
+import PetrelCrypto
+
+/// Your remote key service, HSM or hardware token.
+protocol KeyService: Sendable {
+    /// Returns an ECDSA signature over a SHA-256 digest, compact or DER.
+    func sign(digest: Data) async throws -> Data
 }
-let operationSignature = try await remote.sign(operationBytes)
+
+func signRemotely(
+    operationBytes: Data,
+    rotationKey: ATProtoPublicKey,
+    keyService: any KeyService
+) async throws -> Data {
+    let remote = ATProtoExternalSigner(publicKey: rotationKey) { request in
+        // `request.message` is the bytes; `request.sha256Digest` is their hash.
+        try await keyService.sign(digest: request.sha256Digest)
+    }
+    return try await remote.sign(operationBytes)   // 64 bytes, low-S, verified
+}
 ```
 
 On Apple devices, `SecureEnclaveP256Signer` keeps a P-256 key inside the
 Secure Enclave. The key cannot be exported; persist its `dataRepresentation`.
 
+<!-- compile-example: crypto-secure-enclave -->
 ```swift
-if SecureEnclaveP256Signer.isAvailable {
+import Foundation
+import PetrelCrypto
+
+#if os(iOS) || os(macOS) || os(visionOS)
+func signInEnclave(message: Data) throws -> (key: Data, signature: Data)? {
+    guard SecureEnclaveP256Signer.isAvailable else { return nil }
     let enclaveKey = try SecureEnclaveP256Signer.generate()
     let enclaveSignature = try enclaveKey.sign(message)    // low-S, like any other
+    return (enclaveKey.dataRepresentation, enclaveSignature)
 }
+#endif
 ```
 
 ### Service-auth tokens
 
 Any signer can mint an inter-service JWT, and any public key can verify one.
-JWT verification uses the `.jwt` policy by default.
+JWT verification uses the `.jwt` policy by default. The `jti` nonce is
+generated for you; <doc:ServiceAuth> covers the rest.
 
+<!-- compile-example: crypto-service-jwt-round-trip -->
 ```swift
-let token = try await ServiceJWT.mint(
-    issuer: "did:plc:abcdefghijklmnopqrstuvwx",
-    audience: "did:web:api.bsky.app",
-    method: "com.atproto.repo.getRecord",
-    eventID: UUID().uuidString,
-    signer: keypair
-)
-let claims = try ServiceJWT.verify(token, publicKey: keypair.publicKey)
+import PetrelCrypto
+
+func serviceTokenRoundTrip() async throws -> ServiceJWTClaims {
+    let keypair = ATProtoCrypto.generateKeypair()
+
+    let token = try await ServiceJWT.mint(
+        issuer: "did:plc:abcdefghijklmnopqrstuvwx",
+        audience: "did:web:api.bsky.app",
+        lexiconMethod: "com.atproto.repo.getRecord",
+        signer: keypair
+    )
+    return try ServiceJWT.verify(token, publicKey: keypair.publicKey)
+}
 ```
 
 ## Topics

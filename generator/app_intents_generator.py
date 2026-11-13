@@ -115,7 +115,14 @@ import re
 import aiofiles
 
 from cycle_detector import CycleDetector
-from main import DEFAULT_EXCLUDED_NAMESPACES, load_lexicons, lower_camel
+from main import (
+    BUNDLED_LEXICONS_ALIASES,
+    CORE_REFERENCE_TOKEN,
+    DEFAULT_EXCLUDED_NAMESPACES,
+    get_bundled_core_lexicons_dir,
+    load_lexicons,
+    lower_camel,
+)
 from templates import TemplateManager, escape_swift_string_literal
 from type_converter import CurationError, intent_entity_extraction, intent_facing_type
 from utils import convert_ref, convert_to_camel_case
@@ -180,6 +187,12 @@ def _check_known_keys(obj: dict, allowed: set, context: str):
 
 def _resolve_path(manifest_dir: str, path: str) -> str:
     return path if os.path.isabs(path) else os.path.normpath(os.path.join(manifest_dir, path))
+
+
+def _resolve_reference_path(manifest_dir: str, path: str) -> str:
+    if path in BUNDLED_LEXICONS_ALIASES or path == CORE_REFERENCE_TOKEN:
+        return get_bundled_core_lexicons_dir()
+    return _resolve_path(manifest_dir, path)
 
 
 def normalize_ref(ref: str, current_lexicon_id: str):
@@ -1679,7 +1692,7 @@ class AppIntentsGenerator:
         exclude = tuple(lex_cfg.get('exclude_namespaces', DEFAULT_EXCLUDED_NAMESPACES))
 
         manifest_dir = os.path.dirname(os.path.abspath(manifest_path))
-        reference_dirs = [_resolve_path(manifest_dir, d) for d in reference_dirs_raw]
+        reference_dirs = [_resolve_reference_path(manifest_dir, d) for d in reference_dirs_raw]
         output_dir = _resolve_path(manifest_dir, swift_cfg['output'])
 
         availability = ai_cfg.get('availability', 'iOS 18.0')

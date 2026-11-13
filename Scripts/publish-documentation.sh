@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# Builds the DocC static site and, with --publish, commits it to the docs-site
-# branch that the static host serves.
+# Builds the multi-target DocC static site and, with --publish, commits it to
+# the docs-site branch that the static host serves.
 #
 # The generated site is not tracked on the main line (see .gitignore). It is
 # built here, installed into docs/ for local preview, and published as a single
@@ -18,14 +18,34 @@ BRANCH=${PETREL_DOCS_BRANCH:-docs-site}
 PUBLISH=0
 SWIFT=${PETREL_DOCS_SWIFT:-swift}
 
+DEFAULT_TARGETS=(
+  Petrel
+  PetrelCore
+  PetrelCrypto
+  PetrelRepo
+  PetrelFirehose
+  PetrelJetstream
+  PetrelPLC
+  PetrelPLCPDS
+  PetrelOAuthScopes
+  PetrelOAuthServer
+  PetrelOAuthServerLexicon
+  PetrelOzone
+  PetrelLexicon
+)
+TARGETS=()
+
 usage() {
   cat >&2 <<'USAGE'
-usage: Scripts/publish-documentation.sh [--base-path PATH] [--publish]
+usage: Scripts/publish-documentation.sh [--base-path PATH] [--target TARGET ...] [--publish]
 
   --base-path PATH  URL subpath the site is served from, without slashes.
                     Defaults to "Petrel", which matches a project site served
                     at https://<host>/Petrel/. Use "" for a site served at the
                     domain root.
+  --target TARGET   Build documentation for specific target(s). May be passed
+                    multiple times. Defaults to all 13 documented Petrel library
+                    targets merged into one combined DocC archive.
   --publish         After building, commit the site to the docs-site branch.
                     Pushing is left to you; this never contacts a remote.
 
@@ -41,11 +61,17 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --base-path) [[ $# -ge 2 ]] || usage; BASE_PATH=$2; shift 2 ;;
     --base-path=*) BASE_PATH=${1#*=}; shift ;;
+    --target) [[ $# -ge 2 ]] || usage; TARGETS+=("$2"); shift 2 ;;
+    --target=*) TARGETS+=("${1#*=}"); shift ;;
     --publish) PUBLISH=1; shift ;;
     -h | --help) usage ;;
     *) echo "unknown argument: $1" >&2; usage ;;
   esac
 done
+
+if [[ ${#TARGETS[@]} -eq 0 ]]; then
+  TARGETS=("${DEFAULT_TARGETS[@]}")
+fi
 
 fail() {
   echo "publish-documentation: $*" >&2
@@ -60,7 +86,26 @@ OUTPUT=$BUILD_ROOT/Petrel.doccarchive-static
 rm -rf -- "$BUILD_ROOT"
 mkdir -p -- "$BUILD_ROOT"
 
-echo "publish-documentation: building DocC site (base path: ${BASE_PATH:-/})"
+echo "publish-documentation: building DocC site (base path: ${BASE_PATH:-/}, targets: ${TARGETS[*]})"
+
+# SwiftPM #10285 makes Swift 6.4's default SwiftBuild path misclassify .docc
+# catalogs. Use --build-system native on Swift 6.4 so catalogs remain discoverable.
+package_args=(
+  --scratch-path "$BUILD_ROOT/scratch"
+  --allow-writing-to-directory "$OUTPUT"
+)
+swift_version_output=$("$SWIFT" --version 2>&1 || true)
+if [[ $swift_version_output == *"Swift version 6.4"* ]]; then
+  package_args=(--build-system native "${package_args[@]}")
+fi
+
+docc_target_args=()
+if [[ ${#TARGETS[@]} -gt 1 ]]; then
+  docc_target_args+=(--enable-experimental-combined-documentation)
+fi
+for target in "${TARGETS[@]}"; do
+  docc_target_args+=(--target "$target")
+done
 
 # --transform-for-static-hosting rewrites the archive into a plain static tree.
 # The base path must match the URL the host serves the site from, or every
@@ -71,10 +116,9 @@ if [[ -n $BASE_PATH ]]; then
 fi
 
 "$SWIFT" package \
-  --scratch-path "$BUILD_ROOT/scratch" \
-  --allow-writing-to-directory "$OUTPUT" \
+  "${package_args[@]}" \
   generate-documentation \
-  --target Petrel \
+  "${docc_target_args[@]}" \
   "${hosting_args[@]}" \
   --output-path "$OUTPUT"
 
@@ -96,7 +140,7 @@ Installed for preview: $ROOT/docs
 
 Preview it with:
   (cd $ROOT/docs && python3 -m http.server 8000)
-  open http://localhost:8000/
+  open http://localhost:8000/documentation/
 
 Re-run with --publish to commit the site to the $BRANCH branch.
 EOF
@@ -163,5 +207,5 @@ Review it:
   jj file list -r $BRANCH | head
 
 Push it when you are ready:
-  jj git push --bookmark $BRANCH --allow-new
+  jj git push --bookmark $BRANCH
 EOF

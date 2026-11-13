@@ -20,7 +20,7 @@ This module covers both directions:
   verified caller, resolving the issuer's key through a
   ``ServiceAuthKeyResolver``.
 
-Every snippet on this page is compiled and run by
+The snippets on this page are also exercised by
 `Tests/PetrelCryptoTests/ServiceAuthDocumentationTests.swift`.
 
 ## Mint a token
@@ -29,16 +29,22 @@ Sign with the key published in the issuer's DID document. `lexiconMethod`
 (`lxm`) binds the token to one endpoint; `jti` is a fresh random nonce; the
 lifetime defaults to the 60 seconds the specification recommends.
 
+<!-- compile-example: crypto-service-auth-mint -->
 ```swift
-let keypair = K256Keypair.generate()
+import PetrelCrypto
 
-let token = try await ServiceJWT.mint(
-    issuer: "did:plc:abcdefghijklmnopqrstuvwx",
-    audience: "did:web:feed.example.com#bsky_fg",
-    lexiconMethod: "app.bsky.feed.getFeedSkeleton",
-    signer: keypair
-)
-let authorization = ServiceJWT.bearerAuthorization(token)   // "Bearer eyJ…"
+func mintFeedToken() async throws -> String {
+    let keypair = K256Keypair.generate()
+
+    let token = try await ServiceJWT.mint(
+        issuer: "did:plc:abcdefghijklmnopqrstuvwx",
+        audience: "did:web:feed.example.com#bsky_fg",
+        lexiconMethod: "app.bsky.feed.getFeedSkeleton",
+        signer: keypair
+    )
+    let authorization = ServiceJWT.bearerAuthorization(token)   // "Bearer eyJ…"
+    return authorization
+}
 ```
 
 The audience is the receiving service's DID followed by its service
@@ -49,15 +55,20 @@ A service that signs with a key other than `#atproto` names it in the `kid`
 header, and can ask for a longer lifetime, up to ``ServiceJWT/maximumLifetime``
 (one hour):
 
+<!-- compile-example: crypto-service-auth-mint-key-id -->
 ```swift
-let labelerToken = try await ServiceJWT.mint(
-    issuer: "did:web:labeler.example.com",
-    audience: "did:web:appview.example.com#bsky_appview",
-    lexiconMethod: "com.atproto.label.queryLabels",
-    signer: labelingKey,
-    keyID: "#atproto_label",
-    lifetime: 5 * 60
-)
+import PetrelCrypto
+
+func mintLabelerToken(labelingKey: any ATProtoSigner) async throws -> String {
+    try await ServiceJWT.mint(
+        issuer: "did:web:labeler.example.com",
+        audience: "did:web:appview.example.com#bsky_appview",
+        lexiconMethod: "com.atproto.label.queryLabels",
+        signer: labelingKey,
+        keyID: "#atproto_label",
+        lifetime: 5 * 60
+    )
+}
 ```
 
 A client application does not hold the account's signing key. It asks its PDS
@@ -70,7 +81,10 @@ A service creates one ``ServiceAuthVerifier`` and calls it from each
 authenticated endpoint. This is the whole of request authentication for a feed
 generator:
 
+<!-- compile-example: crypto-service-auth-feed-generator -->
 ```swift
+import PetrelCrypto
+
 struct FeedGenerator {
     let verifier: ServiceAuthVerifier
 
@@ -134,13 +148,24 @@ callers,
 ``StaticServiceAuthKeyResolver`` holds a table, and
 ``ClosureServiceAuthKeyResolver`` adapts any lookup you already have:
 
+<!-- compile-example: crypto-service-auth-key-resolver -->
 ```swift
-let resolver = ClosureServiceAuthKeyResolver { did, keyID, forceRefresh in
-    let multikey = try await directory.publicKeyMultibase(for: did, keyID: keyID, bypassCache: forceRefresh)
-    return try ATProtoPublicKey(multikey: multikey)
+import PetrelCrypto
+
+/// Whatever your service already uses to look up DID documents.
+protocol KeyDirectory: Sendable {
+    func publicKeyMultibase(for did: String, keyID: String, bypassCache: Bool) async throws -> String
 }
-// Cache keys, and stop forged tokens from forcing a DID resolution each.
-let keyResolver = CachingServiceAuthKeyResolver(upstream: resolver)
+
+func makeKeyResolver(directory: any KeyDirectory) -> CachingServiceAuthKeyResolver {
+    let resolver = ClosureServiceAuthKeyResolver { did, keyID, forceRefresh in
+        let multikey = try await directory.publicKeyMultibase(for: did, keyID: keyID, bypassCache: forceRefresh)
+        return try ATProtoPublicKey(multikey: multikey)
+    }
+    // Cache keys, and stop forged tokens from forcing a DID resolution each.
+    let keyResolver = CachingServiceAuthKeyResolver(upstream: resolver)
+    return keyResolver
+}
 ```
 
 A verifier asks for a forced refresh whenever a signature fails, and anyone can
@@ -149,18 +174,24 @@ such a refresh from upstream at most once per interval for a given issuer.
 
 ### Choose what to accept
 
+<!-- compile-example: crypto-service-auth-configuration -->
 ```swift
-var configuration = ServiceAuthVerifier.Configuration(
-    audience: .exactly("did:web:appview.example.com#bsky_appview")
-)
-// Labelers sign with their labeling key.
-configuration.acceptedKeyIDs = ["#atproto", "#atproto_label"]
-// This service only ever expects the usual one-minute tokens.
-configuration.maximumLifetime = 5 * 60
-// Insist on typ, iat and jti, which the specification lists as required.
-configuration.requiredClaims = .specification
+import PetrelCrypto
 
-let appView = ServiceAuthVerifier(configuration: configuration, keyResolver: keyResolver)
+func makeAppViewVerifier(keyResolver: any ServiceAuthKeyResolver) -> ServiceAuthVerifier {
+    var configuration = ServiceAuthVerifier.Configuration(
+        audience: .exactly("did:web:appview.example.com#bsky_appview")
+    )
+    // Labelers sign with their labeling key.
+    configuration.acceptedKeyIDs = ["#atproto", "#atproto_label"]
+    // Accept lifetimes of at most five minutes instead of the default hour.
+    configuration.maximumLifetime = 5 * 60
+    // Insist on typ, iat and jti, which the specification lists as required.
+    configuration.requiredClaims = .specification
+
+    let appView = ServiceAuthVerifier(configuration: configuration, keyResolver: keyResolver)
+    return appView
+}
 ```
 
 ``ServiceAuthMethodPolicy`` has four cases. Use `.exactly(nsid)` in an endpoint
@@ -174,20 +205,26 @@ Every failure is a ``ServiceAuthError``. Its
 ``ServiceAuthError/xrpcErrorName`` is the error name the TypeScript reference
 implementation uses for the same condition — `BadJwt`, `BadJwtType`,
 `JwtExpired`, `BadJwtAudience`, `BadJwtLexiconMethod`, `BadJwtIss`,
-`BadJwtSignature` — and ``ServiceAuthError/httpStatus`` is 401.
+`BadJwtSignature`, and `MissingJwt` when there is no bearer token — and
+``ServiceAuthError/httpStatus`` is 401.
 
 ## Verify against a key you already hold
 
 When the issuer's key is already in hand, ``ServiceJWT`` verifies directly.
 Pass the audience and method you expect; leaving them out skips those checks.
 
+<!-- compile-example: crypto-service-auth-pinned-key -->
 ```swift
-let claims = try ServiceJWT.verify(
-    token,
-    publicKey: keypair.publicKey,
-    expectedAudience: "did:web:feed.example.com#bsky_fg",
-    expectedMethod: "app.bsky.feed.getFeedSkeleton"
-)
+import PetrelCrypto
+
+func verifyWithKnownKey(token: String, issuerKey: ATProtoPublicKey) throws -> ServiceJWTClaims {
+    try ServiceJWT.verify(
+        token,
+        publicKey: issuerKey,
+        expectedAudience: "did:web:feed.example.com#bsky_fg",
+        expectedMethod: "app.bsky.feed.getFeedSkeleton"
+    )
+}
 ```
 
 To look inside a token without verifying it — for example one a PDS just
@@ -202,7 +239,7 @@ the test suite requires Petrel to reach the same verdict with the same error
 name. The same directory holds Petrel-minted tokens and the reference
 verifier's acceptance of them. Its README lists the four cases where Petrel's
 defaults are deliberately stricter than the reference, and the option that
-relaxes each.
+relaxes each of the three that are configurable.
 
 ## Topics
 

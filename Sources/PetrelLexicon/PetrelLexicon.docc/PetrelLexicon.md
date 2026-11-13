@@ -22,17 +22,22 @@ It has three parts.
 
 <!-- Mirrors DocumentationSnippetTests.documentationValidateRecord -->
 
+<!-- compile-example: lexicon-overview-validate-record -->
 ```swift
+import Foundation
 import PetrelLexicon
 
-var catalog = LexiconCatalog()
-try catalog.add(json: schemaJSON)
+// `schemaJSON` is the Lexicon document for com.example.note.
+func validateNote(schemaJSON: Data) throws {
+    var catalog = LexiconCatalog()
+    try catalog.add(json: schemaJSON)
 
-let record = try LexValue.record(json: Data(#"""
-{ "$type": "com.example.note", "text": "hello", "createdAt": "2026-01-01T00:00:00.000Z" }
-"""#.utf8))
+    let record = try LexValue.record(json: Data(#"""
+    { "$type": "com.example.note", "text": "hello", "createdAt": "2026-01-01T00:00:00.000Z" }
+    """#.utf8))
 
-try catalog.validateRecord(record, collection: "com.example.note", recordKey: "3jzfcijpj2z2a")
+    try catalog.validateRecord(record, collection: "com.example.note", recordKey: "3jzfcijpj2z2a")
+}
 ```
 
 Every failure is a typed error that says where and why: ``LexValueError`` for
