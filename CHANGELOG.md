@@ -23,7 +23,7 @@ Linux (CI: Swift 6.1.2 on Ubuntu 22.04). See [LINUX_SUPPORT.md](LINUX_SUPPORT.md
    (`CIDString(cid)` / `.cid`); `cid-link` fields in `subscribeRepos` messages are `ATProtoLink`.
 3. Optional-and-nullable fields are `ATProtoNullable<T>?`, so "absent" and "explicit null" are
    different values (for example `ComAtprotoRepoPutRecord.Input.swapRecord`).
-4. `ComAtprotoSimplespace*` and the October Spaces renames (see *Spaces* below).
+4. `ComAtprotoSimplespace*` is gone and Spaces follow the November 12 alpha (see *Spaces* below).
 5. Exhaustive `switch` statements over `ATProtocolError`, `AuthError`, `AuthEvent` and
    `NetworkError` need the new cases.
 6. Rebuild against swift-tools 6.1.
@@ -33,6 +33,9 @@ Linux (CI: Swift 6.1.2 on Ubuntu 22.04). See [LINUX_SUPPORT.md](LINUX_SUPPORT.md
    `JetstreamSubscriptionError` need `.ignoredFrame` and `.cursorStorageFailure`.
 9. Petrel no longer sends `X-Catbird-Request-Id` or `X-Catbird-Client`. A server that read them
    needs the app to opt in with `setRequestIDHeader(name:)` / `setHeader(name:value:)`.
+10. Gateway mode carries its configuration: `authMode: .gateway, gatewayURL: url` becomes
+    `authMode: .gateway(try GatewayConfiguration(gatewayURL:callbackURL:permissionCallbackURL:))`.
+    Petrel contains no default gateway or callback host.
 
 `api-breakage-allowlist.txt` lists every reviewed API diagnostic, and
 [docs/api-compatibility/0.1.0-spaces-migration.md](docs/api-compatibility/0.1.0-spaces-migration.md)
@@ -82,7 +85,8 @@ classifies the core-type move.
   `text/event-stream` queries. They now compile and run on Linux, refuse redirects, decode UTF-8
   split across chunks correctly, and cap one event at 8 MiB. (#66)
 - `NetworkService.setRequestIDHeader(name:)` sends a fresh per-request ID under a header name the
-  app chooses (never to anonymous third-party hosts). Off by default. (#64)
+  app chooses (never to anonymous third-party hosts). Off by default. Request deduplication
+  ignores that header, so identical concurrent requests still share one call. (#64, #79)
 - Lexicons synced with bluesky-social/atproto, including 3-segment and 5+-segment NSIDs. (#52)
 
 #### Changed
@@ -115,7 +119,8 @@ classifies the core-type move.
   `invalidServiceEndpoint` instead of falling through to a later entry. (#70)
 - `ATProtocolURI` documents that `format: at-uri` accepts the Spaces URI form, as the reference
   implementation does, and how to check against the specification grammar alone
-  (`ATProtocolURI.isValidATURI(_:grammar: .restricted)`). No behaviour change. (#71)
+  (`ATProtocolURI.isValidATURI(_:grammar: .restricted)`). No behaviour change. (#71; decision
+  D17)
 - Non-2xx responses from generated endpoints throw `ATProtoError<E>` / `ATProtoXRPCError`
   (previously many returned the status with a `nil` body). (#52)
 - Retries: never on 501, never resend a POST after a 5xx or timeout, and honour `Retry-After` up
@@ -177,6 +182,23 @@ classifies the core-type move.
   `.invalidLength`; `CARReaderError.blockCIDMismatch`, `.duplicateBlockConflict`. See
   `docs/api-compatibility/0.1.0-spaces-migration.md`. (#34)
 - swift-tools-version 6.1 (was 6.0). (#41)
+- Gateway mode (`AuthMode.gateway`, for apps that run their own confidential-client gateway) is
+  configured by the caller. `AuthMode.gateway` has an associated `GatewayConfiguration`
+  (`gatewayURL`, `callbackURL`, `permissionCallbackURL`), and `ATProtoClient.init` no longer takes
+  `gatewayURL:`. The gateway and callback hosts that were built into Petrel are gone; callbacks
+  are matched against the configured URLs with the same strictness as before (https, same host,
+  port and path, no user info or fragment). **Migrate:** replace
+  `authMode: .gateway, gatewayURL: url` with
+  `authMode: .gateway(try GatewayConfiguration(gatewayURL: url, callbackURL: …, permissionCallbackURL: …))`.
+  The initializer throws `GatewayConfiguration.ValidationError` for a callback that is not an
+  absolute https URL without user info, query or fragment. (#80)
+- `switchAuthMode(.gateway(…))` is refused with `AuthError.invalidOAuthConfiguration` unless the
+  client was created in gateway mode with the same `gatewayURL`; such a switch used to mix hosts
+  silently. `startGatewayScopeUpgrade(requesting:for:callbackURL:)` takes `URL? = nil`, meaning
+  the configured permission callback. (#80)
+- Removed: the `PetrelLoad` package product, an internal load harness (the target remains:
+  `swift run PetrelLoad`), and the `atproto` git submodule, which SwiftPM cloned for every
+  consumer and nothing read. (#79)
 
 #### Fixed
 - A request cancelled before its data task started could hang. (#57)
@@ -214,21 +236,65 @@ The Spaces lexicons track an unreleased atproto proposal and change between alph
 - `SpaceCredentialManager.get(url:space:audience:maximumArchiveBytes:maximumBlobBytes:)`: the optional `maximumBlobBytes` (default `nil`, unchanged behaviour) replaces the hardened 10 MiB response limit for a single `getBlob` request, clamped to 128 MiB, as `maximumArchiveBytes` does for `getRepo`. Other methods ignore it, and `maximumArchiveBytes` still does not apply to `getBlob`. Existing calls compile unchanged.
 
 ##### Changed
-- Spaces lexicons follow the October 29, 2026 alpha (atproto `5d88b414`, npm `0.0.0-spaces-alpha-20261029171913`), byte-identical to upstream. Source-breaking: every `ComAtprotoSimplespace*` type and `ATProtoClient.Com.Atproto.Simplespace` are removed, including `ComAtprotoSimplespaceDefs` and its `publicPolicy`, `memberListPolicy`, `managingAppPolicy`, `open` and `allowList` types. `createSpace`, `updateSpace`, `getSpace` and `deleteSpace` move to `ComAtprotoSpace*` and take or return one `policy` union in place of `readPolicy`, `writePolicy` and `appAccess`; `putMember`, `removeMember` and `listMembers` move to `ComAtprotoMemberspace*`; `checkUserAccess` moves to `ComAtprotoManagedspaceCheckUserAccess`. Added: the policy objects `ComAtprotoPersonalspacePolicy`, `ComAtprotoMemberspacePolicy` and `ComAtprotoManagedspacePolicy`, the records `ComAtprotoSpacePolicy` and `ComAtprotoMemberspaceMember`, and the generated methods `com.atproto.space.clearRecords`, `removeWriter`, `importRepo`, `exportSpaceMeta` and `importSpaceMeta`. `getSpaceCredential` documents that `SpaceNotFound` may stand in for `UserNotAuthorized`, and the `SpaceCredentialError` description for `SpaceNotFound` now reads "not found or not authorized". Classification is unchanged.
-- Regenerated Swift and Kotlin SimpleSpace APIs against the September 10 Spaces alpha (`9d787ebf`): independent `readPolicy`/`writePolicy`, `putMember` with required read/write flags, and access-specific managing-app checks. The obsolete `addMember` endpoint is removed.
-- Spaces lexicons follow the October 22, 2026 alpha (atproto `ac0c9f15`, npm `0.0.0-spaces-alpha-20261022141228`), byte-identical to upstream. Source-breaking changes from the October 1 alpha (`679724ad`): `ComAtprotoSimplespaceCreateSpace.Input.type` and `ComAtprotoSpaceListSpaces.Parameters.type` are now `spaceType`; `ComAtprotoSpaceNotifyWrite.Input.rev` and `ComAtprotoSpaceListRepos.Repo.rev` are now `repoRev`. `notifyWrite` adds optional `spaceRev`/`prevSpaceRev` and typed `SpaceNotFound`/`FutureRev` errors; `listRepos` entries add `spaceRev`, and its cursor is an exclusive space-revision checkpoint. Source-breaking changes from the October 22 alpha: `ComAtprotoSpaceDefs.SignedCommit`, which carried `hash`, `ikm`, `sig` and `mac`, is replaced by `ComAtprotoSpaceDefs.Commit` (`ver`, `space`, `repo`, `rev`, `data`); `hash` is now `data` in `notifyWrite` input and `listRepos` entries; `ComAtprotoSpaceGetSpaceCredential.Input` requires `credentialKid` and takes an optional `delegationToken`; `getRepo` returns a STAR archive (`application/octet-stream`) and drops `excludeValues`; `getLatestCommit`, `getRecord`, `getRepo` and `listRepoOps` declare `BadSpaceMac`.
-- `SpaceCredentialManager` follows the October 22 credential flow. The `getSpaceCredential` exchange sends the space, a fresh P-256 `did:key` as `credentialKid`, the delegation token and any client attestation in its JSON body, with no Authorization header or HTTP signature; the returned credential's JWT header must name `#atproto`. `get(url:space:audience:)` sends `Authorization: Atproto-Space-Credential <credential>`, `Atproto-Space-Audience` (the `repo` DID, else the space authority DID), and an HTTP Message Signature over both under the `atproto-space-credential` label and tag, replacing Spaces DPoP. For `getLatestCommit`, `getRepo`, `listRepoOps` and `getRecord` it requests and verifies a response MAC keyed to the author's `#atproto_kem` key, and it returns a `getRepo` archive only after full STAR verification. A `401 CredentialRevoked` response drops the cached credential. Ordinary OAuth DPoP is unchanged.
+- **Breaking:** Spaces lexicons and the generated Swift and Kotlin bindings follow the November 12,
+  2026 alpha (atproto `d4def6e9`, npm `0.0.0-spaces-alpha-20261112204144`), vendored
+  byte-for-byte; this includes the November 5 STAR framing. Compared with 1.1.0, every
+  `ComAtprotoSimplespace*` type and `ATProtoClient.Com.Atproto.Simplespace` are gone: spaces live
+  in `com.atproto.space` (create, update, get and delete a space with one `policy` union; records,
+  blobs, sync), `com.atproto.memberspace`, `com.atproto.managedspace` and
+  `com.atproto.personalspace`. Code written against the October alphas on `main` needs these
+  renames (#73):
+
+  | Before | After |
+  | --- | --- |
+  | `getSpaceCredential`, `credentialKid` | `authorizeSpaceSync`, `credentialKey`, optional `notify`; output adds `spaceRev` |
+  | `listRepos`, `.Repo` | `listWriters`, entries `ComAtprotoSpaceDefs.RepoWrite` or `.RepoRemoved` |
+  | `notifyWrite`, `notifyCredentialRevoked` | `notifyRepoUpdate`, `notifyCredentialsRevoked` |
+  | `registerNotify`, `unregisterNotify`, `notifySpaceDeleted` | removed; new `confirmRegistration`, `notifySpaceUpdate` |
+  | `memberspace.putMember` / `removeMember`, `ListMembers.Member` | `putMembers` / `removeMembers` (arrays), `ComAtprotoMemberspaceDefs.Member` |
+  | `managedspace.checkUserAccess` (`user`, `access` → `authorized`) | `checkAccess` (optional `repo`, `clientId` URI → `read`, `write`) |
+  | `createSpace` / `getSpace` output `uri`; `listSpaces` `did`, entries `{ uri }` | `space`; `spaceDid`, entries `{ space, repoRev?, data?, spaceRev? }` |
+  | `removeWriter` input `did`; `listRecords` `reverse`; `listBlobs` `since` | `repo`; removed; removed |
+  | `listRepoOps` output `commit?` | `commit`, required on every page |
+  | Errors `NotSpaceOwner`, `UserNotAuthorized`, `BadSpaceMac`, `MalformedCursor` | `NotAuthorized`, `AccountNotAuthorized`, `InvalidSpaceMac`, `InvalidCursor`; new `RepoTakendown`, `RepoDeactivated`, `RegistrationNotConfirmed`, `InvalidRepoFile`, `RepoMismatch`, `InvalidSpaceMeta` |
+  | Space declaration `name`, `nameLang` | optional `title`, `titleLang` |
+
+- **Breaking:** `SpaceCredentialManager` speaks the November 12 protocol only; the older MAC
+  headers and secret derivation are gone, with no dual support. (#73)
+  - Credentials come from `authorizeSpaceSync` with a fresh P-256 `did:key` as `credentialKey`,
+    the delegation token and any client attestation; Petrel does not register for
+    notifications. The credential must be an `atproto-space-credential+jwt` naming `#atproto`.
+  - `get(url:space:audience:…)` sends `Authorization: Atproto-Space-Credential <credential>`,
+    `Atproto-Space-Audience` and an HTTP Message Signature over both (label and tag
+    `atproto-space-credential`), in place of Spaces DPoP. Ordinary OAuth DPoP is unchanged.
+  - Response MACs are HTTP Message Signatures requested with `Accept-Signature`: exactly one,
+    covering exactly `Atproto-Space-Commit` (checked against the body or archive metadata) or
+    `Atproto-Space-Record` (checked against the URI and recomputed CID). The key is an HPKE
+    export-only secret (RFC 9180, P-256, HKDF-SHA256, `info="atproto-mac"`), fresh for every
+    request, page and retry. A `getRepo` MAC is checked before the archive is parsed, and the
+    archive is returned only after full STAR verification.
+  - STAR archives use `0x01` before each pair and one final `0x00`, with limits of 64 KiB
+    metadata, 4 KiB keys and 1 MiB values, served as `application/vnd.dasl.star`.
+  - Errors: `SpaceDeleted` is checked first; `SpaceNotFound` and `AccountNotAuthorized` are
+    `authorizationRefused`; `RepoTakendown`, `RepoDeactivated` and `UpstreamFailure` are exchange
+    failures and never mean the space is gone. A `401 CredentialRevoked` drops the cached
+    credential.
+  - API: `SpaceMAC.commit`, `SpaceMAC.record` and `SpaceMAC.verify(mac:expected:)` are removed
+    (verification happens inside `SpaceCredentialManager`); `SpaceSTAR.verify` drops `sharedSecret:`
+    and `mac:`. New: `SpaceCredential.spaceRev`, `SpaceSTAR.maximumMetadataBytes`,
+    `SpaceSTAR.maximumKeyBytes`.
 
 ##### Fixed
 - `SpaceCredentialManager` reuses a cached space credential until its `exp` less min(60 s, half its issued lifetime `exp - iat`), bounded by that lifetime from local receipt. The previous flat 60 s margin never reused a 60 s credential, so every read repeated the delegation and credential exchange.
 - Credential-exchange errors keep their protocol names. `SpaceNotFound` at HTTP 400 (the reference host) or 404 (Swan) is now `SpaceCredentialError.authorizationRefused` with error `SpaceNotFound` (previously `exchangeFailed`, which dropped the name or kept it only inside the raw body); it never means deletion. `InvalidClientAttestation` remains `tokenRejected` with that error name, but its description names the client attestation instead of the delegation token, and it no longer triggers the `describeServer` evidence probe. No enum cases were added, so exhaustive switches still compile.
 - `SpaceHostResolver.fetchDIDDocument(for:urlSession:limits:)` (when no `urlSession` is passed) and `SpaceHostResolver.fetchBoundedPublicJSON(from:limits:fixtureSession:)` invalidate the hardened session they create for each call once its request finishes. URLSession keeps a strong reference to its delegate until it is invalidated, so every call previously leaked that session and its delegate.
 - A `SpaceHostResolver` or `SpaceCredentialManager` that creates its own session (no `urlSession` passed) invalidates it when it is released, so a short-lived resolver or manager no longer leaks its session and delegate. A session passed in remains the caller's to invalidate.
-- `com.atproto.space` and `com.atproto.simplespace` lexicons are re-vendored verbatim from bluesky-social/atproto PR #5187 (`57b0a0424fb27d8e4989e74fa37fbc0ce4527ded`). This replaces a non-upstream `com.atproto.space.defs#signedCommit` shape (a "v2 authenticated transition" with optional `did`, `space`, `prevRev`, `prevHash`, `path`, `action`, `cid`, `prevCid`, `val` and optional `ikm`/`mac`) with the upstream v1 shape, where `ikm` and `mac` are required and the v2-only fields no longer exist. This is a source-breaking change for code that constructed or read the removed fields. The same vendor drop replaces `simplespace.addMember` with `simplespace.putMember` and adds `space.notifyCredentialRevoked`. The October 22 alpha later replaced that `signedCommit` shape with `#commit` (see Changed).
 
 ### PetrelCore (new product)
 - CID, DAG-CBOR, DAG-JSON bridge and CAR reading, extracted from `Petrel` (which re-exports
   it). `Dictionary` conforms to `DAGCBOREncodable`. (#34, #38, #52)
+- The DAG-CBOR encoder throws for `UInt` and `UInt64` values above `Int64.max`, because the data
+  model's integer is a signed 64-bit value. Decoding is unchanged. (#75)
 
 ### PetrelCrypto (new product)
 - P-256 and K-256 keypairs behind one `ATProtoSigner` / `ATProtoKeypair` / `ATProtoPublicKey`
@@ -250,6 +316,8 @@ The Spaces lexicons track an unreleased atproto proposal and change between alph
 - `CachingServiceAuthKeyResolver` follows an issuer's key rotation at the first forced refresh
   instead of refusing its tokens for up to 30 seconds; forced refreshes are still rate-limited.
   (#70)
+- Service auth: lookups that share an in-flight key fetch all get the key the cache settled on, so
+  a forced refresh that finishes first is never undone by a slower ordinary fetch. (#70)
 
 ### PetrelRepo (new product)
 - Repository primitives: Merkle Search Tree, commits, CAR import and export, record proofs.
@@ -267,8 +335,22 @@ The Spaces lexicons track an unreleased atproto proposal and change between alph
   `.invalidRecord(path:)`. Imports stream into a `RepositoryBlockStore`, file-backed or in
   memory. (#48)
 - `RepositoryCommitDiff` computes diffs with their covering proofs, verifies operation inversion,
-  and verifies a firehose `#commit` or `#sync` event from its own fields. `PetrelFirehose` does not
-  call it yet. (#48)
+  and verifies a firehose `#commit` or `#sync` event from its own fields (`verifyCommitEvent`,
+  `verifySyncEvent`). Both refuse a revision more than `maximumClockSkew` (300 seconds by default)
+  ahead of `now` with `revisionInFuture`, before any key lookup, and `verifyCommitEvent` refuses
+  more operations than `limits.maximumWrites` (`tooManyOperations`) or more block bytes than
+  `limits.maximumRelevantBlockBytes` (`blocksTooLarge`). (#48, #75)
+- `IdentityResolver` and `CachingServiceAuthKeyResolver` conform to
+  `RepositorySigningKeyResolver`, so event verification can use keys read from the account's DID
+  document; `CachingServiceAuthKeyResolver(upstream: IdentityResolver())` is the recommended
+  resolver for a live firehose. `Repository.signingKey(fromDIDDocument:did:)` applies the identity
+  layer's `#atproto` verification-method rule and checks the document's `id`. (#75)
+- Repositories Petrel writes (secp256k1 and P-256) are checked by the TypeScript reference
+  implementation, `@atproto/repo` 0.11.5: full-repository verification, an independently built
+  MST root, diff verification against the previous export, inclusion and absence proofs, and
+  refusal under another key or DID. The test runs nightly in CI (`ts-repo-interop`) and locally
+  with `PETREL_TS_INTEROP_DIR`; see `Tests/PetrelRepoTests/Vectors/repo-ts-interop/README.md`.
+  (#75)
 - Tested against the official MST, data-model and commit-proof vectors and a real exported
   repository (1,868 records, K-256); exercised up to 250,000 records. (#48)
 - **Breaking:** `CID.parse` rejects non-canonical strings, and `CARReader` requires a version and
@@ -288,6 +370,8 @@ The Spaces lexicons track an unreleased atproto proposal and change between alph
   `PLCOperationLimits.referenceDirectory` (plc.directory's 4,000-byte, 10-alias, 10-service
   limits) by default, so an operation plc.directory would reject is refused before it is sent.
   Pass `operationLimits: .specification` for the previous limits. (#70)
+- The built-in transport is `URLSessionPLCTransport`. The earlier name,
+  `AsyncHTTPClientPLCTransport`, is deprecated; it never used AsyncHTTPClient. (#79)
 
 ### PetrelFirehose and PetrelJetstream (new products)
 - `EventStreamSubscription<Message>` for any Lexicon subscription, `LabelSubscription`, the
@@ -306,6 +390,15 @@ The Spaces lexicons track an unreleased atproto proposal and change between alph
 - A failed cursor `loadCursor()` or `saveCursor(_:)` ends the Jetstream stream with
   `JetstreamSubscriptionError.cursorStorageFailure(operation:message:)`; a failed load used to
   start silently at the live tip. (#61)
+- `RelayCommitEvent.verify(keyResolver:limits:policy:now:maximumClockSkew:)` and
+  `RelaySyncEvent.verify(keyResolver:limits:now:maximumClockSkew:)` verify a firehose event in one
+  call with `PetrelRepo` (signature under the account's current key, revision, operation inversion
+  to `prevData`, record blocks). Verification is opt-in: the subscription delivers events as
+  received. A commit event without `prevData` throws `missingPreviousData`; a malformed operation
+  throws `malformedOperation(path:)`. `RelayRepoOp.repositoryOperation(keySyntax:)` and
+  `RelayCommitEvent.repositoryOperations(keySyntax:)` convert operations for `PetrelRepo`. (#75)
+- `RelayFinalStateVerifier.verify(relay:reference:)`; the earlier `verify(relay:swan:)` spelling
+  is deprecated. (#79)
 
 ### PetrelLexicon and PetrelOzone (new products)
 - `PetrelLexicon`: parse Lexicon documents (`LexiconDoc`), hold them in a `LexiconCatalog`,
@@ -350,14 +443,43 @@ The Spaces lexicons track an unreleased atproto proposal and change between alph
   the MST proof all check out. Every fetch goes through the address-pinning transport rules
   (D13). Without it, the authorization server refused every `include:` scope unless the host wrote
   its own resolver. (#62)
+- Commit signatures are verified with PetrelRepo's `ATProtoRepositoryCommitVerifier`, on P-256 and
+  secp256k1, low-S compact signatures only. (#74)
+
+### PetrelOAuthServerNIO and PetrelOAuthServerHummingbird (new products, opt-in package traits)
+- `PetrelOAuthServerNIO` (trait `OAuthServerNIO`; swift-nio and swift-nio-ssl) holds
+  `PinnedNIOOAuthRemoteTransport`, the address-pinning transport `PetrelOAuthServer` requires for
+  fetching client metadata, for a server built on any framework. (#76)
+- `PetrelOAuthServerHummingbird` (trait `OAuthServerHummingbird`, which enables `OAuthServerNIO`)
+  is the Hummingbird adapter: `OAuthServerHummingbird`, `OAuthResourceChallenge`,
+  `OAuthClientAddressPolicy` and `OAuthServerRequestContext`. It re-exports
+  `PetrelOAuthServerNIO`. (#72, #76)
+- To use one, name the trait in the package dependency, for example
+  `.package(url: "https://github.com/joshlacal/Petrel.git", from: "2.0.0", traits: ["OAuthServerHummingbird"])`,
+  from a manifest with swift-tools-version 6.1 or later. With a trait off, the product's types are
+  unavailable stubs whose message names the trait to enable. (#72, #76)
+- Consumers that enable no trait: Swift 6.2 and later do not fetch hummingbird, swift-nio or
+  swift-nio-ssl; Swift 6.1 fetches them and builds nothing from them. The root `Package.resolved`
+  is the default-trait resolution and carries no pins for those packages. (#72, #76)
 
 ### Server/ (nested package)
-- `PetrelOAuthServerHummingbird` (HTTP adapter plus the address-pinning NIO transport) and the
-  runnable `petrel-oauth-server-example`. (#51)
+- The runnable `petrel-oauth-server-example` and the package's tests. The Hummingbird adapter and
+  the pinned transport it used to hold are now the root products above. (#51, #72)
 - The connection's client address reaches the account authenticator (`OAuthServerRequestContext`);
   `clientAddress: .forwardedFor(trustedProxies:)` uses `X-Forwarded-For` only from a trusted
   proxy. `ExampleServer.router()` returns `Router<OAuthServerRequestContext>`. The example server
   uses `AuthenticatedOAuthLexiconResolver`. (#62, #63)
+- `ExampleServer.init` takes an optional `clientFetcher:` for client metadata and JWKS fetches;
+  the default is unchanged. (#69)
+- CI builds and tests the package on macOS and Linux (`oauth-server.yml`), and nightly runs the
+  reference TypeScript client (`@atproto/oauth-client-node`) against the example server: a
+  loopback public client, a discovered https public client, and a discovered `private_key_jwt`
+  client with a `jwks_uri`, fetched over TLS through the pinned transport. (#67, #69)
+- `PetrelClientInteropTests` runs Petrel's own `ATProtoClient` (public OAuth and CAB) against the
+  example server: discovery, PAR with the nonce retry, sign-in, code exchange, resource calls, a
+  DPoP nonce rotation, refresh and revocation. Known client behaviour it records: against a
+  loopback `http` server, credentials are not attached up front, so each resource call is first
+  refused with 401 and then succeeds after a refresh. `https` servers are unaffected. (#68)
 
 ### Kotlin bindings
 - Binary-output endpoints return raw bytes. (#37)
@@ -372,8 +494,13 @@ The Spaces lexicons track an unreleased atproto proposal and change between alph
   instead of failing generation. (#66)
 - CI: a scheduled `Live network smoke` workflow runs the firehose, labeler, Jetstream and identity
   live tests (never on pull requests). (#61)
+- CI: `Scripts/tests/check-app-specific-names.sh` fails a pull request that names a specific
+  application in library sources, the generator or its templates; reviewed exceptions are in
+  `Scripts/app-specific-names-allowlist.txt`. (#79, #80)
 
 ### Dependencies
+- Used only by the `OAuthServerNIO` and `OAuthServerHummingbird` traits: hummingbird 2.26.0 or
+  later, swift-nio 2.105.0 or later, swift-nio-ssl 2.37.6 or later. (#72)
 - swift-crypto `"3.15.1"..<"6.0.0"`, swift-log 1.15.1 or later, swift-async-dns-resolver
   `0.8.x`, swift-secp256k1 `0.25.x`, swift-docc-plugin from the `swiftlang` organisation,
   vendored BLAKE3 1.8.7. (#56)

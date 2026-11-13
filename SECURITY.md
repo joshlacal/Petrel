@@ -54,7 +54,8 @@ A short map of where Petrel defends against the obvious attacks, for reviewers a
   fetches client metadata only over a transport that connects to the addresses it approved, and
   refuses any other transport unless the host sets `OAuthRemoteFetchPolicy.allowsUnpinnedTransport`.
   `Sources/PetrelOAuthServer/Clients/OAuthRemoteFetch.swift`; the pinning implementation is
-  `Server/Sources/PetrelOAuthServerHummingbird/PinnedNIOOAuthRemoteTransport.swift`.
+  `Sources/PetrelOAuthServerNIO/PinnedNIOOAuthRemoteTransport.swift` (product
+  `PetrelOAuthServerNIO`, package trait `OAuthServerNIO`).
 - **Token binding.** OAuth sessions use PAR, PKCE and DPoP; DPoP private keys live in the same
   credential storage as the session. `Sources/Petrel/Auth/OAuth/`.
 - **Credential storage.** Sessions and DPoP keys go to the Apple Keychain, libsecret, or
