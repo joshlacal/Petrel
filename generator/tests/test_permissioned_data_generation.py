@@ -178,7 +178,8 @@ class PermissionedDataGenerationTests(unittest.TestCase):
         self.assertIn('public let title: String?', generated)
         self.assertIn('nsid: "com.atproto.simplespace.space"', generated)
         self.assertIn('title: "Simple Space"', generated)
-        self.assertIn('titleLang: ["es": "Espacio sencillo", "ja": "\\u30b7\\u30f3\\u30d7\\u30eb\\u30b9\\u30da\\u30fc\\u30b9"]', generated)
+        self.assertIn('titleLang: ["es": "Espacio sencillo", "ja": "シンプルスペース"]', generated)
+        self.assertNotRegex(generated, r"\\u[0-9a-fA-F]{4}")
         self.assertIn('collections: ["app.bsky.feed.post", "app.bsky.graph.list"]', generated)
 
     def test_kotlin_space_primary_type_emits_descriptor(self):

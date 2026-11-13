@@ -916,12 +916,12 @@ class SwiftCodeGenerator(BaseCodeGenerator):
 
     def generate_space_declaration(self, main_def):
         key_type = main_def.get('key', 'tid')
-        title = json.dumps(main_def['title']) if isinstance(main_def.get('title'), str) else 'nil'
+        title = json.dumps(main_def['title'], ensure_ascii=False) if isinstance(main_def.get('title'), str) else 'nil'
         title_lang = main_def.get('title:lang', {})
         if not isinstance(title_lang, dict):
             title_lang = {}
         title_lang_literal = ', '.join(
-            f'{json.dumps(language)}: {json.dumps(value)}'
+            f'{json.dumps(language, ensure_ascii=False)}: {json.dumps(value, ensure_ascii=False)}'
             for language, value in sorted(title_lang.items())
             if isinstance(language, str) and isinstance(value, str)
         )
