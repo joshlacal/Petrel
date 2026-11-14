@@ -75,6 +75,12 @@ class KotlinTypeConverter(BaseTypeConverter):
                 return enum_name
             return self._convert_string_type(format_type)
         elif prop_type == 'integer':
+            if (
+                (prop_schema.get('maximum') or 0) > 2147483647
+                or name.endswith('Ms')
+                or name == 'authGeneration'
+            ):
+                return 'Long'
             return 'Int'
         elif prop_type == 'number':
             return 'Double'
@@ -164,6 +170,12 @@ class KotlinTypeConverter(BaseTypeConverter):
                 return enum_name
             return self._convert_string_type(items_schema.get('format', ''))
         elif items_type == 'integer':
+            if (
+                (items_schema.get('maximum') or 0) > 2147483647
+                or name.endswith('Ms')
+                or name == 'authGeneration'
+            ):
+                return 'Long'
             return 'Int'
         elif items_type == 'number':
             return 'Double'

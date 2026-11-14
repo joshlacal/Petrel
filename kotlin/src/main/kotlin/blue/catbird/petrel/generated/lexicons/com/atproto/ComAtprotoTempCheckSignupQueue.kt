@@ -21,7 +21,7 @@ object ComAtprotoTempCheckSignupQueueDefs {
         @SerialName("activated")
         val activated: Boolean,        @SerialName("placeInQueue")
         val placeInQueue: Int? = null,        @SerialName("estimatedTimeMs")
-        val estimatedTimeMs: Int? = null    )
+        val estimatedTimeMs: Long? = null    )
 
 /**
  * Check accounts location in signup queue.

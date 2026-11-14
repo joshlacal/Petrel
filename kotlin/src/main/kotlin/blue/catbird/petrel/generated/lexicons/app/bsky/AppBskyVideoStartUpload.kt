@@ -22,7 +22,7 @@ object AppBskyVideoStartUploadDefs {
         val sizeBytes: Int,// Declared MIME type of the video.        @SerialName("mimeType")
         val mimeType: String,// Optional client-provided file name.        @SerialName("name")
         val name: String? = null,// Advisory, non-authoritative duration used only for early failure; the authoritative probe runs asynchronously after upload.        @SerialName("durationMs")
-        val durationMs: Int? = null,// Advisory, non-authoritative width used only for early failure; the authoritative probe runs asynchronously after upload.        @SerialName("width")
+        val durationMs: Long? = null,// Advisory, non-authoritative width used only for early failure; the authoritative probe runs asynchronously after upload.        @SerialName("width")
         val width: Int? = null,// Advisory, non-authoritative height used only for early failure; the authoritative probe runs asynchronously after upload.        @SerialName("height")
         val height: Int? = null    )
 
