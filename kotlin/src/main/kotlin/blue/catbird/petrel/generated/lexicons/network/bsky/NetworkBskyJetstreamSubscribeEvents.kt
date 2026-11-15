@@ -180,7 +180,7 @@ enum class NetworkBskyJetstreamSubscribeEventsParametersKinds {
     @Serializable
     data class NetworkBskyJetstreamSubscribeEventsCommit(
 /** Jetstream's monotonic per-event sequence number; the stream cursor. */        @SerialName("seq")
-        val seq: Int,        @SerialName("did")
+        val seq: Long,        @SerialName("did")
         val did: DID,/** The event's display timestamp, microsecond precision: when Jetstream witnessed the event, unless an operator timestamp import overrode it. Timestamp cursors translate against the witnessed time, so after an import this value may not be a faithful resume position. */        @SerialName("time")
         val time: ATProtocolDate,/** The repo rev of the commit that produced this op. */        @SerialName("rev")
         val rev: String,        @SerialName("operation")
@@ -200,7 +200,7 @@ enum class NetworkBskyJetstreamSubscribeEventsParametersKinds {
     @Serializable
     data class NetworkBskyJetstreamSubscribeEventsIdentity(
         @SerialName("seq")
-        val seq: Int,        @SerialName("did")
+        val seq: Long,        @SerialName("did")
         val did: DID,/** The time Jetstream witnessed this event, microsecond precision. Timestamp imports apply only to record (commit) events, so this is always the witnessed time. */        @SerialName("time")
         val time: ATProtocolDate,/** The upstream event; its seq and time are the upstream relay's, not Jetstream's. */        @SerialName("identity")
         val identity: ComAtprotoSyncSubscribeReposIdentity    ) {
@@ -215,7 +215,7 @@ enum class NetworkBskyJetstreamSubscribeEventsParametersKinds {
     @Serializable
     data class NetworkBskyJetstreamSubscribeEventsAccount(
         @SerialName("seq")
-        val seq: Int,        @SerialName("did")
+        val seq: Long,        @SerialName("did")
         val did: DID,/** The time Jetstream witnessed this event, microsecond precision. Timestamp imports apply only to record (commit) events, so this is always the witnessed time. */        @SerialName("time")
         val time: ATProtocolDate,/** The upstream event; its seq and time are the upstream relay's, not Jetstream's. */        @SerialName("account")
         val account: ComAtprotoSyncSubscribeReposAccount    ) {
@@ -230,7 +230,7 @@ enum class NetworkBskyJetstreamSubscribeEventsParametersKinds {
     @Serializable
     data class NetworkBskyJetstreamSubscribeEventsSync(
         @SerialName("seq")
-        val seq: Int,        @SerialName("did")
+        val seq: Long,        @SerialName("did")
         val did: DID,/** The time Jetstream witnessed this event, microsecond precision. Timestamp imports apply only to record (commit) events, so this is always the witnessed time. */        @SerialName("time")
         val time: ATProtocolDate,/** The upstream event; its seq and time are the upstream relay's, not Jetstream's. */        @SerialName("sync")
         val sync: ComAtprotoSyncSubscribeReposSync    ) {
@@ -255,7 +255,7 @@ enum class NetworkBskyJetstreamSubscribeEventsParametersKinds {
 @Serializable
     data class NetworkBskyJetstreamSubscribeEventsParameters(
 // Resume position, inclusive: the server replays events with seq >= cursor and the client dedups the overlap. Values >= 1e15 are interpreted as a unix-microseconds timestamp instead of a seq and translated to the first seq witnessed at or after that instant; a timestamp below the retention floor clamps up to the floor and an #info OutdatedCursor frame is sent. Omitted: start at the live tip.        @SerialName("cursor")
-        val cursor: Int? = null,// Event kinds to receive; values are the message \$type fragment names. Omitted or empty: all kinds. A value outside the enum is rejected pre-upgrade with HTTP 400 (InvalidRequest) rather than silently never matching.        @SerialName("kinds")
+        val cursor: Long? = null,// Event kinds to receive; values are the message \$type fragment names. Omitted or empty: all kinds. A value outside the enum is rejected pre-upgrade with HTTP 400 (InvalidRequest) rather than silently never matching.        @SerialName("kinds")
         val kinds: List<NetworkBskyJetstreamSubscribeEventsParametersKinds>? = null,// Repo DIDs to receive events for; applies to every event kind. Omitted or empty: all repos.        @SerialName("dids")
         val dids: List<DID>? = null,// Collection NSIDs or '<prefix>.*' patterns; constrains which commit events are delivered. Non-commit kinds are unaffected — combine with kinds=commit for a commits-only collection stream. Rejected pre-upgrade with HTTP 400 (InvalidRequest) when kinds is set and excludes commit, since the filter could never apply. Omitted or empty: all collections.        @SerialName("collections")
         val collections: List<String>? = null,// Skip events whose uncompressed frame (envelope included) exceeds this many bytes. 0 (default) means no limit.        @SerialName("maxMessageSizeBytes")

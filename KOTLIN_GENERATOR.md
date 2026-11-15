@@ -43,7 +43,7 @@ generator/
 | Lexicon type | Kotlin type | Notes |
 |---|---|---|
 | `string` | `String` | Standard string |
-| `integer` | `Int` | 32-bit signed integer |
+| `integer` | `Int` / `Long` | 32-bit `Int` by default; 64-bit `Long` when `maximum > 2147483647`, `minimum < -2147483648`, or for 64-bit protocol counters, timestamps, cursors, revisions, and byte sizes |
 | `number` | `Double` | Floating-point number |
 | `boolean` | `Boolean` | Primitive boolean |
 | `array` | `List<T>` | Immutable list |

@@ -33,8 +33,8 @@ enum class NetworkBskyJetstreamPlanSnapshotInputKinds {
         val name: String,/** Zero-based segment index. */        @SerialName("index")
         val index: Int,/** The segment's xxh3 metadata checksum, encoded as 16 hexadecimal characters. */        @SerialName("checksum")
         val checksum: String,        @SerialName("minSeq")
-        val minSeq: Int,        @SerialName("maxSeq")
-        val maxSeq: Int,/** How to download this segment. For segment, download the whole file with getSegment. For blocks, download the ranges listed in blocks with getBlock. */        @SerialName("mode")
+        val minSeq: Long,        @SerialName("maxSeq")
+        val maxSeq: Long,/** How to download this segment. For segment, download the whole file with getSegment. For blocks, download the ranges listed in blocks with getBlock. */        @SerialName("mode")
         val mode: String,/** Block ranges to download, including both endpoints. This field is present only when mode is blocks. */        @SerialName("blocks")
         val blocks: List<NetworkBskyJetstreamPlanSnapshotBlockRange>? = null    ) {
         companion object {
@@ -70,14 +70,14 @@ enum class NetworkBskyJetstreamPlanSnapshotInputKinds {
         val kinds: List<NetworkBskyJetstreamPlanSnapshotInputKinds>? = null,// Only include data for these DIDs. Omit this field or pass an empty array to include all DIDs.        @SerialName("dids")
         val dids: List<DID>? = null,// Collection NSIDs or namespace wildcards such as app.bsky.feed.*; constrains commit events only. Non-commit kinds are unaffected, so combine with kinds=commit for a commits-only collection plan. Rejected when kinds is set and excludes commit. Omit or pass an empty array to include all collections.        @SerialName("collections")
         val collections: List<String>? = null,// Start after this sequence number. Events at or below it are not included.        @SerialName("afterSeq")
-        val afterSeq: Int? = null,// Stop at this sequence number. Events above it are not included.        @SerialName("beforeSeq")
-        val beforeSeq: Int? = null    )
+        val afterSeq: Long? = null,// Stop at this sequence number. Events above it are not included.        @SerialName("beforeSeq")
+        val beforeSeq: Long? = null    )
 
     @Serializable
     data class NetworkBskyJetstreamPlanSnapshotOutput(
 // The last sealed sequence covered by this page. Use this value as afterSeq for the next page. If the response hits the server's page limit, this is the maxSeq of the last item returned; otherwise it equals sealedTipSeq. Planning is complete when plannedThroughSeq reaches sealedTipSeq.        @SerialName("plannedThroughSeq")
-        val plannedThroughSeq: Int,// The end of the sealed archive for this snapshot, capped by beforeSeq when provided. Use this value as beforeSeq on later pages so the snapshot does not move while it is being downloaded.        @SerialName("sealedTipSeq")
-        val sealedTipSeq: Int,        @SerialName("segments")
+        val plannedThroughSeq: Long,// The end of the sealed archive for this snapshot, capped by beforeSeq when provided. Use this value as beforeSeq on later pages so the snapshot does not move while it is being downloaded.        @SerialName("sealedTipSeq")
+        val sealedTipSeq: Long,        @SerialName("segments")
         val segments: List<NetworkBskyJetstreamPlanSnapshotSegment>,        @SerialName("stats")
         val stats: NetworkBskyJetstreamPlanSnapshotStats    )
 

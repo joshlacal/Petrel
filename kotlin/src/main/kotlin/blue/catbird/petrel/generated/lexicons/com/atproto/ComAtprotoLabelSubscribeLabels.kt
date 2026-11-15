@@ -103,7 +103,7 @@ object ComAtprotoLabelSubscribeLabelsMessageUnionSerializer : kotlinx.serializat
     @Serializable
     data class ComAtprotoLabelSubscribeLabelsLabels(
         @SerialName("seq")
-        val seq: Int,        @SerialName("labels")
+        val seq: Long,        @SerialName("labels")
         val labels: List<ComAtprotoLabelDefsLabel>    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoLabelSubscribeLabelsLabels"
@@ -123,7 +123,7 @@ object ComAtprotoLabelSubscribeLabelsMessageUnionSerializer : kotlinx.serializat
 @Serializable
     data class ComAtprotoLabelSubscribeLabelsParameters(
 // The last known event seq number to backfill from.        @SerialName("cursor")
-        val cursor: Int? = null    )
+        val cursor: Long? = null    )
 
     @Serializable
     class ComAtprotoLabelSubscribeLabelsMessage

@@ -232,5 +232,62 @@ class KotlinRefTypedSubscriptionMessageTests(unittest.TestCase):
         )
 
 
+class Kotlin64BitIntegerConversionTests(unittest.TestCase):
+    def test_bounds_and_protocol_counters_map_to_long_while_ui_counts_stay_int(self):
+        lexicon = {
+            "lexicon": 1,
+            "id": "blue.catbird.test.intWidths",
+            "defs": {
+                "main": {
+                    "type": "object",
+                    "required": [
+                        "limit",
+                        "wideMax",
+                        "wideMin",
+                        "timestamp",
+                        "seq",
+                        "afterSeq",
+                        "cursor",
+                        "epoch",
+                        "generation",
+                        "sizeBytes",
+                        "size",
+                        "targetSeqs",
+                    ],
+                    "properties": {
+                        "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+                        "wideMax": {"type": "integer", "maximum": 9007199254740991},
+                        "wideMin": {"type": "integer", "minimum": -3000000000},
+                        "timestamp": {"type": "integer", "minimum": 0},
+                        "seq": {"type": "integer"},
+                        "afterSeq": {"type": "integer"},
+                        "cursor": {"type": "integer"},
+                        "epoch": {"type": "integer"},
+                        "generation": {"type": "integer"},
+                        "sizeBytes": {"type": "integer"},
+                        "size": {"type": "integer"},
+                        "targetSeqs": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                        },
+                    },
+                }
+            },
+        }
+        source = KotlinCodeGenerator(lexicon).convert()
+        self.assertIn("val limit: Int", source)
+        self.assertIn("val wideMax: Long", source)
+        self.assertIn("val wideMin: Long", source)
+        self.assertIn("val timestamp: Long", source)
+        self.assertIn("val seq: Long", source)
+        self.assertIn("val afterSeq: Long", source)
+        self.assertIn("val cursor: Long", source)
+        self.assertIn("val epoch: Long", source)
+        self.assertIn("val generation: Long", source)
+        self.assertIn("val sizeBytes: Long", source)
+        self.assertIn("val size: Long", source)
+        self.assertIn("val targetSeqs: List<Long>", source)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -21,7 +21,7 @@ object AppBskyVideoGetUploadLimitsDefs {
         @SerialName("canUpload")
         val canUpload: Boolean,        @SerialName("remainingDailyVideos")
         val remainingDailyVideos: Int? = null,        @SerialName("remainingDailyBytes")
-        val remainingDailyBytes: Int? = null,        @SerialName("message")
+        val remainingDailyBytes: Long? = null,        @SerialName("message")
         val message: String? = null,        @SerialName("error")
         val error: String? = null    )
 

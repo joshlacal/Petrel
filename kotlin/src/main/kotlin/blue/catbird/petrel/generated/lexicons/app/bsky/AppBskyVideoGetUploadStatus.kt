@@ -25,7 +25,7 @@ object AppBskyVideoGetUploadStatusDefs {
     data class AppBskyVideoGetUploadStatusOutput(
         @SerialName("jobId")
         val jobId: String,        @SerialName("partSizeBytes")
-        val partSizeBytes: Int,        @SerialName("partCount")
+        val partSizeBytes: Long,        @SerialName("partCount")
         val partCount: Int,        @SerialName("receivedParts")
         val receivedParts: List<Int>,        @SerialName("expiresAt")
         val expiresAt: ATProtocolDate,        @SerialName("state")

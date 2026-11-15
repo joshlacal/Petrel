@@ -169,7 +169,7 @@ object ComAtprotoSyncSubscribeReposMessageUnionSerializer : kotlinx.serializatio
     @Serializable
     data class ComAtprotoSyncSubscribeReposCommit(
 /** The stream sequence number of this message. */        @SerialName("seq")
-        val seq: Int,/** DEPRECATED -- unused */        @SerialName("rebase")
+        val seq: Long,/** DEPRECATED -- unused */        @SerialName("rebase")
         val rebase: Boolean,/** DEPRECATED -- replaced by #sync event and data limits. Indicates that this commit contained too many ops, or data size was too large. Consumers will need to make a separate request to get missing data. */        @SerialName("tooBig")
         val tooBig: Boolean,/** The repo this event comes from. Note that all other message types name this field 'did'. */        @SerialName("repo")
         val repo: DID,/** Repo commit object CID. */        @SerialName("commit")
@@ -192,7 +192,7 @@ object ComAtprotoSyncSubscribeReposMessageUnionSerializer : kotlinx.serializatio
     @Serializable
     data class ComAtprotoSyncSubscribeReposSync(
 /** The stream sequence number of this message. */        @SerialName("seq")
-        val seq: Int,/** The account this repo event corresponds to. Must match that in the commit object. */        @SerialName("did")
+        val seq: Long,/** The account this repo event corresponds to. Must match that in the commit object. */        @SerialName("did")
         val did: DID,/** CAR file containing the commit, as a block. The CAR header must include the commit block CID as the first 'root'. */        @SerialName("blocks")
         val blocks: Bytes,/** The rev of the commit. This value must match that in the commit object. */        @SerialName("rev")
         val rev: String,/** Timestamp of when this message was originally broadcast. */        @SerialName("time")
@@ -208,7 +208,7 @@ object ComAtprotoSyncSubscribeReposMessageUnionSerializer : kotlinx.serializatio
     @Serializable
     data class ComAtprotoSyncSubscribeReposIdentity(
         @SerialName("seq")
-        val seq: Int,        @SerialName("did")
+        val seq: Long,        @SerialName("did")
         val did: DID,        @SerialName("time")
         val time: ATProtocolDate,/** The current handle for the account, or 'handle.invalid' if validation fails. This field is optional, might have been validated or passed-through from an upstream source. Semantics and behaviors for PDS vs Relay may evolve in the future; see atproto specs for more details. */        @SerialName("handle")
         val handle: Handle? = null    ) {
@@ -223,7 +223,7 @@ object ComAtprotoSyncSubscribeReposMessageUnionSerializer : kotlinx.serializatio
     @Serializable
     data class ComAtprotoSyncSubscribeReposAccount(
         @SerialName("seq")
-        val seq: Int,        @SerialName("did")
+        val seq: Long,        @SerialName("did")
         val did: DID,        @SerialName("time")
         val time: ATProtocolDate,/** Indicates that the account has a repository which can be fetched from the host that emitted this event. */        @SerialName("active")
         val active: Boolean,/** If active=false, this optional field indicates a reason for why the account is not active. */        @SerialName("status")
@@ -261,7 +261,7 @@ object ComAtprotoSyncSubscribeReposMessageUnionSerializer : kotlinx.serializatio
 @Serializable
     data class ComAtprotoSyncSubscribeReposParameters(
 // The last known event seq number to backfill from.        @SerialName("cursor")
-        val cursor: Int? = null    )
+        val cursor: Long? = null    )
 
     @Serializable
     class ComAtprotoSyncSubscribeReposMessage

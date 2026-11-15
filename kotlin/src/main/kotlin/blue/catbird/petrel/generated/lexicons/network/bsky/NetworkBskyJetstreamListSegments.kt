@@ -21,11 +21,11 @@ object NetworkBskyJetstreamListSegmentsDefs {
 /** Segment filename; pass to getSegment. */        @SerialName("name")
         val name: String,/** Zero-based segment index. */        @SerialName("index")
         val index: Int,/** File size in bytes. */        @SerialName("sizeBytes")
-        val sizeBytes: Int,/** Segment-format xxh3 metadata checksum as 16-char hex; equals the getSegment ETag. */        @SerialName("checksum")
+        val sizeBytes: Long,/** Segment-format xxh3 metadata checksum as 16-char hex; equals the getSegment ETag. */        @SerialName("checksum")
         val checksum: String,/** Number of events in the segment. */        @SerialName("eventCount")
         val eventCount: Int,        @SerialName("minSeq")
-        val minSeq: Int,        @SerialName("maxSeq")
-        val maxSeq: Int,/** Earliest witnessed-at, unix microseconds. */        @SerialName("minWitnessedAt")
+        val minSeq: Long,        @SerialName("maxSeq")
+        val maxSeq: Long,/** Earliest witnessed-at, unix microseconds. */        @SerialName("minWitnessedAt")
         val minWitnessedAt: Int,/** Latest witnessed-at, unix microseconds. */        @SerialName("maxWitnessedAt")
         val maxWitnessedAt: Int    ) {
         companion object {

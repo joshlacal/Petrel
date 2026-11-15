@@ -36,6 +36,75 @@ def convert_to_pascal_case(s: str) -> str:
 class KotlinTypeConverter(BaseTypeConverter):
     """Converts lexicon types to Kotlin types."""
 
+    _INT32_MAX = 2_147_483_647
+    _INT32_MIN = -2_147_483_648
+
+    _EXACT_64BIT_INTEGER_NAMES = frozenset({
+        'timestamp',
+        'timestamps',
+        'seq',
+        'seqs',
+        'cursor',
+        'cursors',
+        'epoch',
+        'epochs',
+        'generation',
+        'generations',
+        'revision',
+        'revisions',
+        'size',
+        'exp',
+        'iat',
+        'nbf',
+        'blobUploadLimit',
+        'paddedSize',
+        'ciphertextSize',
+        'plaintextSize',
+    })
+
+    _SUFFIX_64BIT_INTEGER_NAMES = (
+        'Ms',
+        'Millis',
+        'Us',
+        'Ns',
+        'Timestamp',
+        'Timestamps',
+        'Seq',
+        'Seqs',
+        'SeqInclusive',
+        'SeqExclusive',
+        'Cursor',
+        'Cursors',
+        'Epoch',
+        'Epochs',
+        'EpochNumber',
+        'Generation',
+        'Generations',
+        'GenerationAtOrigin',
+        'SequencerTerm',
+        'Counter',
+        'Counters',
+        'Revision',
+        'Revisions',
+        'Rev',
+        'Revs',
+        'Bytes',
+    )
+
+    @classmethod
+    def _is_64bit_integer(cls, schema: Dict[str, Any], name: str) -> bool:
+        """Return True when a lexicon integer requires 64-bit Kotlin Long."""
+        maximum = schema.get('maximum')
+        if maximum is not None and maximum > cls._INT32_MAX:
+            return True
+        minimum = schema.get('minimum')
+        if minimum is not None and minimum < cls._INT32_MIN:
+            return True
+        return (
+            name in cls._EXACT_64BIT_INTEGER_NAMES
+            or name.endswith(cls._SUFFIX_64BIT_INTEGER_NAMES)
+        )
+
     def determine_type(self, name: str, prop_schema: Dict[str, Any],
                        required_fields: List[str], current_struct_name: str,
                        context_identity=None, nullable_fields=None) -> str:
@@ -75,11 +144,7 @@ class KotlinTypeConverter(BaseTypeConverter):
                 return enum_name
             return self._convert_string_type(format_type)
         elif prop_type == 'integer':
-            if (
-                (prop_schema.get('maximum') or 0) > 2147483647
-                or name.endswith('Ms')
-                or name == 'authGeneration'
-            ):
+            if self._is_64bit_integer(prop_schema, name):
                 return 'Long'
             return 'Int'
         elif prop_type == 'number':
@@ -170,11 +235,7 @@ class KotlinTypeConverter(BaseTypeConverter):
                 return enum_name
             return self._convert_string_type(items_schema.get('format', ''))
         elif items_type == 'integer':
-            if (
-                (items_schema.get('maximum') or 0) > 2147483647
-                or name.endswith('Ms')
-                or name == 'authGeneration'
-            ):
+            if self._is_64bit_integer(items_schema, name):
                 return 'Long'
             return 'Int'
         elif items_type == 'number':

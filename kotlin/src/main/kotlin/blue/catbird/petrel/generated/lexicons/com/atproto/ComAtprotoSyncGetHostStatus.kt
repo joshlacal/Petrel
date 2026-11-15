@@ -25,7 +25,7 @@ object ComAtprotoSyncGetHostStatusDefs {
     data class ComAtprotoSyncGetHostStatusOutput(
         @SerialName("hostname")
         val hostname: String,// Recent repo stream event sequence number. May be delayed from actual stream processing (eg, persisted cursor not in-memory cursor).        @SerialName("seq")
-        val seq: Int? = null,// Number of accounts on the server which are associated with the upstream host. Note that the upstream may actually have more accounts.        @SerialName("accountCount")
+        val seq: Long? = null,// Number of accounts on the server which are associated with the upstream host. Note that the upstream may actually have more accounts.        @SerialName("accountCount")
         val accountCount: Int? = null,        @SerialName("status")
         val status: ComAtprotoSyncDefsHostStatus? = null    )
 

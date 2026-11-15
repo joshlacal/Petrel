@@ -31,7 +31,7 @@ object AppBskyVideoUploadPartDefs {
     data class AppBskyVideoUploadPartOutput(
         @SerialName("partNumber")
         val partNumber: Int,        @SerialName("sizeBytes")
-        val sizeBytes: Int    )
+        val sizeBytes: Long    )
 
 sealed class AppBskyVideoUploadPartError(val name: String, val description: String?) {
         object UploadNotFound: AppBskyVideoUploadPartError("UploadNotFound", "The job ID is unknown or aged out of retention; known terminal sessions are never reported as not found.")

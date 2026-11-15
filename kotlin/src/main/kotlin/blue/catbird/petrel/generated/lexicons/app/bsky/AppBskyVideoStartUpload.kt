@@ -19,7 +19,7 @@ object AppBskyVideoStartUploadDefs {
 @Serializable
     data class AppBskyVideoStartUploadInput(
 // Exact byte size of the complete upload-ready video file before it is split into parts.        @SerialName("sizeBytes")
-        val sizeBytes: Int,// Declared MIME type of the video.        @SerialName("mimeType")
+        val sizeBytes: Long,// Declared MIME type of the video.        @SerialName("mimeType")
         val mimeType: String,// Optional client-provided file name.        @SerialName("name")
         val name: String? = null,// Advisory, non-authoritative duration used only for early failure; the authoritative probe runs asynchronously after upload.        @SerialName("durationMs")
         val durationMs: Long? = null,// Advisory, non-authoritative width used only for early failure; the authoritative probe runs asynchronously after upload.        @SerialName("width")
@@ -30,7 +30,7 @@ object AppBskyVideoStartUploadDefs {
     data class AppBskyVideoStartUploadOutput(
         @SerialName("jobId")
         val jobId: String,        @SerialName("partSizeBytes")
-        val partSizeBytes: Int,        @SerialName("partCount")
+        val partSizeBytes: Long,        @SerialName("partCount")
         val partCount: Int,        @SerialName("expiresAt")
         val expiresAt: ATProtocolDate    )
 
