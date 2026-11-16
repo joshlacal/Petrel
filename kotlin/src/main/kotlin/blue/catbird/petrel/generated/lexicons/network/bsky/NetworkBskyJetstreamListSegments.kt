@@ -26,8 +26,8 @@ object NetworkBskyJetstreamListSegmentsDefs {
         val eventCount: Int,        @SerialName("minSeq")
         val minSeq: Long,        @SerialName("maxSeq")
         val maxSeq: Long,/** Earliest witnessed-at, unix microseconds. */        @SerialName("minWitnessedAt")
-        val minWitnessedAt: Int,/** Latest witnessed-at, unix microseconds. */        @SerialName("maxWitnessedAt")
-        val maxWitnessedAt: Int    ) {
+        val minWitnessedAt: Long,/** Latest witnessed-at, unix microseconds. */        @SerialName("maxWitnessedAt")
+        val maxWitnessedAt: Long    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#networkBskyJetstreamListSegmentsSegment"
         }
