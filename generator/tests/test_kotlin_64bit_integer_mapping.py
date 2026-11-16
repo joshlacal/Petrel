@@ -90,6 +90,14 @@ class Kotlin64BitIntegerMappingTests(unittest.TestCase):
         self.assertFalse(KotlinTypeConverter._is_64bit_integer({}, "at"))
         self.assertFalse(KotlinTypeConverter._is_64bit_integer({}, "seat"))
 
+    def test_name_based_widening_yields_to_an_explicit_int32_maximum(self):
+        # A declared maximum that fits in Int keeps the field Int, even when its
+        # name looks like a timestamp or a bare 64-bit suffix word.
+        bounded = {"type": "integer", "maximum": 86400}
+        self.assertFalse(KotlinTypeConverter._is_64bit_integer(bounded, "expiresAt"))
+        self.assertFalse(KotlinTypeConverter._is_64bit_integer(bounded, "sequencerTerm"))
+        self.assertTrue(KotlinTypeConverter._is_64bit_integer({"type": "integer"}, "expiresAt"))
+
 
 if __name__ == "__main__":
     unittest.main()

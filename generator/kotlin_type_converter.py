@@ -106,6 +106,9 @@ class KotlinTypeConverter(BaseTypeConverter):
             return True
         if name in cls._EXACT_64BIT_INTEGER_NAMES or name.endswith(cls._SUFFIX_64BIT_INTEGER_NAMES):
             return True
+        # The name-based rules below give way to a declared maximum that fits in Int.
+        if maximum is not None:
+            return False
         # A field named exactly like a suffix word (`sequencerTerm` for `SequencerTerm`).
         # Exact match only: case-folding short suffixes would capture names like `items`.
         if name in cls._BARE_SUFFIX_64BIT_INTEGER_NAMES:
