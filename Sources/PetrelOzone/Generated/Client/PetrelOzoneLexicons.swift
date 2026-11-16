@@ -106,6 +106,7 @@ public enum PetrelOzoneLexicons {
         ATProtocolValueContainer.registerDecoder(forType: "tools.ozone.report.defs#liveStats", as: ToolsOzoneReportDefs.LiveStats.self)
         ATProtocolValueContainer.registerDecoder(forType: "tools.ozone.report.defs#historicalStats", as: ToolsOzoneReportDefs.HistoricalStats.self)
         ATProtocolValueContainer.registerDecoder(forType: "tools.ozone.report.defs#assignmentView", as: ToolsOzoneReportDefs.AssignmentView.self)
+        ATProtocolValueContainer.registerDecoder(forType: "tools.ozone.report.queryModeratorActivity#activityRow", as: ToolsOzoneReportQueryModeratorActivity.ActivityRow.self)
         ATProtocolValueContainer.registerDecoder(forType: "tools.ozone.safelink.defs#event", as: ToolsOzoneSafelinkDefs.Event.self)
         ATProtocolValueContainer.registerDecoder(forType: "tools.ozone.safelink.defs#urlRule", as: ToolsOzoneSafelinkDefs.UrlRule.self)
         ATProtocolValueContainer.registerDecoder(forType: "tools.ozone.safelink.syncSource#sourceRule", as: ToolsOzoneSafelinkSyncSource.SourceRule.self)
