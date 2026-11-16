@@ -91,6 +91,10 @@ class KotlinTypeConverter(BaseTypeConverter):
         'Bytes',
     )
 
+    _BARE_SUFFIX_64BIT_INTEGER_NAMES = frozenset(
+        suffix[0].lower() + suffix[1:] for suffix in _SUFFIX_64BIT_INTEGER_NAMES
+    )
+
     @classmethod
     def _is_64bit_integer(cls, schema: Dict[str, Any], name: str) -> bool:
         """Return True when a lexicon integer requires 64-bit Kotlin Long."""
@@ -100,10 +104,14 @@ class KotlinTypeConverter(BaseTypeConverter):
         minimum = schema.get('minimum')
         if minimum is not None and minimum < cls._INT32_MIN:
             return True
-        return (
-            name in cls._EXACT_64BIT_INTEGER_NAMES
-            or name.endswith(cls._SUFFIX_64BIT_INTEGER_NAMES)
-        )
+        if name in cls._EXACT_64BIT_INTEGER_NAMES or name.endswith(cls._SUFFIX_64BIT_INTEGER_NAMES):
+            return True
+        # A field named exactly like a suffix word (`sequencerTerm` for `SequencerTerm`).
+        # Exact match only: case-folding short suffixes would capture names like `items`.
+        if name in cls._BARE_SUFFIX_64BIT_INTEGER_NAMES:
+            return True
+        # An integer `...At` field is a timestamp (seconds, milliseconds or microseconds).
+        return len(name) > 2 and name.endswith('At') and name[-3].islower()
 
     def determine_type(self, name: str, prop_schema: Dict[str, Any],
                        required_fields: List[str], current_struct_name: str,
