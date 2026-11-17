@@ -85,6 +85,23 @@
             #expect(transport.accounts.count == 2)
         }
 
+        @Test func twoHomeServicesAreBoundToTheManifestRun() throws {
+            let policy = try DebugFixtureTransport.HostPolicy(
+                fixtureDomain: "request-fixture.catbird.blue", additionalHosts: [], serviceLabels: ["ds1", "ds2"]
+            )
+            var input = manifest()
+            var hosts = try #require(input["hosts"] as? [String: String])
+            hosts.removeValue(forKey: "chat.catbird.blue")
+            hosts.removeValue(forKey: "public.api.bsky.app")
+            let target = try #require(hosts.values.first)
+            hosts["ds1-test.request-fixture.catbird.blue"] = target
+            hosts["ds2-test.request-fixture.catbird.blue"] = target
+            input["hosts"] = hosts
+            let transport = try decode(input, policy: policy)
+            #expect(transport.permits(try #require(URL(string: "https://ds1-test.request-fixture.catbird.blue"))))
+            #expect(!transport.permits(try #require(URL(string: "https://ds1-other.request-fixture.catbird.blue"))))
+        }
+
         @Test func rejectsUnboundedOrNonlocalManifest() throws {
             var value = manifest(); value["fixtureOnly"] = false
             #expect(throws: (any Error).self) { try decode(value) }
