@@ -63,8 +63,9 @@ public enum PublicRepositoryRecordCodec {
     /// This is deliberately kept at the repository boundary so public writes
     /// and permissioned writes cannot accidentally share a permissive JSON
     /// bridge. Typed blob references are accepted only in the modern,
-    /// content-addressed form used by the public blob endpoint. Unresolved
-    /// typed values remain rejected.
+    /// content-addressed form used by the public blob endpoint; unregistered
+    /// typed objects are accepted as AT data-model objects when their fields
+    /// validate and any top-level `$type` matches `collection`.
     ///
     /// Depth accounting mirrors `prepare`'s encoder exactly: `depth` names
     /// the level a *container* occupies, the record object is level 1, and
@@ -122,8 +123,13 @@ public enum PublicRepositoryRecordCodec {
         for (key, value) in fields {
             output[key] = try convert(value, depth: depth, limits: limits)
         }
-        if case let .string(type)? = output["$type"], type == "blob" {
-            try validateTypedBlob(output)
+        if let existingType = output["$type"] {
+            guard case let .string(type) = existingType, !type.isEmpty else {
+                throw PublicRepositoryDomainError.invalidRecordType
+            }
+            if type == "blob" {
+                try validateTypedBlob(output)
+            }
         }
         return .object(output)
     }
@@ -169,7 +175,7 @@ public enum PublicRepositoryRecordCodec {
         depth: Int,
         limits: PublicRepositoryLimits
     ) throws -> PublicRecordValue {
-        guard type == "blob", case let .object(fields) = value else {
+        guard !type.isEmpty, case let .object(fields) = value else {
             throw PublicRepositoryDomainError.invalidRecordType
         }
         guard case var .object(object) = try convertObject(
@@ -184,7 +190,9 @@ public enum PublicRepositoryRecordCodec {
         } else {
             object["$type"] = .string(type)
         }
-        try validateTypedBlob(object)
+        if type == "blob" {
+            try validateTypedBlob(object)
+        }
         return .object(object)
     }
 
@@ -210,8 +218,13 @@ public enum PublicRepositoryRecordCodec {
                     entry.value, depth: depth + 1, limits: limits
                 )
             }
-            if case let .string(type)? = fields["$type"], type == "blob" {
-                try validateTypedBlob(fields)
+            if let existingType = fields["$type"] {
+                guard case let .string(type) = existingType, !type.isEmpty else {
+                    throw PublicRepositoryDomainError.invalidRecordType
+                }
+                if type == "blob" {
+                    try validateTypedBlob(fields)
+                }
             }
             return .object(fields)
         }
@@ -223,8 +236,13 @@ public enum PublicRepositoryRecordCodec {
             for (key, item) in map {
                 fields[key] = try convertCBOR(item, depth: depth + 1, limits: limits)
             }
-            if case let .string(type)? = fields["$type"], type == "blob" {
-                try validateTypedBlob(fields)
+            if let existingType = fields["$type"] {
+                guard case let .string(type) = existingType, !type.isEmpty else {
+                    throw PublicRepositoryDomainError.invalidRecordType
+                }
+                if type == "blob" {
+                    try validateTypedBlob(fields)
+                }
             }
             return .object(fields)
         }
