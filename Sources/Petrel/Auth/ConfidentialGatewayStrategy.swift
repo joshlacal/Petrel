@@ -1208,20 +1208,24 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
     }
 
+    /// Longest scope string an upgrade may ask for.
+    static let maxUpgradeScopeLength = 1024
+
     private func startGatewayScopeUpgradeLocked(
         requesting: Set<String>,
         for expectedDID: String,
         callbackURL: URL
     ) async throws -> URL {
-        // Validate scopes. Mirrors the gateway's structural rules: length <= 256
-        // (parameterized `space:` scopes exceed 128) and no whitespace. Wildcard
-        // characters are legitimate scope syntax (e.g. `authority=*`); the
-        // gateway's exact-match allowlist is the authorization gate.
+        // Validate scopes: a bounded, whitespace-free request. The length bound only keeps
+        // the request body small; it sits above the longest scope the gateway allowlists
+        // (a `space:` scope naming each collection, the Labyrinth mailbox one, is 531
+        // characters). Wildcard characters are legitimate scope syntax (e.g. `authority=*`);
+        // the gateway's exact-match allowlist is the authorization gate.
         guard !requesting.isEmpty, requesting.count <= 16 else {
             throw AuthError.invalidOAuthConfiguration
         }
         for scope in requesting {
-            guard !scope.isEmpty, scope.count <= 256 else {
+            guard !scope.isEmpty, scope.count <= Self.maxUpgradeScopeLength else {
                 throw AuthError.invalidOAuthConfiguration
             }
             guard !scope.contains(where: \.isWhitespace) else {
@@ -1463,7 +1467,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
         let finalGrants = Set(commitResp.granted_scopes)
         guard finalGrants.contains("atproto"),
-              requiredScopes.isSubset(of: finalGrants)
+              GatewayScopeGrantMatching.grants(finalGrants, coverAll: requiredScopes, accountDID: expectedDID)
         else {
             throw GatewayError.invalidSession
         }
@@ -1651,7 +1655,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
         let grantSet = Set(exchangeResp.granted_scopes)
         guard grantSet.contains("atproto"),
-              requiredScopes.isSubset(of: grantSet)
+              GatewayScopeGrantMatching.grants(grantSet, coverAll: requiredScopes, accountDID: expectedDID)
         else {
             throw GatewayError.invalidSession
         }
