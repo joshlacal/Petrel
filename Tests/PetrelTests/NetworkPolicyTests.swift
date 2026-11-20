@@ -773,6 +773,47 @@ struct NetworkPolicyTests {
         let approved: Set = ["93.184.216.34", "93.184.216.35"]
         #expect(HardenedURLSessionDelegate.transportAddressesAreApproved(["93.184.216.35", "93.184.216.36"], approved: approved))
     }
+
+    @Test("Remote address parser preserves uncompressed public IPv6 addresses without false SSRF rejection")
+    func remoteAddressPreservesUncompressedPublicIPv6() {
+        let cloudflareIPv6 = "2606:4700:130:436c:6f75:6466:6c61:7265"
+        #expect(HardenedURLSessionDelegate.extractRemoteIPAddress(from: cloudflareIPv6) == cloudflareIPv6)
+        #expect(!HardenedURLSessionDelegate.isDisallowedRemoteAddress(cloudflareIPv6, isLocalTarget: false))
+
+        let bracketedWithPort = "[\(cloudflareIPv6)]:443"
+        #expect(HardenedURLSessionDelegate.extractRemoteIPAddress(from: bracketedWithPort) == cloudflareIPv6)
+        #expect(!HardenedURLSessionDelegate.isDisallowedRemoteAddress(bracketedWithPort, isLocalTarget: false))
+    }
+
+    @Test("Remote address check still rejects private/reserved uncompressed IPv6 and IPv4-with-port")
+    func remoteAddressRejectsPrivateAndReservedLiterals() {
+        let privateAddresses = [
+            "127.0.0.1:443",
+            "127.0.0.1",
+            "10.0.0.5:8443",
+            "[::1]:443",
+            "::1",
+            "0:0:0:0:0:ffff:7f00:1",
+            "fe80:0:0:0:0:0:0:1",
+            "fe80:0:0:0:0:0:0:1%en0",
+            "fc00:0:0:0:0:0:0:1",
+            "[::ffff:127.0.0.1]:443",
+        ]
+        for address in privateAddresses {
+            #expect(
+                HardenedURLSessionDelegate.isDisallowedRemoteAddress(address, isLocalTarget: false),
+                "Expected \(address) to be rejected for non-local targets"
+            )
+            #expect(
+                !HardenedURLSessionDelegate.isDisallowedRemoteAddress(address, isLocalTarget: true),
+                "Expected \(address) to be permitted for explicit local targets"
+            )
+        }
+
+        #expect(HardenedURLSessionDelegate.extractRemoteIPAddress(from: "93.184.216.34:443") == "93.184.216.34")
+        #expect(!HardenedURLSessionDelegate.isDisallowedRemoteAddress("93.184.216.34:443", isLocalTarget: false))
+        #expect(!HardenedURLSessionDelegate.isDisallowedRemoteAddress("93.184.216.34", isLocalTarget: false))
+    }
 }
 
 private func makeGzipPayload(_ uncompressed: Data) -> Data {

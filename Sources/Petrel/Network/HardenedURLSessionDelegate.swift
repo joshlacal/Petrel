@@ -239,6 +239,31 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
             && !normalized.contains(where: IPAddress.isPrivateOrReservedAddress)
             && !normalized.isDisjoint(with: approved)
     }
+
+    /// Extracts the bare IP literal from a `URLSessionTaskTransactionMetrics.remoteAddress` value.
+    /// Preserves unbracketed IPv6 addresses in both compressed (`::1`) and uncompressed 8-group
+    /// (`2606:4700:130:436c:6f75:6466:6c61:7265`) forms while stripping brackets and `:port`
+    /// suffixes from bracketed IPv6 (`[::1]:443`) and IPv4 (`127.0.0.1:443`).
+    package static func extractRemoteIPAddress(from remoteAddress: String) -> String {
+        let trimmed = remoteAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("["), let closeBracket = trimmed.firstIndex(of: "]") {
+            return String(trimmed[trimmed.index(after: trimmed.startIndex) ..< closeBracket])
+        }
+        // Only strip `:port` when there is a single colon (IPv4:port). Multiple colons indicate
+        // an unbracketed IPv6 address (compressed or full 8-hextet), which must stay intact.
+        if let firstColon = trimmed.firstIndex(of: ":"),
+           firstColon == trimmed.lastIndex(of: ":")
+        {
+            return String(trimmed[..<firstColon])
+        }
+        return trimmed
+    }
+
+    package static func isDisallowedRemoteAddress(_ remoteAddress: String, isLocalTarget: Bool) -> Bool {
+        let cleaned = extractRemoteIPAddress(from: remoteAddress)
+        let normalized = IPAddress.normalizeIPv4MappedIPv6(cleaned)
+        return IPAddress.isPrivateOrReservedAddress(normalized) && !isLocalTarget
+    }
     package struct TaskContext {
         var redirectCount = 0
         var wireBytesReceived = 0
@@ -491,16 +516,7 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
 
         for transactionMetric in metrics.transactionMetrics {
             if let remoteAddress = transactionMetric.remoteAddress {
-                // Strip port or brackets if present (e.g. "127.0.0.1:443" or "[::1]:443")
-                var cleaned = remoteAddress
-                if cleaned.hasPrefix("[") && cleaned.contains("]") {
-                    let parts = cleaned.dropFirst().split(separator: "]")
-                    cleaned = String(parts.first ?? "")
-                } else if let colonIndex = cleaned.firstIndex(of: ":"), !cleaned.contains("::") {
-                    cleaned = String(cleaned[..<colonIndex])
-                }
-                let normalized = IPAddress.normalizeIPv4MappedIPv6(cleaned)
-                if IPAddress.isPrivateOrReservedAddress(normalized) && !isLocalTarget {
+                if Self.isDisallowedRemoteAddress(remoteAddress, isLocalTarget: isLocalTarget) {
                     LogManager.logError("Security violation: transport connected to private/reserved address: \(remoteAddress)")
                     self.contextManager.recordSecurityViolation(for: task)
                     task.cancel()
