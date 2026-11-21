@@ -20,6 +20,10 @@ public enum ToolsOzoneModerationEmitEvent {
         public let all: Bool?
         /// Target all eligible reports on the account and its owned subjects, including records, messages, and conversations. Only valid for account subjects and events that close reports. Excludes assigned, escalated, and actively assigned reports unless explicitly targeted by ID.
         public let allOwned: Bool?
+        /// Expands report targeting to include additional subjects. Requires event subject to be an account. Mutually exclusive with `subjectTypes`.
+        public let subjects: [ReportActionSubjectsUnion]?
+        /// Expands report targeting to include owned subjects of these types. Requires event subject to be an account. Mutually exclusive with `subjects`.
+        public let subjectTypes: [ReportActionSubjectTypes]?
         /// Note to send to reporter(s) when actioning their report
         public let note: String?
         /// Set true when the report activities are created by an automated process.
@@ -33,6 +37,8 @@ public enum ToolsOzoneModerationEmitEvent {
             types: [String]? = nil,
             all: Bool? = nil,
             allOwned: Bool? = nil,
+            subjects: [ReportActionSubjectsUnion]? = nil,
+            subjectTypes: [ReportActionSubjectTypes]? = nil,
             note: String? = nil,
             isAutomated: Bool? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
@@ -41,6 +47,8 @@ public enum ToolsOzoneModerationEmitEvent {
             self.types = types
             self.all = all
             self.allOwned = allOwned
+            self.subjects = subjects
+            self.subjectTypes = subjectTypes
             self.note = note
             self.isAutomated = isAutomated
             self.extraFields = extraFields
@@ -99,6 +107,30 @@ public enum ToolsOzoneModerationEmitEvent {
                 malformedFields.insert("allOwned")
             }
             do {
+                subjects = try container.decodeIfPresent([ReportActionSubjectsUnion].self, forKey: .subjects, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'subjects' — degrading to nil: \(error)")
+                subjects = nil
+                malformedFields.insert("subjects")
+            }
+            do {
+                subjectTypes = try container.decodeIfPresent([ReportActionSubjectTypes].self, forKey: .subjectTypes, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'subjectTypes' — degrading to nil: \(error)")
+                subjectTypes = nil
+                malformedFields.insert("subjectTypes")
+            }
+            do {
                 note = try container.decodeIfPresent(String.self, forKey: .note, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
@@ -131,6 +163,8 @@ public enum ToolsOzoneModerationEmitEvent {
             try container.encodeIfPresent(types, forKey: .types)
             try container.encodeIfPresent(all, forKey: .all)
             try container.encodeIfPresent(allOwned, forKey: .allOwned)
+            try container.encodeIfPresent(subjects, forKey: .subjects)
+            try container.encodeIfPresent(subjectTypes, forKey: .subjectTypes)
             try container.encodeIfPresent(note, forKey: .note)
             try container.encodeIfPresent(isAutomated, forKey: .isAutomated)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
@@ -153,6 +187,16 @@ public enum ToolsOzoneModerationEmitEvent {
                 hasher.combine(nil as Int?)
             }
             if let value = allOwned {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = subjects {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = subjectTypes {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -182,6 +226,12 @@ public enum ToolsOzoneModerationEmitEvent {
                 return false
             }
             if allOwned != other.allOwned {
+                return false
+            }
+            if subjects != other.subjects {
+                return false
+            }
+            if subjectTypes != other.subjectTypes {
                 return false
             }
             if note != other.note {
@@ -215,6 +265,14 @@ public enum ToolsOzoneModerationEmitEvent {
                 let allOwnedValue = try value.toCBORValue()
                 map = map.adding(key: "allOwned", value: allOwnedValue)
             }
+            if let value = subjects {
+                let subjectsValue = try value.toCBORValue()
+                map = map.adding(key: "subjects", value: subjectsValue)
+            }
+            if let value = subjectTypes {
+                let subjectTypesValue = try value.toCBORValue()
+                map = map.adding(key: "subjectTypes", value: subjectTypesValue)
+            }
             if let value = note {
                 let noteValue = try value.toCBORValue()
                 map = map.adding(key: "note", value: noteValue)
@@ -226,7 +284,7 @@ public enum ToolsOzoneModerationEmitEvent {
             return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "ids", "types", "all", "allOwned", "note", "isAutomated"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "ids", "types", "all", "allOwned", "subjects", "subjectTypes", "note", "isAutomated"]
 
         /// Whether this value writes the wire field `name` itself. An extra field of the
         /// same name (a malformed value kept from decoding) is written only when it is not.
@@ -236,6 +294,8 @@ public enum ToolsOzoneModerationEmitEvent {
             case "types": return types != nil
             case "all": return all != nil
             case "allOwned": return allOwned != nil
+            case "subjects": return subjects != nil
+            case "subjectTypes": return subjectTypes != nil
             case "note": return note != nil
             case "isAutomated": return isAutomated != nil
             default: return false
@@ -247,6 +307,8 @@ public enum ToolsOzoneModerationEmitEvent {
             case types
             case all
             case allOwned
+            case subjects
+            case subjectTypes
             case note
             case isAutomated
         }
@@ -1450,6 +1512,156 @@ public enum ToolsOzoneModerationEmitEvent {
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
+        }
+    }
+
+    public enum ReportActionSubjectsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+        case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
+        case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
+        case unexpected(ATProtocolValueContainer)
+        public init(_ value: ComAtprotoAdminDefs.RepoRef) {
+            self = .comAtprotoAdminDefsRepoRef(value)
+        }
+
+        public init(_ value: ComAtprotoRepoStrongRef) {
+            self = .comAtprotoRepoStrongRef(value)
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
+
+            switch typeValue {
+            case "com.atproto.admin.defs#repoRef":
+                let value = try ComAtprotoAdminDefs.RepoRef(from: decoder)
+                self = .comAtprotoAdminDefsRepoRef(value)
+            case "com.atproto.repo.strongRef":
+                let value = try ComAtprotoRepoStrongRef(from: decoder)
+                self = .comAtprotoRepoStrongRef(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .comAtprotoAdminDefsRepoRef(value):
+                try container.encode("com.atproto.admin.defs#repoRef", forKey: .type)
+                try value.encode(to: encoder)
+            case let .comAtprotoRepoStrongRef(value):
+                try container.encode("com.atproto.repo.strongRef", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .comAtprotoAdminDefsRepoRef(value):
+                hasher.combine("com.atproto.admin.defs#repoRef")
+                hasher.combine(value)
+            case let .comAtprotoRepoStrongRef(value):
+                hasher.combine("com.atproto.repo.strongRef")
+                hasher.combine(value)
+            case let .unexpected(container):
+                hasher.combine("unexpected")
+                hasher.combine(container)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public static func == (lhs: ReportActionSubjectsUnion, rhs: ReportActionSubjectsUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .comAtprotoAdminDefsRepoRef(lhsValue),
+                .comAtprotoAdminDefsRepoRef(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .comAtprotoRepoStrongRef(lhsValue),
+                .comAtprotoRepoStrongRef(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? ReportActionSubjectsUnion else { return false }
+            return self == other
+        }
+
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // Create an ordered map to maintain field order
+            var map = OrderedCBORMap()
+
+            switch self {
+            case let .comAtprotoAdminDefsRepoRef(value):
+                map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoRef")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .comAtprotoRepoStrongRef(value):
+                map = map.adding(key: "$type", value: "com.atproto.repo.strongRef")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .unexpected(container):
+                return try container.toCBORValue()
+            }
+        }
+    }
+
+    public enum ReportActionSubjectTypes: String, Codable, ATProtocolCodable, ATProtocolValue, Sendable {
+        case value_account = "account"
+        case value_record = "record"
+        case value_message = "message"
+        case value_conversation = "conversation"
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? ReportActionSubjectTypes else { return false }
+            return self == otherValue
+        }
+
+        public func toCBORValue() throws -> Any {
+            return rawValue
         }
     }
 }

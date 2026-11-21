@@ -3,13 +3,13 @@
   "sources": [
     {
       "repository": "https://github.com/bluesky-social/atproto",
-      "commit": "ec49bcb0d88202e92674fe910a0201f2a44db961",
+      "commit": "56201be4acdcb4333f2da430ce62f6e9a42aa79d",
       "path": "lexicons",
       "namespaces": ["com.atproto", "tools.ozone"]
     },
     {
       "repository": "https://github.com/bluesky-social/bsky",
-      "commit": "19fb7b03e1096ee88376ca403103804c3e5856ce",
+      "commit": "416b0ad1d9e443d9c6c16d4be36340c26d5aba0f",
       "path": "lexicons",
       "namespaces": ["app.bsky", "chat.bsky", "network.bsky"]
     }
