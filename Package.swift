@@ -127,7 +127,7 @@ let package = Package(
         // (see the PetrelOAuthServerNIO and PetrelOAuthServerHummingbird
         // targets). Swift 6.2 and later do not fetch them when the traits are
         // off; Swift 6.1 fetches them (though it builds nothing from them), so
-        // keep the floor aligned with exact-pinned Swift 6.1 consumers (Swan).
+        // keep the floor aligned with exact-pinned Swift 6.1 consumers.
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.25.1"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.101.3"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.37.2"),
