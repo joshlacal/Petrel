@@ -126,10 +126,11 @@ let package = Package(
         // Used only with the OAuthServerNIO and OAuthServerHummingbird traits
         // (see the PetrelOAuthServerNIO and PetrelOAuthServerHummingbird
         // targets). Swift 6.2 and later do not fetch them when the traits are
-        // off; Swift 6.1 fetches them but builds nothing from them.
-        .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.26.0"),
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.105.0"),
-        .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.37.6"),
+        // off; Swift 6.1 fetches them (though it builds nothing from them), so
+        // keep the floor aligned with exact-pinned Swift 6.1 consumers (Swan).
+        .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.25.1"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.101.3"),
+        .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.37.2"),
     ],
     targets: [
         // System library for libsecret (Linux only, ignored on other platforms)

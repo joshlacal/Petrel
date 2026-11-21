@@ -569,6 +569,8 @@ public actor NetworkService: NetworkServiceProtocol {
     )?
     nonisolated let exactAuthRequestScopeServiceID = UUID()
     private var activeExactAuthRequestScope: ExactAuthGeneratedRequestScope?
+    /// How long an ordinary request waits for an exact-auth scope to end before it is refused.
+    private var exactAuthScopeWaitLimit: Duration = .seconds(5)
     private var exactAuthDestinationGeneration = UUID()
 
     private struct HTTPErrorResponseRequestIdentity: Equatable {
@@ -744,6 +746,25 @@ public actor NetworkService: NetworkServiceProtocol {
     func endExactAuthGeneratedRequestScope(_ scope: ExactAuthGeneratedRequestScope) {
         guard activeExactAuthRequestScope?.id == scope.id else { return }
         activeExactAuthRequestScope = nil
+    }
+
+    func setExactAuthScopeWaitLimit(_ limit: Duration) {
+        exactAuthScopeWaitLimit = limit
+    }
+
+    /// Holds an ordinary request back while an exact-auth scope owns this service.
+    ///
+    /// A scope lasts one request, so unrelated work that arrives meanwhile (a feed load next
+    /// to a draft sync) waits for it rather than failing and taking the scoped request down
+    /// with it. Nothing is sent while the scope is active either way. Returns once no scope is
+    /// active, or at the wait limit with one still active: the caller then refuses the
+    /// request, which is what stops a request that escaped a scope's own operation and is
+    /// being awaited by it.
+    private func waitForExactAuthRequestScopeToEnd() async throws {
+        let deadline = ContinuousClock.now + exactAuthScopeWaitLimit
+        while activeExactAuthRequestScope != nil, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
     }
 
     func isExactAuthGeneratedRequestScopeActive(_ scope: ExactAuthGeneratedRequestScope) -> Bool {
@@ -1330,6 +1351,7 @@ public actor NetworkService: NetworkServiceProtocol {
                 scope: scope
             )
         }
+        try await waitForExactAuthRequestScopeToEnd()
         if let activeExactAuthRequestScope {
             activeExactAuthRequestScope.state.failContinuity()
             throw ExactAuthGeneratedRequestContinuityError()

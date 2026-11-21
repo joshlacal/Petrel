@@ -104,6 +104,137 @@ final class PublicRepositoryDomainTests: XCTestCase {
         )
     }
 
+    func testUnregisteredCustomLexiconRecordWithBytesRoundTripsThroughCodecAndBlockValidator() throws {
+        let deviceCollection = "blue.catbird.chat.device"
+        let keyBytes = Data((0 ..< 32).map(UInt8.init))
+        let unpaddedBase64 = keyBytes.base64EncodedString().replacingOccurrences(of: "=", with: "")
+        let json = Data(
+            #"""
+            {
+              "$type": "blue.catbird.chat.device",
+              "mlsSignaturePublicKey": { "$bytes": "\#(unpaddedBase64)" },
+              "algorithm": "ed25519",
+              "createdAt": "2026-11-18T22:55:00.000Z"
+            }
+            """#.utf8
+        )
+
+        let container = try JSONDecoder().decode(ATProtocolValueContainer.self, from: json)
+        guard case let .unknownType(decodedType, _) = container else {
+            return XCTFail("Expected unregistered custom record to decode as .unknownType")
+        }
+        XCTAssertEqual(decodedType, deviceCollection)
+
+        let path = try PublicRepositoryPath(collection: deviceCollection, recordKey: "3m7device01")
+        let record = try PublicRepositoryRecordCodec.publicRecord(
+            from: container,
+            collection: deviceCollection
+        )
+        XCTAssertEqual(record.fields["$type"], .string(deviceCollection))
+        XCTAssertEqual(record.fields["mlsSignaturePublicKey"], .bytes(keyBytes))
+        XCTAssertEqual(record.fields["algorithm"], .string("ed25519"))
+
+        let prepared = try PublicRepositoryRecordCodec.prepare(record, for: path)
+        let decodedBlock = try RepositoryMSTValidation.decodeRecordBlock(prepared.bytes, for: path)
+        let roundTripped = try PublicRepositoryRecordCodec.publicRecord(
+            from: decodedBlock,
+            collection: deviceCollection
+        )
+        XCTAssertEqual(roundTripped, record)
+    }
+
+    func testUnregisteredRecordWithNestedTypedObjectsAndTypedBlobRoundTrips() throws {
+        let mailboxCollection = "blue.catbird.labyrinth.mailboxKeys"
+        let blobCID = CID.fromBlob(Data("custom-record-blob".utf8))
+        let pubKey = Data(repeating: 0x42, count: 32)
+        let sig = Data(repeating: 0x99, count: 64)
+        let json = Data(
+            #"""
+            {
+              "$type": "blue.catbird.labyrinth.mailboxKeys",
+              "current": {
+                "$type": "blue.catbird.labyrinth.defs#epochPublic",
+                "epochNumber": 0,
+                "attestation": {
+                  "$type": "blue.catbird.labyrinth.defs#transportAttestation",
+                  "transportPubkey": { "$bytes": "\#(pubKey.base64EncodedString())" },
+                  "sig": { "$bytes": "\#(sig.base64EncodedString())" }
+                }
+              },
+              "attachment": {
+                "$type": "blob",
+                "ref": { "$link": "\#(blobCID.string)" },
+                "mimeType": "application/octet-stream",
+                "size": 18
+              },
+              "backend": "space",
+              "updatedAt": "2026-11-18T22:55:00.000Z"
+            }
+            """#.utf8
+        )
+
+        let container = try JSONDecoder().decode(ATProtocolValueContainer.self, from: json)
+        let path = try PublicRepositoryPath(collection: mailboxCollection, recordKey: "self")
+        let record = try PublicRepositoryRecordCodec.publicRecord(
+            from: container,
+            collection: mailboxCollection
+        )
+        guard case let .object(currentFields)? = record.fields["current"],
+              case let .object(attestationFields)? = currentFields["attestation"] else {
+            return XCTFail("Expected nested typed objects to survive conversion")
+        }
+        XCTAssertEqual(currentFields["$type"], .string("blue.catbird.labyrinth.defs#epochPublic"))
+        XCTAssertEqual(
+            attestationFields["$type"],
+            .string("blue.catbird.labyrinth.defs#transportAttestation")
+        )
+        XCTAssertEqual(attestationFields["transportPubkey"], .bytes(pubKey))
+        XCTAssertEqual(attestationFields["sig"], .bytes(sig))
+        XCTAssertEqual(
+            PublicRepositoryRecordCodec.publicBlobCIDs(in: record).map(\.string),
+            [blobCID.string]
+        )
+        let typedBlobs = try PublicRepositoryRecordCodec.publicTypedBlobReferences(in: record)
+        XCTAssertEqual(typedBlobs, [PublicTypedBlobReference(cid: blobCID, mimeType: "application/octet-stream", size: 18)])
+
+        let prepared = try PublicRepositoryRecordCodec.prepare(record, for: path)
+        let decodedBlock = try RepositoryMSTValidation.decodeRecordBlock(prepared.bytes, for: path)
+        XCTAssertEqual(
+            try PublicRepositoryRecordCodec.publicRecord(from: decodedBlock, collection: mailboxCollection),
+            record
+        )
+    }
+
+    func testUnknownTypeStillRejectsMismatchedCollectionInvalidTypeAndMalformedNestedBlob() {
+        let customCollection = "blue.catbird.chat.declaration"
+        for invalid in [
+            ATProtocolValueContainer.unknownType("blue.catbird.chat.device", .object([:])),
+            ATProtocolValueContainer.unknownType("", .object([:])),
+            ATProtocolValueContainer.unknownType(customCollection, .string("not-an-object")),
+            ATProtocolValueContainer.unknownType(
+                customCollection,
+                .object(["nested": .object(["$type": .string("")])])
+            ),
+            ATProtocolValueContainer.unknownType(
+                customCollection,
+                .object(["nested": .object(["$type": .number(7)])])
+            ),
+            ATProtocolValueContainer.unknownType(
+                customCollection,
+                .object([
+                    "badBlob": .unknownType("blob", .object(["mimeType": .string("image/png")])),
+                ])
+            ),
+        ] {
+            XCTAssertThrowsError(try PublicRepositoryRecordCodec.publicRecord(
+                from: invalid,
+                collection: customCollection
+            )) {
+                XCTAssertEqual($0 as? PublicRepositoryDomainError, .invalidRecordType)
+            }
+        }
+    }
+
     func testTypedBlobRejectsWrongShapeAndMIME() throws {
         let cid = CID.fromBlob(Data("typed-blob-invalid".utf8))
         let base: [String: ATProtocolValueContainer] = [

@@ -25,17 +25,26 @@
             /// exactly the gateway, the two account hosts and these.
             public let additionalHosts: Set<String>
 
+            /// Local services such as numbered delivery homes. Names are derived from the
+            /// manifest gateway's run suffix; they cannot name another run or a public host.
+            public let serviceLabels: Set<String>
+
             /// Creates a host policy.
             /// - Throws: ``Failure/invalidConfiguration`` when a name is not a lowercase DNS name.
-            public init(fixtureDomain: String, additionalHosts: Set<String>) throws {
+            public init(fixtureDomain: String, additionalHosts: Set<String>, serviceLabels: Set<String> = []) throws {
                 guard DebugFixtureTransport.isLowercaseDNSName(fixtureDomain),
                       additionalHosts.allSatisfy(DebugFixtureTransport.isLowercaseDNSName),
+                      serviceLabels.count <= 8, serviceLabels.allSatisfy({ label in
+                          !label.isEmpty && label.count <= 20 && !["gateway", "alice", "bob"].contains(label)
+                              && label.utf8.allSatisfy { (97 ... 122).contains($0) || (48 ... 57).contains($0) }
+                      }),
                       !additionalHosts.contains(where: { $0 == fixtureDomain || $0.hasSuffix("." + fixtureDomain) })
                 else {
                     throw Failure.invalidConfiguration
                 }
                 self.fixtureDomain = fixtureDomain
                 self.additionalHosts = additionalHosts
+                self.serviceLabels = serviceLabels
             }
 
             func isFixtureHost(_ host: String) -> Bool {
@@ -108,13 +117,15 @@
                   corsURL.user == nil, corsURL.password == nil, corsURL.query == nil, corsURL.fragment == nil,
                   corsURL.path.isEmpty,
                   let rawAccounts = object["accounts"] as? [[String: Any]], rawAccounts.count == 2,
-                  let rawHosts = object["hosts"] as? [String: String], rawHosts.count == 3 + hostPolicy.additionalHosts.count,
+                  let rawHosts = object["hosts"] as? [String: String], rawHosts.count == 3 + hostPolicy.additionalHosts.count + hostPolicy.serviceLabels.count,
                   !hostPolicy.additionalHosts.contains(host)
             else {
                 throw Failure.invalidConfiguration
             }
             var accounts: [Account] = []
-            var allowedHosts: Set<String> = hostPolicy.additionalHosts.union([host])
+            let runSuffix = host.dropFirst("gateway-".count)
+            let localServices = hostPolicy.serviceLabels.map { "\($0)-\(runSuffix)" }
+            var allowedHosts: Set<String> = hostPolicy.additionalHosts.union(localServices).union([host])
             for row in rawAccounts {
                 guard Set(row.keys) == Set(["label", "did", "deviceId"]),
                       let label = row["label"] as? String, ["alice", "bob"].contains(label),

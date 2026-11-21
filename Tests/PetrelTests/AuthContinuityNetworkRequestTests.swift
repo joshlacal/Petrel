@@ -80,6 +80,32 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
         XCTAssertEqual(refreshCount, 1)
     }
 
+    func testOrdinaryRequestArrivingDuringScopeWaitsAndBothSucceed() async throws {
+        let responseGate = AsyncGate(initiallyOpen: false)
+        let fixture = await makeFixture(responseGate: responseGate)
+        let scoped = Task {
+            try await fixture.client.performGeneratedRequestWithExactAuthContinuity(matching: fixture.snapshot) {
+                try await fixture.client.com.atproto.server.describeServer()
+            }
+        }
+        await fixture.transport.waitForRequestCount(1)
+
+        // An unrelated request, such as a feed load, arrives while the scoped one is in flight.
+        let ordinary = Task {
+            try await fixture.client.com.atproto.server.describeServer()
+        }
+        try await Task.sleep(for: .milliseconds(150))
+        let sentWhileScopeHeld = await fixture.transport.requests.count
+        XCTAssertEqual(sentWhileScopeHeld, 1, "nothing else is sent while the scope owns the service")
+        await responseGate.open()
+
+        try await assertPerformed(scoped.value, responseCode: 200)
+        let ordinaryResult = try await ordinary.value
+        XCTAssertEqual(ordinaryResult.responseCode, 200)
+        let requestCount = await fixture.transport.requests.count
+        XCTAssertEqual(requestCount, 2)
+    }
+
     func testPrepareGatedDriftSendsNothing() async throws {
         let prepareGate = AsyncGate(initiallyOpen: false)
         let fixture = await makeFixture(prepareGate: prepareGate)
@@ -548,6 +574,9 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
 
     func testDetachedTaskCannotBypassActiveScope() async throws {
         let fixture = await makeFixture()
+        // The detached request waits for a scope that cannot end until it returns, so it runs
+        // into the wait limit. Shortened here; the outcome is the same at any limit.
+        await fixture.client.networkService.setExactAuthScopeWaitLimit(.milliseconds(200))
         let result = try await fixture.client.performGeneratedRequestWithExactAuthContinuity(matching: fixture.snapshot) {
             try await Task.detached {
                 try await fixture.client.com.atproto.server.describeServer()

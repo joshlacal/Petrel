@@ -503,6 +503,72 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
         }
     }
 
+    /// The encrypted-chat `space:` scopes name every collection, so they run to several
+    /// hundred characters. They must reach the gateway, whose allowlist decides.
+    func testStartUpgradeSendsLongSpaceScopesToTheGateway() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.start.long.\(UUID().uuidString)"
+            let initialSessionUUID = UUID().uuidString.lowercased()
+            let (client, _) = try await self.makeClient(namespace: namespace, initialSession: initialSessionUUID)
+            let alice = self.aliceDID
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                let ok = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: ["Content-Type": "application/json"]
+                )!
+                if path == "/auth/session" {
+                    let body = """
+                    {"did": "\(alice)", "handle": "alice.test", "granted_scopes": ["atproto", "transition:generic"]}
+                    """.data(using: .utf8)!
+                    return (ok, body)
+                } else if path == "/auth/upgrade" {
+                    let body = """
+                    {"authorization_url":"https://auth.pds.test/oauth/authorize?req=123"}
+                    """.data(using: .utf8)!
+                    return (ok, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let collections = (0 ..< 9).map { "&collection=blue.catbird.labyrinth.exampleCollection\($0)" }.joined()
+            let mailboxScope = "space:blue.catbird.labyrinth.mailbox?action=create&action=delete&action=read&action=update" + collections
+            XCTAssertGreaterThan(mailboxScope.count, 512)
+            XCTAssertLessThanOrEqual(mailboxScope.count, 1024)
+
+            let authURL = try await client.startGatewayScopeUpgrade(
+                requesting: [mailboxScope, "blob:*/*"],
+                for: self.aliceDID,
+                callbackURL: self.validCallbackBase
+            )
+            XCTAssertEqual(authURL.absoluteString, "https://auth.pds.test/oauth/authorize?req=123")
+
+            let reqs = GatewayUpgradeTestURLProtocol.recordedRequests()
+            guard let req = reqs.first(where: { $0.url?.path == "/auth/upgrade" }) else {
+                XCTFail("No /auth/upgrade request captured")
+                return
+            }
+            let body = req.httpBody ?? req.httpBodyStream.map { stream -> Data in
+                stream.open()
+                defer { stream.close() }
+                var data = Data()
+                var buffer = [UInt8](repeating: 0, count: 4096)
+                while stream.hasBytesAvailable {
+                    let read = stream.read(&buffer, maxLength: buffer.count)
+                    guard read > 0 else { break }
+                    data.append(buffer, count: read)
+                }
+                return data
+            } ?? Data()
+            let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+            let sent = try XCTUnwrap(json["additional_scopes"] as? [String])
+            XCTAssertEqual(Set(sent), [mailboxScope, "blob:*/*"])
+        }
+    }
+
     func testStartUpgradeRejectsInvalidScopesAndCallbacks() async throws {
         try await withInMemoryBackend { _ in
             let namespace = "test.gateway.upgrade.start.invalid.\(UUID().uuidString)"
@@ -521,11 +587,11 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 XCTFail("Expected failure for >16 scopes")
             } catch {}
 
-            // 3. Unbounded single scope (> 256 chars)
-            let longScope = String(repeating: "a", count: 257)
+            // 3. Unbounded single scope (> 1024 chars)
+            let longScope = String(repeating: "a", count: 1025)
             do {
                 _ = try await client.startGatewayScopeUpgrade(requesting: [longScope], for: self.aliceDID, callbackURL: self.validCallbackBase)
-                XCTFail("Expected failure for >256-char scope")
+                XCTFail("Expected failure for >1024-char scope")
             } catch {}
 
             // 5. Whitespace scope
@@ -756,6 +822,92 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
     }
 
     // MARK: - 3. Scope Downgrades and Exact Wire Validations
+
+    /// The server grants an own-account `space:` scope with the account DID written into it.
+    /// That is the scope that was asked for, so the upgrade completes.
+    func testCompleteUpgradeAcceptsOwnAccountSpaceScopeResolvedToTheAccountDID() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.complete.selfauthority.\(UUID().uuidString)"
+            let initialSessionUUID = UUID().uuidString.lowercased()
+            let candidateSessionUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: initialSessionUUID)
+
+            let alice = self.aliceDID
+            let requested = "space:blue.catbird.labyrinth.mailbox?action=create&action=delete&action=read&action=update&collection=blue.catbird.labyrinth.device"
+            let resolved = "space:blue.catbird.labyrinth.mailbox?action=create&action=delete&action=read&action=update&authority=\(alice)&collection=blue.catbird.labyrinth.device"
+            let grantJSON = #"["atproto", "transition:generic", "\#(resolved)"]"#
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                let ok = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                if path == "/auth/session" {
+                    return (ok, #"{"did":"\#(alice)","handle":"alice.test","granted_scopes":["atproto","transition:generic"]}"#.data(using: .utf8)!)
+                } else if path == "/auth/upgrade" {
+                    return (ok, #"{"authorization_url":"https://auth.pds.test/oauth/authorize?req=1"}"#.data(using: .utf8)!)
+                } else if path == "/auth/upgrade/exchange" {
+                    return (ok, #"{"candidate_session_id":"\#(candidateSessionUUID)","did":"\#(alice)","granted_scopes":\#(grantJSON)}"#.data(using: .utf8)!)
+                } else if path == "/auth/upgrade/commit" {
+                    return (ok, #"{"status":"committed","session_id":"\#(candidateSessionUUID)","did":"\#(alice)","granted_scopes":\#(grantJSON)}"#.data(using: .utf8)!)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            _ = try await client.startGatewayScopeUpgrade(
+                requesting: [requested],
+                for: self.aliceDID,
+                callbackURL: self.validCallbackBase
+            )
+            let incomingCallback = URL(string: "https://catbird.blue/oauth/permission-callback?code=auth-code-12345")!
+            let granted = try await client.completeGatewayScopeUpgrade(callbackURL: incomingCallback, for: self.aliceDID)
+
+            XCTAssertEqual(granted, ["atproto", "transition:generic", resolved])
+            let currentSession = try await storage.getGatewaySession(for: self.aliceDID)
+            XCTAssertEqual(currentSession, candidateSessionUUID, "The upgraded session must replace the old one")
+        }
+    }
+
+    /// A grant naming another account's DID is not the scope that was asked for.
+    func testCompleteUpgradeRejectsSpaceScopeGrantedForAnotherAccount() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.complete.otherauthority.\(UUID().uuidString)"
+            let initialSessionUUID = UUID().uuidString.lowercased()
+            let candidateSessionUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: initialSessionUUID)
+
+            let alice = self.aliceDID
+            let bob = self.bobDID
+            let requested = "space:blue.catbird.labyrinth.mailbox?action=read&collection=blue.catbird.labyrinth.device"
+            let foreign = "space:blue.catbird.labyrinth.mailbox?action=read&authority=\(bob)&collection=blue.catbird.labyrinth.device"
+            let grantJSON = #"["atproto", "transition:generic", "\#(foreign)"]"#
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                let ok = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                if path == "/auth/session" {
+                    return (ok, #"{"did":"\#(alice)","handle":"alice.test","granted_scopes":["atproto","transition:generic"]}"#.data(using: .utf8)!)
+                } else if path == "/auth/upgrade" {
+                    return (ok, #"{"authorization_url":"https://auth.pds.test/oauth/authorize?req=1"}"#.data(using: .utf8)!)
+                } else if path == "/auth/upgrade/exchange" {
+                    return (ok, #"{"candidate_session_id":"\#(candidateSessionUUID)","did":"\#(alice)","granted_scopes":\#(grantJSON)}"#.data(using: .utf8)!)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            _ = try await client.startGatewayScopeUpgrade(
+                requesting: [requested],
+                for: self.aliceDID,
+                callbackURL: self.validCallbackBase
+            )
+            let incomingCallback = URL(string: "https://catbird.blue/oauth/permission-callback?code=auth-code-12345")!
+            do {
+                _ = try await client.completeGatewayScopeUpgrade(callbackURL: incomingCallback, for: self.aliceDID)
+                XCTFail("Expected failure when the space scope is granted for another account")
+            } catch {}
+
+            let currentSession = try await storage.getGatewaySession(for: self.aliceDID)
+            XCTAssertEqual(currentSession, initialSessionUUID, "A refused grant must leave the old session in place")
+        }
+    }
 
     func testExchangeAndCommitRejectScopeDowngrades() async throws {
         try await withInMemoryBackend { _ in
