@@ -21,7 +21,7 @@ object AppBskyFeedGetAuthorFeedDefs {
         @SerialName("actor")
         val actor: ATIdentifier,        @SerialName("limit")
         val limit: Int? = null,        @SerialName("cursor")
-        val cursor: String? = null,// Combinations of post/repost types to include in response.        @SerialName("filter")
+        val cursor: String? = null,// Combinations of post/repost types to include in response. The posts_and_replies_only filter includes authored top-level posts and replies, but excludes reposts.        @SerialName("filter")
         val filter: String? = null,        @SerialName("includePins")
         val includePins: Boolean? = null    )
 

@@ -16,6 +16,132 @@ object AppBskyEmbedExternalDefs {
     const val TYPE_IDENTIFIER = "app.bsky.embed.external"
 }
 
+@Serializable(with = AppBskyEmbedExternalViewDataUnionSerializer::class)
+sealed interface AppBskyEmbedExternalViewDataUnion {
+    @Serializable
+    data class ViewArticle(val value: blue.catbird.petrel.generated.AppBskyEmbedExternalViewArticle) : AppBskyEmbedExternalViewDataUnion
+
+    @Serializable
+    data class ViewArticlePublication(val value: blue.catbird.petrel.generated.AppBskyEmbedExternalViewArticlePublication) : AppBskyEmbedExternalViewDataUnion
+
+    @Serializable
+    data class ViewGallery(val value: blue.catbird.petrel.generated.AppBskyEmbedExternalViewGallery) : AppBskyEmbedExternalViewDataUnion
+
+    @Serializable
+    data class ViewLivestream(val value: blue.catbird.petrel.generated.AppBskyEmbedExternalViewLivestream) : AppBskyEmbedExternalViewDataUnion
+
+    @Serializable
+    data class Unexpected(val value: JsonElement) : AppBskyEmbedExternalViewDataUnion
+}
+
+object AppBskyEmbedExternalViewDataUnionSerializer : kotlinx.serialization.KSerializer<AppBskyEmbedExternalViewDataUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyEmbedExternalViewDataUnion")
+
+    private val TYPE_ViewArticle = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external#viewArticle")
+    private val TYPE_ViewArticlePublication = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external#viewArticlePublication")
+    private val TYPE_ViewGallery = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external#viewGallery")
+    private val TYPE_ViewLivestream = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external#viewLivestream")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyEmbedExternalViewDataUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyEmbedExternalViewDataUnion.ViewArticle -> {
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedExternalViewArticle.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ViewArticle
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ViewArticle)
+                }
+                obj
+            }
+            is AppBskyEmbedExternalViewDataUnion.ViewArticlePublication -> {
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedExternalViewArticlePublication.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ViewArticlePublication
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ViewArticlePublication)
+                }
+                obj
+            }
+            is AppBskyEmbedExternalViewDataUnion.ViewGallery -> {
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedExternalViewGallery.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ViewGallery
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ViewGallery)
+                }
+                obj
+            }
+            is AppBskyEmbedExternalViewDataUnion.ViewLivestream -> {
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedExternalViewLivestream.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ViewLivestream
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ViewLivestream)
+                }
+                obj
+            }
+            is AppBskyEmbedExternalViewDataUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyEmbedExternalViewDataUnion {
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyEmbedExternalViewDataUnion can only be deserialized from JSON")
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyEmbedExternalViewDataUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyEmbedExternalViewDataUnion.Unexpected(element)
+
+        return when (type) {
+            "app.bsky.embed.external#viewArticle" -> AppBskyEmbedExternalViewDataUnion.ViewArticle(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.AppBskyEmbedExternalViewArticle.serializer(), element)
+            )
+            "app.bsky.embed.external#viewArticlePublication" -> AppBskyEmbedExternalViewDataUnion.ViewArticlePublication(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.AppBskyEmbedExternalViewArticlePublication.serializer(), element)
+            )
+            "app.bsky.embed.external#viewGallery" -> AppBskyEmbedExternalViewDataUnion.ViewGallery(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.AppBskyEmbedExternalViewGallery.serializer(), element)
+            )
+            "app.bsky.embed.external#viewLivestream" -> AppBskyEmbedExternalViewDataUnion.ViewLivestream(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.AppBskyEmbedExternalViewLivestream.serializer(), element)
+            )
+            else -> AppBskyEmbedExternalViewDataUnion.Unexpected(element)
+        }
+    }
+}
+
 @Serializable(with = AppBskyEmbedExternalViewGalleryItemsUnionSerializer::class)
 sealed interface AppBskyEmbedExternalViewGalleryItemsUnion {
     @Serializable
@@ -95,7 +221,8 @@ object AppBskyEmbedExternalViewGalleryItemsUnionSerializer : kotlinx.serializati
     @Serializable
     data class AppBskyEmbedExternalView(
         @SerialName("external")
-        val external: AppBskyEmbedExternalViewExternal    ) {
+        val external: AppBskyEmbedExternalViewExternal,/** Hydrated modality-specific data for the external embed, when available. */        @SerialName("data")
+        val `data`: AppBskyEmbedExternalViewDataUnion? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyEmbedExternalView"
         }
@@ -167,7 +294,8 @@ object AppBskyEmbedExternalViewGalleryItemsUnionSerializer : kotlinx.serializati
 
     @Serializable
     data class AppBskyEmbedExternalViewArticle(
-        @SerialName("uri")
+/** Best-effort provider domain for cosmetic attribution, such as pckt.blog. Not verified provenance. */        @SerialName("providerId")
+        val providerId: String? = null,        @SerialName("uri")
         val uri: URI,        @SerialName("title")
         val title: String,        @SerialName("description")
         val description: String,        @SerialName("createdAt")
@@ -178,7 +306,8 @@ object AppBskyEmbedExternalViewGalleryItemsUnionSerializer : kotlinx.serializati
         val associatedProfiles: List<AppBskyActorDefsProfileViewBasic>? = null,        @SerialName("image")
         val image: URI? = null,        @SerialName("publisher")
         val publisher: AppBskyEmbedExternalViewArticlePublication? = null,        @SerialName("readingTime")
-        val readingTime: Int? = null,        @SerialName("likeCount")
+        val readingTime: Int? = null,        @SerialName("viewer")
+        val viewer: AppBskyEmbedExternalViewArticleViewerState? = null,        @SerialName("likeCount")
         val likeCount: Int? = null,/** Available profile previews. Selected deterministically by DID; not a ranking. */        @SerialName("likers")
         val likers: List<AppBskyActorDefsProfileViewBasic>? = null    ) {
         companion object {
@@ -186,9 +315,22 @@ object AppBskyEmbedExternalViewGalleryItemsUnionSerializer : kotlinx.serializati
         }
     }
 
+    /**
+     * Metadata about the requesting account's relationship with the subject article. Only has meaningful content for authed requests.
+     */
+    @Serializable
+    data class AppBskyEmbedExternalViewArticleViewerState(
+/** The requesting account's site.standard.graph.recommend record for this article, if recommended. */        @SerialName("like")
+        val like: ATProtocolURI? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyEmbedExternalViewArticleViewerState"
+        }
+    }
+
     @Serializable
     data class AppBskyEmbedExternalViewArticlePublication(
-        @SerialName("uri")
+/** Best-effort provider domain for cosmetic attribution, such as pckt.blog. Not verified provenance. */        @SerialName("providerId")
+        val providerId: String? = null,        @SerialName("uri")
         val uri: URI,        @SerialName("title")
         val title: String,        @SerialName("description")
         val description: String,        @SerialName("createdAt")
@@ -199,11 +341,24 @@ object AppBskyEmbedExternalViewGalleryItemsUnionSerializer : kotlinx.serializati
         val associatedProfiles: List<AppBskyActorDefsProfileViewBasic>? = null,        @SerialName("logo")
         val logo: URI? = null,        @SerialName("image")
         val image: URI? = null,        @SerialName("theme")
-        val theme: AppBskyEmbedExternalViewArticlePublicationTheme? = null,        @SerialName("subscriptionCount")
+        val theme: AppBskyEmbedExternalViewArticlePublicationTheme? = null,        @SerialName("viewer")
+        val viewer: AppBskyEmbedExternalViewArticlePublicationViewerState? = null,        @SerialName("subscriptionCount")
         val subscriptionCount: Int? = null,/** Available profile previews. Selected deterministically by DID; not a ranking. */        @SerialName("subscribers")
         val subscribers: List<AppBskyActorDefsProfileViewBasic>? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyEmbedExternalViewArticlePublication"
+        }
+    }
+
+    /**
+     * Metadata about the requesting account's relationship with the subject publication. Only has meaningful content for authed requests.
+     */
+    @Serializable
+    data class AppBskyEmbedExternalViewArticlePublicationViewerState(
+/** The requesting account's site.standard.graph.subscription record for this publication, if subscribed. */        @SerialName("subscription")
+        val subscription: ATProtocolURI? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyEmbedExternalViewArticlePublicationViewerState"
         }
     }
 
@@ -221,7 +376,8 @@ object AppBskyEmbedExternalViewGalleryItemsUnionSerializer : kotlinx.serializati
 
     @Serializable
     data class AppBskyEmbedExternalViewGallery(
-        @SerialName("uri")
+/** Best-effort provider domain for cosmetic attribution, such as grain.social. Not verified provenance. */        @SerialName("providerId")
+        val providerId: String? = null,        @SerialName("uri")
         val uri: URI,        @SerialName("title")
         val title: String,        @SerialName("description")
         val description: String,        @SerialName("createdAt")
@@ -230,11 +386,25 @@ object AppBskyEmbedExternalViewGalleryItemsUnionSerializer : kotlinx.serializati
         val labels: List<ComAtprotoLabelDefsLabel>? = null,        @SerialName("associatedRefs")
         val associatedRefs: List<ComAtprotoRepoStrongRef>? = null,        @SerialName("associatedProfiles")
         val associatedProfiles: List<AppBskyActorDefsProfileViewBasic>? = null,/** The media items in the gallery. Each item may be of a different type, but all types must be supported by the client. */        @SerialName("items")
-        val items: List<AppBskyEmbedExternalViewGalleryItemsUnion>,        @SerialName("likeCount")
+        val items: List<AppBskyEmbedExternalViewGalleryItemsUnion>,/** Total number of gallery item backlinks, independent of the items included in this view. */        @SerialName("photoCount")
+        val photoCount: Int? = null,        @SerialName("viewer")
+        val viewer: AppBskyEmbedExternalViewGalleryViewerState? = null,        @SerialName("likeCount")
         val likeCount: Int? = null,/** Available profile previews. Selected deterministically by DID; not a ranking. */        @SerialName("likers")
         val likers: List<AppBskyActorDefsProfileViewBasic>? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyEmbedExternalViewGallery"
+        }
+    }
+
+    /**
+     * Metadata about the requesting account's relationship with the subject gallery. Only has meaningful content for authed requests.
+     */
+    @Serializable
+    data class AppBskyEmbedExternalViewGalleryViewerState(
+/** The requesting account's social.grain.favorite record for this gallery, if favorited. */        @SerialName("like")
+        val like: ATProtocolURI? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyEmbedExternalViewGalleryViewerState"
         }
     }
 
@@ -252,7 +422,8 @@ object AppBskyEmbedExternalViewGalleryItemsUnionSerializer : kotlinx.serializati
 
     @Serializable
     data class AppBskyEmbedExternalViewLivestream(
-        @SerialName("uri")
+/** Best-effort provider domain for cosmetic attribution, such as stream.place. Not verified provenance. */        @SerialName("providerId")
+        val providerId: String? = null,        @SerialName("uri")
         val uri: URI,        @SerialName("title")
         val title: String,        @SerialName("description")
         val description: String,        @SerialName("createdAt")
@@ -264,7 +435,8 @@ object AppBskyEmbedExternalViewGalleryItemsUnionSerializer : kotlinx.serializati
         val image: URI? = null,/** True if the livestream is currently active at the time this view is served, false if it has ended. */        @SerialName("active")
         val active: Boolean,        @SerialName("startedAt")
         val startedAt: ATProtocolDate? = null,        @SerialName("endedAt")
-        val endedAt: ATProtocolDate? = null    ) {
+        val endedAt: ATProtocolDate? = null,/** When the livestream last reported that it was live. A livestream without endedAt is considered active until two minutes after its last heartbeat; clients can apply the same window to tell whether a cached view is still live. */        @SerialName("lastSeenAt")
+        val lastSeenAt: ATProtocolDate? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyEmbedExternalViewLivestream"
         }

@@ -784,7 +784,8 @@ object AppBskyFeedDefsSkeletonFeedPostReasonUnionSerializer : kotlinx.serializat
         val replyCount: Int? = null,        @SerialName("repostCount")
         val repostCount: Int? = null,        @SerialName("likeCount")
         val likeCount: Int? = null,        @SerialName("quoteCount")
-        val quoteCount: Int? = null,        @SerialName("indexedAt")
+        val quoteCount: Int? = null,/** Approximate number of times the post has been viewed. Only included in authenticated responses to the post's author when eligible to see the count. Counts less than 100 are omitted. */        @SerialName("viewCount")
+        val viewCount: Int? = null,        @SerialName("indexedAt")
         val indexedAt: ATProtocolDate,        @SerialName("viewer")
         val viewer: AppBskyFeedDefsViewerState? = null,        @SerialName("labels")
         val labels: List<ComAtprotoLabelDefsLabel>? = null,        @SerialName("threadgate")
@@ -1001,7 +1002,9 @@ object AppBskyFeedDefsSkeletonFeedPostReasonUnionSerializer : kotlinx.serializat
     data class AppBskyFeedDefsInteraction(
         @SerialName("item")
         val item: ATProtocolURI? = null,        @SerialName("event")
-        val event: String? = null,/** Context on a feed item that was originally supplied by the feed generator on getFeedSkeleton. */        @SerialName("feedContext")
+        val event: String? = null,/** The view in which the interaction occurred. */        @SerialName("viewContext")
+        val viewContext: String? = null,/** Additional data for the interaction, with an application-defined structure. */        @SerialName("payload")
+        val payload: JsonElement? = null,/** Context on a feed item that was originally supplied by the feed generator on getFeedSkeleton. */        @SerialName("feedContext")
         val feedContext: String? = null,/** Unique identifier per request that may be passed back alongside interactions. */        @SerialName("reqId")
         val reqId: String? = null    ) {
         companion object {

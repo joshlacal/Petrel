@@ -4,7 +4,7 @@ import Petrel
 
 // lexicon: 1, id: tools.ozone.report.closeReports
 
-/// Close eligible reports on a subject matching the given criteria, optionally linking an existing moderation action. Assigned, escalated, and actively assigned reports are excluded. Reports whose current status does not permit a transition to closed are skipped silently.
+/// Close eligible reports on a subject matching the given criteria, optionally linking an existing moderation action. Assigned, escalated, and actively assigned reports are excluded unless explicitly targeted by reportId. Reports whose current status does not permit a transition to closed are skipped silently.
 public enum ToolsOzoneReportCloseReports {
     public static let typeIdentifier = "tools.ozone.report.closeReports"
 
@@ -13,7 +13,9 @@ public enum ToolsOzoneReportCloseReports {
         public let subject: URI
         /// If true, also close reports on all subjects owned by the account, including records, messages, and conversations. Only valid when subject is an account DID.
         public let includeAllOwned: Bool?
-        /// If nonempty, only reports of the given report types (fully qualified reason NSIDs) are closed. When omitted or empty, all eligible reports in the requested subject scope are targeted, except excludedReportTypes. Assigned and escalated reports are always excluded.
+        /// An explicitly targeted report in the requested subject scope. It is included even if assigned, escalated, or not in reportTypes; excludedReportTypes still applies.
+        public let reportId: Int?
+        /// If nonempty, eligible reports of the given report types (fully qualified reason NSIDs) are closed, in addition to reportId. When omitted or empty, all eligible reports in the requested subject scope are targeted, except excludedReportTypes. Assigned, escalated, and actively assigned reports are excluded unless explicitly targeted by reportId.
         public let reportTypes: [String]?
         /// Reports of these types (fully qualified reason NSIDs) are excluded from closure and left unchanged. When omitted or empty, no report types are excluded.
         public let excludedReportTypes: [String]?
@@ -29,6 +31,7 @@ public enum ToolsOzoneReportCloseReports {
         public init(
             subject: URI,
             includeAllOwned: Bool? = nil,
+            reportId: Int? = nil,
             reportTypes: [String]? = nil,
             excludedReportTypes: [String]? = nil,
             actionEventId: Int? = nil,
@@ -38,6 +41,7 @@ public enum ToolsOzoneReportCloseReports {
         ) {
             self.subject = subject
             self.includeAllOwned = includeAllOwned
+            self.reportId = reportId
             self.reportTypes = reportTypes
             self.excludedReportTypes = excludedReportTypes
             self.actionEventId = actionEventId
@@ -51,6 +55,7 @@ public enum ToolsOzoneReportCloseReports {
             let strict = decoder.isATProtoStrictDecoding
             subject = try container.decode(URI.self, forKey: .subject)
             includeAllOwned = try container.decodeIfPresent(Bool.self, forKey: .includeAllOwned, rejectingNull: strict)
+            reportId = try container.decodeIfPresent(Int.self, forKey: .reportId, rejectingNull: strict)
             reportTypes = try container.decodeIfPresent([String].self, forKey: .reportTypes, rejectingNull: strict)
             excludedReportTypes = try container.decodeIfPresent([String].self, forKey: .excludedReportTypes, rejectingNull: strict)
             actionEventId = try container.decodeIfPresent(Int.self, forKey: .actionEventId, rejectingNull: strict)
@@ -63,6 +68,7 @@ public enum ToolsOzoneReportCloseReports {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(subject, forKey: .subject)
             try container.encodeIfPresent(includeAllOwned, forKey: .includeAllOwned)
+            try container.encodeIfPresent(reportId, forKey: .reportId)
             try container.encodeIfPresent(reportTypes, forKey: .reportTypes)
             try container.encodeIfPresent(excludedReportTypes, forKey: .excludedReportTypes)
             try container.encodeIfPresent(actionEventId, forKey: .actionEventId)
@@ -78,6 +84,10 @@ public enum ToolsOzoneReportCloseReports {
             if let value = includeAllOwned {
                 let includeAllOwnedValue = try value.toCBORValue()
                 map = map.adding(key: "includeAllOwned", value: includeAllOwnedValue)
+            }
+            if let value = reportId {
+                let reportIdValue = try value.toCBORValue()
+                map = map.adding(key: "reportId", value: reportIdValue)
             }
             if let value = reportTypes {
                 let reportTypesValue = try value.toCBORValue()
@@ -109,6 +119,7 @@ public enum ToolsOzoneReportCloseReports {
         private enum CodingKeys: String, CodingKey {
             case subject
             case includeAllOwned
+            case reportId
             case reportTypes
             case excludedReportTypes
             case actionEventId
@@ -163,7 +174,7 @@ public enum ToolsOzoneReportCloseReports {
 public extension ATProtoClient.Tools.Ozone.Report {
     // MARK: - closeReports
 
-    /// Close eligible reports on a subject matching the given criteria, optionally linking an existing moderation action. Assigned, escalated, and actively assigned reports are excluded. Reports whose current status does not permit a transition to closed are skipped silently.
+    /// Close eligible reports on a subject matching the given criteria, optionally linking an existing moderation action. Assigned, escalated, and actively assigned reports are excluded unless explicitly targeted by reportId. Reports whose current status does not permit a transition to closed are skipped silently.
     ///
     /// - Parameters:
     ///   - input: The request body

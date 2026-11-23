@@ -19,6 +19,8 @@ public enum AppBskyFeedDefs {
         public let repostCount: Int?
         public let likeCount: Int?
         public let quoteCount: Int?
+        /// Approximate number of times the post has been viewed. Only included in authenticated responses to the post's author when eligible to see the count. Counts less than 100 are omitted.
+        public let viewCount: Int?
         public let indexedAt: ATProtocolDate
         public let viewer: ViewerState?
         public let labels: [ComAtprotoLabelDefs.Label]?
@@ -40,6 +42,7 @@ public enum AppBskyFeedDefs {
             repostCount: Int? = nil,
             likeCount: Int? = nil,
             quoteCount: Int? = nil,
+            viewCount: Int? = nil,
             indexedAt: ATProtocolDate,
             viewer: ViewerState? = nil,
             labels: [ComAtprotoLabelDefs.Label]? = nil,
@@ -57,6 +60,7 @@ public enum AppBskyFeedDefs {
             self.repostCount = repostCount
             self.likeCount = likeCount
             self.quoteCount = quoteCount
+            self.viewCount = viewCount
             self.indexedAt = indexedAt
             self.viewer = viewer
             self.labels = labels
@@ -145,6 +149,18 @@ public enum AppBskyFeedDefs {
                 quoteCount = nil
                 malformedFields.insert("quoteCount")
             }
+            do {
+                viewCount = try container.decodeIfPresent(Int.self, forKey: .viewCount, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'viewCount' — degrading to nil: \(error)")
+                viewCount = nil
+                malformedFields.insert("viewCount")
+            }
             indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
             do {
                 viewer = try container.decodeIfPresent(ViewerState.self, forKey: .viewer, rejectingNull: strict)
@@ -209,6 +225,7 @@ public enum AppBskyFeedDefs {
             try container.encodeIfPresent(repostCount, forKey: .repostCount)
             try container.encodeIfPresent(likeCount, forKey: .likeCount)
             try container.encodeIfPresent(quoteCount, forKey: .quoteCount)
+            try container.encodeIfPresent(viewCount, forKey: .viewCount)
             try container.encode(indexedAt, forKey: .indexedAt)
             try container.encodeIfPresent(viewer, forKey: .viewer)
             try container.encodeIfPresent(labels, forKey: .labels)
@@ -248,6 +265,11 @@ public enum AppBskyFeedDefs {
                 hasher.combine(nil as Int?)
             }
             if let value = quoteCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = viewCount {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -308,6 +330,9 @@ public enum AppBskyFeedDefs {
             if quoteCount != other.quoteCount {
                 return false
             }
+            if viewCount != other.viewCount {
+                return false
+            }
             if indexedAt != other.indexedAt {
                 return false
             }
@@ -364,6 +389,10 @@ public enum AppBskyFeedDefs {
                 let quoteCountValue = try value.toCBORValue()
                 map = map.adding(key: "quoteCount", value: quoteCountValue)
             }
+            if let value = viewCount {
+                let viewCountValue = try value.toCBORValue()
+                map = map.adding(key: "viewCount", value: viewCountValue)
+            }
             let indexedAtValue = try indexedAt.toCBORValue()
             map = map.adding(key: "indexedAt", value: indexedAtValue)
             if let value = viewer {
@@ -385,7 +414,7 @@ public enum AppBskyFeedDefs {
             return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "cid", "author", "record", "embed", "bookmarkCount", "replyCount", "repostCount", "likeCount", "quoteCount", "indexedAt", "viewer", "labels", "threadgate", "debug"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "cid", "author", "record", "embed", "bookmarkCount", "replyCount", "repostCount", "likeCount", "quoteCount", "viewCount", "indexedAt", "viewer", "labels", "threadgate", "debug"]
 
         /// Whether this value writes the wire field `name` itself. An extra field of the
         /// same name (a malformed value kept from decoding) is written only when it is not.
@@ -401,6 +430,7 @@ public enum AppBskyFeedDefs {
             case "repostCount": return repostCount != nil
             case "likeCount": return likeCount != nil
             case "quoteCount": return quoteCount != nil
+            case "viewCount": return viewCount != nil
             case "indexedAt": return true
             case "viewer": return viewer != nil
             case "labels": return labels != nil
@@ -421,6 +451,7 @@ public enum AppBskyFeedDefs {
             case repostCount
             case likeCount
             case quoteCount
+            case viewCount
             case indexedAt
             case viewer
             case labels
@@ -2737,6 +2768,10 @@ public enum AppBskyFeedDefs {
 
         public let item: ATProtocolURI?
         public let event: String?
+        /// The view in which the interaction occurred.
+        public let viewContext: String?
+        /// Additional data for the interaction, with an application-defined structure.
+        public let payload: ATProtocolValueContainer?
         /// Context on a feed item that was originally supplied by the feed generator on getFeedSkeleton.
         public let feedContext: String?
         /// Unique identifier per request that may be passed back alongside interactions.
@@ -2748,12 +2783,16 @@ public enum AppBskyFeedDefs {
         public init(
             item: ATProtocolURI? = nil,
             event: String? = nil,
+            viewContext: String? = nil,
+            payload: ATProtocolValueContainer? = nil,
             feedContext: String? = nil,
             reqId: String? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.item = item
             self.event = event
+            self.viewContext = viewContext
+            self.payload = payload
             self.feedContext = feedContext
             self.reqId = reqId
             self.extraFields = extraFields
@@ -2788,6 +2827,30 @@ public enum AppBskyFeedDefs {
                 malformedFields.insert("event")
             }
             do {
+                viewContext = try container.decodeIfPresent(String.self, forKey: .viewContext, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'viewContext' — degrading to nil: \(error)")
+                viewContext = nil
+                malformedFields.insert("viewContext")
+            }
+            do {
+                payload = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .payload, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'payload' — degrading to nil: \(error)")
+                payload = nil
+                malformedFields.insert("payload")
+            }
+            do {
                 feedContext = try container.decodeIfPresent(String.self, forKey: .feedContext, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
@@ -2818,6 +2881,8 @@ public enum AppBskyFeedDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encodeIfPresent(item, forKey: .item)
             try container.encodeIfPresent(event, forKey: .event)
+            try container.encodeIfPresent(viewContext, forKey: .viewContext)
+            try container.encodeIfPresent(payload, forKey: .payload)
             try container.encodeIfPresent(feedContext, forKey: .feedContext)
             try container.encodeIfPresent(reqId, forKey: .reqId)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
@@ -2830,6 +2895,16 @@ public enum AppBskyFeedDefs {
                 hasher.combine(nil as Int?)
             }
             if let value = event {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = viewContext {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = payload {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -2855,6 +2930,12 @@ public enum AppBskyFeedDefs {
             if event != other.event {
                 return false
             }
+            if viewContext != other.viewContext {
+                return false
+            }
+            if payload != other.payload {
+                return false
+            }
             if feedContext != other.feedContext {
                 return false
             }
@@ -2878,6 +2959,14 @@ public enum AppBskyFeedDefs {
                 let eventValue = try value.toCBORValue()
                 map = map.adding(key: "event", value: eventValue)
             }
+            if let value = viewContext {
+                let viewContextValue = try value.toCBORValue()
+                map = map.adding(key: "viewContext", value: viewContextValue)
+            }
+            if let value = payload {
+                let payloadValue = try value.toCBORValue()
+                map = map.adding(key: "payload", value: payloadValue)
+            }
             if let value = feedContext {
                 let feedContextValue = try value.toCBORValue()
                 map = map.adding(key: "feedContext", value: feedContextValue)
@@ -2889,7 +2978,7 @@ public enum AppBskyFeedDefs {
             return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "item", "event", "feedContext", "reqId"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "item", "event", "viewContext", "payload", "feedContext", "reqId"]
 
         /// Whether this value writes the wire field `name` itself. An extra field of the
         /// same name (a malformed value kept from decoding) is written only when it is not.
@@ -2897,6 +2986,8 @@ public enum AppBskyFeedDefs {
             switch name {
             case "item": return item != nil
             case "event": return event != nil
+            case "viewContext": return viewContext != nil
+            case "payload": return payload != nil
             case "feedContext": return feedContext != nil
             case "reqId": return reqId != nil
             default: return false
@@ -2906,6 +2997,8 @@ public enum AppBskyFeedDefs {
         private enum CodingKeys: String, CodingKey {
             case item
             case event
+            case viewContext
+            case payload
             case feedContext
             case reqId
         }
@@ -4178,4 +4271,10 @@ public enum AppBskyFeedDefs {
 
     /// User shared the feed item
     public static let interactionShare = "app.bsky.feed.defs#interactionShare"
+
+    /// User followed the author of the feed item
+    public static let interactionFollow = "app.bsky.feed.defs#interactionFollow"
+
+    /// Application-defined interaction with the feed item
+    public static let interactionUnspecced = "app.bsky.feed.defs#interactionUnspecced"
 }
