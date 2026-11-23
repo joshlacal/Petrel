@@ -1,0 +1,100 @@
+name: Publish DocC site
+
+# Builds the combined DocC site for every documented Petrel product and serves
+# it with GitHub Pages at https://joshlacal.github.io/Petrel/.
+#
+# It runs only for pushes to main and by hand, never for pull requests, so
+# nothing from a fork can deploy. docc.yml still validates every pull request.
+#
+# Needs Settings > Pages > Build and deployment > Source set to "GitHub
+# Actions". Scripts/publish-documentation.sh --publish (the docs-site branch)
+# stays available as a manual fallback.
+
+'on':
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-pages
+  cancel-in-progress: false
+
+jobs:
+  build-site:
+    name: Build DocC site
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Select and verify minimum stable Xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+          export RELEASE_TOOLCHAIN_LANE=minimum
+          export RELEASE_TOOLCHAIN_SELECTION=pinned-minimum
+          export RELEASE_EVIDENCE_CLASS=stable-release
+          export RELEASE_DEVELOPER_DIR=/Applications/Xcode_16.3.app/Contents/Developer
+          export RELEASE_XCODE_VERSION=16.3
+          export RELEASE_XCODE_BUILD='16E140'
+          export RELEASE_IOS_RUNTIME=18.4
+          export RELEASE_WATCHOS_RUNTIME=11.4
+          export RELEASE_TVOS_RUNTIME=18.4
+          export RELEASE_VISIONOS_RUNTIME=2.4
+          source Scripts/activate-release-toolchain.sh
+          for name in DEVELOPER_DIR RELEASE_SWIFT; do
+            printf '%s=%s\n' "$name" "${!name}" >> "$GITHUB_ENV"
+          done
+      - name: Build the combined DocC site
+        shell: bash
+        run: |
+          set -euo pipefail
+          PETREL_DOCS_SWIFT="$RELEASE_SWIFT" Scripts/publish-documentation.sh --base-path Petrel
+      - name: Package the site for GitHub Pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          site=.build/documentation-site/Petrel.doccarchive-static
+          test -f "$site/documentation/petrel/index.html"
+          # The site root has no page of its own; send it to the Petrel
+          # overview, which links every other module.
+          cat > "$site/index.html" <<'HTML'
+          <!doctype html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <title>Petrel documentation</title>
+          <link rel="canonical" href="documentation/petrel/">
+          <meta http-equiv="refresh" content="0; url=documentation/petrel/">
+          </head>
+          <body>
+          <p><a href="documentation/petrel/">Petrel documentation</a></p>
+          </body>
+          </html>
+          HTML
+          touch "$site/.nojekyll"
+          # GitHub Pages takes one tar file in an artifact named github-pages.
+          COPYFILE_DISABLE=1 tar -cf "$RUNNER_TEMP/artifact.tar" -C "$site" .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build-site
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5

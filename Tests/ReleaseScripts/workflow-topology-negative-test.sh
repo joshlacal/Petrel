@@ -775,4 +775,26 @@ for relative in \
   expect_failure "$fixture" "required release executable is not executable: $relative"
 done
 
+fixture=$TMP/docs-pages-pull-request-trigger
+make_fixture "$fixture"
+/usr/bin/ruby - "$fixture/.github/workflows/docs-pages.yml" <<'RUBY'
+path = ARGV.fetch(0)
+source = File.binread(path)
+reviewed = "  workflow_dispatch:\n"
+abort "docs-pages trigger fixture did not match" unless source.include?(reviewed)
+File.binwrite(path, source.sub(reviewed, "  pull_request:\n" + reviewed))
+RUBY
+expect_failure "$fixture" 'docs-pages.yml must run only for pushes to main and by hand'
+
+fixture=$TMP/docs-pages-extra-write-scope
+make_fixture "$fixture"
+/usr/bin/ruby - "$fixture/.github/workflows/docs-pages.yml" <<'RUBY'
+path = ARGV.fetch(0)
+source = File.binread(path)
+reviewed = "      id-token: write\n"
+abort "docs-pages permissions fixture did not match" unless source.include?(reviewed)
+File.binwrite(path, source.sub(reviewed, reviewed + "      contents: write\n"))
+RUBY
+expect_failure "$fixture" 'docs-pages.yml deploy job must hold only pages: write and id-token: write'
+
 echo "workflow topology negative contracts: PASS"

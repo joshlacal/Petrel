@@ -13,8 +13,8 @@ service routing and retries apply to every call. Start with <doc:GettingStarted>
 
 For Bluesky apps, `client.bsky` (``ATProtoClient/bsky``) returns a ``BskyAgent`` with
 higher-level helpers: posting with rich-text facets, images and replies, the social-graph
-verbs, preferences, and moderation decisions. See <doc:BlueskyPosting>,
-<doc:BlueskyModeration> and <doc:BlueskyPreferences>.
+verbs, preferences, and moderation decisions. See <doc:ReadingFeedsAndThreads>,
+<doc:BlueskyPosting>, <doc:BlueskyModeration> and <doc:BlueskyPreferences>.
 
 To generate the same typed API for your own Lexicons, see <doc:CustomLexicons>.
 
@@ -94,6 +94,7 @@ shows how the streaming and repository modules fit together.
 
 ### Bluesky Agent, Rich Text & Moderation
 
+- <doc:ReadingFeedsAndThreads>
 - <doc:BlueskyPosting>
 - <doc:BlueskyModeration>
 - <doc:BlueskyPreferences>
