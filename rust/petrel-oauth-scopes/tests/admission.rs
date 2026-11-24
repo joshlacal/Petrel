@@ -3,7 +3,8 @@ use petrel_oauth_scopes::{
     OAuthScopeBudget, OAuthScopeTokenizer, OAuthUnknownScopePolicy, ScopeSet,
 };
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn canonical_collision_cannot_expand_a_declaration() {
     let declared = "rpc:com.example.method?aud=did:web:example.com%23svc%26admin";
     let requested = "rpc:com.example.method?aud=did:web:example.com%23svc%2526admin";
@@ -21,7 +22,8 @@ fn canonical_collision_cannot_expand_a_declaration() {
     );
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn declaration_matches_meaning_within_one_family() {
     for (a, b) in [
         (
@@ -81,7 +83,8 @@ fn declaration_matches_meaning_within_one_family() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn admission_requires_base_scope_and_has_explicit_unknown_scope_policy() {
     let opaque = ScopeSet::from_scope_string("atproto future:K");
     let opaque_different = ScopeSet::from_scope_string("atproto future:\u{212A}");
@@ -103,7 +106,8 @@ fn admission_requires_base_scope_and_has_explicit_unknown_scope_policy() {
     );
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn tokenizer_and_storage_apply_separate_byte_and_count_budgets() {
     let small = OAuthScopeBudget {
         bytes_per_scope: 7,
@@ -149,7 +153,8 @@ fn tokenizer_and_storage_apply_separate_byte_and_count_budgets() {
     );
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn scope_set_keeps_opaque_bytes_and_checks_wildcards_as_requirements() {
     let generic = ScopeSet::from_scope_string("atproto transition:generic");
     let both = ScopeSet::from_scope_string("atproto transition:generic transition:chat.bsky");
@@ -170,7 +175,8 @@ fn scope_set_keeps_opaque_bytes_and_checks_wildcards_as_requirements() {
     );
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn wire_normalization_preserves_literal_percent_and_plus() {
     let wire = "blob?accept=image/svg%2Bxml&accept=image/png rpc:com.example.method?aud=did:web:example.com%23svc%2541";
     let grant = ScopeSet::parse(wire).unwrap();

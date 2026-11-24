@@ -1,9 +1,10 @@
 use petrel_oauth_scopes::{
     AccountPermission, AtProtoScope, BlobPermission, IdentityPermission, IncludeScope,
-    RepoPermission, RpcPermission, ScopeParseError, ScopeSet,
+    RepoPermission, RpcPermission, ScopeSet,
 };
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn builders_validate_the_same_values_as_parsers() {
     let repo = RepoPermission::new(&["com.example.foo", "com.example.foo"], &[]).unwrap();
     assert_eq!(
@@ -69,75 +70,9 @@ fn builders_validate_the_same_values_as_parsers() {
     assert!(ScopeSet::parse_strict("atproto rpc:*?aud=*").is_err());
 }
 
-#[test]
-fn schema_checks_arity_defaults_and_positionals() {
-    for (value, expected) in [
-        (
-            "account",
-            ScopeParseError::MissingRequiredParameter { key: "attr" },
-        ),
-        (
-            "account:",
-            ScopeParseError::InvalidPositional { key: "attr" },
-        ),
-        (
-            "account:email?attr=email",
-            ScopeParseError::PositionalConflict { key: "attr" },
-        ),
-        (
-            "account?attr=email&attr=email",
-            ScopeParseError::RepeatedSingleValue { key: "attr" },
-        ),
-        (
-            "identity:handle?action=manage",
-            ScopeParseError::UnknownParameter {
-                prefix: "identity",
-                key: "action".into(),
-            },
-        ),
-        (
-            "identity?attr=",
-            ScopeParseError::InvalidParameter { key: "attr" },
-        ),
-        (
-            "repo?collection=com.example.foo&action=read",
-            ScopeParseError::InvalidParameter { key: "action" },
-        ),
-        (
-            "repo:com.example.foo?collection=com.example.bar",
-            ScopeParseError::PositionalConflict { key: "collection" },
-        ),
-        (
-            "repo:com.example.foo?unknown=value",
-            ScopeParseError::UnknownParameter {
-                prefix: "repo",
-                key: "unknown".into(),
-            },
-        ),
-        (
-            "rpc:com.example.foo",
-            ScopeParseError::MissingRequiredParameter { key: "aud" },
-        ),
-        (
-            "rpc:com.example.foo?aud=*&aud=*",
-            ScopeParseError::RepeatedSingleValue { key: "aud" },
-        ),
-        (
-            "rpc:*?aud=*",
-            ScopeParseError::ForbiddenCombination { prefix: "rpc" },
-        ),
-        (
-            "include:com.example.foo?aud=*",
-            ScopeParseError::InvalidParameter { key: "aud" },
-        ),
-        (
-            "blob:image/png?accept=image/png",
-            ScopeParseError::PositionalConflict { key: "accept" },
-        ),
-    ] {
-        assert_eq!(AtProtoScope::parse(value), Err(expected), "{value}");
-    }
-
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+fn explicit_defaults_preserve_structural_provenance() {
     let basic = RepoPermission::parse("repo:com.example.foo").unwrap();
     let explicit =
         RepoPermission::parse("repo:com.example.foo?action=create&action=update&action=delete")

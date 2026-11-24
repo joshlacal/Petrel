@@ -93,25 +93,28 @@ impl Schema {
             });
         }
         let syntax = ScopeStringSyntax::parse(input)?;
-        let mut named = BTreeMap::<&str, Vec<&str>>::new();
-        for (key, value) in syntax.parameters.entries() {
-            named.entry(key).or_default().push(value);
-        }
+        let named = syntax
+            .parameters
+            .ordered_keys()
+            .into_iter()
+            .map(|key| (key, syntax.parameters.values(key)));
         self.read(syntax.positional.as_deref(), named)
     }
 
-    fn read(
+    fn read<'a>(
         self,
         positional: Option<&str>,
-        mut named: BTreeMap<&str, Vec<&str>>,
+        parameters: impl IntoIterator<Item = (&'a str, Vec<&'a str>)>,
     ) -> Result<ScopeParameterValues, ScopeParseError> {
-        for &key in named.keys() {
+        let mut named = BTreeMap::new();
+        for (key, values) in parameters {
             if !self.parameters.iter().any(|parameter| parameter.key == key) {
                 return Err(ScopeParseError::UnknownParameter {
                     prefix: self.prefix,
                     key: key.to_owned(),
                 });
             }
+            named.insert(key, values);
         }
 
         let mut result = ScopeParameterValues::default();
@@ -158,8 +161,7 @@ impl Schema {
             params
                 .iter()
                 .filter(|(_, values)| !values.is_empty())
-                .map(|&(key, values)| (key, values.to_vec()))
-                .collect(),
+                .map(|&(key, values)| (key, values.to_vec())),
         )
     }
 

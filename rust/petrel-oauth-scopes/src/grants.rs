@@ -90,7 +90,7 @@ impl ScopeSet {
     /// Parse a scope value containing only recognized, valid scopes.
     pub fn parse_strict(wire: &str) -> Result<Self, ScopeParseError> {
         let scopes = Self::from_scope_string(wire);
-        if let Some(error) = scopes.rejected.values().next() {
+        if let Some(error) = split_scopes(wire).find_map(|token| scopes.rejected.get(token)) {
             return Err(error.clone());
         }
         Ok(scopes)

@@ -101,6 +101,32 @@ pub fn is_parent_authority_of(nsid: &str, child: &str) -> bool {
         })
 }
 
+/// Why one Lexicon entry produced no permission.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExpansionRejectionReason {
+    /// The resource or an explicit RPC audience is not allowed in a set.
+    NotAllowedInPermissionSet,
+    /// The entry's parameters do not describe a valid permission.
+    InvalidPermission,
+    /// The entry names a method or collection beyond the set's namespace.
+    OutsideNamespaceAuthority,
+}
+
+/// An omitted entry with its position and reason.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpansionRejection<'a> {
+    pub index: usize,
+    pub permission: &'a LexiconPermission,
+    pub reason: ExpansionRejectionReason,
+}
+
+/// The permissions granted by a set and the entries it could not grant.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ScopeExpansion<'a> {
+    pub permissions: Vec<IncludedPermission>,
+    pub rejections: Vec<ExpansionRejection<'a>>,
+}
+
 impl IncludeScope {
     pub fn is_parent_authority_of(&self, child: &str) -> bool {
         self.parameters()
@@ -113,13 +139,7 @@ impl IncludeScope {
     pub fn expand(&self, set: &LexiconPermissionSet) -> Vec<IncludedPermission> {
         set.permissions
             .iter()
-            .filter_map(|entry| self.expand_entry(entry))
-            .filter(|permission| {
-                permission
-                    .targets()
-                    .iter()
-                    .all(|name| self.is_parent_authority_of(name))
-            })
+            .filter_map(|entry| self.expand_entry(entry).ok())
             .collect()
     }
 
@@ -133,21 +153,62 @@ impl IncludeScope {
             .collect()
     }
 
-    fn expand_entry(&self, entry: &LexiconPermission) -> Option<IncludedPermission> {
-        match entry.resource.as_str() {
+    /// Expand an authenticated set and report every skipped entry.
+    pub fn expansion<'a>(&self, set: &'a LexiconPermissionSet) -> ScopeExpansion<'a> {
+        let mut expansion = ScopeExpansion::default();
+        for (index, entry) in set.permissions.iter().enumerate() {
+            match self.expand_entry(entry) {
+                Ok(permission) => expansion.permissions.push(permission),
+                Err(reason) => expansion.rejections.push(ExpansionRejection {
+                    index,
+                    permission: entry,
+                    reason,
+                }),
+            }
+        }
+        expansion
+    }
+
+    fn expand_entry(
+        &self,
+        entry: &LexiconPermission,
+    ) -> Result<IncludedPermission, ExpansionRejectionReason> {
+        use ExpansionRejectionReason::{
+            InvalidPermission, NotAllowedInPermissionSet, OutsideNamespaceAuthority,
+        };
+
+        let permission = match entry.resource.as_str() {
             "repo" => {
                 let parameters = entry
                     .fields
                     .iter()
                     .map(|(key, value)| Some((key.as_str(), strings(value)?)))
-                    .collect::<Option<BTreeMap<_, _>>>()?;
-                RepoPermission::from_lexicon(parameters)
-                    .ok()
-                    .map(IncludedPermission::Repo)
+                    .collect::<Option<BTreeMap<_, _>>>()
+                    .ok_or(InvalidPermission)?;
+                IncludedPermission::Repo(
+                    RepoPermission::from_lexicon(parameters).map_err(|_| InvalidPermission)?,
+                )
             }
-            "rpc" => self.expand_rpc(entry).map(IncludedPermission::Rpc),
-            _ => None,
+            "rpc" => {
+                if entry
+                    .fields
+                    .get("aud")
+                    .is_some_and(|aud| aud.as_str() != Some("*"))
+                {
+                    return Err(NotAllowedInPermissionSet);
+                }
+                IncludedPermission::Rpc(self.expand_rpc(entry).ok_or(InvalidPermission)?)
+            }
+            _ => return Err(NotAllowedInPermissionSet),
+        };
+        if permission
+            .targets()
+            .iter()
+            .any(|name| !self.is_parent_authority_of(name))
+        {
+            return Err(OutsideNamespaceAuthority);
         }
+        Ok(permission)
     }
 
     fn expand_rpc(&self, entry: &LexiconPermission) -> Option<RpcPermission> {
