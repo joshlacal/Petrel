@@ -1,11 +1,35 @@
-//! End-to-end harness for the Petrel Rust runtime.
+//! Native test harness for the Petrel Rust client and Swift test servers.
 //!
-//! Stub created by Lane 0. Lane F of the Petrel Rust program owns this crate
-//! (map: `docs/execution-plans/2026-11-24-petrel-rust/maps/test-servers.md`,
-//! packages E0 to E7). It spawns the Swift OAuth and CAB example servers,
-//! runs its own fake PLC directory, and drives public-client and CAB-client
-//! sign-in, refresh rotation and revocation against them.
-//!
-//! The harness spawns processes, so it is native-only and compiles to an empty
-//! crate on `wasm32`.
+//! Build `petrel-oauth-server-example` and `petrel-cab-server` from the Swift
+//! `Server` package. Set `PETREL_E2E_SERVER_BIN_DIR` to the directory with both
+//! executables and run `cargo test -p petrel-e2e` from `rust/`. Set
+//! `PETREL_E2E_REQUIRED=1` to fail when the binaries are unavailable.
+
 #![cfg(not(target_arch = "wasm32"))]
+
+mod browser;
+mod plc;
+mod swift;
+
+pub use browser::headless_approve;
+pub use plc::FakePlc;
+pub use swift::{CAB_CLIENT_ID, CAB_REDIRECT, CabClient, CabServer, ExampleServer, ServerBins};
+
+use std::time::Duration;
+
+use reqwest::{Client, redirect::Policy};
+
+pub const DEMO_DID: &str = "did:plc:petrelexampledemoaccount";
+pub const DEMO_HANDLE: &str = "demo.test";
+pub const DEMO_SCOPE: &str = "atproto transition:generic";
+const DEMO_PASSWORD: &str = "petrel-demo";
+
+pub type TestResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
+fn loopback_http_client(timeout: Duration) -> Result<Client, reqwest::Error> {
+    Client::builder()
+        .no_proxy()
+        .redirect(Policy::none())
+        .timeout(timeout)
+        .build()
+}

@@ -15,10 +15,16 @@ default = []
 wasm = []
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+base64 = { workspace = true }
+p256 = { workspace = true, features = ["pem"] }
 petrel = { workspace = true, features = ["native"] }
 petrel-core = { workspace = true }
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "process", "time", "net", "io-util"] }
+reqwest = { workspace = true, features = ["form"] }
+serde_json = { workspace = true }
 tempfile = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "net"] }
+url = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,0 +1,132 @@
+name: Rust
+
+'on':
+  push:
+    branches: [main]
+    paths:
+      - 'rust/**'
+      - 'Server/**'
+      - 'Sources/PetrelOAuthServer*/**'
+      - 'Sources/PetrelOAuthScopes/**'
+      - 'Package.swift'
+      - 'Package.resolved'
+      - 'Scripts/verify-release-workflow-topology.sh'
+      - '.github/workflows/rust.yml'
+  pull_request:
+    paths:
+      - 'rust/**'
+      - 'Server/**'
+      - 'Sources/PetrelOAuthServer*/**'
+      - 'Sources/PetrelOAuthScopes/**'
+      - 'Package.swift'
+      - 'Package.resolved'
+      - 'Scripts/verify-release-workflow-topology.sh'
+      - '.github/workflows/rust.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  lint-test:
+    name: Rust lint and unit tests
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install checksum-pinned rustup
+        run: bash petrel-e2e/ci/install-rustup.sh
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Lint all targets
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Run unit and integration tests
+        run: cargo test --locked --workspace --exclude petrel-e2e
+      - name: Check the minimum supported Rust version
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          cargo +1.88.0 check --locked --workspace
+
+  wasm32:
+    name: Browser-target SDK build
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install checksum-pinned rustup
+        run: bash petrel-e2e/ci/install-rustup.sh
+      - name: Build the SDK crates for wasm32
+        run: |
+          cargo build --locked --target wasm32-unknown-unknown --no-default-features --features wasm \
+            -p petrel-core -p petrel-oauth-scopes -p petrel-api -p petrel
+      - name: Check wasm32 with the minimum supported Rust version
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal --target wasm32-unknown-unknown
+          cargo +1.88.0 check --locked --target wasm32-unknown-unknown --no-default-features --features wasm \
+            -p petrel-core -p petrel-oauth-scopes -p petrel-api -p petrel
+      - name: Keep native-only dependencies out of the wasm SDK
+        run: |
+          set -euo pipefail
+          tree=$(cargo tree --locked --target wasm32-unknown-unknown --no-default-features --features wasm \
+            -p petrel-core -p petrel-oauth-scopes -p petrel-api -p petrel --edges normal --prefix none)
+          if grep -E '^(tokio|mio|socket2|hickory-[^ ]+|aws-lc[^ ]*) v' <<< "$tree"; then
+            echo 'Native-only dependencies found in the wasm SDK' >&2
+            exit 1
+          fi
+
+  e2e:
+    name: Rust client against the Swift OAuth and CAB servers
+    runs-on: ubuntu-24.04
+    container: swift:6.1.2-jammy@sha256:5910655d205a5a54b0b9efdf72c4066a8de1932513fdc81793e2544b5d5a0709
+    defaults:
+      run:
+        shell: bash
+    env:
+      PETREL_E2E_REQUIRED: '1'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install system dependencies
+        # Use the same resolver retry as the Swift OAuth server workflow.
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if apt-get update && apt-get install -y build-essential cmake curl libsecret-1-dev libglib2.0-dev pkg-config; then
+              exit 0
+            fi
+            echo "apt attempt ${attempt} failed; retrying in $((attempt * 15))s"
+            if [ "${attempt}" -eq 2 ]; then
+              printf "nameserver 1.1.1.1\nnameserver 8.8.8.8\n" > /etc/resolv.conf
+            fi
+            sleep $((attempt * 15))
+          done
+          echo "apt-get could not install system dependencies after 6 attempts" >&2
+          exit 1
+      - name: Verify pinned Swift
+        run: test "$(swift --version | head -n 1)" = 'Swift version 6.1.2 (swift-6.1.2-RELEASE)'
+      - name: Build the Swift test servers
+        run: |
+          swift build --package-path Server --product petrel-oauth-server-example
+          swift build --package-path Server --product petrel-cab-server
+          bin_dir=$(swift build --package-path Server --show-bin-path)
+          printf 'PETREL_E2E_SERVER_BIN_DIR=%s\n' "$bin_dir" >> "$GITHUB_ENV"
+      - name: Install checksum-pinned rustup
+        working-directory: rust
+        run: bash petrel-e2e/ci/install-rustup.sh
+      - name: Run local Rust and Swift interoperability tests
+        working-directory: rust
+        run: cargo test --locked -p petrel-e2e
