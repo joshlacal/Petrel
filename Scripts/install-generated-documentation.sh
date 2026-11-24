@@ -29,7 +29,7 @@ is_generated_entry() {
     .nojekyll | css | data | developer-og-twitter.jpg | developer-og.jpg | \
       documentation | downloads | favicon.ico | favicon.svg | images | img | \
       index | index.html | js | link-hierarchy.json | linkable-entities.json | \
-      metadata.json | theme-settings.json | videos)
+      metadata.json | theme-settings.json | tutorials | videos)
       return 0
       ;;
     *)
