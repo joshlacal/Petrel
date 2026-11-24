@@ -160,7 +160,7 @@ fn scope_set_keeps_opaque_bytes_and_checks_wildcards_as_requirements() {
 
     let opaque = ScopeSet::parse("space:com.example.group?aud=%3a+%FF").unwrap();
     assert!(opaque.covers(&opaque));
-    assert!(opaque.scopes().is_empty());
+    assert_eq!(opaque.scopes(), []);
     assert_eq!(opaque.normalized_scope_string(), opaque.scope_string());
     assert!(!generic.covers(&opaque));
     assert!(AtProtoScope::parse("rpc:*?aud=*").is_err());

@@ -356,18 +356,36 @@ macro_rules! family {
     };
 }
 
-family!(/// Grants write actions on repository collections.
-    RepoPermission, REPO);
-family!(/// Grants access to RPC methods, constrained by service audience.
-    RpcPermission, RPC);
-family!(/// Grants access to account attributes.
-    AccountPermission, ACCOUNT);
-family!(/// Grants blob uploads by media type.
-    BlobPermission, BLOB);
-family!(/// Grants access to identity attributes.
-    IdentityPermission, IDENTITY);
-family!(/// Refers to an external Lexicon permission set.
-    IncludeScope, INCLUDE);
+family!(
+    /// Grants write actions on repository collections.
+    RepoPermission,
+    REPO
+);
+family!(
+    /// Grants access to RPC methods, constrained by service audience.
+    RpcPermission,
+    RPC
+);
+family!(
+    /// Grants access to account attributes.
+    AccountPermission,
+    ACCOUNT
+);
+family!(
+    /// Grants blob uploads by media type.
+    BlobPermission,
+    BLOB
+);
+family!(
+    /// Grants access to identity attributes.
+    IdentityPermission,
+    IDENTITY
+);
+family!(
+    /// Refers to an external Lexicon permission set.
+    IncludeScope,
+    INCLUDE
+);
 
 impl RepoPermission {
     /// Build a validated permission from decoded parameter values.
