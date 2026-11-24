@@ -916,15 +916,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hkdf"
-version = "0.12.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b5f8eb2ad728638ea2c7d47a21db23b7b58a72ed6a38256b8a1849f15fbbdf7"
-dependencies = [
- "hmac",
-]
-
-[[package]]
 name = "hmac"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1583,17 +1574,16 @@ dependencies = [
  "getrandom 0.2.17",
  "gloo-timers",
  "hickory-resolver",
- "hkdf",
  "http",
  "js-sys",
  "k256",
  "p256",
+ "petrel-api",
  "petrel-core",
  "petrel-oauth-scopes",
  "reqwest",
  "rustix",
  "serde",
- "serde_html_form",
  "serde_json",
  "sha2",
  "tempfile",
@@ -1658,6 +1648,7 @@ dependencies = [
  "serde",
  "serde_json",
  "url",
+ "wasm-bindgen-test",
 ]
 
 [[package]]
@@ -2150,19 +2141,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.10",
-]
-
-[[package]]
-name = "serde_html_form"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f0346d7a342ab90f405cfc08f25d15075f944f42fcabbc5eac923829fa6d228"
-dependencies = [
- "form_urlencoded",
- "indexmap",
- "itoa",
- "serde_core",
- "zmij",
 ]
 
 [[package]]

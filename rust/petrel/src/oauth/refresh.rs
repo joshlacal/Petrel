@@ -171,7 +171,7 @@ impl OAuthClient {
         let lock = self.account_lock(did);
         let mut state = lock.lock().await;
         let current = self
-            .read_record(did, &state)
+            .read_record(did, &mut state)
             .await?
             .ok_or(OAuthError::MissingSession)?;
         if current.generation() != observed.generation() {

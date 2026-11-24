@@ -32,7 +32,6 @@ petrel = { path = "petrel", version = "0.0.0", default-features = false }
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
-serde_html_form = "0.4"
 base64 = "0.22"
 
 # Errors
@@ -46,7 +45,6 @@ k256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"]
 getrandom = "0.2"
 aes-gcm = "0.10"
 bs58 = "0.5"
-hkdf = "0.12"
 zeroize = "1"
 
 # HTTP model, URLs, async plumbing (runtime-agnostic)

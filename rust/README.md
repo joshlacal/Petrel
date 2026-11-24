@@ -7,10 +7,7 @@ which needs an OAuth client that can ask a client assertion backend (CAB: a
 small server that signs the client's identity proof, so the app never holds the
 signing key) for a fresh assertion on every token request.
 
-**Status: skeleton.** Lane 0 of the program created the workspace, froze the
-interfaces the other lanes share, and proved the serialization design with a
-test spike. The crates compile and the spike passes; most behaviour is not
-written yet. The governing plan is
+**Status: in development.** The governing plan is
 `docs/execution-plans/2026-11-24-petrel-rust.md` in the Catbird+Petrel
 workspace repository, with decisions logged in `docs/DECISIONS.md` there under
 the tag `petrel-rust`.
@@ -20,12 +17,14 @@ the tag `petrel-rust`.
 | Crate | What it is | Owner lane |
 |---|---|---|
 | `petrel-core` | Identifiers, the data-model `Value`, strict DAG-CBOR, the typed-to-`Value` bridge, XRPC endpoint traits. No HTTP, no crypto beyond SHA-256. | A |
-| `petrel-api` | **Generated** API types, from `generator/manifests/petrel-core.json`. Never hand-edited. Empty until the generator's Rust backend lands. | B |
+| `petrel-api` | API types generated from `generator/manifests/petrel-core.json`. | B |
 | `petrel-oauth-scopes` | The OAuth scope grammar. Depends on nothing else here. | C |
 | `petrel` | The runtime: transport, XRPC pipeline, identity, crypto, OAuth, storage, service auth. | D and E |
 | `petrel-e2e` | End-to-end tests against the Swift test servers. Never published. | F |
 
-Settings: cargo resolver 3, edition 2024, minimum Rust 1.88.
+The workspace uses Cargo resolver 3 and Rust edition 2024. The developer and
+CI toolchain is pinned in `rust-toolchain.toml`. CI tests compatibility with
+the minimum supported Rust version, 1.88.
 
 ## Commands
 
@@ -34,23 +33,23 @@ goes through the build queue: prefix it with
 `CTL_AGENT=<you> ctl run --slot cargo --`.
 
 ```bash
-cargo check --workspace
+cargo check --workspace --locked
 ```
 
 ```bash
-cargo check --workspace --target wasm32-unknown-unknown --no-default-features --features wasm
+cargo check --workspace --locked --target wasm32-unknown-unknown --no-default-features --features wasm
 ```
 
 ```bash
-cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --workspace --locked --all-targets --all-features -- -D warnings
 ```
 
 ```bash
-cargo test -p petrel-core spike
+cargo test --locked -p petrel-core --test spike
 ```
 
 ```bash
-cargo tree -p petrel --target wasm32-unknown-unknown --no-default-features --features wasm
+cargo tree --locked -p petrel --target wasm32-unknown-unknown --no-default-features --features wasm -e normal
 ```
 
 The last command must list no `tokio`, `mio`, `hickory` or `aws-lc` crate.
@@ -69,12 +68,18 @@ Notes on the wasm command:
 
 | Feature | Pulls in | Notes |
 |---|---|---|
-| `native` (default) | reqwest over rustls, tokio timers, hickory DNS | Declared only for non-wasm targets. |
-| `wasm` | reqwest's fetch backend, gloo timers, `getrandom`'s JS backend | No tokio anywhere on this path. |
-| `file-store` | AES-GCM, HKDF, zeroize | The encrypted on-disk secret store. |
+| `native` (default) | reqwest over rustls, Tokio timers, Hickory DNS | Native targets. |
+| `wasm` | Browser Fetch through `web-sys`, Gloo timers, JavaScript entropy | Browser and worker targets. |
+| `file-store` | AES-GCM and platform file locks | Encrypted native storage. |
 
 Native-only dependencies sit in a `cfg(not(target_arch = "wasm32"))` target
 table, so even building for wasm with default features cannot pull tokio in.
+
+Browser Fetch omits ambient credentials and refuses opaque redirects. The
+browser controls DNS and decompression, so the SDK can limit the decoded body
+size while native transport also checks IP addresses and compressed wire size.
+For cross-origin OAuth and XRPC, servers must expose `DPoP-Nonce` and
+`WWW-Authenticate` through CORS for the SDK to handle nonce challenges.
 
 `getrandom` is wired for the 0.2 line only (`getrandom/js`), which is what
 `p256` 0.13 uses. If a later dependency brings `getrandom` 0.3 or 0.4 into the
@@ -97,8 +102,7 @@ other's way:
 
 ## The frozen contracts
 
-Names other lanes can rely on. Bodies marked *placeholder* are minimal and get
-replaced by the owning lane without a rename.
+Shared names used by the generator and runtime.
 
 **`petrel_core`**
 
@@ -107,7 +111,7 @@ replaced by the owning lane without a rename.
 - Identifiers: `Did`, `Handle`, `AtIdentifier`, `Nsid`, `AtUri`, `SpaceRef`,
   `Uri`, `Tid`, `RecordKey`, `Datetime`, `Language`, `CidString`. Each has
   `parse`, `as_str`, `into_string`, `FromStr`, `Display`, and the bridge and
-  serde traits. *Validators are placeholders.*
+  serde traits.
 - Wire wrappers: `Cid`, `CidLink`, `Bytes`, `Blob`, `Nullable<T>`.
 - The bridge: `ToValue`, `FromValue`, `ObjectReader`, `ObjectWriter`,
   `to_json`, `from_json`, `to_dag_cbor`, `from_dag_cbor`,
