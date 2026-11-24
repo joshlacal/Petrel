@@ -371,6 +371,16 @@ fn retryable_refresh_failure(error: &OAuthError) -> bool {
 }
 
 #[cfg(test)]
+impl OAuthClient {
+    pub(super) async fn allow_next_refresh_probe(&self, did: &Did) {
+        let account = self.account_lock(did);
+        let mut state = account.lock().await;
+        assert!(state.retry_after != 0);
+        state.retry_after = 0;
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
