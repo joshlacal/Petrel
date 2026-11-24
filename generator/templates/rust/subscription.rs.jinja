@@ -1,0 +1,13 @@
+#[derive(Debug)]
+pub struct {{ endpoint_name }};
+
+impl {{ endpoint_name }} {
+    pub const NSID: &'static str = {{ lexicon_id | escape_str_literal }};
+{% if known_message_types %}
+    pub const KNOWN_MESSAGE_TYPES: &'static [&'static str] = &[
+{% for tag in known_message_types %}
+        {{ tag | escape_str_literal }},
+{% endfor %}
+    ];
+{% endif %}
+}

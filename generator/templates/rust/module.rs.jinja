@@ -1,0 +1,54 @@
+// Lexicon: {{ lexicon_version }}, ID: {{ lexicon_id }}
+{% if description %}
+{{ description | escape_module_doc }}
+{% endif %}
+
+pub const NSID: &str = {{ lexicon_id | escape_str_literal }};
+{% if strict_ref_helper %}
+
+{{ strict_ref_helper }}
+{% endif %}
+{% if space_declaration %}
+
+{{ space_declaration }}
+{% endif %}
+{% if record %}
+
+{{ record }}
+{% endif %}
+{% if main_object %}
+
+{{ main_object }}
+{% endif %}
+{% if parameters %}
+
+{{ parameters }}
+{% endif %}
+{% if input %}
+
+{{ input }}
+{% endif %}
+{% if output %}
+
+{{ output }}
+{% endif %}
+{% if message %}
+
+{{ message }}
+{% endif %}
+{% if errors %}
+
+{{ errors }}
+{% endif %}
+{% if endpoint %}
+
+{{ endpoint }}
+{% endif %}
+{% if definitions %}
+
+{{ definitions }}
+{% endif %}
+{% if enums %}
+
+{{ enums }}
+{% endif %}

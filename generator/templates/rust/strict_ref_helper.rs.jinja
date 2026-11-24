@@ -1,0 +1,44 @@
+fn decode_strict_ref<T: petrel_core::FromValue>(
+    raw: petrel_core::Value,
+    allowed_keys: &[&str],
+    expected_type_id: &str,
+    field_name: &str,
+) -> Result<T, petrel_core::DecodeError> {
+    let map = raw.as_object().ok_or_else(|| {
+        petrel_core::DecodeError::TypeMismatch {
+            expected: "object",
+            found: raw.kind(),
+        }
+        .in_field(field_name)
+    })?;
+
+    if let Some(type_val) = map.get("$type") {
+        match type_val.as_str() {
+            Some(actual) if actual == expected_type_id => {}
+            Some(actual) => {
+                return Err(petrel_core::DecodeError::Custom(format!(
+                    "expected `$type` `{expected_type_id}`, found `{actual}`"
+                ))
+                .in_field(field_name));
+            }
+            None => {
+                return Err(petrel_core::DecodeError::TypeMismatch {
+                    expected: "string",
+                    found: type_val.kind(),
+                }
+                .in_field(field_name));
+            }
+        }
+    }
+
+    for key in map.keys() {
+        if key != "$type" && !allowed_keys.contains(&key.as_str()) {
+            return Err(petrel_core::DecodeError::Custom(format!(
+                "unexpected key `{key}` in strict reference"
+            ))
+            .in_field(field_name));
+        }
+    }
+
+    T::from_value(raw).map_err(|err| err.in_field(field_name))
+}

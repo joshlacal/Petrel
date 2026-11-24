@@ -1,0 +1,4 @@
+{% if description %}
+{{ description | escape_doc }}
+{% endif %}
+pub type {{ name }} = {{ target }};

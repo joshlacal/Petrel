@@ -1,0 +1,144 @@
+{% if description %}
+{{ description | escape_doc }}
+{% endif %}
+#[derive(Debug, Clone, PartialEq)]
+pub struct {{ name }} {
+{% for prop in properties %}
+{% if prop.description %}
+{{ prop.description | escape_doc | indent(4, true) }}
+{% endif %}
+    pub {{ prop.ident }}: {{ prop.rust_type }},
+{% endfor %}
+{% if has_extra %}
+    pub {{ extra_name }}: Option<std::collections::BTreeMap<String, petrel_core::Value>>,
+{% endif %}
+}
+
+impl {{ name }} {
+    pub const TYPE_IDENTIFIER: &'static str = {{ type_identifier | escape_str_literal }};
+
+    pub fn new({% for p in required_params %}{{ p.ident }}: {{ p.rust_type }}{% if not loop.last %}, {% endif %}{% endfor %}) -> Self {
+        Self {
+{% for prop in properties %}
+{% if prop.in_new_params %}
+            {{ prop.ident }},
+{% else %}
+            {{ prop.ident }}: None,
+{% endif %}
+{% endfor %}
+{% if has_extra %}
+            {{ extra_name }}: None,
+{% endif %}
+        }
+    }
+}
+{% if all_optional %}
+
+impl Default for {{ name }} {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+{% endif %}
+{% if is_record %}
+
+impl petrel_core::Collection for {{ name }} {
+    const NSID: &'static str = {{ lexicon_id | escape_str_literal }};
+    const KEY: petrel_core::RecordKeyType = {{ record_key_expr }};
+}
+{% endif %}
+
+impl petrel_core::ToValue for {{ name }} {
+    fn to_value(&self) -> Result<petrel_core::Value, petrel_core::EncodeError> {
+        let {% if has_extra or properties %}mut {% endif %}writer = {% if encodes_type %}petrel_core::ObjectWriter::with_type({{ lexicon_id | escape_str_literal }}){% else %}petrel_core::ObjectWriter::new(){% endif %};
+{% for prop in properties %}
+{% if prop.required_nullable %}
+        writer.required_nullable({{ prop.wire_literal }}, &self.{{ prop.ident }})?;
+{% elif prop.tri_state %}
+        writer.optional_nullable({{ prop.wire_literal }}, &self.{{ prop.ident }})?;
+{% elif prop.wire_optional %}
+        writer.optional({{ prop.wire_literal }}, &self.{{ prop.ident }})?;
+{% else %}
+        writer.field({{ prop.wire_literal }}, &self.{{ prop.ident }})?;
+{% endif %}
+{% endfor %}
+{% if has_extra %}
+        writer.extra(self.{{ extra_name }}.as_ref());
+{% endif %}
+        Ok(writer.finish())
+    }
+}
+
+impl petrel_core::FromValue for {{ name }} {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        let {% if properties %}mut {% elif not has_extra %}_{% endif %}reader = petrel_core::ObjectReader::new(value)?;
+{% for prop in properties %}
+{% if prop.strict_decode %}
+{% if prop.required_nullable %}
+        let {{ prop.ident }} = reader
+            .required_nullable::<petrel_core::Value>({{ prop.wire_literal }})?
+            .map(|raw| decode_strict_ref::<{{ prop.strict_target_type }}>(raw, &[{{ prop.strict_allowed_keys }}], {{ prop.strict_type_id_literal }}, {{ prop.wire_literal }}))
+            .transpose()?;
+{% elif prop.wire_optional %}
+        let {{ prop.ident }} = reader
+            .optional_strict::<petrel_core::Value>({{ prop.wire_literal }})?
+            .map(|raw| decode_strict_ref::<{{ prop.strict_target_type }}>(raw, &[{{ prop.strict_allowed_keys }}], {{ prop.strict_type_id_literal }}, {{ prop.wire_literal }}))
+            .transpose()?;
+{% else %}
+        let {{ prop.ident }} = decode_strict_ref::<{{ prop.strict_target_type }}>(
+            reader.required::<petrel_core::Value>({{ prop.wire_literal }})?,
+            &[{{ prop.strict_allowed_keys }}],
+            {{ prop.strict_type_id_literal }},
+            {{ prop.wire_literal }},
+        )?;
+{% endif %}
+{% endif %}
+{% endfor %}
+        Ok(Self {
+{% for prop in properties %}
+{% if prop.strict_decode %}
+            {{ prop.ident }},
+{% elif prop.required_nullable %}
+            {{ prop.ident }}: reader.required_nullable({{ prop.wire_literal }})?,
+{% elif prop.tri_state %}
+            {{ prop.ident }}: reader.optional_nullable({{ prop.wire_literal }}),
+{% elif prop.wire_optional %}
+{% if lenient %}
+            {{ prop.ident }}: reader.optional({{ prop.wire_literal }}),
+{% else %}
+            {{ prop.ident }}: reader.optional_strict({{ prop.wire_literal }})?,
+{% endif %}
+{% else %}
+            {{ prop.ident }}: reader.required({{ prop.wire_literal }})?,
+{% endif %}
+{% endfor %}
+{% if has_extra %}
+            {{ extra_name }}: reader.finish(),
+{% endif %}
+        })
+    }
+}
+
+impl petrel_core::XrpcInput for {{ name }} {
+    fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
+        petrel_core::xrpc::json_body(&self)
+    }
+}
+
+impl petrel_core::XrpcOutput for {{ name }} {
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json(body)
+    }
+}
+
+impl serde::Serialize for {{ name }} {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        petrel_core::serde_bridge::serialize(self, serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for {{ name }} {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        petrel_core::serde_bridge::deserialize(deserializer)
+    }
+}

@@ -1361,6 +1361,44 @@ with LOG_PATH.open("a", encoding="utf-8") as handle:
                 self.assertEqual(sum_code, 0, sum_err)
                 self.assertIn(f"Client Path:     {expected_accessor}", sum_out)
 
+    def test_sibling_overlay_manifest_resolves_cwd_instead_of_manifest_dir(self):
+        petrel_dir = self.temp_root / "Petrel"
+        overlay_dir = self.temp_root / "PetrelOverlay"
+        petrel_dir.mkdir()
+        (overlay_dir / "manifests").mkdir(parents=True)
+        (overlay_dir / "lexicons" / "xyz" / "test").mkdir(parents=True)
+        (overlay_dir / "lexicons" / "xyz" / "test" / "ping.json").write_text(
+            json.dumps({"lexicon": 1, "id": "xyz.test.ping", "defs": {"main": {"type": "query"}}}),
+            encoding="utf-8",
+        )
+        manifest_path = overlay_dir / "manifests" / "overlay.json"
+        manifest_path.write_text(
+            json.dumps({
+                "package": {"kind": "overlay", "name": "PetrelOverlay"},
+                "lexicons": {"emit": ["../PetrelOverlay/lexicons"], "reference": ["@petrel/core-lexicons"]},
+                "rust": {
+                    "output": "../PetrelOverlay/rust/src/generated",
+                    "crate": "petrel_overlay",
+                    "crate_path": "crate::generated",
+                    "reference_crate": "petrel_api::generated",
+                },
+            }),
+            encoding="utf-8",
+        )
+        code, _, stderr = self._run_cli(
+            ["generate", "--manifest", "../PetrelOverlay/manifests/overlay.json", "--language", "rust"],
+            cwd=petrel_dir,
+        )
+        self.assertEqual(code, 0, stderr)
+        self.assertTrue((overlay_dir / "rust" / "src" / "generated" / "xyz" / "test" / "ping.rs").is_file())
+        self.assertFalse((overlay_dir / "PetrelOverlay").exists())
+
+        chk_code, _, chk_err = self._run_cli(
+            ["generate", "--manifest", "../PetrelOverlay/manifests/overlay.json", "--language", "rust", "--check"],
+            cwd=petrel_dir,
+        )
+        self.assertEqual(chk_code, 0, chk_err)
+
 
 if __name__ == "__main__":
     unittest.main()

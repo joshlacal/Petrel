@@ -12,6 +12,12 @@ repository.workspace = true
 # here, with implication edges computed from cross-namespace refs.
 default = []
 wasm = ["petrel-core/wasm"]
+app_bsky = ["com_atproto"]
+chat_bsky = ["app_bsky", "com_atproto"]
+com_atproto = []
+com_germnetwork = []
+network_bsky = ["com_atproto"]
+site_standard = ["com_atproto"]
 
 [dependencies]
 petrel-core = { workspace = true }

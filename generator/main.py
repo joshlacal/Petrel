@@ -5,12 +5,14 @@ import asyncio
 import aiofiles
 import re
 from collections.abc import Sequence
+from base_code_generator import validate_lexicon_schema
 from swift_code_generator import SwiftCodeGenerator, convert_json_to_swift
 from kotlin_code_generator import KotlinCodeGenerator
 from kotlin_type_converter import convert_to_pascal_case
+from rust_type_converter import compute_rust_boxed_fields, rust_module_segments
 from utils import convert_to_camel_case, swift_member_name, namespace_type_name
 from cycle_detector import CycleDetector
-from generated_projection import write_swift_projection, write_kotlin_projection
+from generated_projection import write_swift_projection, write_kotlin_projection, write_rust_projection
 
 def get_namespace_path(lexicon_id: str) -> str:
     """Convert lexicon ID to hierarchical path.
@@ -846,6 +848,190 @@ def generate_kotlin_overlay_namespaces(emit_hierarchy, reference_hierarchy):
     return header + '\n'.join(extensions) + '\n\n' + '\n\n'.join(classes) + '\n'
 
 
+def compute_rust_namespace_features(lexicons, schemas_by_ref=None):
+    """Compute top-level 2-segment Cargo features and cross-namespace implication edges."""
+    emit_ids = {lex.get('id', '') for _, lex in lexicons}
+    feature_deps = {}
+
+    def feature_for_nsid(nsid: str) -> str:
+        parts = rust_module_segments(nsid)
+        return "_".join(parts[:2]) if len(parts) >= 2 else parts[0]
+
+    for _fp, lex in lexicons:
+        lid = lex.get('id', '')
+        src_feat = feature_for_nsid(lid)
+        feature_deps.setdefault(src_feat, set())
+
+        def walk(node):
+            if isinstance(node, dict):
+                ref_val = node.get('ref')
+                if isinstance(ref_val, str) and not ref_val.startswith('#'):
+                    _add_ref(ref_val)
+                refs_val = node.get('refs')
+                if isinstance(refs_val, list):
+                    for r in refs_val:
+                        if isinstance(r, str) and not r.startswith('#'):
+                            _add_ref(r)
+                for v in node.values():
+                    walk(v)
+            elif isinstance(node, list):
+                for item in node:
+                    walk(item)
+
+        def _add_ref(ref_str: str):
+            target_nsid, sep, frag = ref_str.partition('#')
+            if target_nsid not in emit_ids:
+                return
+            if schemas_by_ref is not None:
+                key = target_nsid if (not sep or frag == 'main') else f"{target_nsid}#{frag}"
+                target_schema = schemas_by_ref.get(key)
+                if isinstance(target_schema, dict) and target_schema.get('type') in (
+                    'bytes', 'blob', 'cid-link'
+                ):
+                    return
+            dst_feat = feature_for_nsid(target_nsid)
+            if dst_feat != src_feat:
+                feature_deps[src_feat].add(dst_feat)
+
+        walk(lex)
+
+    return {feat: sorted(deps) for feat, deps in sorted(feature_deps.items())}
+
+
+async def generate_rust_from_lexicons_recursive(
+    folder_path,
+    output_folder: str,
+    exclude_namespaces=DEFAULT_EXCLUDED_NAMESPACES,
+    reference_dirs=(),
+    overlay=False,
+    package_name='Petrel',
+    crate_path='crate',
+    reference_crate='petrel_api',
+    property_type_overrides=None,
+    features=False,
+):
+    """Generate Rust module tree from AT Protocol lexicons."""
+    property_type_overrides = dict(property_type_overrides or {})
+    expected_files = {}
+    cycle_detector = CycleDetector()
+
+    emit_dirs = folder_path if isinstance(folder_path, (list, tuple)) else [folder_path]
+
+    lexicons = await load_lexicons(emit_dirs, exclude_namespaces, cycle_detector)
+    emit_ids = {lex.get('id', '') for _, lex in lexicons}
+    reference_dirs, reference_exclude = resolve_reference_dirs(reference_dirs, exclude_namespaces)
+    await load_lexicons(
+        reference_dirs, reference_exclude, cycle_detector, skip_ids=emit_ids
+    )
+    cycle_detector.detect_cycles()
+    boxed_fields = compute_rust_boxed_fields(cycle_detector.schemas_by_ref)
+
+    try:
+        from rust_code_generator import RustCodeGenerator
+    except ImportError:
+        RustCodeGenerator = None
+
+    def add_expected_file(relative_path, content):
+        if relative_path in expected_files:
+            raise ValueError(f"duplicate generated Rust target: {relative_path}")
+        expected_files[relative_path] = content
+
+    # Track directory -> sorted child module names so every directory gets a `mod.rs`.
+    dir_children = {(): set()}
+    lexicon_entries = []
+    for _filepath, lexicon in lexicons:
+        lexicon_id = lexicon.get('id', '')
+        mod_parts = tuple(rust_module_segments(lexicon_id))
+        for depth in range(len(mod_parts)):
+            parent = mod_parts[:depth]
+            child = mod_parts[depth]
+            dir_children.setdefault(parent, set()).add(child)
+            if depth + 1 < len(mod_parts):
+                dir_children.setdefault(mod_parts[: depth + 1], set())
+        lexicon_entries.append((lexicon, mod_parts))
+
+    prefix_module_bodies = {}
+    for lexicon, mod_parts in lexicon_entries:
+        lexicon_id = lexicon.get('id', '')
+        overrides = property_type_overrides.pop(lexicon_id, None)
+        if RustCodeGenerator is not None:
+            rust_code = RustCodeGenerator(
+                lexicon,
+                cycle_detector,
+                emit_ids=emit_ids,
+                crate_path=crate_path,
+                reference_crate=reference_crate,
+                overlay=overlay,
+                property_type_overrides=overrides,
+                boxed_fields=boxed_fields,
+            ).convert()
+        else:
+            validate_lexicon_schema(lexicon)
+            rust_code = (
+                f"// Lexicon: 1, ID: {lexicon_id}\n"
+                f'pub const TYPE_IDENTIFIER: &str = "{lexicon_id}";\n'
+            )
+
+        if mod_parts in dir_children:
+            if mod_parts in prefix_module_bodies:
+                raise ValueError(
+                    f"duplicate generated Rust target: {'/'.join(mod_parts)}/mod.rs"
+                )
+            prefix_module_bodies[mod_parts] = rust_code
+        else:
+            rel_path = "/".join(mod_parts) + ".rs"
+            add_expected_file(rel_path, rust_code)
+
+    if property_type_overrides:
+        raise ValueError(
+            "rust.property_type_overrides names lexicons this manifest does not emit: "
+            f"{sorted(property_type_overrides)}"
+        )
+
+    for dir_parts in sorted(dir_children):
+        children = sorted(dir_children[dir_parts])
+        mod_lines = []
+        for child in children:
+            if features and len(dir_parts) == 1:
+                feat_name = f"{dir_parts[0]}_{child}"
+                mod_lines.append(f'#[cfg(feature = "{feat_name}")]')
+            mod_lines.append(f"pub mod {child};")
+        body = prefix_module_bodies.get(dir_parts)
+        if body:
+            preamble, rest = _split_rust_module_preamble(body)
+            sections = []
+            if preamble:
+                sections.append(preamble)
+            if mod_lines:
+                sections.append("\n".join(mod_lines))
+            if rest:
+                sections.append(rest.rstrip("\n"))
+            mod_content = "\n\n".join(sections) + "\n"
+        else:
+            mod_content = "\n".join(mod_lines) + ("\n" if mod_lines else "")
+        mod_rel_path = "/".join((*dir_parts, "mod.rs")) if dir_parts else "mod.rs"
+        add_expected_file(mod_rel_path, mod_content)
+
+    await write_rust_projection(output_folder, expected_files)
+
+
+def _split_rust_module_preamble(body: str) -> tuple[str, str]:
+    """Separate leading `// Lexicon:` / `//!` lines so inner doc comments precede `pub mod` items."""
+    lines = body.splitlines()
+    idx = 0
+    if idx < len(lines) and lines[idx].startswith("// Lexicon:"):
+        idx += 1
+    while idx < len(lines) and lines[idx].startswith("//!"):
+        idx += 1
+    if idx == 0:
+        return "", body
+    preamble = "\n".join(lines[:idx])
+    while idx < len(lines) and lines[idx] == "":
+        idx += 1
+    rest = "\n".join(lines[idx:])
+    return preamble, rest
+
+
 def _resolve_kotlin_output():
     """Resolve the petrel-kotlin generated source root.
 
@@ -863,7 +1049,7 @@ def _resolve_kotlin_output():
 
 async def run_manifest(
     manifest_path,
-    language='both',
+    language='all',
     graph_path=None,
     default_core_namespace_roots: Sequence[str] = (),
 ):
@@ -885,8 +1071,12 @@ async def run_manifest(
         # the core/overlay path for manifest kinds that never touch it.
         if language == 'kotlin':
             raise ValueError(f"app-intents manifest {manifest_path} does not support --language kotlin")
+        if language == 'rust':
+            raise ValueError(f"app-intents manifest {manifest_path} does not support --language rust")
         if manifest.get('kotlin'):
             raise ValueError(f"app-intents manifest {manifest_path} must not declare a 'kotlin' output")
+        if manifest.get('rust'):
+            raise ValueError(f"app-intents manifest {manifest_path} must not declare a 'rust' output")
         from app_intents_generator import AppIntentsGenerator
         await AppIntentsGenerator(manifest, manifest_path).generate()
         return
@@ -926,7 +1116,7 @@ async def run_manifest(
 
     tasks = []
     swift_cfg = manifest.get('swift')
-    if swift_cfg and language in ('swift', 'both'):
+    if swift_cfg and language in ('swift', 'both', 'all'):
         tasks.append(generate_swift_from_lexicons_recursive(
             emit_dirs, swift_cfg['output'],
             exclude_namespaces=exclude, reference_dirs=reference_dirs,
@@ -938,17 +1128,32 @@ async def run_manifest(
             lexicon_documents=swift_cfg.get('lexicon_documents'),
         ))
     kotlin_cfg = manifest.get('kotlin')
-    if kotlin_cfg and language in ('kotlin', 'both'):
+    if kotlin_cfg and language in ('kotlin', 'both', 'all'):
         tasks.append(generate_kotlin_from_lexicons_recursive(
             emit_dirs, kotlin_cfg['output'],
             exclude_namespaces=exclude, reference_dirs=reference_dirs,
             overlay=overlay, package_name=package_name,
+        ))
+    rust_cfg = manifest.get('rust')
+    if rust_cfg and language in ('rust', 'all'):
+        tasks.append(generate_rust_from_lexicons_recursive(
+            emit_dirs, rust_cfg['output'],
+            exclude_namespaces=exclude, reference_dirs=reference_dirs,
+            overlay=overlay, package_name=package_name,
+            crate_path=rust_cfg.get('crate_path', 'crate'),
+            reference_crate=rust_cfg.get('reference_crate', 'petrel_api'),
+            property_type_overrides=rust_cfg.get('property_type_overrides'),
+            features=bool(rust_cfg.get('features', False)),
         ))
     await asyncio.gather(*tasks)
 
 
 async def main(input_dir, output_dir, language='swift'):
     """Main entry point supporting multiple languages (legacy positional CLI)."""
+    if language == 'rust':
+        raise ValueError(
+            "Rust code generation requires --manifest (legacy positional CLI does not support --language rust)"
+        )
     if language == 'swift':
         await generate_swift_from_lexicons_recursive(input_dir, output_dir)
     elif language == 'kotlin':
@@ -963,11 +1168,13 @@ async def main(input_dir, output_dir, language='swift'):
             generate_swift_from_lexicons_recursive(input_dir, output_dir),
             generate_kotlin_from_lexicons_recursive(input_dir, kotlin_output)
         )
+    else:
+        raise ValueError(f"Unsupported legacy positional language: {language!r}")
 
 
 if __name__ == "__main__":
     if len(sys.argv) >= 3 and sys.argv[1] == '--manifest':
-        language = sys.argv[3] if len(sys.argv) > 3 else 'both'
+        language = sys.argv[3] if len(sys.argv) > 3 else 'all'
         asyncio.run(run_manifest(sys.argv[2], language))
         sys.exit(0)
 
