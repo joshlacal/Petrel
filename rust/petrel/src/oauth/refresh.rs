@@ -2,10 +2,14 @@ use std::collections::VecDeque;
 
 use petrel_core::Did;
 
-use crate::{crypto::{random_bytes, sha256}, net::TransportError};
 use super::{
     OAuthClient, OAuthError, OAuthProtocolError, Session, SessionRecord,
-    client::{TokenResponse, require_success}, protocol::{AsEndpoint, retry_delay, unix_now},
+    client::{TokenResponse, require_success},
+    protocol::{AsEndpoint, retry_delay, unix_now},
+};
+use crate::{
+    crypto::{random_bytes, sha256},
+    net::TransportError,
 };
 
 #[derive(Default)]
@@ -59,7 +63,10 @@ impl OAuthClient {
         Ok(self.session_record(did).await?.map(|record| record.session))
     }
 
-    pub(super) async fn session_record(&self, did: &Did) -> Result<Option<SessionRecord>, OAuthError> {
+    pub(super) async fn session_record(
+        &self,
+        did: &Did,
+    ) -> Result<Option<SessionRecord>, OAuthError> {
         let lock = self.account_lock(did);
         let refresh = lock.lock().await;
         self.read_record(did, &refresh).await
@@ -81,7 +88,11 @@ impl OAuthClient {
     pub async fn refresh(&self, did: &Did, force: bool) -> Result<Session, OAuthError> {
         // Read the observed generation before waiting for its refresh. A
         // caller that begins after a refresh started still sees the old one.
-        let observed = self.storage.get_session(did).await?.ok_or(OAuthError::MissingSession)?;
+        let observed = self
+            .storage
+            .get_session(did)
+            .await?
+            .ok_or(OAuthError::MissingSession)?;
         self.refresh_after(&observed, force).await
     }
 
@@ -93,7 +104,10 @@ impl OAuthClient {
         let did = &observed.session.did;
         let lock = self.account_lock(did);
         let mut state = lock.lock().await;
-        let current = self.read_record(did, &state).await?.ok_or(OAuthError::MissingSession)?;
+        let current = self
+            .read_record(did, &state)
+            .await?
+            .ok_or(OAuthError::MissingSession)?;
         if current.dpop_jkt != observed.dpop_jkt
             || current.session.access_token() != observed.session.access_token()
             || current.session.created_at != observed.session.created_at
@@ -114,13 +128,22 @@ impl OAuthClient {
         if now < state.retry_after {
             return Err(OAuthError::RefreshBackoff);
         }
-        let server = self.validate_account(&current.account).inspect_err(|error| state.failure(now, error))?;
-        let key = self.bound_key(&current.dpop_key_id, &current.dpop_jkt).await?;
+        let server = self
+            .validate_account(&current.account)
+            .inspect_err(|error| state.failure(now, error))?;
+        let key = self
+            .bound_key(&current.dpop_key_id, &current.dpop_jkt)
+            .await?;
         let digest = state.burn(token)?;
-        let response = self.protocol.send_as(
-            &server, AsEndpoint::Token,
-            &[("grant_type", "refresh_token"), ("refresh_token", token)], &*key,
-        ).await;
+        let response = self
+            .protocol
+            .send_as(
+                &server,
+                AsEndpoint::Token,
+                &[("grant_type", "refresh_token"), ("refresh_token", token)],
+                &*key,
+            )
+            .await;
         let result = match response {
             Ok(response) => match require_success(&response) {
                 Ok(()) => {
@@ -144,7 +167,10 @@ impl OAuthClient {
         match result {
             Ok(session) => {
                 state.success();
-                let new = SessionRecord { session: session.clone(), ..current };
+                let new = SessionRecord {
+                    session: session.clone(),
+                    ..current
+                };
                 self.persist_refresh(&mut state, new).await;
                 Ok(session)
             }
@@ -162,7 +188,10 @@ impl OAuthClient {
         for attempt in 0..3 {
             if self.storage.save_session(&current).await.is_ok() {
                 state.pending = None;
-                let _ = self.storage.delete_pending_session(&current.session.did).await;
+                let _ = self
+                    .storage
+                    .delete_pending_session(&current.session.did)
+                    .await;
                 return;
             }
             if attempt < 2 {
@@ -182,9 +211,15 @@ impl OAuthClient {
         let Some(record) = self.read_record(did, &state).await? else {
             return Ok(false);
         };
-        let revoked = match (self.validate_account(&record.account), self.bound_key(&record.dpop_key_id, &record.dpop_jkt).await) {
+        let revoked = match (
+            self.validate_account(&record.account),
+            self.bound_key(&record.dpop_key_id, &record.dpop_jkt).await,
+        ) {
             (Ok(server), Ok(key)) => {
-                let token = record.session.refresh_token().unwrap_or_else(|| record.session.access_token());
+                let token = record
+                    .session
+                    .refresh_token()
+                    .unwrap_or_else(|| record.session.access_token());
                 self.revoke(&server, &*key, token).await
             }
             _ => false,
@@ -203,11 +238,17 @@ impl OAuthClient {
 }
 
 fn retryable_refresh_failure(error: &OAuthError) -> bool {
-    matches!(error,
+    matches!(
+        error,
         OAuthError::ServerStatus(429 | 500..=599)
-        | OAuthError::Protocol(OAuthProtocolError::Transport(TransportError::Timeout | TransportError::Connect(_)))
-        | OAuthError::Protocol(OAuthProtocolError::AssertionBackend(
-            super::AssertionBackendError::Rejected { status: 429 | 500..=599, .. }
-        ))
+            | OAuthError::Protocol(OAuthProtocolError::Transport(
+                TransportError::Timeout | TransportError::Connect(_)
+            ))
+            | OAuthError::Protocol(OAuthProtocolError::AssertionBackend(
+                super::AssertionBackendError::Rejected {
+                    status: 429 | 500..=599,
+                    ..
+                }
+            ))
     )
 }

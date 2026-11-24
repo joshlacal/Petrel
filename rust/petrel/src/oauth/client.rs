@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fmt, sync::{Arc, Mutex}};
+use std::{
+    collections::HashMap,
+    fmt,
+    sync::{Arc, Mutex},
+};
 
 use async_lock::Mutex as AsyncMutex;
 use bytes::Bytes;
@@ -9,13 +13,23 @@ use serde::Deserialize;
 use url::Url;
 use zeroize::Zeroize;
 
-use crate::{crypto::{DpopSigner, SoftwareDpopSigner, base64url, pkce_challenge, pkce_verifier, random_bytes},
-    net::SharedTransport, rt::{BoxFuture, MaybeSend, MaybeSync}, storage::{SessionStore, StoreError}};
+use crate::{
+    crypto::{
+        DpopSigner, SoftwareDpopSigner, base64url, pkce_challenge, pkce_verifier, random_bytes,
+    },
+    net::SharedTransport,
+    rt::{BoxFuture, MaybeSend, MaybeSync},
+    storage::{SessionStore, StoreError},
+};
 
 use super::{
     ClientAuth, MetadataError, OAuthProtocolError, Session, SessionRecord,
-    dpop::{DpopNonces, nonce_header, oauth_error_code}, metadata::{ValidatedAuthorizationServer, endpoint_url, is_loopback, origin, require_canonical_origin},
-    models::{Account, OAuthFlowState}, protocol::{AsEndpoint, OAuthProtocol, unix_now},
+    dpop::{DpopNonces, nonce_header, oauth_error_code},
+    metadata::{
+        ValidatedAuthorizationServer, endpoint_url, is_loopback, origin, require_canonical_origin,
+    },
+    models::{Account, OAuthFlowState},
+    protocol::{AsEndpoint, OAuthProtocol, unix_now},
     refresh::RefreshState,
 };
 
@@ -89,8 +103,13 @@ impl OAuthConfig {
     ) -> Result<Self, OAuthError> {
         let client_id = client_id.into();
         let parsed = endpoint_url(&client_id).ok_or(OAuthError::ClientId)?;
-        let raw_authority = client_id.split_once("://").ok_or(OAuthError::ClientId)?.1
-            .split(['/', '?', '#']).next().ok_or(OAuthError::ClientId)?;
+        let raw_authority = client_id
+            .split_once("://")
+            .ok_or(OAuthError::ClientId)?
+            .1
+            .split(['/', '?', '#'])
+            .next()
+            .ok_or(OAuthError::ClientId)?;
         if raw_authority.contains(':') {
             return Err(OAuthError::ClientId);
         }
@@ -102,23 +121,43 @@ impl OAuthConfig {
         } else if parsed.scheme() != "https" || parsed.query().is_some() || is_loopback(&parsed) {
             return Err(OAuthError::ClientId);
         }
-        if let ClientAuth::Cab { client_id: backend_client, .. } = &authentication
+        if let ClientAuth::Cab {
+            client_id: backend_client,
+            ..
+        } = &authentication
             && backend_client != &client_id
         {
             return Err(OAuthError::ClientId);
         }
-        let reversed_host = parsed.host_str().ok_or(OAuthError::ClientId)?
-            .split('.').rev().collect::<Vec<_>>().join(".");
+        let reversed_host = parsed
+            .host_str()
+            .ok_or(OAuthError::ClientId)?
+            .split('.')
+            .rev()
+            .collect::<Vec<_>>()
+            .join(".");
         let redirect_matches = match redirect_uri.scheme() {
-            "https" => !development_id && redirect_uri.host_str().is_some() && !is_loopback(&redirect_uri),
-            "http" => development_id
-                && matches!(redirect_uri.host_str(), Some("127.0.0.1" | "[::1]")),
-            scheme => !development_id && scheme == reversed_host && redirect_uri.host_str().is_none()
-                && redirect_uri.path().starts_with('/') && !redirect_uri.path().starts_with("//"),
+            "https" => {
+                !development_id && redirect_uri.host_str().is_some() && !is_loopback(&redirect_uri)
+            }
+            "http" => {
+                development_id && matches!(redirect_uri.host_str(), Some("127.0.0.1" | "[::1]"))
+            }
+            scheme => {
+                !development_id
+                    && scheme == reversed_host
+                    && redirect_uri.host_str().is_none()
+                    && redirect_uri.path().starts_with('/')
+                    && !redirect_uri.path().starts_with("//")
+            }
         };
-        if !redirect_matches || redirect_uri.fragment().is_some()
-            || !redirect_uri.username().is_empty() || redirect_uri.password().is_some()
-            || redirect_uri.query_pairs().any(|(key, _)| is_callback_parameter(&key))
+        if !redirect_matches
+            || redirect_uri.fragment().is_some()
+            || !redirect_uri.username().is_empty()
+            || redirect_uri.password().is_some()
+            || redirect_uri
+                .query_pairs()
+                .any(|(key, _)| is_callback_parameter(&key))
         {
             return Err(OAuthError::RedirectUri);
         }
@@ -127,7 +166,13 @@ impl OAuthConfig {
             return Err(OAuthError::Scope);
         }
 
-        Ok(Self { client_id, redirect_uri, scope, authentication, allow_loopback: false })
+        Ok(Self {
+            client_id,
+            redirect_uri,
+            scope,
+            authentication,
+            allow_loopback: false,
+        })
     }
 
     /// Permit explicit loopback HTTP endpoints for local development.
@@ -167,7 +212,10 @@ pub trait OAuthIdentityResolver: MaybeSend + MaybeSync {
 /// Implementations may store opaque keys, such as browser WebCrypto CryptoKeys.
 pub trait DpopKeyStore: MaybeSend + MaybeSync {
     fn create<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Arc<dyn DpopSigner>, StoreError>>;
-    fn get<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Arc<dyn DpopSigner>>, StoreError>>;
+    fn get<'a>(
+        &'a self,
+        id: &'a str,
+    ) -> BoxFuture<'a, Result<Option<Arc<dyn DpopSigner>>, StoreError>>;
     fn delete<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<(), StoreError>>;
 }
 
@@ -178,18 +226,27 @@ struct SoftwareKeyStore {
 impl DpopKeyStore for SoftwareKeyStore {
     fn create<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Arc<dyn DpopSigner>, StoreError>> {
         Box::pin(async move {
-            let key = SoftwareDpopSigner::generate().map_err(|_| StoreError::Unavailable("DPoP key generation".into()))?;
+            let key = SoftwareDpopSigner::generate()
+                .map_err(|_| StoreError::Unavailable("DPoP key generation".into()))?;
             self.storage.save_dpop_key(id, &key.to_bytes()).await?;
             Ok(Arc::new(key) as Arc<dyn DpopSigner>)
         })
     }
 
-    fn get<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Arc<dyn DpopSigner>>, StoreError>> {
+    fn get<'a>(
+        &'a self,
+        id: &'a str,
+    ) -> BoxFuture<'a, Result<Option<Arc<dyn DpopSigner>>, StoreError>> {
         Box::pin(async move {
-            self.storage.get_dpop_key(id).await?.map(|material| {
-                SoftwareDpopSigner::from_bytes(&material).map(|key| Arc::new(key) as Arc<dyn DpopSigner>)
-                    .map_err(|_| StoreError::Corrupt("DPoP key".into()))
-            }).transpose()
+            self.storage
+                .get_dpop_key(id)
+                .await?
+                .map(|material| {
+                    SoftwareDpopSigner::from_bytes(&material)
+                        .map(|key| Arc::new(key) as Arc<dyn DpopSigner>)
+                        .map_err(|_| StoreError::Corrupt("DPoP key".into()))
+                })
+                .transpose()
         })
     }
 
@@ -242,7 +299,9 @@ impl OAuthClient {
                 allow_loopback: config.allow_loopback,
                 nonces: DpopNonces::default(),
             },
-            keys: Arc::new(SoftwareKeyStore { storage: storage.clone() }),
+            keys: Arc::new(SoftwareKeyStore {
+                storage: storage.clone(),
+            }),
             storage,
             resolver,
             config,
@@ -260,7 +319,8 @@ impl OAuthClient {
         let target_key = match &target {
             OAuthTarget::Identifier(identifier) => identifier.as_str(),
             OAuthTarget::Server(url) => url.as_str(),
-        }.to_owned();
+        }
+        .to_owned();
         // Different targets share a short-lived flow limit. A concurrent start
         // for the same target reuses the same pushed request and state.
         let mut pending = self.pending.lock().await;
@@ -270,8 +330,11 @@ impl OAuthClient {
         {
             return Ok(flow.authorize_url.clone());
         }
-        let expired = pending.iter().filter(|(_, flow)| now.saturating_sub(flow.created_at) > 600)
-            .map(|(target, _)| target.clone()).collect::<Vec<_>>();
+        let expired = pending
+            .iter()
+            .filter(|(_, flow)| now.saturating_sub(flow.created_at) > 600)
+            .map(|(target, _)| target.clone())
+            .collect::<Vec<_>>();
         for target in expired {
             if let Some(flow) = pending.remove(&target) {
                 self.cancel_flow(&flow, now).await?;
@@ -283,15 +346,28 @@ impl OAuthClient {
 
         let (expected_did, expected_pds, server, login_hint) = match &target {
             OAuthTarget::Identifier(identifier) => {
-                let identity = self.resolver.resolve_identity(identifier, false).await.map_err(|_| OAuthError::Identity)?;
-                if let AtIdentifier::Did(did) = identifier && did != &identity.did {
+                let identity = self
+                    .resolver
+                    .resolve_identity(identifier, false)
+                    .await
+                    .map_err(|_| OAuthError::Identity)?;
+                if let AtIdentifier::Did(did) = identifier
+                    && did != &identity.did
+                {
                     return Err(OAuthError::IdentityChanged);
                 }
                 let pds = origin(&identity.pds, false).ok_or(OAuthError::Identity)?;
                 let metadata = self.protocol.discover_pds(&identity.pds).await?;
-                (Some(identity.did), Some(pds), metadata, Some(identifier.as_str()))
+                (
+                    Some(identity.did),
+                    Some(pds),
+                    metadata,
+                    Some(identifier.as_str()),
+                )
             }
-            OAuthTarget::Server(url) => (None, None, self.protocol.discover_server(url).await?, None),
+            OAuthTarget::Server(url) => {
+                (None, None, self.protocol.discover_server(url).await?, None)
+            }
         };
 
         let key_id = base64url(&random_bytes::<32>()?);
@@ -304,8 +380,18 @@ impl OAuthClient {
                 return Err(error.into());
             }
         };
-        let authorize_url = match self.push_authorization(&server, &state, &key_id, &jkt, &*key,
-            expected_did, expected_pds, login_hint).await
+        let authorize_url = match self
+            .push_authorization(
+                &server,
+                &state,
+                &key_id,
+                &jkt,
+                &*key,
+                expected_did,
+                expected_pds,
+                login_hint,
+            )
+            .await
         {
             Ok(url) => url,
             Err(error) => {
@@ -314,9 +400,16 @@ impl OAuthClient {
                 return Err(error);
             }
         };
-        pending.insert(target_key, PendingAuthorization {
-            state, authorize_url: authorize_url.clone(), created_at: unix_now()?, key_id, jkt,
-        });
+        pending.insert(
+            target_key,
+            PendingAuthorization {
+                state,
+                authorize_url: authorize_url.clone(),
+                created_at: unix_now()?,
+                key_id,
+                jkt,
+            },
+        );
         Ok(authorize_url)
     }
 
@@ -333,7 +426,9 @@ impl OAuthClient {
         login_hint: Option<&str>,
     ) -> Result<Url, OAuthError> {
         #[derive(Deserialize)]
-        struct ParResponse { request_uri: String }
+        struct ParResponse {
+            request_uri: String,
+        }
 
         let verifier = zeroize::Zeroizing::new(pkce_verifier()?);
         let challenge = pkce_challenge(&verifier);
@@ -346,20 +441,31 @@ impl OAuthClient {
             ("state", state),
             ("scope", scope.as_str()),
         ];
-        if let Some(hint) = login_hint { parameters.push(("login_hint", hint)); }
-        let response = self.protocol.send_as(server, AsEndpoint::Par, &parameters, key).await?;
+        if let Some(hint) = login_hint {
+            parameters.push(("login_hint", hint));
+        }
+        let response = self
+            .protocol
+            .send_as(server, AsEndpoint::Par, &parameters, key)
+            .await?;
         require_success(&response)?;
         let nonce = required_nonce(response.headers())?;
-        let par: ParResponse = serde_json::from_slice(response.body())
-            .map_err(|_| OAuthError::InvalidResponse)?;
-        if par.request_uri.is_empty() || par.request_uri.bytes().any(|byte| byte.is_ascii_control()) {
+        let par: ParResponse =
+            serde_json::from_slice(response.body()).map_err(|_| OAuthError::InvalidResponse)?;
+        if par.request_uri.is_empty() || par.request_uri.bytes().any(|byte| byte.is_ascii_control())
+        {
             return Err(OAuthError::InvalidResponse);
         }
         let mut authorize = server.authorization_endpoint().clone();
-        if authorize.query_pairs().any(|(param, _)| matches!(param.as_ref(), "client_id" | "request_uri")) {
+        if authorize
+            .query_pairs()
+            .any(|(param, _)| matches!(param.as_ref(), "client_id" | "request_uri"))
+        {
             return Err(OAuthError::InvalidResponse);
         }
-        authorize.query_pairs_mut().append_pair("client_id", &self.config.client_id)
+        authorize
+            .query_pairs_mut()
+            .append_pair("client_id", &self.config.client_id)
             .append_pair("request_uri", &par.request_uri);
 
         let stored = OAuthFlowState {
@@ -373,13 +479,19 @@ impl OAuthClient {
             dpop_jkt: jkt.to_owned(),
             metadata: server.metadata().clone(),
         };
-        self.storage.save_oauth_state(state, unix_now()?, &stored).await?;
+        self.storage
+            .save_oauth_state(state, unix_now()?, &stored)
+            .await?;
         Ok(authorize)
     }
 
     async fn cancel_flow(&self, flow: &PendingAuthorization, now: u64) -> Result<(), OAuthError> {
-        match self.storage.consume_oauth_state::<OAuthFlowState>(&flow.state, now).await {
-            Ok(_) | Err(StoreError::InvalidFlowStateAge) => {},
+        match self
+            .storage
+            .consume_oauth_state::<OAuthFlowState>(&flow.state, now)
+            .await
+        {
+            Ok(_) | Err(StoreError::InvalidFlowStateAge) => {}
             Err(error) => return Err(error.into()),
         }
         self.protocol.nonces.clear_key(&flow.jkt);
@@ -390,12 +502,22 @@ impl OAuthClient {
     /// Completes a callback and atomically commits its bound account session.
     pub async fn complete_authorization(&self, callback: &Url) -> Result<Session, OAuthError> {
         let state = callback_parameter(callback, "state")?.ok_or(OAuthError::UnknownState)?;
-        if state.len() != 43 || !state.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_')) {
+        if state.len() != 43
+            || !state
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
+        {
             return Err(OAuthError::UnknownState);
         }
-        let flow: OAuthFlowState = self.storage.consume_oauth_state(&state, unix_now()?).await?
+        let flow: OAuthFlowState = self
+            .storage
+            .consume_oauth_state(&state, unix_now()?)
+            .await?
             .ok_or(OAuthError::UnknownState)?;
-        self.pending.lock().await.retain(|_, pending| pending.state != state);
+        self.pending
+            .lock()
+            .await
+            .retain(|_, pending| pending.state != state);
         let result = self.complete_flow(callback, &flow).await;
         if result.is_err() {
             self.protocol.nonces.clear_key(&flow.dpop_jkt);
@@ -404,32 +526,61 @@ impl OAuthClient {
         result
     }
 
-    async fn complete_flow(&self, callback: &Url, flow: &OAuthFlowState) -> Result<Session, OAuthError> {
-        if flow.redirect_uri != self.config.redirect_uri.as_str() || !same_redirect(callback, &self.config.redirect_uri) {
+    async fn complete_flow(
+        &self,
+        callback: &Url,
+        flow: &OAuthFlowState,
+    ) -> Result<Session, OAuthError> {
+        if flow.redirect_uri != self.config.redirect_uri.as_str()
+            || !same_redirect(callback, &self.config.redirect_uri)
+        {
             return Err(OAuthError::RedirectUri);
         }
         if let Some(error) = callback_parameter(callback, "error")? {
-            return Err(if error == "access_denied" { OAuthError::Cancelled } else { OAuthError::AuthorizationRejected });
+            return Err(if error == "access_denied" {
+                OAuthError::Cancelled
+            } else {
+                OAuthError::AuthorizationRejected
+            });
         }
         let issuer = callback_parameter(callback, "iss")?.ok_or(OAuthError::Callback)?;
-        if issuer != flow.expected_issuer || flow.expected_did.is_some() != flow.expected_pds.is_some() {
+        if issuer != flow.expected_issuer
+            || flow.expected_did.is_some() != flow.expected_pds.is_some()
+        {
             return Err(OAuthError::Callback);
         }
-        let code = zeroize::Zeroizing::new(callback_parameter(callback, "code")?.ok_or(OAuthError::Callback)?);
+        let code = zeroize::Zeroizing::new(
+            callback_parameter(callback, "code")?.ok_or(OAuthError::Callback)?,
+        );
         let key = self.bound_key(&flow.dpop_key_id, &flow.dpop_jkt).await?;
-        let server = flow.metadata.clone().validate(&flow.expected_issuer, self.config.authentication.method())?;
+        let server = flow
+            .metadata
+            .clone()
+            .validate(&flow.expected_issuer, self.config.authentication.method())?;
         if let Some(pds) = &flow.expected_pds {
             server.validates_resource(pds)?;
         }
         if server.par_endpoint.origin() == server.token_endpoint.origin() {
-            self.protocol.nonces.put(&flow.dpop_jkt, &server.token_endpoint, &flow.nonce)
+            self.protocol
+                .nonces
+                .put(&flow.dpop_jkt, &server.token_endpoint, &flow.nonce)
                 .map_err(OAuthProtocolError::Dpop)?;
         }
 
-        let response = self.protocol.send_as(&server, AsEndpoint::Token, &[
-            ("grant_type", "authorization_code"), ("code", &code),
-            ("redirect_uri", &flow.redirect_uri), ("code_verifier", &flow.code_verifier),
-        ], &*key).await?;
+        let response = self
+            .protocol
+            .send_as(
+                &server,
+                AsEndpoint::Token,
+                &[
+                    ("grant_type", "authorization_code"),
+                    ("code", &code),
+                    ("redirect_uri", &flow.redirect_uri),
+                    ("code_verifier", &flow.code_verifier),
+                ],
+                &*key,
+            )
+            .await?;
         require_success(&response)?;
         let result = self.verify_and_save(flow, &server, &response).await;
         if result.is_err() {
@@ -447,13 +598,25 @@ impl OAuthClient {
         required_nonce(response.headers())?;
         let tokens = TokenResponse::decode(response.body())?;
         let did = tokens.did()?;
-        if flow.expected_did.as_ref().is_some_and(|expected| expected != &did) {
+        if flow
+            .expected_did
+            .as_ref()
+            .is_some_and(|expected| expected != &did)
+        {
             return Err(OAuthError::IdentityChanged);
         }
-        let identity = self.resolver.resolve_identity(&AtIdentifier::Did(did.clone()), true).await
+        let identity = self
+            .resolver
+            .resolve_identity(&AtIdentifier::Did(did.clone()), true)
+            .await
             .map_err(|_| OAuthError::Identity)?;
         let pds = origin(&identity.pds, false).ok_or(OAuthError::Identity)?;
-        if identity.did != did || flow.expected_pds.as_ref().is_some_and(|expected| expected != &pds) {
+        if identity.did != did
+            || flow
+                .expected_pds
+                .as_ref()
+                .is_some_and(|expected| expected != &pds)
+        {
             return Err(OAuthError::IdentityChanged);
         }
         let verified = self.protocol.discover_pds(&identity.pds).await?;
@@ -490,11 +653,19 @@ impl OAuthClient {
     }
 
     pub(super) fn account_lock(&self, did: &Did) -> Arc<AsyncMutex<RefreshState>> {
-        self.accounts.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
-            .entry(did.clone()).or_default().clone()
+        self.accounts
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .entry(did.clone())
+            .or_default()
+            .clone()
     }
 
-    pub(super) async fn bound_key(&self, id: &str, jkt: &str) -> Result<Arc<dyn DpopSigner>, OAuthError> {
+    pub(super) async fn bound_key(
+        &self,
+        id: &str,
+        jkt: &str,
+    ) -> Result<Arc<dyn DpopSigner>, OAuthError> {
         let key = self.keys.get(id).await?.ok_or(OAuthError::KeyBinding)?;
         if key.public_jwk().thumbprint()? != jkt {
             return Err(OAuthError::KeyBinding);
@@ -511,7 +682,9 @@ impl OAuthClient {
             return Err(OAuthError::Identity);
         }
         let metadata = &account.authorization_server;
-        let server = metadata.clone().validate(&metadata.issuer, self.config.authentication.method())?;
+        let server = metadata
+            .clone()
+            .validate(&metadata.issuer, self.config.authentication.method())?;
         if is_loopback(&require_canonical_origin(server.issuer())?) && !is_loopback(&pds) {
             return Err(OAuthError::Identity);
         }
@@ -519,7 +692,12 @@ impl OAuthClient {
         Ok(server)
     }
 
-    pub(super) async fn revoke_returned(&self, server: &ValidatedAuthorizationServer, key: &dyn DpopSigner, body: &[u8]) {
+    pub(super) async fn revoke_returned(
+        &self,
+        server: &ValidatedAuthorizationServer,
+        key: &dyn DpopSigner,
+        body: &[u8],
+    ) {
         #[derive(Deserialize)]
         struct Revocable {
             #[serde(default)]
@@ -536,18 +714,31 @@ impl OAuthClient {
         }
 
         if let Ok(tokens) = serde_json::from_slice::<Revocable>(body)
-            && let Some(token) = tokens.refresh_token.as_deref().filter(|token| !token.is_empty())
-                .or(tokens.access_token.as_deref().filter(|token| !token.is_empty()))
+            && let Some(token) = tokens
+                .refresh_token
+                .as_deref()
+                .filter(|token| !token.is_empty())
+                .or(tokens
+                    .access_token
+                    .as_deref()
+                    .filter(|token| !token.is_empty()))
         {
             let _ = self.revoke(server, key, token).await;
         }
     }
 
-    pub(super) async fn revoke(&self, server: &ValidatedAuthorizationServer, key: &dyn DpopSigner, token: &str) -> bool {
+    pub(super) async fn revoke(
+        &self,
+        server: &ValidatedAuthorizationServer,
+        key: &dyn DpopSigner,
+        token: &str,
+    ) -> bool {
         if server.revocation_endpoint.is_none() {
             return false;
         }
-        self.protocol.send_as(server, AsEndpoint::Revoke, &[("token", token)], key).await
+        self.protocol
+            .send_as(server, AsEndpoint::Revoke, &[("token", token)], key)
+            .await
             .is_ok_and(|response| response.status() == StatusCode::OK)
     }
 }
@@ -556,8 +747,10 @@ pub(super) fn require_success(response: &Response<Bytes>) -> Result<(), OAuthErr
     if response.status().is_success() {
         return Ok(());
     }
-    if matches!(response.status(), StatusCode::BAD_REQUEST | StatusCode::UNAUTHORIZED)
-        && oauth_error_code(response.body()) == Some("invalid_grant")
+    if matches!(
+        response.status(),
+        StatusCode::BAD_REQUEST | StatusCode::UNAUTHORIZED
+    ) && oauth_error_code(response.body()) == Some("invalid_grant")
     {
         return Err(OAuthError::InvalidGrant);
     }
@@ -565,7 +758,10 @@ pub(super) fn require_success(response: &Response<Bytes>) -> Result<(), OAuthErr
 }
 
 fn required_nonce(headers: &http::HeaderMap) -> Result<&str, OAuthError> {
-    nonce_header(headers).ok().flatten().ok_or(OAuthError::MissingNonce)
+    nonce_header(headers)
+        .ok()
+        .flatten()
+        .ok_or(OAuthError::MissingNonce)
 }
 
 fn callback_parameter(url: &Url, name: &str) -> Result<Option<String>, OAuthError> {
@@ -578,7 +774,10 @@ fn callback_parameter(url: &Url, name: &str) -> Result<Option<String>, OAuthErro
 }
 
 fn is_callback_parameter(name: &str) -> bool {
-    matches!(name, "state" | "iss" | "code" | "error" | "error_description" | "error_uri")
+    matches!(
+        name,
+        "state" | "iss" | "code" | "error" | "error_description" | "error_uri"
+    )
 }
 
 fn same_redirect(callback: &Url, expected: &Url) -> bool {
@@ -590,7 +789,8 @@ fn same_redirect(callback: &Url, expected: &Url) -> bool {
         && callback.password().is_none()
         && callback.fragment().is_none()
         && expected.query_pairs().all(|(key, value)| {
-            callback_parameter(callback, &key).is_ok_and(|found| found.as_deref() == Some(value.as_ref()))
+            callback_parameter(callback, &key)
+                .is_ok_and(|found| found.as_deref() == Some(value.as_ref()))
         })
 }
 
@@ -619,7 +819,8 @@ impl TokenResponse {
         now: u64,
         old_refresh: Option<&str>,
     ) -> Result<Session, OAuthError> {
-        if !self.token_type.eq_ignore_ascii_case("dpop") || !valid_access_token(&self.access_token)
+        if !self.token_type.eq_ignore_ascii_case("dpop")
+            || !valid_access_token(&self.access_token)
             || self.refresh_token.as_ref().is_some_and(String::is_empty)
         {
             return Err(OAuthError::InvalidResponse);
@@ -632,8 +833,16 @@ impl TokenResponse {
         if expires_in == 0 || now.checked_add(expires_in).is_none() {
             return Err(OAuthError::InvalidResponse);
         }
-        Ok(Session::new(did, self.access_token.clone(),
-            self.refresh_token.clone().or_else(|| old_refresh.map(str::to_owned)), now, expires_in, &scope))
+        Ok(Session::new(
+            did,
+            self.access_token.clone(),
+            self.refresh_token
+                .clone()
+                .or_else(|| old_refresh.map(str::to_owned)),
+            now,
+            expires_in,
+            &scope,
+        ))
     }
 }
 
@@ -646,6 +855,8 @@ impl Drop for TokenResponse {
 
 pub(super) fn valid_access_token(token: &str) -> bool {
     let base = token.trim_end_matches('=');
-    !base.is_empty() && base.bytes().all(|byte|
-        byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~' | b'+' | b'/'))
+    !base.is_empty()
+        && base.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~' | b'+' | b'/')
+        })
 }

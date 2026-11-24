@@ -37,7 +37,14 @@ impl Session {
         expires_in: u64,
         scope: &ScopeSet,
     ) -> Self {
-        Self { did, access_token, refresh_token, created_at, expires_in, scope: scope.scope_string() }
+        Self {
+            did,
+            access_token,
+            refresh_token,
+            created_at,
+            expires_in,
+            scope: scope.scope_string(),
+        }
     }
 
     pub fn access_token(&self) -> &str {
@@ -58,7 +65,10 @@ impl Session {
 
     pub fn needs_refresh(&self, now: u64) -> bool {
         let expiry = self.expires_at();
-        let margin = self.refresh_token.as_ref().map_or(0, |_| (self.expires_in / 5).min(60));
+        let margin = self
+            .refresh_token
+            .as_ref()
+            .map_or(0, |_| (self.expires_in / 5).min(60));
         now >= expiry.saturating_sub(margin)
     }
 }

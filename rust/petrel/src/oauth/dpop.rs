@@ -6,11 +6,11 @@ use http::{HeaderMap, Method, StatusCode, header::WWW_AUTHENTICATE};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::crypto::{
-    CryptoError, DpopSigner, Jwk, base64url, finish_es256_jws, jws_signing_input,
-    random_bytes, sha256,
-};
 use super::metadata::origin;
+use crate::crypto::{
+    CryptoError, DpopSigner, Jwk, base64url, finish_es256_jws, jws_signing_input, random_bytes,
+    sha256,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum DpopError {
@@ -27,7 +27,14 @@ pub enum DpopError {
 /// Canonical origin and path for DPoP's htu claim.
 pub fn dpop_target(url: &Url) -> Result<String, DpopError> {
     let origin = origin(url, true).ok_or(DpopError::Target)?;
-    Ok(format!("{origin}{}", if url.path().is_empty() { "/" } else { url.path() }))
+    Ok(format!(
+        "{origin}{}",
+        if url.path().is_empty() {
+            "/"
+        } else {
+            url.path()
+        }
+    ))
 }
 
 /// Signs one proof. Supply an access token only for a protected resource request.
@@ -63,7 +70,11 @@ pub async fn dpop_proof(
         return Err(DpopError::Nonce);
     }
     let input = jws_signing_input(
-        &Header { typ: "dpop+jwt", alg: "ES256", jwk: &Jwk::try_from(&signer.public_jwk())? },
+        &Header {
+            typ: "dpop+jwt",
+            alg: "ES256",
+            jwk: &Jwk::try_from(&signer.public_jwk())?,
+        },
         &Claims {
             jti: base64url(&random_bytes::<24>()?),
             htm: method.as_str(),
@@ -79,8 +90,11 @@ pub async fn dpop_proof(
 }
 
 fn valid_nonce(nonce: &str) -> bool {
-    !nonce.is_empty() && nonce.len() <= 8 * 1024 && nonce.bytes()
-        .all(|byte| matches!(byte, 0x21 | 0x23..=0x5B | 0x5D..=0x7E))
+    !nonce.is_empty()
+        && nonce.len() <= 8 * 1024
+        && nonce
+            .bytes()
+            .all(|byte| matches!(byte, 0x21 | 0x23..=0x5B | 0x5D..=0x7E))
 }
 
 /// A map scoped to both the sender key and the server origin.
@@ -98,8 +112,12 @@ impl std::fmt::Debug for DpopNonces {
 impl DpopNonces {
     pub fn get(&self, jkt: &str, url: &Url) -> Option<String> {
         let origin = origin(url, false)?;
-        self.by_key.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
-            .get(jkt)?.get(&origin).cloned()
+        self.by_key
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(jkt)?
+            .get(&origin)
+            .cloned()
     }
 
     pub fn put(&self, jkt: &str, url: &Url, nonce: &str) -> Result<(), DpopError> {
@@ -107,13 +125,19 @@ impl DpopNonces {
         if !valid_nonce(nonce) {
             return Err(DpopError::Nonce);
         }
-        self.by_key.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
-            .entry(jkt.to_owned()).or_default().insert(origin, nonce.to_owned());
+        self.by_key
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .entry(jkt.to_owned())
+            .or_default()
+            .insert(origin, nonce.to_owned());
         Ok(())
     }
 
     pub fn clear_key(&self, jkt: &str) {
-        self.by_key.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.by_key
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .remove(jkt);
     }
 }
@@ -136,15 +160,23 @@ pub(super) fn oauth_error_code(body: &[u8]) -> Option<&str> {
     struct ErrorBody<'a> {
         error: &'a str,
     }
-    serde_json::from_slice::<ErrorBody<'_>>(body).ok().map(|body| body.error)
+    serde_json::from_slice::<ErrorBody<'_>>(body)
+        .ok()
+        .map(|body| body.error)
 }
 
 pub(super) fn use_dpop_nonce<B: AsRef<[u8]>>(response: &http::Response<B>) -> bool {
-    if !matches!(response.status(), StatusCode::BAD_REQUEST | StatusCode::UNAUTHORIZED) {
+    if !matches!(
+        response.status(),
+        StatusCode::BAD_REQUEST | StatusCode::UNAUTHORIZED
+    ) {
         return false;
     }
     oauth_error_code(response.body().as_ref()) == Some("use_dpop_nonce")
-        || response.headers().get_all(WWW_AUTHENTICATE).iter()
+        || response
+            .headers()
+            .get_all(WWW_AUTHENTICATE)
+            .iter()
             .filter_map(|header| header.to_str().ok())
             .any(www_authenticate_nonce)
 }
@@ -173,7 +205,8 @@ fn www_authenticate_nonce(input: &str) -> bool {
 
 fn is_nonce_parameter(input: &str) -> bool {
     let input = input.trim();
-    let parameter = input.split_once([' ', '\t'])
+    let parameter = input
+        .split_once([' ', '\t'])
         .filter(|(scheme, _)| scheme.eq_ignore_ascii_case("DPoP"))
         .map_or(input, |(_, value)| value);
     parameter.split_once('=').is_some_and(|(key, value)| {
@@ -185,18 +218,23 @@ fn is_nonce_parameter(input: &str) -> bool {
 mod tests {
     use serde_json::Value;
 
-    use crate::crypto::{SoftwareDpopSigner, split_compact_jws};
     use super::*;
+    use crate::crypto::{SoftwareDpopSigner, split_compact_jws};
 
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
     #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
     async fn proofs_bind_target_method_hash_nonce_and_fresh_id() {
         let signer = SoftwareDpopSigner::generate().unwrap();
         let method = Method::POST;
-        let target = Url::parse("https://EXAMPLE.test:443/oauth/token?secret=ignored#ignored").unwrap();
+        let target =
+            Url::parse("https://EXAMPLE.test:443/oauth/token?secret=ignored#ignored").unwrap();
         let token = Some("fixture-token");
-        let old = dpop_proof(&signer, &method, &target, 10, token, Some("nonce1")).await.unwrap();
-        let new = dpop_proof(&signer, &method, &target, 11, token, Some("nonce2")).await.unwrap();
+        let old = dpop_proof(&signer, &method, &target, 10, token, Some("nonce1"))
+            .await
+            .unwrap();
+        let new = dpop_proof(&signer, &method, &target, 11, token, Some("nonce2"))
+            .await
+            .unwrap();
         let old = split_compact_jws(&old).unwrap();
         let new = split_compact_jws(&new).unwrap();
         let header: Value = serde_json::from_slice(&old.header).unwrap();
@@ -223,7 +261,10 @@ mod tests {
         let another_port = Url::parse("https://issuer.example:8000/path1").unwrap();
         nonces.put("key-a", &first, "nonce-a").unwrap();
         nonces.put("key-b", &first, "nonce-b").unwrap();
-        assert_eq!(nonces.get("key-a", &same_origin).as_deref(), Some("nonce-a"));
+        assert_eq!(
+            nonces.get("key-a", &same_origin).as_deref(),
+            Some("nonce-a")
+        );
         assert_eq!(nonces.get("key-a", &another_port), None);
         nonces.clear_key("key-a");
         assert_eq!(nonces.get("key-a", &first), None);
@@ -233,13 +274,25 @@ mod tests {
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
     #[cfg_attr(not(target_arch = "wasm32"), test)]
     fn nonce_challenge_requires_status_and_exact_code() {
-        let challenge = http::Response::builder().status(401)
-            .header(WWW_AUTHENTICATE, "DPoP error=\"use_dpop_nonce\", error_description=\"try again, now\"")
-            .header("DPoP-Nonce", "fresh").body(b"".as_slice()).unwrap();
+        let challenge = http::Response::builder()
+            .status(401)
+            .header(
+                WWW_AUTHENTICATE,
+                "DPoP error=\"use_dpop_nonce\", error_description=\"try again, now\"",
+            )
+            .header("DPoP-Nonce", "fresh")
+            .body(b"".as_slice())
+            .unwrap();
         assert!(use_dpop_nonce(&challenge));
         assert_eq!(nonce_header(challenge.headers()).unwrap(), Some("fresh"));
-        assert!(!www_authenticate_nonce("DPoP error_description=\"error=\\\"use_dpop_nonce\\\"\""));
-        assert!(!www_authenticate_nonce("DPoP error=\"use_dpop_nonce_extra\""));
-        assert!(!use_dpop_nonce(&http::Response::new(br#"{"error":"use_dpop_nonce"}"#.as_slice())));
+        assert!(!www_authenticate_nonce(
+            "DPoP error_description=\"error=\\\"use_dpop_nonce\\\"\""
+        ));
+        assert!(!www_authenticate_nonce(
+            "DPoP error=\"use_dpop_nonce_extra\""
+        ));
+        assert!(!use_dpop_nonce(&http::Response::new(
+            br#"{"error":"use_dpop_nonce"}"#.as_slice()
+        )));
     }
 }

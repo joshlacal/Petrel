@@ -9,10 +9,6 @@ use url::Url;
 use web_time::{SystemTime, UNIX_EPOCH};
 use zeroize::Zeroizing;
 
-use crate::{
-    crypto::{CryptoError, DpopSigner, base64url, finish_es256_jws, jws_signing_input, random_bytes},
-    net::{SendOptions, SharedTransport, TransportError},
-};
 use super::{
     ClientAuth,
     dpop::{DpopError, DpopNonces, dpop_proof, nonce_header, oauth_error_code, use_dpop_nonce},
@@ -21,6 +17,12 @@ use super::{
         ProtectedResourceMetadata, ValidatedAuthorizationServer, endpoint_url, is_loopback, origin,
         require_canonical_origin,
     },
+};
+use crate::{
+    crypto::{
+        CryptoError, DpopSigner, base64url, finish_es256_jws, jws_signing_input, random_bytes,
+    },
+    net::{SendOptions, SharedTransport, TransportError},
 };
 
 const ASSERTION_TYPE: &str = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
@@ -31,7 +33,10 @@ pub enum AssertionBackendError {
     #[error("the client assertion backend URL is invalid")]
     InvalidUrl,
     #[error("client assertion backend returned HTTP {status} ({code:?})")]
-    Rejected { status: u16, code: Option<AssertionBackendErrorCode> },
+    Rejected {
+        status: u16,
+        code: Option<AssertionBackendErrorCode>,
+    },
     #[error("client assertion backend did not return a fresh DPoP nonce")]
     MissingNonce,
     #[error("client assertion backend returned another client ID")]
@@ -119,9 +124,12 @@ impl OAuthProtocol {
         &self,
         pds: &Url,
     ) -> Result<ValidatedAuthorizationServer, MetadataError> {
-        let origin = origin(pds, false).filter(|_| self.permits(pds))
+        let origin = origin(pds, false)
+            .filter(|_| self.permits(pds))
             .ok_or(MetadataError::InvalidOrigin)?;
-        let prm: ProtectedResourceMetadata = self.fetch(MetadataDocument::ProtectedResource, &origin).await?;
+        let prm: ProtectedResourceMetadata = self
+            .fetch(MetadataDocument::ProtectedResource, &origin)
+            .await?;
         let issuer = prm.validate(&origin)?;
         if is_loopback(&require_canonical_origin(issuer)?) && !is_loopback(pds) {
             return Err(MetadataError::InvalidOrigin);
@@ -140,24 +148,41 @@ impl OAuthProtocol {
             Ok(metadata) => return Ok(metadata),
             Err(error) => error,
         };
-        let issuer = origin(server, false).filter(|_| self.permits(server))
+        let issuer = origin(server, false)
+            .filter(|_| self.permits(server))
             .ok_or(MetadataError::InvalidOrigin)?;
         match self.discover_issuer(&issuer).await {
             Ok(metadata) => Ok(metadata),
-            Err(error) if matches!(resource_error, MetadataError::UnexpectedStatus {
-                document: MetadataDocument::ProtectedResource,
-                status: 404,
-            }) => Err(error),
+            Err(error)
+                if matches!(
+                    resource_error,
+                    MetadataError::UnexpectedStatus {
+                        document: MetadataDocument::ProtectedResource,
+                        status: 404,
+                    }
+                ) =>
+            {
+                Err(error)
+            }
             Err(_) => Err(resource_error),
         }
     }
 
-    async fn discover_issuer(&self, issuer: &str) -> Result<ValidatedAuthorizationServer, MetadataError> {
-        let metadata: AuthorizationServerMetadata = self.fetch(MetadataDocument::AuthorizationServer, issuer).await?;
+    async fn discover_issuer(
+        &self,
+        issuer: &str,
+    ) -> Result<ValidatedAuthorizationServer, MetadataError> {
+        let metadata: AuthorizationServerMetadata = self
+            .fetch(MetadataDocument::AuthorizationServer, issuer)
+            .await?;
         metadata.validate(issuer, self.authentication.method())
     }
 
-    async fn fetch<T: DeserializeOwned>(&self, document: MetadataDocument, origin: &str) -> Result<T, MetadataError> {
+    async fn fetch<T: DeserializeOwned>(
+        &self,
+        document: MetadataDocument,
+        origin: &str,
+    ) -> Result<T, MetadataError> {
         let origin_url = require_canonical_origin(origin)?;
         if !self.permits(&origin_url) {
             return Err(MetadataError::InvalidOrigin);
@@ -167,8 +192,10 @@ impl OAuthProtocol {
         let response = {
             let mut attempt = 0;
             loop {
-                let request = Request::get(&url).header(header::ACCEPT, "application/json")
-                    .body(Bytes::new()).map_err(|_| MetadataError::InvalidOrigin)?;
+                let request = Request::get(&url)
+                    .header(header::ACCEPT, "application/json")
+                    .body(Bytes::new())
+                    .map_err(|_| MetadataError::InvalidOrigin)?;
                 match self.transport.send_dyn(request, &options).await {
                     Ok(response) => break response,
                     Err(TransportError::Timeout | TransportError::Connect(_)) if attempt < 2 => {
@@ -180,12 +207,16 @@ impl OAuthProtocol {
             }
         };
         if response.status() != StatusCode::OK {
-            return Err(MetadataError::UnexpectedStatus { document, status: response.status().as_u16() });
+            return Err(MetadataError::UnexpectedStatus {
+                document,
+                status: response.status().as_u16(),
+            });
         }
         if !json_content_type(&response) {
             return Err(MetadataError::ContentType(document));
         }
-        serde_json::from_slice(response.body()).map_err(|_| MetadataError::MalformedDocument(document))
+        serde_json::from_slice(response.body())
+            .map_err(|_| MetadataError::MalformedDocument(document))
     }
 
     /// Sends a signed form to a validated endpoint. This is the only AS sender.
@@ -199,10 +230,21 @@ impl OAuthProtocol {
         let (url, timeout) = match endpoint {
             AsEndpoint::Par => (&metadata.par_endpoint, 30),
             AsEndpoint::Token => (&metadata.token_endpoint, 30),
-            AsEndpoint::Revoke => (metadata.revocation_endpoint.as_ref().ok_or(OAuthProtocolError::InvalidRequest)?, 10),
+            AsEndpoint::Revoke => (
+                metadata
+                    .revocation_endpoint
+                    .as_ref()
+                    .ok_or(OAuthProtocolError::InvalidRequest)?,
+                10,
+            ),
         };
-        if !self.permits(url) || parameters.iter().any(|(key, _)|
-            matches!(*key, "client_id" | "client_assertion_type" | "client_assertion"))
+        if !self.permits(url)
+            || parameters.iter().any(|(key, _)| {
+                matches!(
+                    *key,
+                    "client_id" | "client_assertion_type" | "client_assertion"
+                )
+            })
         {
             return Err(OAuthProtocolError::InvalidRequest);
         }
@@ -212,10 +254,18 @@ impl OAuthProtocol {
         for attempt in 0..2 {
             // The backend and private signer are called again for the retry.
             let assertion = self.client_assertion(metadata.issuer(), key).await?;
-            let body = as_form(parameters, &self.client_id, assertion.as_deref().map(String::as_str));
-            let proof = dpop_proof(key, &Method::POST, url, unix_now()?, None, nonce.as_deref()).await?;
+            let body = as_form(
+                parameters,
+                &self.client_id,
+                assertion.as_deref().map(String::as_str),
+            );
+            let proof =
+                dpop_proof(key, &Method::POST, url, unix_now()?, None, nonce.as_deref()).await?;
             let request = form_request(url, body, &proof)?;
-            let response = self.transport.send_dyn(request, &options).await
+            let response = self
+                .transport
+                .send_dyn(request, &options)
+                .await
                 .map_err(OAuthProtocolError::Transport)?;
             if response.status().is_redirection() {
                 return Err(OAuthProtocolError::Redirect);
@@ -258,7 +308,11 @@ impl OAuthProtocol {
                 }
                 let now = unix_now()?;
                 let input = jws_signing_input(
-                    &Header { alg: "ES256", typ: "JWT", kid: signer.key_id() },
+                    &Header {
+                        alg: "ES256",
+                        typ: "JWT",
+                        kid: signer.key_id(),
+                    },
                     &Claims {
                         iss: &self.client_id,
                         sub: &self.client_id,
@@ -271,11 +325,16 @@ impl OAuthProtocol {
                 let bytes = signer.sign(input.as_bytes()).await?;
                 Ok(Some(Zeroizing::new(finish_es256_jws(input, &bytes)?)))
             }
-            ClientAuth::Cab { backend_url, client_id } => {
+            ClientAuth::Cab {
+                backend_url,
+                client_id,
+            } => {
                 if client_id != &self.client_id {
                     return Err(AssertionBackendError::ClientIdMismatch.into());
                 }
-                Ok(Some(Zeroizing::new(self.cab_assertion(backend_url, issuer, key).await?)))
+                Ok(Some(Zeroizing::new(
+                    self.cab_assertion(backend_url, issuer, key).await?,
+                )))
             }
         }
     }
@@ -292,19 +351,33 @@ impl OAuthProtocol {
             client_assertion: String,
         }
 
-        let mut url = endpoint_url(backend.as_str()).filter(|url| self.permits(url) && url.query().is_none())
+        let mut url = endpoint_url(backend.as_str())
+            .filter(|url| self.permits(url) && url.query().is_none())
             .ok_or(AssertionBackendError::InvalidUrl)?;
-        url.path_segments_mut().map_err(|()| AssertionBackendError::InvalidUrl)?
-            .pop_if_empty().extend(["oauth", "client-assertion"]);
+        url.path_segments_mut()
+            .map_err(|()| AssertionBackendError::InvalidUrl)?
+            .pop_if_empty()
+            .extend(["oauth", "client-assertion"]);
         let options = self.options(30, false);
 
         // CAB nonces are specific to this challenge, not reusable AS/PDS nonces.
         let mut nonce = None;
         for attempt in 0..2 {
-            let proof = dpop_proof(key, &Method::POST, &url, unix_now()?, None, nonce.as_deref()).await?;
+            let proof = dpop_proof(
+                key,
+                &Method::POST,
+                &url,
+                unix_now()?,
+                None,
+                nonce.as_deref(),
+            )
+            .await?;
             let body = encode_form(&[("aud", issuer)]);
             let request = form_request(&url, body, &proof)?;
-            let response = self.transport.send_dyn(request, &options).await
+            let response = self
+                .transport
+                .send_dyn(request, &options)
+                .await
                 .map_err(OAuthProtocolError::Transport)?;
             if response.status().is_redirection() {
                 return Err(OAuthProtocolError::Redirect);
@@ -328,20 +401,32 @@ impl OAuthProtocol {
                 Some("rate_limited") => Some(AssertionBackendErrorCode::RateLimited),
                 _ => None,
             };
-            if attempt == 0 && response.status() == StatusCode::BAD_REQUEST
+            if attempt == 0
+                && response.status() == StatusCode::BAD_REQUEST
                 && code == Some(AssertionBackendErrorCode::UseDpopNonce)
             {
-                nonce = Some(nonce_header(response.headers())?.ok_or(AssertionBackendError::MissingNonce)?.to_owned());
+                nonce = Some(
+                    nonce_header(response.headers())?
+                        .ok_or(AssertionBackendError::MissingNonce)?
+                        .to_owned(),
+                );
                 continue;
             }
-            return Err(AssertionBackendError::Rejected { status: response.status().as_u16(), code }.into());
+            return Err(AssertionBackendError::Rejected {
+                status: response.status().as_u16(),
+                code,
+            }
+            .into());
         }
         unreachable!("the second attempt always returns its response")
     }
 }
 
 fn json_content_type(response: &Response<Bytes>) -> bool {
-    response.headers().get(header::CONTENT_TYPE).and_then(|value| value.to_str().ok())
+    response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
         .and_then(|value| value.split(';').next())
         .is_some_and(|value| value.trim().eq_ignore_ascii_case("application/json"))
 }
@@ -363,7 +448,11 @@ fn encode_form(parameters: &[(&str, &str)]) -> String {
         .finish()
 }
 
-fn form_request(url: &Url, body: String, proof: &str) -> Result<Request<Bytes>, OAuthProtocolError> {
+fn form_request(
+    url: &Url,
+    body: String,
+    proof: &str,
+) -> Result<Request<Bytes>, OAuthProtocolError> {
     let mut dpop = HeaderValue::from_str(proof).map_err(|_| OAuthProtocolError::InvalidRequest)?;
     dpop.set_sensitive(true);
     Request::post(url.as_str())

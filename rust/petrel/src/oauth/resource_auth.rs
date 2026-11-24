@@ -27,7 +27,10 @@ pub struct SessionAuth {
 
 impl OAuthClient {
     pub fn session_auth(self: &Arc<Self>, did: Did) -> SessionAuth {
-        SessionAuth { client: Arc::clone(self), did }
+        SessionAuth {
+            client: Arc::clone(self),
+            did,
+        }
     }
 }
 
@@ -37,8 +40,14 @@ impl AuthProvider for SessionAuth {
         mut request: Request<Bytes>,
     ) -> BoxFuture<'_, Result<(Request<Bytes>, AuthCtx), AuthError>> {
         Box::pin(async move {
-            let uri = Url::parse(&request.uri().to_string()).map_err(|_| AuthError::Other("invalid request URI".into()))?;
-            let Some(record) = self.client.session_record(&self.did).await.map_err(auth_error)? else {
+            let uri = Url::parse(&request.uri().to_string())
+                .map_err(|_| AuthError::Other("invalid request URI".into()))?;
+            let Some(record) = self
+                .client
+                .session_record(&self.did)
+                .await
+                .map_err(auth_error)?
+            else {
                 return Err(AuthError::NoSession);
             };
             if origin(&uri, false).as_deref() != Some(&record.account.pds)
@@ -52,27 +61,53 @@ impl AuthProvider for SessionAuth {
             let token = record.session.access_token();
             let now = unix_now().map_err(|error| auth_error(error.into()))?;
             if now >= record.session.expires_at() || !valid_access_token(token) {
-                return Err(AuthError::SessionExpired("access token expired or malformed".into()));
+                return Err(AuthError::SessionExpired(
+                    "access token expired or malformed".into(),
+                ));
             }
-            let key = self.client.bound_key(&record.dpop_key_id, &record.dpop_jkt).await.map_err(auth_error)?;
+            let key = self
+                .client
+                .bound_key(&record.dpop_key_id, &record.dpop_jkt)
+                .await
+                .map_err(auth_error)?;
             let nonce = self.client.protocol.nonces.get(&record.dpop_jkt, &uri);
-            let proof = dpop_proof(&*key, request.method(), &uri, now, Some(token), nonce.as_deref()).await
-                .map_err(|error| auth_error(OAuthProtocolError::Dpop(error).into()))?;
+            let proof = dpop_proof(
+                &*key,
+                request.method(),
+                &uri,
+                now,
+                Some(token),
+                nonce.as_deref(),
+            )
+            .await
+            .map_err(|error| auth_error(OAuthProtocolError::Dpop(error).into()))?;
             let mut authorization = HeaderValue::from_str(&format!("DPoP {token}"))
                 .map_err(|_| AuthError::Other("invalid access token header".into()))?;
             let mut dpop = HeaderValue::from_str(&proof)
                 .map_err(|_| AuthError::Other("invalid DPoP header".into()))?;
             authorization.set_sensitive(true);
             dpop.set_sensitive(true);
-            request.headers_mut().insert(header::AUTHORIZATION, authorization);
+            request
+                .headers_mut()
+                .insert(header::AUTHORIZATION, authorization);
             request.headers_mut().insert("dpop", dpop);
-            Ok((request, AuthCtx { did: Some(self.did.clone()), jkt: Some(record.dpop_jkt) }))
+            Ok((
+                request,
+                AuthCtx {
+                    did: Some(self.did.clone()),
+                    jkt: Some(record.dpop_jkt),
+                },
+            ))
         })
     }
 
     fn refresh_if_needed(&self) -> BoxFuture<'_, Result<(), AuthError>> {
         Box::pin(async move {
-            self.client.refresh(&self.did, false).await.map(|_| ()).map_err(auth_error)
+            self.client
+                .refresh(&self.did, false)
+                .await
+                .map(|_| ())
+                .map_err(auth_error)
         })
     }
 
@@ -88,25 +123,46 @@ impl AuthProvider for SessionAuth {
             if !refreshable || ctx.did.as_ref() != Some(&self.did) {
                 return Ok(UnauthorizedAction::GiveUp);
             }
-            if matches!(code,
-                Some("AccountTakedown" | "AccountSuspended" | "AccountDeactivated" | "AccountDeleted"
-                    | "Suspended" | "Deactivated" | "Deleted")
+            if matches!(
+                code,
+                Some(
+                    "AccountTakedown"
+                        | "AccountSuspended"
+                        | "AccountDeactivated"
+                        | "AccountDeleted"
+                        | "Suspended"
+                        | "Deactivated"
+                        | "Deleted"
+                )
             ) {
                 return Ok(UnauthorizedAction::GiveUp);
             }
-            let Some(record) = self.client.session_record(&self.did).await.map_err(auth_error)? else {
+            let Some(record) = self
+                .client
+                .session_record(&self.did)
+                .await
+                .map_err(auth_error)?
+            else {
                 return Ok(UnauthorizedAction::GiveUp);
             };
             if ctx.jkt.as_deref() != Some(&record.dpop_jkt) {
                 return Ok(UnauthorizedAction::GiveUp);
             }
 
-            self.client.refresh_after(&record, true).await.map_err(auth_error)?;
+            self.client
+                .refresh_after(&record, true)
+                .await
+                .map_err(auth_error)?;
             Ok(UnauthorizedAction::Retry)
         })
     }
 
-    fn update_dpop_nonce<'a>(&'a self, origin: &'a str, nonce: &'a str, ctx: &'a AuthCtx) -> BoxFuture<'a, ()> {
+    fn update_dpop_nonce<'a>(
+        &'a self,
+        origin: &'a str,
+        nonce: &'a str,
+        ctx: &'a AuthCtx,
+    ) -> BoxFuture<'a, ()> {
         Box::pin(async move {
             if ctx.did.as_ref() == Some(&self.did)
                 && let Ok(Some(record)) = self.client.session_record(&self.did).await
@@ -114,7 +170,11 @@ impl AuthProvider for SessionAuth {
                 && origin == record.account.pds
                 && let Ok(url) = require_canonical_origin(origin)
             {
-                let _ = self.client.protocol.nonces.put(&record.dpop_jkt, &url, nonce);
+                let _ = self
+                    .client
+                    .protocol
+                    .nonces
+                    .put(&record.dpop_jkt, &url, nonce);
             }
         })
     }
@@ -125,8 +185,10 @@ fn auth_error(error: OAuthError) -> AuthError {
         OAuthError::Store(error) => AuthError::Store(error),
         OAuthError::Protocol(OAuthProtocolError::Transport(error)) => AuthError::Transport(error),
         OAuthError::MissingSession => AuthError::NoSession,
-        OAuthError::InvalidGrant | OAuthError::ExpiredSession | OAuthError::UsedRefreshToken | OAuthError::KeyBinding =>
-            AuthError::SessionExpired(error.to_string()),
+        OAuthError::InvalidGrant
+        | OAuthError::ExpiredSession
+        | OAuthError::UsedRefreshToken
+        | OAuthError::KeyBinding => AuthError::SessionExpired(error.to_string()),
         _ => AuthError::RefreshFailed(error.to_string()),
     }
 }
