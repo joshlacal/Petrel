@@ -479,3 +479,6 @@ pub(super) async fn retry_delay(millis: u32) {
     )))]
     let _ = millis;
 }
+
+#[cfg(test)]
+mod discovery_tests;
