@@ -497,11 +497,7 @@ string_newtype!(
 impl CidString {
     /// Decodes the string when it contains a canonical, AT Protocol blessed CID.
     pub fn cid(&self) -> Option<Cid> {
-        Cid::parse(self.as_str()).ok().filter(|cid| {
-            matches!(cid.codec(), Cid::CODEC_RAW | Cid::CODEC_DAG_CBOR)
-                && cid.hash_code() == Cid::HASH_SHA2_256
-                && cid.digest().len() == 32
-        })
+        Cid::parse_blessed(self.as_str()).ok()
     }
 }
 
