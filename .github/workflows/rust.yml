@@ -48,17 +48,20 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Lint all targets
-        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+        run: cargo clippy --locked --workspace --all-features --all-targets -- -D warnings
       - name: Run unit and integration tests
-        run: cargo test --locked --workspace --exclude petrel-e2e
+        run: cargo test --locked --workspace --all-features --exclude petrel-e2e
       - name: Check the minimum supported Rust version
         run: |
           rustup toolchain install 1.88.0 --profile minimal
-          cargo +1.88.0 check --locked --workspace
+          cargo +1.88.0 check --locked --workspace --all-features
 
   wasm32:
-    name: Browser-target SDK build
+    name: Browser-target SDK build and Node tests
     runs-on: ubuntu-24.04
+    env:
+      NODE_VERSION: v22.23.5
+      NODE_SHA256: cdeb8670a0c81f51b4dc4ac61919f9b1ad917b304bf8221eb939570663d240f8
     defaults:
       run:
         shell: bash
@@ -87,6 +90,29 @@ jobs:
             echo 'Native-only dependencies found in the wasm SDK' >&2
             exit 1
           fi
+      - name: Install checksum-pinned Node.js
+        run: |
+          set -euo pipefail
+          archive="node-${NODE_VERSION}-linux-x64.tar.xz"
+          node_dir=$(mktemp -d "${RUNNER_TEMP}/petrel-node.XXXXXX")
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location --retry 3 \
+            --output "$node_dir/$archive" "https://nodejs.org/dist/${NODE_VERSION}/$archive"
+          printf '%s  %s\n' "$NODE_SHA256" "$node_dir/$archive" | sha256sum --check
+          tar -xJf "$node_dir/$archive" -C "$node_dir"
+          printf '%s\n' "$node_dir/node-${NODE_VERSION}-linux-x64/bin" >> "$GITHUB_PATH"
+      - name: Install the wasm-bindgen runner matching Cargo.lock
+        run: |
+          set -euo pipefail
+          bindgen_version=$(awk '/^name = "wasm-bindgen"$/ { getline; gsub(/"/, "", $3); print $3 }' Cargo.lock)
+          [[ $bindgen_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          cargo install --locked --version "=$bindgen_version" wasm-bindgen-cli
+      - name: Run wasm-bindgen tests in Node.js
+        env:
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER: wasm-bindgen-test-runner
+        run: |
+          test "$(node --version)" = "$NODE_VERSION"
+          cargo test --locked --target wasm32-unknown-unknown --no-default-features --features wasm \
+            -p petrel-core -p petrel-oauth-scopes -p petrel
 
   e2e:
     name: Rust client against the Swift OAuth and CAB servers
