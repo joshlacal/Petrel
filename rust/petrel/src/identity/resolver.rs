@@ -171,6 +171,7 @@ pub struct ResolvedIdentity {
 }
 
 /// Resolve DIDs and verify both sides of a DID-to-handle relationship.
+#[must_use]
 pub struct IdentityResolver<D, C = InMemoryIdentityCache> {
     transport: SharedTransport,
     dns: D,
@@ -274,8 +275,7 @@ impl<D: DnsResolver, C: IdentityCache> IdentityResolver<D, C> {
         };
         Ok(ResolvedIdentity {
             did: did.clone(),
-            handle: handle
-                .unwrap_or_else(|| "handle.invalid".parse().expect("fixed handle sentinel")),
+            handle: handle.unwrap_or_else(invalid_handle),
             verification,
             document,
         })
@@ -311,7 +311,10 @@ impl<D: DnsResolver, C: IdentityCache> IdentityResolver<D, C> {
     }
 
     fn validate_handle(&self, handle: &Handle) -> Result<(), IdentityError> {
-        let dev = handle.normalized().ends_with(".test");
+        let dev = handle
+            .normalized()
+            .rsplit_once('.')
+            .is_some_and(|(_, tld)| tld == "test");
         if !handle.is_valid_tld() || (dev && !self.options.allow_development_identifiers) {
             return Err(IdentityError::ReservedHandleTld(handle.clone()));
         }
@@ -325,7 +328,11 @@ impl<D: DnsResolver, C: IdentityCache> IdentityResolver<D, C> {
         } else {
             self.cache.document(did).await
         };
-        if let Some(entry) = fresh(&cached, self.options.cache_policy.fresh_for, (self.clock)()) {
+        if let Some(entry) = fresh(
+            cached.as_ref(),
+            self.options.cache_policy.fresh_for,
+            (self.clock)(),
+        ) {
             return Ok(entry.value.clone());
         }
 
@@ -343,7 +350,7 @@ impl<D: DnsResolver, C: IdentityCache> IdentityResolver<D, C> {
                 if error.definitive() {
                     self.cache.remove_document(did).await;
                 } else if let Some(entry) = fresh(
-                    &cached,
+                    cached.as_ref(),
                     self.options.cache_policy.maximum_age,
                     (self.clock)(),
                 ) {
@@ -360,7 +367,11 @@ impl<D: DnsResolver, C: IdentityCache> IdentityResolver<D, C> {
         } else {
             self.cache.handle(handle).await
         };
-        if let Some(entry) = fresh(&cached, self.options.cache_policy.fresh_for, (self.clock)()) {
+        if let Some(entry) = fresh(
+            cached.as_ref(),
+            self.options.cache_policy.fresh_for,
+            (self.clock)(),
+        ) {
             return Ok(entry.value.clone());
         }
 
@@ -381,7 +392,7 @@ impl<D: DnsResolver, C: IdentityCache> IdentityResolver<D, C> {
                 if error.definitive() {
                     self.cache.remove_handle(handle).await;
                 } else if let Some(entry) = fresh(
-                    &cached,
+                    cached.as_ref(),
                     self.options.cache_policy.maximum_age,
                     (self.clock)(),
                 ) {
@@ -529,19 +540,15 @@ impl<D: DnsResolver, C: IdentityCache> IdentityResolver<D, C> {
             .get(&url, "application/json", 16 * 1024, RedirectPolicy::Never)
             .await?;
 
-        #[derive(Deserialize)]
-        struct Output {
-            did: String,
-        }
-
         match response.status() {
             status if status.is_success() => {
-                let body: Output = serde_json::from_slice(response.body()).map_err(|_| {
-                    IdentityError::HandleLookupFailed {
-                        handle: handle.clone(),
-                        reason: "invalid resolveHandle response".to_owned(),
-                    }
-                })?;
+                let body: ResolveHandleOutput =
+                    serde_json::from_slice(response.body()).map_err(|_| {
+                        IdentityError::HandleLookupFailed {
+                            handle: handle.clone(),
+                            reason: "invalid resolveHandle response".to_owned(),
+                        }
+                    })?;
                 validate_candidate(&body.did, handle).map(Some)
             }
             StatusCode::BAD_REQUEST | StatusCode::NOT_FOUND => Ok(None),
@@ -670,6 +677,15 @@ impl<D: DnsResolver, C: IdentityCache> IdentityResolver<D, C> {
     }
 }
 
+#[derive(Deserialize)]
+struct ResolveHandleOutput {
+    did: String,
+}
+
+fn invalid_handle() -> Handle {
+    "handle.invalid".parse().expect("fixed handle sentinel")
+}
+
 fn strict_did(value: &str) -> Option<Did> {
     let did: Did = value.parse().ok()?;
     if did.method().bytes().all(|byte| byte.is_ascii_lowercase()) && !value.ends_with([':', '%']) {
@@ -687,11 +703,11 @@ fn validate_candidate(value: &str, handle: &Handle) -> Result<Did, IdentityError
 }
 
 fn fresh<T>(
-    cached: &Option<CacheEntry<T>>,
+    cached: Option<&CacheEntry<T>>,
     max_age: Duration,
     now: SystemTime,
 ) -> Option<&CacheEntry<T>> {
-    cached.as_ref().filter(|entry| entry.within(max_age, now))
+    cached.filter(|entry| entry.within(max_age, now))
 }
 
 async fn with_deadline<T>(

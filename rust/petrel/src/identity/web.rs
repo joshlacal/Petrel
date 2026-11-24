@@ -102,7 +102,11 @@ impl DidWebIdentifier {
     }
 
     pub fn is_development_host(&self) -> bool {
-        self.host == "localhost" || self.host.ends_with(".test")
+        self.host == "localhost"
+            || self
+                .host
+                .rsplit_once('.')
+                .is_some_and(|(_, tld)| tld == "test")
     }
 
     pub fn document_url(&self) -> Result<Url, url::ParseError> {

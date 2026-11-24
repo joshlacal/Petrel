@@ -1,6 +1,6 @@
 use std::{
     collections::BTreeMap,
-    future::Future,
+    future::{Future, ready},
     sync::{Mutex, PoisonError},
     time::Duration,
 };
@@ -87,52 +87,70 @@ impl Default for InMemoryIdentityCache {
 }
 
 impl IdentityCache for InMemoryIdentityCache {
-    async fn document(&self, did: &Did) -> Option<CacheEntry<DidDocument>> {
-        self.documents
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .get(did)
-            .cloned()
+    fn document(
+        &self,
+        did: &Did,
+    ) -> impl Future<Output = Option<CacheEntry<DidDocument>>> + MaybeSend {
+        ready(
+            self.documents
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .get(did)
+                .cloned(),
+        )
     }
 
-    async fn handle(&self, handle: &Handle) -> Option<CacheEntry<Did>> {
-        self.handles
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .get(handle.normalized())
-            .cloned()
+    fn handle(&self, handle: &Handle) -> impl Future<Output = Option<CacheEntry<Did>>> + MaybeSend {
+        ready(
+            self.handles
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .get(handle.normalized())
+                .cloned(),
+        )
     }
 
-    async fn put_document(&self, document: CacheEntry<DidDocument>) {
+    fn put_document(
+        &self,
+        document: CacheEntry<DidDocument>,
+    ) -> impl Future<Output = ()> + MaybeSend {
         let mut cache = self
             .documents
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         cache.insert(document.value.id.clone(), document);
         trim(&mut cache, self.capacity);
+        ready(())
     }
 
-    async fn put_handle(&self, handle: Handle, candidate: CacheEntry<Did>) {
+    fn put_handle(
+        &self,
+        handle: Handle,
+        candidate: CacheEntry<Did>,
+    ) -> impl Future<Output = ()> + MaybeSend {
         let mut cache = self.handles.lock().unwrap_or_else(PoisonError::into_inner);
         cache.insert(handle.normalized().to_owned(), candidate);
         trim(&mut cache, self.capacity);
+        ready(())
     }
 
-    async fn remove_document(&self, did: &Did) {
+    fn remove_document(&self, did: &Did) -> impl Future<Output = ()> + MaybeSend {
         self.documents
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .remove(did);
+        ready(())
     }
 
-    async fn remove_handle(&self, handle: &Handle) {
+    fn remove_handle(&self, handle: &Handle) -> impl Future<Output = ()> + MaybeSend {
         self.handles
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .remove(handle.normalized());
+        ready(())
     }
 
-    async fn clear(&self) {
+    fn clear(&self) -> impl Future<Output = ()> + MaybeSend {
         self.documents
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -141,6 +159,7 @@ impl IdentityCache for InMemoryIdentityCache {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .clear();
+        ready(())
     }
 }
 

@@ -136,25 +136,9 @@ impl Sleeper for PlatformSleeper {
     }
 }
 
-fn default_sleeper() -> Option<Arc<dyn Sleeper>> {
-    #[cfg(any(
-        all(not(target_arch = "wasm32"), feature = "native"),
-        all(target_arch = "wasm32", feature = "wasm")
-    ))]
-    {
-        Some(Arc::new(PlatformSleeper))
-    }
-    #[cfg(not(any(
-        all(not(target_arch = "wasm32"), feature = "native"),
-        all(target_arch = "wasm32", feature = "wasm")
-    )))]
-    {
-        None
-    }
-}
-
 /// Send generated (or raw) calls to a Personal Data Server (PDS).
 #[derive(Clone)]
+#[must_use]
 pub struct XrpcClient {
     base_url: Url,
     base_origin: Origin,
@@ -194,7 +178,16 @@ impl XrpcClient {
             base_origin,
             transport,
             auth: None,
-            sleeper: default_sleeper(),
+            #[cfg(any(
+                all(not(target_arch = "wasm32"), feature = "native"),
+                all(target_arch = "wasm32", feature = "wasm")
+            ))]
+            sleeper: Some(Arc::new(PlatformSleeper)),
+            #[cfg(not(any(
+                all(not(target_arch = "wasm32"), feature = "native"),
+                all(target_arch = "wasm32", feature = "wasm")
+            )))]
+            sleeper: None,
             headers,
             service_dids: [
                 (
@@ -292,10 +285,8 @@ impl XrpcClient {
             self.build::<R::Error>(method, R::NSID, pairs, body, R::OUTPUT_ENCODING, options)?;
         let raw = self.execute(call, options).await?;
         let response = require_success::<R::Error>(raw)?;
-        if let Some(expected) = R::OUTPUT_ENCODING {
-            if expected != "*/*" {
-                require_content_type::<R::Error>(&response, expected)?;
-            }
+        if let Some(expected) = R::OUTPUT_ENCODING.filter(|encoding| *encoding != "*/*") {
+            require_content_type::<R::Error>(&response, expected)?;
         }
         let output = R::Output::from_body(response.body()).map_err(|source| Error::Decode {
             endpoint: R::NSID,
@@ -371,23 +362,30 @@ impl XrpcClient {
             .pop_if_empty()
             .extend(["xrpc", nsid]);
 
-        let mut params = params.into_iter().peekable();
-        if params.peek().is_some() {
-            let mut query = url.query_pairs_mut();
-            for (key, value) in params {
-                query.append_pair(key.as_ref(), value.as_ref());
+        let mut query = String::new();
+        for (key, value) in params {
+            if !query.is_empty() {
+                query.push('&');
             }
+            append_query_part(&mut query, key.as_ref());
+            query.push('=');
+            append_query_part(&mut query, value.as_ref());
+        }
+        if !query.is_empty() {
+            url.set_query(Some(&query));
         }
 
         let origin = Origin::from_url(&url)
             .map_err(|error| TransportError::PolicyViolation(error.to_string()))?;
-        let same_origin = self.base_origin == origin;
-        let eligible = same_origin
-            && origin.host().trim_end_matches('.') != "plc.directory"
+        let anonymous = self.base_origin != origin
+            || origin.host().trim_end_matches('.') == "plc.directory"
+            || options.transport.anonymous;
+        let eligible = !anonymous
             && nsid != "com.atproto.server.createSession"
-            && !options.transport.anonymous;
+            && !url.path().starts_with("/oauth/")
+            && !url.path().starts_with("/.well-known/");
 
-        let headers = self.headers(same_origin, nsid, body.as_ref(), accept, options)?;
+        let headers = self.headers(!anonymous, nsid, body.as_ref(), accept, options)?;
         let request = Request::builder()
             .method(method)
             .uri(url.as_str())
@@ -397,9 +395,10 @@ impl XrpcClient {
             request,
             origin,
             eligible,
+            anonymous,
         };
         *call.request.headers_mut() = headers;
-        if !same_origin || options.transport.anonymous {
+        if anonymous {
             retain_anonymous_headers(call.request.headers_mut());
         }
         if !eligible {
@@ -491,6 +490,8 @@ impl XrpcClient {
         let auth = self.auth.as_deref().filter(|_| call.eligible);
         let origin = call.origin.to_string();
         let safe_method = matches!(*call.request.method(), Method::GET | Method::HEAD);
+        let mut exchange_options = options.transport.clone();
+        exchange_options.anonymous = call.anonymous;
         let mut retried_nonce = false;
         let mut retried_auth = false;
 
@@ -507,7 +508,7 @@ impl XrpcClient {
             let response = send_with_redirects(
                 self.transport.as_ref(),
                 request,
-                &options.transport,
+                &exchange_options,
                 redirects,
             )
             .await;
@@ -595,6 +596,7 @@ struct Call {
     request: Request<Bytes>,
     origin: Origin,
     eligible: bool,
+    anonymous: bool,
 }
 
 async fn prepare(
@@ -657,6 +659,19 @@ fn require_content_type<E: fmt::Debug>(
             expected,
             actual: actual.map(str::to_owned),
         })
+    }
+}
+
+fn append_query_part(query: &mut String, part: &str) {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    for byte in part.bytes() {
+        if byte.is_ascii_alphanumeric() || b"-._~!$()*,:;@/?".contains(&byte) {
+            query.push(char::from(byte));
+        } else {
+            query.push('%');
+            query.push(char::from(HEX[usize::from(byte >> 4)]));
+            query.push(char::from(HEX[usize::from(byte & 15)]));
+        }
     }
 }
 

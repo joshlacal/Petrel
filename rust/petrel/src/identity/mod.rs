@@ -21,3 +21,6 @@ pub use resolver::{
     IdentityOptions, IdentityResolver, ResolvedIdentity,
 };
 pub use web::{DidWebError, DidWebIdentifier};
+
+#[cfg(all(test, not(target_arch = "wasm32"), feature = "native"))]
+mod tests;

@@ -39,9 +39,9 @@ pub trait DnsResolver: MaybeSend + MaybeSync {
 
 #[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
 mod native {
-    use hickory_resolver::{TokioResolver, proto::rr::RData};
+    use hickory_resolver::{TokioResolver, config::LookupIpStrategy, proto::rr::RData};
 
-    use super::*;
+    use super::{DnsError, DnsResolver, IpAddr};
 
     /// Native DNS resolver using the operating system's resolver configuration.
     #[derive(Clone)]
@@ -55,7 +55,8 @@ mod native {
 
     impl HickoryResolver {
         pub fn system() -> Result<Self, DnsError> {
-            let builder = TokioResolver::builder_tokio().map_err(lookup_error)?;
+            let mut builder = TokioResolver::builder_tokio().map_err(lookup_error)?;
+            builder.options_mut().ip_strategy = LookupIpStrategy::Ipv4AndIpv6;
             builder.build().map(Self).map_err(lookup_error)
         }
     }
@@ -131,11 +132,14 @@ impl DohResolver {
 
     pub fn cloudflare(transport: SharedTransport) -> Self {
         Self {
-            endpoint: Url::parse("https://cloudflare-dns.com/dns-query")
-                .expect("fixed DNS endpoint"),
+            endpoint: cloudflare_endpoint(),
             transport,
         }
     }
+}
+
+fn cloudflare_endpoint() -> Url {
+    Url::parse("https://cloudflare-dns.com/dns-query").expect("fixed DNS endpoint")
 }
 
 impl DnsResolver for DohResolver {
@@ -162,10 +166,13 @@ impl DnsResolver for DohResolver {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    async fn lookup_ip(&self, _host: &str) -> Result<Vec<IpAddr>, DnsError> {
-        Err(DnsError::Lookup(
+    fn lookup_ip(
+        &self,
+        _host: &str,
+    ) -> impl Future<Output = Result<Vec<IpAddr>, DnsError>> + MaybeSend {
+        std::future::ready(Err(DnsError::Lookup(
             "this resolver only provides TXT records".to_owned(),
-        ))
+        )))
     }
 }
 
@@ -250,7 +257,10 @@ mod tests {
             parse_dns_json(body).unwrap(),
             ["did=did:plc:x", "did=did:plc:y"]
         );
-        assert!(parse_dns_json(br#"{"Status":3}"#).unwrap().is_empty());
+        assert_eq!(
+            parse_dns_json(br#"{"Status":3}"#).unwrap(),
+            Vec::<String>::new()
+        );
         assert!(parse_dns_json(br#"{"Status":2}"#).is_err());
         assert!(parse_dns_json(br#"{"Status":0,"TC":true}"#).is_err());
     }

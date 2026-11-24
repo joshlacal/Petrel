@@ -8,7 +8,6 @@ use http::{
     header::{ACCEPT_ENCODING, CONTENT_ENCODING, CONTENT_LENGTH, HOST},
 };
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
-use url::Url;
 
 use crate::identity::{DnsResolver, HickoryResolver};
 
@@ -16,8 +15,7 @@ use super::{
     HttpTransport, SendOptions, TransportError,
     body::{DecodeError, decode},
     policy::{
-        PolicyError, retain_anonymous_headers, validate_resolved_addresses,
-        validate_url_with_development,
+        PolicyError, retain_anonymous_headers, validate_request_uri, validate_resolved_addresses,
     },
 };
 
@@ -63,9 +61,7 @@ impl HttpTransport for ReqwestTransport {
         options: &SendOptions,
     ) -> Result<Response<Bytes>, TransportError> {
         let (mut parts, body) = request.into_parts();
-        let url = Url::parse(&parts.uri.to_string())
-            .map_err(|error| TransportError::InvalidRequest(error.to_string()))?;
-        let origin = validate_url_with_development(&url, options.allow_loopback)
+        let (url, origin) = validate_request_uri(&parts.uri, options.allow_loopback)
             .map_err(|error| TransportError::PolicyViolation(error.to_string()))?;
         if !matches!(origin.scheme(), "http" | "https") {
             return Err(TransportError::InvalidRequest(
@@ -109,7 +105,9 @@ async fn read_response(
             StatusCode::NO_CONTENT | StatusCode::NOT_MODIFIED
         )
     {
-        let mut result = result.body(Bytes::new()).map_err(invalid_response)?;
+        let mut result = result
+            .body(Bytes::new())
+            .map_err(|error| TransportError::Other(error.to_string()))?;
         *result.headers_mut() = std::mem::take(response.headers_mut());
         return Ok(result);
     }
@@ -153,11 +151,9 @@ async fn read_response(
         .headers_mut()
         .ok_or_else(|| TransportError::Other("invalid HTTP response headers".to_owned()))? =
         headers;
-    result.body(body).map_err(invalid_response)
-}
-
-fn invalid_response(error: http::Error) -> TransportError {
-    TransportError::Other(error.to_string())
+    result
+        .body(body)
+        .map_err(|error| TransportError::Other(error.to_string()))
 }
 
 struct FilteringDns<D>(Arc<D>);

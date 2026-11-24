@@ -3,13 +3,12 @@ use http::{
     Method, Request, Response, StatusCode,
     header::{AUTHORIZATION, CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, HOST, LOCATION},
 };
-use url::Url;
 
 use super::{
     DynHttpTransport, SendOptions, TransportError,
     policy::{
         Origin, retain_anonymous_headers, strip_sensitive_headers, validate_redirect,
-        validate_url_with_development,
+        validate_request_uri,
     },
 };
 
@@ -39,17 +38,16 @@ pub async fn send_with_redirects(
     options: &SendOptions,
     redirects: RedirectPolicy,
 ) -> Result<Response<Bytes>, TransportError> {
-    let mut url = Url::parse(&request.uri().to_string())
-        .map_err(|error| TransportError::InvalidRequest(error.to_string()))?;
-    let mut origin = validate_url_with_development(&url, options.allow_loopback)
+    let (mut url, mut origin) = validate_request_uri(request.uri(), options.allow_loopback)
         .map_err(|error| TransportError::PolicyViolation(error.to_string()))?;
+    let mut options = options.clone();
     if options.anonymous {
         retain_anonymous_headers(request.headers_mut());
     }
     request.headers_mut().remove(HOST);
 
     for hop in 0..=MAX_REDIRECTS {
-        let mut response = transport.send_dyn(request.clone(), options).await?;
+        let mut response = transport.send_dyn(request.clone(), &options).await?;
         response
             .extensions_mut()
             .insert(ResponseOrigin(origin.clone()));
@@ -73,7 +71,12 @@ pub async fn send_with_redirects(
         url.set_fragment(None);
         let next_origin = validate_redirect(&origin, &url, options.allow_loopback)
             .map_err(|error| TransportError::PolicyViolation(error.to_string()))?;
-        update_request(&mut request, response.status(), origin != next_origin)?;
+        let cross_origin = origin != next_origin;
+        update_request(&mut request, response.status(), cross_origin)?;
+        if cross_origin {
+            options.anonymous = true;
+            retain_anonymous_headers(request.headers_mut());
+        }
         *request.uri_mut() = url.as_str().parse().map_err(invalid_location)?;
         origin = next_origin;
     }
@@ -165,5 +168,75 @@ mod tests {
         assert_eq!(request.method(), Method::GET);
         assert!(request.body().is_empty());
         assert!(!request.headers().contains_key(CONTENT_TYPE));
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32"), feature = "native"))]
+mod integration_tests {
+    use super::*;
+    use crate::net::test_support::{MockTransport, reply};
+
+    #[tokio::test]
+    async fn redirect_checks_the_target_and_sanitizes_an_origin_change() {
+        let transport = MockTransport::new(|_: &Request<Bytes>, _: &SendOptions, ordinal| {
+            if ordinal == 0 {
+                Ok(Response::builder()
+                    .status(302)
+                    .header(LOCATION, "https://other.example:444/page")
+                    .body(Bytes::new())
+                    .unwrap())
+            } else {
+                Ok(reply(200, b"{}"))
+            }
+        });
+        let request = Request::get("https://pds.example/page")
+            .header("authorization", "Bearer fixture")
+            .header("dpop", "fixture-proof")
+            .header("atproto-proxy", "did:plc:test")
+            .header("x-client-context", "fixture")
+            .header("accept", "application/json")
+            .body(Bytes::new())
+            .unwrap();
+        let result = send_with_redirects(
+            &transport,
+            request,
+            &SendOptions::default(),
+            RedirectPolicy::Follow,
+        )
+        .await
+        .unwrap();
+        let origin = result.extensions().get::<ResponseOrigin>().unwrap();
+        assert_eq!(origin.0.to_string(), "https://other.example:444");
+        let seen = transport.seen();
+        assert_eq!(seen.len(), 2);
+        assert_eq!(seen[1].0.headers().len(), 1);
+        assert_eq!(seen[1].0.headers()["accept"], "application/json");
+        assert!(seen[1].1.anonymous);
+    }
+
+    #[tokio::test]
+    async fn redirect_cannot_move_to_cleartext_or_loopback_or_extend_past_five_hops() {
+        for (location, expected_sends) in [
+            ("http://other.example/page", 1),
+            ("http://localhost:3344/", 1),
+            ("/another-hop", 6),
+        ] {
+            let transport = MockTransport::new(move |_: &Request<Bytes>, _: &SendOptions, _| {
+                Ok(Response::builder()
+                    .status(302)
+                    .header(LOCATION, location)
+                    .body(Bytes::new())
+                    .unwrap())
+            });
+            let request = Request::get("https://pds.example/page")
+                .body(Bytes::new())
+                .unwrap();
+            let mut options = SendOptions::new();
+            options.allow_loopback = true;
+            let result =
+                send_with_redirects(&transport, request, &options, RedirectPolicy::Follow).await;
+            assert!(matches!(result, Err(TransportError::PolicyViolation(_))));
+            assert_eq!(transport.seen().len(), expected_sends);
+        }
     }
 }

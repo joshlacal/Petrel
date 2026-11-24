@@ -22,6 +22,8 @@
 //! header rules, retry policy and cursor pagination. The endpoint traits
 //! themselves are in [`petrel_core::xrpc`].
 
+use std::fmt;
+
 use bytes::Bytes;
 use petrel_core::Did;
 
@@ -32,13 +34,29 @@ use crate::storage::StoreError;
 /// What [`AuthProvider::prepare`] bound a request to. The pipeline passes it
 /// back unchanged, so a late response is never applied to a session that has
 /// since been replaced.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Clone, PartialEq, Eq, Default)]
 pub struct AuthCtx {
     /// The account the request was signed for. `None` if unauthenticated.
     pub did: Option<Did>,
     /// RFC 7638 thumbprint of the DPoP key that signed the request. `None`
     /// if no DPoP proof was attached.
     pub jkt: Option<String>,
+    /// Opaque provider-defined revision of the session that signed this request.
+    /// A late response can refer to a superseded token even if the key is unchanged.
+    pub session_generation: Option<[u8; 32]>,
+}
+
+impl fmt::Debug for AuthCtx {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AuthCtx")
+            .field("did", &self.did)
+            .field("jkt", &self.jkt)
+            .field(
+                "session_generation",
+                &self.session_generation.map(|_| "<redacted>"),
+            )
+            .finish()
+    }
 }
 
 /// What the pipeline should do after a 401.
@@ -120,3 +138,6 @@ mod response;
 pub use client::{CallOptions, Error, Sleeper, XrpcBody, XrpcClient};
 pub use petrel_core::xrpc::{RateLimit, XrpcErrorBody};
 pub use response::{ResponseMetadata, XrpcError, XrpcErrorKind, XrpcLabeler, XrpcResponse};
+
+#[cfg(all(test, not(target_arch = "wasm32"), feature = "native"))]
+mod tests;

@@ -132,3 +132,9 @@ pub use browser::FetchTransport;
 pub use native::ReqwestTransport;
 pub use policy::Origin;
 pub use redirect::{RedirectPolicy, ResponseOrigin, send_with_redirects};
+
+#[cfg(all(test, not(target_arch = "wasm32"), feature = "native"))]
+pub(crate) mod test_support;
+
+#[cfg(all(test, not(target_arch = "wasm32"), feature = "native"))]
+mod native_tests;

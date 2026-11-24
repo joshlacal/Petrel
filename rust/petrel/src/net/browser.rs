@@ -8,7 +8,6 @@ use http::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, HOST},
 };
 use js_sys::{Array, Function, Promise, Reflect, Uint8Array};
-use url::Url;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -18,7 +17,7 @@ use web_sys::{
 
 use super::{
     HttpTransport, SendOptions, TransportError,
-    policy::{retain_anonymous_headers, validate_url_with_development},
+    policy::{retain_anonymous_headers, validate_request_uri},
 };
 
 /// Fetch transport for browsers and Web Workers.
@@ -37,9 +36,7 @@ impl HttpTransport for FetchTransport {
         options: &SendOptions,
     ) -> Result<Response<Bytes>, TransportError> {
         let (mut parts, body) = request.into_parts();
-        let url = Url::parse(&parts.uri.to_string())
-            .map_err(|error| TransportError::InvalidRequest(error.to_string()))?;
-        let origin = validate_url_with_development(&url, options.allow_loopback)
+        let (url, origin) = validate_request_uri(&parts.uri, options.allow_loopback)
             .map_err(|error| TransportError::PolicyViolation(error.to_string()))?;
         if !matches!(origin.scheme(), "http" | "https") {
             return Err(TransportError::InvalidRequest(
@@ -63,6 +60,7 @@ impl HttpTransport for FetchTransport {
         let init = RequestInit::new();
         init.set_method(parts.method.as_str());
         init.set_mode(RequestMode::Cors);
+        init.set_referrer("");
         init.set_credentials(RequestCredentials::Omit);
         init.set_redirect(RequestRedirect::Manual);
         init.set_signal(Some(&controller.0.signal()));

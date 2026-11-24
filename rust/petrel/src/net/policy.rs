@@ -5,7 +5,7 @@ mod ip;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use http::{HeaderMap, HeaderName, HeaderValue};
+use http::{HeaderMap, HeaderName, HeaderValue, Uri};
 use thiserror::Error;
 use url::{Host, Url};
 
@@ -113,6 +113,29 @@ pub fn validate_url_with_development(
         Host::Domain(_) => {}
     }
     Ok(origin)
+}
+
+/// Check a request's original authority before URL normalization.
+pub(crate) fn validate_request_uri(
+    uri: &Uri,
+    allow_loopback: bool,
+) -> Result<(Url, Origin), PolicyError> {
+    if uri
+        .authority()
+        .is_some_and(|authority| authority.as_str().contains('@'))
+    {
+        return Err(PolicyError::InvalidAuthority);
+    }
+    let url = Url::parse(&uri.to_string()).map_err(|_| PolicyError::InvalidAuthority)?;
+    let origin = validate_url_with_development(&url, allow_loopback)?;
+    if is_loopback_host(origin.host())
+        && !uri
+            .host()
+            .is_some_and(|host| is_loopback_host(&host.to_ascii_lowercase()))
+    {
+        return Err(PolicyError::DisallowedAddress);
+    }
+    Ok((url, origin))
 }
 
 /// Reject an entire DNS answer set when any address violates the target's policy.
