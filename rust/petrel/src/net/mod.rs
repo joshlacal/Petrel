@@ -8,11 +8,9 @@
 //! strip `DPoP` and `atproto-proxy` when a redirect crosses origins, and so
 //! authorization-server requests can refuse redirects outright.
 //!
-//! Lane D adds here (map: `maps/network-identity.md`, packages N1 to N3):
-//! the origin type and the SSRF/IP policy, the reqwest transport with a
-//! filtering DNS resolver (`native`), the fetch transport (`wasm`), response
-//! size and decompression caps, and the Petrel-level redirect follower.
-//! Embedders such as Tauri can supply their own [`HttpTransport`].
+//! The native transport verifies the addresses supplied to its connector,
+//! and bounds wire bytes and decoded contents. Browser builds use Fetch.
+//! Embedders can supply their own [`HttpTransport`].
 //!
 //! Browser Fetch cannot enforce connection-IP, wire-byte, or decompression
 //! ratio limits. It caps the decoded stream and blocks opaque redirects.

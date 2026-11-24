@@ -128,10 +128,10 @@ async fn exchange(
         let value = HeaderValue::from_str(&value).map_err(|_| invalid_response())?;
         result = result.header(name, value);
     }
-    if let Some(headers) = result.headers_mut() {
-        if headers.remove(CONTENT_ENCODING).is_some() {
-            headers.remove(CONTENT_LENGTH);
-        }
+    if let Some(headers) = result.headers_mut()
+        && headers.remove(CONTENT_ENCODING).is_some()
+    {
+        headers.remove(CONTENT_LENGTH);
     }
 
     let mut bytes = BytesMut::new();

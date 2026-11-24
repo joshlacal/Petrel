@@ -22,7 +22,9 @@ use super::{
 use crate::{
     net::{
         Origin, RedirectPolicy, SendOptions, SharedTransport, TransportError,
-        policy::{retain_anonymous_headers, validate_url_with_development},
+        policy::{
+            retain_anonymous_headers, strip_sensitive_headers, validate_url_with_development,
+        },
         send_with_redirects,
     },
     rt::{BoxFuture, MaybeSend, MaybeSync},
@@ -400,19 +402,8 @@ impl XrpcClient {
         *call.request.headers_mut() = headers;
         if anonymous {
             retain_anonymous_headers(call.request.headers_mut());
-        }
-        if !eligible {
-            for name in [
-                "authorization",
-                "dpop",
-                "x-dpop",
-                "cookie",
-                "x-api-key",
-                "x-auth-token",
-                "proxy-authorization",
-            ] {
-                call.request.headers_mut().remove(name);
-            }
+        } else if !eligible {
+            strip_sensitive_headers(call.request.headers_mut());
         }
         Ok(call)
     }
@@ -431,29 +422,37 @@ impl XrpcClient {
                 .entry(ACCEPT)
                 .or_insert(HeaderValue::from_static(accept));
         }
+        headers.extend(options.headers.clone());
         if let Some(body) = body {
             headers.insert(CONTENT_TYPE, body.content_type.clone());
         }
-        headers.extend(options.headers.clone());
 
         if !same_origin || never_proxy(nsid) {
             headers.remove(PROXY);
-        } else if !options.headers.contains_key(PROXY) {
-            let proxy = options
-                .proxy
-                .as_deref()
-                .or_else(|| self.mapped_service(nsid));
-            if let Some(proxy) = proxy {
+        } else {
+            let configured_proxy = options.proxy.as_deref().or_else(|| {
+                (!headers.contains_key(PROXY))
+                    .then(|| self.mapped_service(nsid))
+                    .flatten()
+            });
+            if let Some(proxy) = configured_proxy {
                 set_header(&mut headers, PROXY, proxy)?;
             }
         }
 
-        if same_origin && !options.headers.contains_key(LABELERS) {
-            let labelers = options.accept_labelers.as_deref().unwrap_or(&self.labelers);
-            if !labelers.is_empty() {
-                set_header(&mut headers, LABELERS, &XrpcLabeler::header_value(labelers))?;
-            } else if options.accept_labelers.is_some() {
-                headers.remove(LABELERS);
+        if same_origin {
+            if let Some(labelers) = &options.accept_labelers {
+                if labelers.is_empty() {
+                    headers.remove(LABELERS);
+                } else {
+                    set_header(&mut headers, LABELERS, &XrpcLabeler::header_value(labelers))?;
+                }
+            } else if !headers.contains_key(LABELERS) && !self.labelers.is_empty() {
+                set_header(
+                    &mut headers,
+                    LABELERS,
+                    &XrpcLabeler::header_value(&self.labelers),
+                )?;
             }
         }
         if same_origin && self.request_ids && !headers.contains_key("x-request-id") {
@@ -538,10 +537,10 @@ impl XrpcClient {
                     let body = XrpcErrorBody::parse(response.body());
                     let code = body.as_ref().map(|body| body.error.as_str());
                     if status == StatusCode::UNAUTHORIZED && nonce_challenge(&response, code) {
-                        if retried_nonce || attempt == MAX_ATTEMPTS {
+                        if retried_nonce {
                             return Err(Error::MaxRetries);
                         }
-                        if nonce.is_some() {
+                        if nonce.is_some() && attempt < MAX_ATTEMPTS {
                             retried_nonce = true;
                             continue;
                         }

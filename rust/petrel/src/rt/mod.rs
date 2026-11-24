@@ -8,10 +8,9 @@
 //! `wasm32`. These three items are `Send`/`Sync` on native targets and
 //! unbounded on `wasm32`, so every trait in this crate is written once.
 //!
-//! Lane D adds here: a `sleep` function (tokio under `native`, gloo timers
-//! under `wasm`) and the clock wrapper over `web-time` (`std::time` panics on
-//! `wasm32-unknown-unknown`). Nothing in this crate may call
-//! `std::time::Instant::now` or `SystemTime::now` directly.
+//! Timers use Tokio with `native` and gloo with `wasm`. Clock types come
+//! from `web-time` because the standard library clock does not run on
+//! `wasm32-unknown-unknown`.
 
 use std::future::Future;
 use std::pin::Pin;

@@ -1,6 +1,11 @@
-use std::{future::Future, time::Duration};
-
-use futures_util::future::{Either, select};
+#[cfg(any(
+    all(not(target_arch = "wasm32"), feature = "native"),
+    all(target_arch = "wasm32", feature = "wasm")
+))]
+use {
+    futures_util::future::{Either, select},
+    std::{future::Future, time::Duration},
+};
 
 /// Yield to the platform's timer for the specified duration.
 #[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
@@ -10,11 +15,9 @@ pub async fn sleep(duration: Duration) {
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
 pub async fn sleep(duration: Duration) {
-    let mut delay_ms = duration
-        .as_millis()
-        .saturating_add(u128::from(duration.subsec_nanos() % 1_000_000 != 0));
     // Browser timer APIs accept at most a signed 32-bit millisecond count.
     const MAX_DELAY: u32 = 2_147_483_647;
+    let mut delay_ms = duration.as_nanos().div_ceil(1_000_000);
     while delay_ms > u128::from(MAX_DELAY) {
         gloo_timers::future::TimeoutFuture::new(MAX_DELAY).await;
         delay_ms -= u128::from(MAX_DELAY);

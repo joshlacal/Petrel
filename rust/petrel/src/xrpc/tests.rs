@@ -147,6 +147,8 @@ async fn nonce_retry_has_one_fresh_proof_and_records_nonce_with_context() {
     assert_eq!(nonces[1].1, "next");
     assert_eq!(nonces[0].2.did.as_ref().unwrap().as_str(), "did:plc:abc");
     assert_eq!(nonces[0].2.jkt.as_deref(), Some("test-key"));
+    assert_eq!(nonces[0].2.session_generation, Some([42; 32]));
+    assert!(format!("{:?}", nonces[0].2).contains("<redacted>"));
     assert_eq!(auth.unauthorized.load(Ordering::Relaxed), 0);
 }
 
@@ -311,7 +313,15 @@ async fn request_building_uses_namespace_proxy_but_never_proxies_preferences_or_
             redact: true,
         }]);
     client
-        .query("app.bsky.feed.getTimeline", [("q", "c++")], &options)
+        .query(
+            "app.bsky.feed.getTimeline",
+            [
+                ("q", "c++ & 1+1=2"),
+                ("since", "2026-01-01T00:00:00+01:00"),
+                ("cursor", "a+b/c=="),
+            ],
+            &options,
+        )
         .await
         .unwrap();
     client
@@ -339,7 +349,10 @@ async fn request_building_uses_namespace_proxy_but_never_proxies_preferences_or_
         .unwrap();
 
     let seen = transport.seen();
-    assert_eq!(seen[0].0.uri().query(), Some("q=c%2B%2B"));
+    assert_eq!(
+        seen[0].0.uri().query(),
+        Some("q=c%2B%2B%20%26%201%2B1%3D2&since=2026-01-01T00:00:00%2B01:00&cursor=a%2Bb/c%3D%3D"),
+    );
     assert_eq!(
         seen[0].0.headers()["atproto-proxy"],
         "did:web:api.bsky.app#bsky_appview"
@@ -496,4 +509,91 @@ async fn pages_stop_on_repeat_and_on_error_and_respect_zero_limit() {
     assert_eq!(pages.len(), 1);
     assert!(matches!(&pages[0], Err(Error::Xrpc(error)) if error.code == "BadCursor"));
     assert_eq!(transport.seen().len(), 3);
+}
+
+#[tokio::test]
+async fn an_unsent_redirect_hop_does_not_retry_a_procedure_that_already_got_a_response() {
+    let transport = Arc::new(MockTransport::<MockHandler>::new(|_, _, ordinal| {
+        if ordinal == 0 {
+            Ok(Response::builder()
+                .status(303)
+                .header("location", "/elsewhere")
+                .body(Bytes::new())
+                .unwrap())
+        } else {
+            Err(TransportError::Connect(
+                "synthetic connection failure".to_owned(),
+            ))
+        }
+    }));
+    let delays = Arc::new(MockSleeper::default());
+    let client = client(transport.clone()).with_sleeper(delays.clone());
+    let result = client
+        .procedure(
+            "com.atproto.repo.uploadBlob",
+            EMPTY,
+            Some(XrpcBody::json("{}")),
+            &CallOptions::default(),
+        )
+        .await;
+    assert!(matches!(
+        result,
+        Err(Error::Transport(TransportError::ConnectionLost(_)))
+    ));
+    let seen = transport.seen();
+    assert_eq!(seen.len(), 2);
+    assert_eq!(seen[0].0.method(), Method::POST);
+    assert_eq!(seen[1].0.method(), Method::GET);
+    assert_eq!(delays.0.lock().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn explicit_routing_and_validated_body_headers_take_precedence() {
+    let transport = Arc::new(MockTransport::<MockHandler>::new(|_, _, _| {
+        Ok(reply(200, b"{}"))
+    }));
+    let mut client_headers = http::HeaderMap::new();
+    client_headers.insert("atproto-proxy", HeaderValue::from_static("did:plc:client"));
+    let client = client(transport.clone()).with_headers(client_headers);
+    client
+        .query("app.bsky.feed.getTimeline", EMPTY, &CallOptions::default())
+        .await
+        .unwrap();
+
+    let mut opts = CallOptions {
+        proxy: Some("did:plc:typed".to_owned()),
+        accept_labelers: Some(vec![XrpcLabeler {
+            did: "did:plc:typed-labeler".to_owned(),
+            redact: true,
+        }]),
+        ..CallOptions::default()
+    };
+    opts.headers
+        .insert("atproto-proxy", HeaderValue::from_static("did:plc:manual"));
+    opts.headers.insert(
+        "atproto-accept-labelers",
+        HeaderValue::from_static("did:plc:manual-labeler"),
+    );
+    opts.headers.insert(
+        "content-type",
+        HeaderValue::from_static("invalid-media-type"),
+    );
+    client
+        .procedure(
+            "app.bsky.feed.createFixture",
+            EMPTY,
+            Some(XrpcBody::json("{}")),
+            &opts,
+        )
+        .await
+        .unwrap();
+
+    let seen = transport.seen();
+    assert_eq!(seen[0].0.headers()["atproto-proxy"], "did:plc:client");
+    assert_eq!(seen[1].0.headers()["atproto-proxy"], "did:plc:typed");
+    assert_eq!(
+        seen[1].0.headers()["atproto-accept-labelers"],
+        "did:plc:typed-labeler;redact"
+    );
+    assert_eq!(seen[1].0.headers()["content-type"], "application/json");
 }

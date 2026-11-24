@@ -101,7 +101,7 @@ pub enum XrpcErrorKind<E> {
     Undeclared(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct XrpcError<E> {
     pub kind: XrpcErrorKind<E>,
     pub code: String,
@@ -116,26 +116,25 @@ impl<E> XrpcError<E> {
         declare: impl FnOnce(&str) -> Option<E>,
     ) -> Self {
         let body = XrpcErrorBody::parse(response.body());
-        let (code, message) = if let Some(body) = body {
-            let message = body.message.map(|message| {
-                let mut end = diagnostic_limit.min(message.len());
-                while !message.is_char_boundary(end) {
-                    end -= 1;
-                }
-                message[..end].to_owned()
-            });
-            (body.error, message)
+        let (code, message, declared) = if let Some(body) = body {
+            let declared = declare(&body.error);
+            let code = bounded_text(&body.error, diagnostic_limit).to_owned();
+            let message = body
+                .message
+                .map(|message| bounded_text(&message, diagnostic_limit).to_owned());
+            (code, message, declared)
         } else {
             let bytes = &response.body()[..response.body().len().min(diagnostic_limit)];
             let text = String::from_utf8_lossy(bytes);
-            let trim = text.trim();
+            let trim = bounded_text(text.trim(), diagnostic_limit);
             (
                 format!("HTTP {}", response.status().as_u16()),
                 (!trim.is_empty()).then(|| trim.to_owned()),
+                None,
             )
         };
 
-        let kind = declare(&code).map_or_else(
+        let kind = declared.map_or_else(
             || XrpcErrorKind::Undeclared(code.clone()),
             XrpcErrorKind::Declared,
         );
@@ -153,6 +152,23 @@ impl<E> XrpcError<E> {
 
     pub fn retry_after(&self) -> Option<Duration> {
         self.metadata.retry_after()
+    }
+}
+
+fn bounded_text(text: &str, limit: usize) -> &str {
+    let mut end = text.len().min(limit);
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    &text[..end]
+}
+
+impl<E> fmt::Debug for XrpcError<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("XrpcError")
+            .field("code", &self.code)
+            .field("status", &self.metadata.status)
+            .finish_non_exhaustive()
     }
 }
 
@@ -238,5 +254,21 @@ mod tests {
         let error = XrpcError::<()>::parse(&response, 7, |_| None);
         assert_eq!(error.kind, XrpcErrorKind::Undeclared("HTTP 502".to_owned()));
         assert_eq!(error.message.as_deref(), Some("<html>"));
+    }
+    #[test]
+    fn error_diagnostics_bound_utf8_and_debug_omits_response_secrets() {
+        let long = "é".repeat(20);
+        let body =
+            serde_json::to_vec(&serde_json::json!({"error": long, "message": long})).unwrap();
+        let response = Response::builder()
+            .status(400)
+            .header("set-cookie", "synthetic-secret")
+            .body(Bytes::from(body))
+            .unwrap();
+        let error = XrpcError::<()>::parse(&response, 9, |_| None);
+        assert_eq!(error.code, "éééé");
+        assert_eq!(error.message.as_deref(), Some("éééé"));
+        assert_eq!(error.metadata.headers["set-cookie"], "synthetic-secret");
+        assert!(!format!("{error:?}").contains("synthetic-secret"));
     }
 }

@@ -47,7 +47,12 @@ pub async fn send_with_redirects(
     request.headers_mut().remove(HOST);
 
     for hop in 0..=MAX_REDIRECTS {
-        let mut response = transport.send_dyn(request.clone(), &options).await?;
+        let mut response = match transport.send_dyn(request.clone(), &options).await {
+            Err(TransportError::Connect(reason)) if hop != 0 => {
+                return Err(TransportError::ConnectionLost(reason));
+            }
+            result => result?,
+        };
         response
             .extensions_mut()
             .insert(ResponseOrigin(origin.clone()));

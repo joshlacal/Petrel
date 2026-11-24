@@ -16,11 +16,9 @@
 //!   [`AuthProvider::handle_unauthorized`] on a 401; the provider decides
 //!   whether a refresh happened and whether the request is worth repeating.
 //!
-//! Lane D adds here (map: `maps/network-identity.md`, packages N2, N4, N5):
-//! the XRPC error and response model, `XrpcClient` with its one generic
-//! `send::<R: XrpcRequest>(params, input, &CallOptions)`, `atproto-proxy`
-//! header rules, retry policy and cursor pagination. The endpoint traits
-//! themselves are in [`petrel_core::xrpc`].
+//! [`XrpcClient`] handles generated and raw requests, origin-scoped routing,
+//! retries, and cursor pagination. Generated endpoint types implement the
+//! traits in [`petrel_core::xrpc`].
 
 use std::fmt;
 
