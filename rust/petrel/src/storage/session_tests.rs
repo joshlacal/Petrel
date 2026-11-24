@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::oauth::SessionRecord;
 
-use super::{MemorySecretStore, SecretStore, SessionStore, StoreError};
+use super::{MemorySecretStore, PendingRefresh, SecretStore, SessionStore, StoreError};
 
 const FIRST: &str = "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa";
 const SECOND: &str = "did:plc:bbbbbbbbbbbbbbbbbbbbbbbb";
@@ -92,17 +92,55 @@ async fn pending_session_is_available_without_changing_committed_state() {
     let committed = session(FIRST, "committed-token");
     let pending = session(FIRST, "pending-token");
     sessions.save_session(&committed).await.unwrap();
-    sessions.save_pending_session(&pending).await.unwrap();
+    sessions
+        .save_pending_refresh(&PendingRefresh {
+            based_on: [21; 32],
+            record: pending,
+        })
+        .await
+        .unwrap();
 
     let reopened = SessionStore::new(backend, "petrel").unwrap();
     let did = &committed.account.did;
     let committed = reopened.get_session(did).await.unwrap().unwrap();
     assert_eq!(committed.session.access_token(), "committed-token");
-    let pending = reopened.get_pending_session(did).await.unwrap().unwrap();
-    assert_eq!(pending.session.access_token(), "pending-token");
+    let pending = reopened.get_pending_refresh(did).await.unwrap().unwrap();
+    assert_eq!(pending.based_on, [21; 32]);
+    assert_eq!(pending.record.session.access_token(), "pending-token");
     reopened.delete_pending_session(did).await.unwrap();
-    assert!(reopened.get_pending_session(did).await.unwrap().is_none());
+    assert!(reopened.get_pending_refresh(did).await.unwrap().is_none());
     assert!(reopened.get_session(did).await.unwrap().is_some());
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn stale_refresh_does_not_replace_a_new_sign_in() {
+    let (backend, sessions) = in_memory();
+    let concurrent = SessionStore::new(backend, "petrel").unwrap();
+    let original = session(FIRST, "before-refresh");
+    let refreshed = session(FIRST, "first-refresh");
+    let new_sign_in = session(FIRST, "fresh-sign-in");
+    sessions.save_session(&original).await.unwrap();
+    assert!(
+        sessions
+            .compare_and_swap_session(&original, &refreshed)
+            .await
+            .unwrap()
+    );
+    concurrent.save_session(&new_sign_in).await.unwrap();
+    assert!(
+        !sessions
+            .compare_and_swap_session(&refreshed, &original)
+            .await
+            .unwrap()
+    );
+
+    let saved = sessions
+        .get_session(&original.account.did)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(saved.session.access_token(), "fresh-sign-in");
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]

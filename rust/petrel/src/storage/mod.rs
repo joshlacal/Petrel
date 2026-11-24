@@ -37,7 +37,7 @@ pub use callback::CallbackSecretStore;
 #[cfg(all(feature = "file-store", any(unix, windows)))]
 pub use file::FileSecretStore;
 pub use memory::MemorySecretStore;
-pub use session::SessionStore;
+pub use session::{PendingRefresh, SessionStore};
 
 /// A secret store operation failed.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

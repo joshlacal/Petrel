@@ -18,6 +18,21 @@ const PENDING_SESSION: &str = "session.pending";
 const DPOP_KEY: &str = "dpopKey";
 const OAUTH_STATE: &str = "oauthState";
 
+/// A replacement produced by refreshing a specific committed session generation.
+#[derive(Clone, Deserialize, Serialize)]
+pub struct PendingRefresh {
+    /// Fingerprint of the committed record this replacement supersedes.
+    pub based_on: [u8; 32],
+    /// Replacement account, tokens and key binding.
+    pub record: SessionRecord,
+}
+
+impl fmt::Debug for PendingRefresh {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PendingRefresh").finish_non_exhaustive()
+    }
+}
+
 /// Stores OAuth account and session records in a namespace of a secret store.
 ///
 /// The account, tokens, and DPoP key reference are published as one item.
@@ -56,22 +71,49 @@ impl SessionStore {
         self.save_record(SESSION, record).await
     }
 
+    /// Replaces the committed record only when it still matches `expected`.
+    ///
+    /// Compares the serialized bytes for the same DID in one backend operation.
+    /// A concurrent sign-in changes those bytes and leaves the newer record intact.
+    /// Backends without compare-and-swap return [`StoreError::Unsupported`].
+    pub async fn compare_and_swap_session(
+        &self,
+        expected: &SessionRecord,
+        replacement: &SessionRecord,
+    ) -> Result<bool, StoreError> {
+        let did = &expected.session.did;
+        validate_record(expected, did)?;
+        validate_record(replacement, did)?;
+        let key = item_key(SESSION, did.as_str())?;
+        let expected = encode(expected)?;
+        let replacement = encode(replacement)?;
+        self.secrets
+            .compare_and_swap(&self.namespace, &key, Some(&expected), Some(&replacement))
+            .await
+    }
+
     /// Removes the committed record. A pending record remains independently addressable.
     pub async fn delete_session(&self, did: &Did) -> Result<(), StoreError> {
         self.delete(SESSION, did.as_str()).await
     }
 
     /// Loads a pending replacement for this DID.
-    pub async fn get_pending_session(
+    pub async fn get_pending_refresh(
         &self,
         did: &Did,
-    ) -> Result<Option<SessionRecord>, StoreError> {
-        self.get_record(PENDING_SESSION, did).await
+    ) -> Result<Option<PendingRefresh>, StoreError> {
+        let pending: Option<PendingRefresh> = self.load(PENDING_SESSION, did.as_str()).await?;
+        if let Some(ref pending) = pending {
+            validate_record(&pending.record, did)?;
+        }
+        Ok(pending)
     }
 
     /// Saves a replacement token set pending a successful commit.
-    pub async fn save_pending_session(&self, record: &SessionRecord) -> Result<(), StoreError> {
-        self.save_record(PENDING_SESSION, record).await
+    pub async fn save_pending_refresh(&self, pending: &PendingRefresh) -> Result<(), StoreError> {
+        let did = &pending.record.session.did;
+        validate_record(&pending.record, did)?;
+        self.save(PENDING_SESSION, did.as_str(), pending).await
     }
 
     /// Removes the pending replacement for this DID.
@@ -172,15 +214,7 @@ impl SessionStore {
         value: &T,
     ) -> Result<(), StoreError> {
         let key = item_key(base, suffix)?;
-        let mut bytes = Zeroizing::new(Vec::new());
-        serde_json::to_writer(
-            &mut *bytes,
-            &Envelope {
-                v: VERSION,
-                data: value,
-            },
-        )
-        .map_err(|_| StoreError::Other("could not encode a typed secret".into()))?;
+        let bytes = encode(value)?;
         self.secrets.put(&self.namespace, &key, &bytes).await
     }
 
@@ -233,6 +267,19 @@ struct BorrowedTimed<'a> {
     issued_at: u64,
     #[serde(borrow)]
     payload: &'a RawValue,
+}
+
+fn encode(value: &impl Serialize) -> Result<Zeroizing<Vec<u8>>, StoreError> {
+    let mut bytes = Zeroizing::new(Vec::new());
+    serde_json::to_writer(
+        &mut *bytes,
+        &Envelope {
+            v: VERSION,
+            data: value,
+        },
+    )
+    .map_err(|_| StoreError::Other("could not encode a typed secret".into()))?;
+    Ok(bytes)
 }
 
 fn payload(bytes: &[u8]) -> Result<&RawValue, StoreError> {
