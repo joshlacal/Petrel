@@ -49,7 +49,7 @@ cd Examples/StatusphereOverlay
 swift run StatusphereCLI post \
   --handle your-handle.bsky.social \
   --emoji "🚀" \
-  --mood "xyz.statusphere.defs#shipping" \
+  --mood "xyz.statusphere.status#shipping" \
   --note "Testing custom Lexicon overlays with Petrel 2.0"
 ```
 
