@@ -7,9 +7,14 @@ use serde_json::value::RawValue;
 use zeroize::Zeroizing;
 
 use crate::oauth::SessionRecord;
-use crate::rt::MaybeSync;
+use crate::rt::{MaybeSend, MaybeSync};
 
-use super::{SecretStore, StoreError, validate_key, validate_namespace};
+use super::events::SharedAuthEvents;
+use super::{
+    AuthEvent, AuthSubscription, SecretStore, StoreError, validate_key, validate_namespace,
+};
+
+mod catalog;
 
 const VERSION: u8 = 1;
 const MAX_FLOW_AGE_SECONDS: u64 = 600;
@@ -38,10 +43,15 @@ impl fmt::Debug for PendingRefresh {
 /// The account, tokens, and DPoP key reference are published as one item.
 /// Pending replacements occupy a separate item so a refresh can leave the
 /// last committed record available until the new one is durably saved.
+/// Clones share the catalog mutation lock and event observers. When a
+/// backend lacks atomic compare-and-swap, use one store and its clones for
+/// each namespace, or coordinate catalog mutations in the embedder.
 #[derive(Clone)]
 pub struct SessionStore {
     secrets: Arc<dyn SecretStore>,
     namespace: String,
+    catalog_lock: Arc<async_lock::Mutex<()>>,
+    events: SharedAuthEvents,
 }
 
 impl fmt::Debug for SessionStore {
@@ -58,17 +68,66 @@ impl SessionStore {
     ) -> Result<Self, StoreError> {
         let namespace = namespace.into();
         validate_namespace(&namespace)?;
-        Ok(Self { secrets, namespace })
+        Ok(Self {
+            secrets,
+            namespace,
+            catalog_lock: Arc::default(),
+            events: SharedAuthEvents::default(),
+        })
+    }
+
+    /// Observes local auth events from this store and its clones.
+    ///
+    /// Callbacks run synchronously after a storage operation releases its
+    /// locks. Keep the returned subscription alive to continue observing.
+    pub fn observe_auth_events<F>(&self, observer: F) -> AuthSubscription
+    where
+        F: Fn(&AuthEvent) + MaybeSend + MaybeSync + 'static,
+    {
+        self.events.subscribe(observer)
+    }
+
+    pub(crate) fn emit_auth_event(&self, event: AuthEvent) {
+        self.events.emit(&event);
+    }
+
+    fn report_storage_result<T>(
+        &self,
+        did: Option<&Did>,
+        operation: &'static str,
+        result: Result<T, StoreError>,
+    ) -> Result<T, StoreError> {
+        if matches!(
+            &result,
+            Err(StoreError::Unavailable(_)
+                | StoreError::Corrupt(_)
+                | StoreError::KeyMismatch
+                | StoreError::Other(_))
+        ) {
+            self.emit_auth_event(AuthEvent::StorageFailure {
+                operation,
+                did: did.cloned(),
+            });
+        }
+        result
     }
 
     /// Loads the committed record. A backend or decode failure is an error.
     pub async fn get_session(&self, did: &Did) -> Result<Option<SessionRecord>, StoreError> {
-        self.get_record(SESSION, did).await
+        let result = self.get_record(SESSION, did).await;
+        self.report_storage_result(Some(did), "read session", result)
     }
 
     /// Publishes the account and its session together under their shared DID.
     pub async fn save_session(&self, record: &SessionRecord) -> Result<(), StoreError> {
-        self.save_record(SESSION, record).await
+        let did = &record.session.did;
+        let result = async {
+            validate_record(record, did)?;
+            self.register_session_account(did).await?;
+            self.save(SESSION, did.as_str(), record).await
+        }
+        .await;
+        self.report_storage_result(Some(did), "save session", result)
     }
 
     /// Replaces the committed record only when it still matches `expected`.
@@ -87,14 +146,17 @@ impl SessionStore {
         let key = item_key(SESSION, did.as_str())?;
         let expected = encode(expected)?;
         let replacement = encode(replacement)?;
-        self.secrets
+        let result = self
+            .secrets
             .compare_and_swap(&self.namespace, &key, Some(&expected), Some(&replacement))
-            .await
+            .await;
+        self.report_storage_result(Some(did), "replace session", result)
     }
 
     /// Removes the committed record. A pending record remains independently addressable.
     pub async fn delete_session(&self, did: &Did) -> Result<(), StoreError> {
-        self.delete(SESSION, did.as_str()).await
+        let result = self.delete(SESSION, did.as_str()).await;
+        self.report_storage_result(Some(did), "delete session", result)
     }
 
     /// Loads a pending replacement for this DID.
@@ -197,12 +259,6 @@ impl SessionStore {
             validate_record(record, did)?;
         }
         Ok(record)
-    }
-
-    async fn save_record(&self, base: &str, record: &SessionRecord) -> Result<(), StoreError> {
-        let did = &record.session.did;
-        validate_record(record, did)?;
-        self.save(base, did.as_str(), record).await
     }
 
     async fn load<T: DeserializeOwned>(

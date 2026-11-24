@@ -3,12 +3,10 @@
 //! Contract 11 of the Petrel Rust plan lives here and is frozen:
 //! [`SecretStore`] and [`StoreError`].
 //!
-//! Lane E adds here (map: `maps/serviceauth-space-storage.md`, packages ST1
-//! to ST3): an in-memory store, the typed session store on top of the trait,
-//! the encrypted file store behind the `file-store` feature, and a
-//! conformance suite every store must pass, including injected I/O errors.
-//! OS keychains and `IndexedDB` belong to the embedder, which implements
-//! this trait.
+//! The typed session store maintains the account catalog, selected account
+//! and local authentication observers. Use the in-memory store, the
+//! encrypted file store behind `file-store`, or an embedder backend built
+//! on an OS keychain or `IndexedDB`.
 //!
 //! The rule that matters most: **a failed read is an error, never "signed
 //! out".** [`SecretStore::get`] returns `Ok(None)` only when the item is
@@ -22,7 +20,10 @@ use crate::rt::{BoxFuture, MaybeSend, MaybeSync};
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
 mod callback;
 #[cfg(test)]
+mod catalog_tests;
+#[cfg(test)]
 mod contract_tests;
+mod events;
 #[cfg(all(feature = "file-store", any(unix, windows)))]
 mod file;
 #[cfg(all(test, feature = "file-store", any(unix, windows)))]
@@ -34,6 +35,7 @@ mod session_tests;
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
 pub use callback::CallbackSecretStore;
+pub use events::{AuthEvent, AuthSubscription};
 #[cfg(all(feature = "file-store", any(unix, windows)))]
 pub use file::FileSecretStore;
 pub use memory::MemorySecretStore;
@@ -62,6 +64,9 @@ pub enum StoreError {
     /// The consumed OAuth state was expired or dated in the future.
     #[error("OAuth flow state was expired or dated in the future")]
     InvalidFlowStateAge,
+    /// The account selector was set for an account outside the catalog.
+    #[error("account is not registered in the catalog")]
+    UnknownAccount,
     /// The backend cannot perform this optional operation.
     #[error("secret storage operation is unsupported")]
     Unsupported,

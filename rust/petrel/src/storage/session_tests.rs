@@ -10,7 +10,7 @@ use super::{MemorySecretStore, PendingRefresh, SecretStore, SessionStore, StoreE
 const FIRST: &str = "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa";
 const SECOND: &str = "did:plc:bbbbbbbbbbbbbbbbbbbbbbbb";
 
-fn session(did: &str, access: &str) -> SessionRecord {
+pub(super) fn session(did: &str, access: &str) -> SessionRecord {
     serde_json::from_value(json!({
         "account": {
             "did": did,
