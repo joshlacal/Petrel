@@ -63,6 +63,10 @@ async fn catalog_contract(backend: Arc<dyn SecretStore>) {
     ));
     store.save_current_did(second_did).await.unwrap();
     let reopened = SessionStore::new(backend, "petrel").unwrap();
+    reopened
+        .clear_current_did_if_selected(first_did)
+        .await
+        .unwrap();
     assert_eq!(
         reopened.get_current_did().await.unwrap().as_ref(),
         Some(second_did)

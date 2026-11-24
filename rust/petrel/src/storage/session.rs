@@ -78,8 +78,9 @@ impl SessionStore {
 
     /// Observes local auth events from this store and its clones.
     ///
-    /// Callbacks run synchronously after a storage operation releases its
-    /// locks. Keep the returned subscription alive to continue observing.
+    /// Callbacks run inline after storage releases its own locks. Schedule
+    /// asynchronous follow-up work so the caller can finish its operation.
+    /// Keep the returned subscription alive to continue observing.
     pub fn observe_auth_events<F>(&self, observer: F) -> AuthSubscription
     where
         F: Fn(&AuthEvent) + MaybeSend + MaybeSync + 'static,

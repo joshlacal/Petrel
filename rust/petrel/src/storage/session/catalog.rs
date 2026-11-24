@@ -145,6 +145,20 @@ impl SessionStore {
         Ok(())
     }
 
+    pub(crate) async fn clear_current_did_if_selected(&self, did: &Did) -> Result<(), StoreError> {
+        let result = self
+            .edit_catalog(|catalog| {
+                if catalog.current.as_ref() == Some(did) {
+                    catalog.current = None;
+                }
+                Ok(())
+            })
+            .await;
+        let selection = self.report_storage_result(Some(did), "clear current account", result)?;
+        self.emit_selection_change(selection);
+        Ok(())
+    }
+
     pub(super) async fn register_session_account(&self, did: &Did) -> Result<(), StoreError> {
         self.edit_catalog(|catalog| {
             catalog
