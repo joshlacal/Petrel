@@ -28,12 +28,16 @@ mod file;
 #[cfg(all(test, feature = "file-store", any(unix, windows)))]
 mod file_tests;
 mod memory;
+mod session;
+#[cfg(test)]
+mod session_tests;
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
 pub use callback::CallbackSecretStore;
 #[cfg(all(feature = "file-store", any(unix, windows)))]
 pub use file::FileSecretStore;
 pub use memory::MemorySecretStore;
+pub use session::SessionStore;
 
 /// A secret store operation failed.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -55,6 +59,9 @@ pub enum StoreError {
     /// Keys must be nonempty and may not contain NUL.
     #[error("invalid secret storage key")]
     InvalidKey,
+    /// The consumed OAuth state was expired or dated in the future.
+    #[error("OAuth flow state was expired or dated in the future")]
+    InvalidFlowStateAge,
     /// The backend cannot perform this optional operation.
     #[error("secret storage operation is unsupported")]
     Unsupported,
@@ -76,7 +83,7 @@ pub trait SecretStore: MaybeSend + MaybeSync {
         key: &'a str,
     ) -> BoxFuture<'a, Result<Option<Vec<u8>>, StoreError>>;
 
-    /// Writes an item, replacing any existing one.
+    /// Writes an item, replacing any existing one atomically.
     fn put<'a>(
         &'a self,
         namespace: &'a str,
