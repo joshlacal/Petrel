@@ -211,6 +211,7 @@ impl SessionAuth {
     ///
     /// The PDS signs the token on behalf of the session DID. Petrel checks
     /// the returned claims, and the receiving service verifies the signature.
+    #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
     pub async fn get_service_auth(
         &self,
         audience: &crate::service_auth::ServiceRef,

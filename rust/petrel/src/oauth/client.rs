@@ -340,6 +340,8 @@ impl fmt::Debug for OAuthClient {
 }
 
 impl OAuthClient {
+    // The key store uses the same shared ownership API on native and wasm.
+    #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
     pub fn new(
         transport: SharedTransport,
         resolver: Arc<dyn OAuthIdentityResolver>,

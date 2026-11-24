@@ -556,6 +556,7 @@ fn validate_proof(request: &Request<Bytes>) -> Value {
     claims
 }
 
+#[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
 fn client(server: &Arc<Server>, auth: ClientAuth) -> Arc<OAuthClient> {
     let storage = SessionStore::new(Arc::new(MemorySecretStore::new()), "fixtures").unwrap();
     let config = OAuthConfig::new(CLIENT, Url::parse(REDIRECT).unwrap(), SCOPE, auth).unwrap();
