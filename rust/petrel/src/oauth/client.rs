@@ -204,6 +204,7 @@ impl OAuthConfig {
     }
 
     /// Permit explicit loopback HTTP endpoints for local development.
+    #[must_use]
     pub fn with_loopback_development(mut self) -> Self {
         self.allow_loopback = true;
         self
@@ -314,6 +315,13 @@ pub struct OAuthClient {
     pending: AsyncMutex<Vec<PendingAuthorization>>,
 }
 
+struct ResolvedAuthorizationTarget<'a> {
+    server: ValidatedAuthorizationServer,
+    expected_did: Option<Did>,
+    expected_pds: Option<String>,
+    login_hint: Option<&'a str>,
+}
+
 struct PendingAuthorization {
     target: (String, String, Option<String>),
     flow: PendingOAuthFlow,
@@ -362,6 +370,7 @@ impl OAuthClient {
         })
     }
 
+    #[must_use]
     pub fn with_key_store(mut self, keys: Arc<dyn DpopKeyStore>) -> Self {
         self.keys = keys;
         self
@@ -425,32 +434,7 @@ impl OAuthClient {
             return Err(OAuthError::AuthorizationRejected);
         }
 
-        let (expected_did, expected_pds, server, login_hint) = match &target {
-            OAuthTarget::Identifier(identifier) => {
-                let identity = self
-                    .resolver
-                    .resolve_identity(identifier, false)
-                    .await
-                    .map_err(|_| OAuthError::Identity)?;
-                if let AtIdentifier::Did(did) = identifier
-                    && did != &identity.did
-                {
-                    return Err(OAuthError::IdentityChanged);
-                }
-                let pds = origin(&identity.pds, false).ok_or(OAuthError::Identity)?;
-                let metadata = self.protocol.discover_pds(&identity.pds).await?;
-                (
-                    Some(identity.did),
-                    Some(pds),
-                    metadata,
-                    Some(identifier.as_str()),
-                )
-            }
-            OAuthTarget::Server(url) => {
-                (None, None, self.protocol.discover_server(url).await?, None)
-            }
-        };
-
+        let resolved = self.resolve_target(&target).await?;
         let key_id = base64url(&random_bytes::<32>()?);
         let state = base64url(&random_bytes::<32>()?);
         let state = options
@@ -465,17 +449,7 @@ impl OAuthClient {
             }
         };
         let (authorize_url, par_lifetime) = match self
-            .push_authorization(
-                &server,
-                &target_key.1,
-                &state,
-                &key_id,
-                &jkt,
-                &*key,
-                expected_did,
-                expected_pds,
-                login_hint,
-            )
+            .push_authorization(resolved, &target_key.1, &state, &key_id, &jkt, &*key)
             .await
         {
             Ok(url) => url,
@@ -502,18 +476,48 @@ impl OAuthClient {
         Ok(flow)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    async fn resolve_target<'a>(
+        &self,
+        target: &'a OAuthTarget,
+    ) -> Result<ResolvedAuthorizationTarget<'a>, OAuthError> {
+        match target {
+            OAuthTarget::Identifier(identifier) => {
+                let identity = self
+                    .resolver
+                    .resolve_identity(identifier, false)
+                    .await
+                    .map_err(|_| OAuthError::Identity)?;
+                if let AtIdentifier::Did(did) = identifier
+                    && did != &identity.did
+                {
+                    return Err(OAuthError::IdentityChanged);
+                }
+                let pds = origin(&identity.pds, false).ok_or(OAuthError::Identity)?;
+                let server = self.protocol.discover_pds(&identity.pds).await?;
+                Ok(ResolvedAuthorizationTarget {
+                    server,
+                    expected_did: Some(identity.did),
+                    expected_pds: Some(pds),
+                    login_hint: Some(identifier.as_str()),
+                })
+            }
+            OAuthTarget::Server(url) => Ok(ResolvedAuthorizationTarget {
+                server: self.protocol.discover_server(url).await?,
+                expected_did: None,
+                expected_pds: None,
+                login_hint: None,
+            }),
+        }
+    }
+
     async fn push_authorization(
         &self,
-        server: &ValidatedAuthorizationServer,
+        target: ResolvedAuthorizationTarget<'_>,
         scope: &str,
         state: &str,
         key_id: &str,
         jkt: &str,
         key: &dyn DpopSigner,
-        expected_did: Option<Did>,
-        expected_pds: Option<String>,
-        login_hint: Option<&str>,
     ) -> Result<(Url, u64), OAuthError> {
         #[derive(Deserialize)]
         struct ParResponse {
@@ -531,9 +535,10 @@ impl OAuthClient {
             ("state", state),
             ("scope", scope),
         ];
-        if let Some(hint) = login_hint {
+        if let Some(hint) = target.login_hint {
             parameters.push(("login_hint", hint));
         }
+        let server = &target.server;
         let response = self
             .protocol
             .send_as(server, AsEndpoint::Par, &parameters, key)
@@ -562,8 +567,8 @@ impl OAuthClient {
             code_verifier: verifier.to_string(),
             nonce: nonce.to_owned(),
             expected_issuer: server.issuer().to_owned(),
-            expected_pds,
-            expected_did,
+            expected_pds: target.expected_pds,
+            expected_did: target.expected_did,
             redirect_uri: self.config.redirect_uri.as_str().to_owned(),
             dpop_key_id: key_id.to_owned(),
             dpop_jkt: jkt.to_owned(),

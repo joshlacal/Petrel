@@ -121,7 +121,7 @@ impl Server {
                 json_response(
                     200,
                     None,
-                    json!({"resource":PDS,"authorization_servers":[ISSUER]}),
+                    &json!({"resource":PDS,"authorization_servers":[ISSUER]}),
                 )
             }
             (Some("issuer.example"), "/.well-known/oauth-authorization-server") => {
@@ -133,182 +133,13 @@ impl Server {
                 if matches!(self.scenario, Scenario::NoRevocationEndpoint) {
                     metadata.revocation_endpoint = None;
                 }
-                json_response(200, None, serde_json::to_value(metadata).unwrap())
+                json_response(200, None, &serde_json::to_value(metadata).unwrap())
             }
             (Some("cab.example"), "/backend/oauth/client-assertion") => {
-                let proof = validate_proof(&request);
-                let mut calls = self.exchanges.lock().unwrap();
-                let aud = form["aud"].clone();
-                let challenged = calls.cab.len() % 2 == 0;
-                calls.cab.push((aud, proof.clone()));
-                if matches!(self.scenario, Scenario::CabDenied) {
-                    json_response(
-                        403,
-                        None,
-                        json!({"error":"access_denied","error_description":"test refusal"}),
-                    )
-                } else if challenged || matches!(self.scenario, Scenario::CabRepeatedNonce) {
-                    if challenged {
-                        assert!(proof.get("nonce").is_none());
-                    } else {
-                        assert_eq!(proof["nonce"], "cab-nonce");
-                    }
-                    json_response(400, Some("cab-nonce"), json!({"error":"use_dpop_nonce"}))
-                } else {
-                    assert_eq!(proof["nonce"], "cab-nonce");
-                    let client = if matches!(self.scenario, Scenario::CabClientMismatch) {
-                        "https://other.example/client.json"
-                    } else {
-                        CLIENT
-                    };
-                    json_response(
-                        200,
-                        None,
-                        json!({
-                            "client_id": client,
-                            "client_assertion": format!("fixture-assertion-{}", calls.cab.len())
-                        }),
-                    )
-                }
+                self.cab_exchange(&request, &form)
             }
-            (Some("issuer.example"), "/par") => {
-                let proof = validate_proof(&request);
-                assert_eq!(form["client_id"], CLIENT);
-                assert_eq!(form["code_challenge_method"], "S256");
-                if form["scope"] == SCOPE {
-                    assert!(
-                        std::str::from_utf8(request.body())
-                            .unwrap()
-                            .contains("%2523")
-                    );
-                } else {
-                    assert_eq!(form["scope"], "atproto");
-                }
-                let mut calls = self.exchanges.lock().unwrap();
-                if let Some(assertion) = form.get("client_assertion") {
-                    calls.assertions.push(assertion.clone());
-                }
-                calls.par.push(form);
-                if matches!(self.scenario, Scenario::RepeatedAsNonce) {
-                    json_response(400, Some("fresh-nonce"), json!({"error":"use_dpop_nonce"}))
-                } else if matches!(self.scenario, Scenario::AsNonce) && calls.par.len() == 1 {
-                    assert!(proof.get("nonce").is_none());
-                    json_response(400, Some("fresh-nonce"), json!({"error":"use_dpop_nonce"}))
-                } else {
-                    if matches!(self.scenario, Scenario::AsNonce) {
-                        assert_eq!(proof["nonce"], "fresh-nonce");
-                    }
-                    let nonce = (!matches!(self.scenario, Scenario::MissingParNonce))
-                        .then_some("par-nonce");
-                    json_response(
-                        201,
-                        nonce,
-                        json!({
-                            "request_uri": format!("urn:example:fixture:{}", calls.par.len()),
-                            "expires_in": 60
-                        }),
-                    )
-                }
-            }
-            (Some("issuer.example"), "/token") => {
-                let proof = validate_proof(&request);
-                let grant = form["grant_type"].as_str();
-                if grant == "authorization_code" {
-                    assert_eq!(proof["nonce"], "par-nonce");
-                    let index: usize = form["code"]
-                        .strip_prefix("fixture-code-")
-                        .unwrap()
-                        .parse()
-                        .unwrap();
-                    let mut calls = self.exchanges.lock().unwrap();
-                    assert_eq!(
-                        crate::crypto::pkce_challenge(&form["code_verifier"]),
-                        calls.par[index]["code_challenge"]
-                    );
-                    calls.tokens += 1;
-                    if let Some(assertion) = form.get("client_assertion") {
-                        calls.assertions.push(assertion.clone());
-                    }
-                    let jws =
-                        split_compact_jws(request.headers()["dpop"].to_str().unwrap()).unwrap();
-                    let header: Value = serde_json::from_slice(&jws.header).unwrap();
-                    let key: Jwk = serde_json::from_value(header["jwk"].clone()).unwrap();
-                    calls.proof_jkts.push(serde_json::to_string(&key).unwrap());
-                    match self.scenario {
-                        Scenario::TokenRedirect => Response::builder()
-                            .status(303)
-                            .header(header::LOCATION, "https://untrusted.example/token")
-                            .body(Bytes::new())
-                            .unwrap(),
-                        Scenario::MissingExchangeNonce => token_response(DID, "first", None),
-                        Scenario::OmitRefresh => json_response(
-                            200,
-                            Some("token-nonce"),
-                            json!({
-                                "access_token": "access-only", "token_type": "DPoP", "scope": SCOPE, "sub": DID
-                            }),
-                        ),
-                        Scenario::SubjectMismatch => {
-                            token_response(OTHER_DID, "first", Some("token-nonce"))
-                        }
-                        Scenario::WrongThumbprint => json_response(
-                            200,
-                            Some("token-nonce"),
-                            json!({
-                                "access_token": "access-first", "refresh_token": "refresh-first",
-                                "token_type":"DPoP", "scope":SCOPE, "sub":DID, "dpop_jkt":"unexpected"
-                            }),
-                        ),
-                        Scenario::MalformedRefreshToken => json_response(
-                            200,
-                            Some("token-nonce"),
-                            json!({
-                                "access_token": "access-first", "refresh_token": 12,
-                                "token_type":"DPoP", "scope":SCOPE, "sub":DID
-                            }),
-                        ),
-                        _ => token_response(DID, "first", Some("token-nonce")),
-                    }
-                } else {
-                    assert_eq!(grant, "refresh_token");
-                    assert_eq!(form["refresh_token"], "refresh-first");
-                    assert_eq!(proof["nonce"], "token-nonce");
-                    let count = {
-                        let mut exchanges = self.exchanges.lock().unwrap();
-                        exchanges.refreshes += 1;
-                        exchanges.refreshes
-                    };
-                    retry_delay(15).await;
-                    if matches!(self.scenario, Scenario::RetainedRefreshToken) {
-                        json_response(
-                            200,
-                            None,
-                            json!({
-                                "access_token": format!("access-rotation-{count}"),
-                                "token_type":"DPoP", "scope":SCOPE, "sub":DID
-                            }),
-                        )
-                    } else {
-                        match self.scenario {
-                            Scenario::TransientRefresh if count == 1 => {
-                                json_response(503, None, json!({"error":"temporary"}))
-                            }
-                            Scenario::InvalidGrant => {
-                                json_response(400, None, json!({"error":"invalid_grant"}))
-                            }
-                            Scenario::LostAtproto => json_response(
-                                200,
-                                None,
-                                json!({
-                                    "access_token": "access-no-atproto", "refresh_token":"refresh-no-atproto",
-                                    "token_type": "DPoP", "scope": "transition:generic", "sub": DID
-                                }),
-                            ),
-                            _ => token_response(DID, "second", None),
-                        }
-                    }
-                }
-            }
+            (Some("issuer.example"), "/par") => self.par_exchange(&request, form),
+            (Some("issuer.example"), "/token") => self.token_exchange(&request, &form).await,
             (Some("issuer.example"), "/revoke") => {
                 validate_proof(&request);
                 self.exchanges
@@ -317,63 +148,13 @@ impl Server {
                     .revokes
                     .push(form["token"].clone());
                 if matches!(self.scenario, Scenario::RevocationFailure) {
-                    json_response(503, None, json!({"error":"temporarily_unavailable"}))
+                    json_response(503, None, &json!({"error":"temporarily_unavailable"}))
                 } else {
-                    json_response(200, None, json!({}))
+                    json_response(200, None, &json!({}))
                 }
             }
             (Some("pds.example"), "/xrpc/com.atproto.server.getServiceAuth") => {
-                self.exchanges.lock().unwrap().service_requests += 1;
-                assert_eq!(
-                    request.headers()[header::AUTHORIZATION],
-                    "DPoP access-first"
-                );
-                validate_proof(&request);
-                let mut params: HashMap<_, _> =
-                    url::form_urlencoded::parse(uri.query().unwrap().as_bytes())
-                        .into_owned()
-                        .collect();
-                assert_eq!(
-                    params.remove("aud").as_deref(),
-                    Some("did:web:service.example#atproto_service")
-                );
-                assert_eq!(
-                    params.remove("lxm").as_deref(),
-                    Some("blue.example.service")
-                );
-                let exp = params.remove("exp").unwrap().parse::<u64>().unwrap();
-                assert!(exp > super::protocol::unix_now().unwrap());
-                match self.scenario {
-                    Scenario::ServiceTokenBadExpiration => {
-                        json_response(400, None, json!({"error":"BadExpiration"}))
-                    }
-                    Scenario::ServiceTokenRejected => {
-                        json_response(418, None, json!({"error":"UnknownFailure"}))
-                    }
-                    _ => {
-                        // The PDS owns this service signing key. The client is
-                        // responsible for inspecting the PDS response claims.
-                        let key = SoftwareDpopSigner::generate().unwrap();
-                        let issuer = if matches!(self.scenario, Scenario::ServiceTokenWrongIssuer) {
-                            OTHER_DID
-                        } else {
-                            DID
-                        };
-                        let input = crate::crypto::jws_signing_input(
-                            &json!({"alg":"ES256","typ":"JWT"}),
-                            &json!({
-                                "iss":issuer,
-                                "aud":"did:web:service.example",
-                                "lxm":"blue.example.service",
-                                "exp":exp
-                            }),
-                        )
-                        .unwrap();
-                        let signature = key.sign(input.as_bytes()).await.unwrap();
-                        let token = crate::crypto::finish_es256_jws(input, &signature).unwrap();
-                        json_response(200, None, json!({"token":token}))
-                    }
-                }
+                self.service_auth_exchange(&request).await
             }
             _ => {
                 self.exchanges.lock().unwrap().unexpected_requests += 1;
@@ -381,6 +162,247 @@ impl Server {
             }
         };
         Ok(response)
+    }
+    fn cab_exchange(
+        &self,
+        request: &Request<Bytes>,
+        form: &HashMap<String, String>,
+    ) -> Response<Bytes> {
+        let proof = validate_proof(request);
+        let mut calls = self.exchanges.lock().unwrap();
+        let aud = form["aud"].clone();
+        let challenged = calls.cab.len().is_multiple_of(2);
+        calls.cab.push((aud, proof.clone()));
+        if matches!(self.scenario, Scenario::CabDenied) {
+            json_response(
+                403,
+                None,
+                &json!({"error":"access_denied","error_description":"test refusal"}),
+            )
+        } else if challenged || matches!(self.scenario, Scenario::CabRepeatedNonce) {
+            if challenged {
+                assert!(proof.get("nonce").is_none());
+            } else {
+                assert_eq!(proof["nonce"], "cab-nonce");
+            }
+            json_response(400, Some("cab-nonce"), &json!({"error":"use_dpop_nonce"}))
+        } else {
+            assert_eq!(proof["nonce"], "cab-nonce");
+            let client = if matches!(self.scenario, Scenario::CabClientMismatch) {
+                "https://other.example/client.json"
+            } else {
+                CLIENT
+            };
+            json_response(
+                200,
+                None,
+                &json!({
+                    "client_id": client,
+                    "client_assertion": format!("fixture-assertion-{}", calls.cab.len())
+                }),
+            )
+        }
+    }
+
+    fn par_exchange(
+        &self,
+        request: &Request<Bytes>,
+        form: HashMap<String, String>,
+    ) -> Response<Bytes> {
+        let proof = validate_proof(request);
+        assert_eq!(form["client_id"], CLIENT);
+        assert_eq!(form["code_challenge_method"], "S256");
+        if form["scope"] == SCOPE {
+            assert!(
+                std::str::from_utf8(request.body())
+                    .unwrap()
+                    .contains("%2523")
+            );
+        } else {
+            assert_eq!(form["scope"], "atproto");
+        }
+        let mut calls = self.exchanges.lock().unwrap();
+        if let Some(assertion) = form.get("client_assertion") {
+            calls.assertions.push(assertion.clone());
+        }
+        calls.par.push(form);
+        if matches!(self.scenario, Scenario::RepeatedAsNonce) {
+            json_response(400, Some("fresh-nonce"), &json!({"error":"use_dpop_nonce"}))
+        } else if matches!(self.scenario, Scenario::AsNonce) && calls.par.len() == 1 {
+            assert!(proof.get("nonce").is_none());
+            json_response(400, Some("fresh-nonce"), &json!({"error":"use_dpop_nonce"}))
+        } else {
+            if matches!(self.scenario, Scenario::AsNonce) {
+                assert_eq!(proof["nonce"], "fresh-nonce");
+            }
+            let nonce =
+                (!matches!(self.scenario, Scenario::MissingParNonce)).then_some("par-nonce");
+            json_response(
+                201,
+                nonce,
+                &json!({
+                    "request_uri": format!("urn:example:fixture:{}", calls.par.len()),
+                    "expires_in": 60
+                }),
+            )
+        }
+    }
+
+    async fn token_exchange(
+        &self,
+        request: &Request<Bytes>,
+        form: &HashMap<String, String>,
+    ) -> Response<Bytes> {
+        let proof = validate_proof(request);
+        let grant = form["grant_type"].as_str();
+        if grant == "authorization_code" {
+            assert_eq!(proof["nonce"], "par-nonce");
+            let index: usize = form["code"]
+                .strip_prefix("fixture-code-")
+                .unwrap()
+                .parse()
+                .unwrap();
+            let mut calls = self.exchanges.lock().unwrap();
+            assert_eq!(
+                crate::crypto::pkce_challenge(&form["code_verifier"]),
+                calls.par[index]["code_challenge"]
+            );
+            calls.tokens += 1;
+            if let Some(assertion) = form.get("client_assertion") {
+                calls.assertions.push(assertion.clone());
+            }
+            let jws = split_compact_jws(request.headers()["dpop"].to_str().unwrap()).unwrap();
+            let header: Value = serde_json::from_slice(&jws.header).unwrap();
+            let key: Jwk = serde_json::from_value(header["jwk"].clone()).unwrap();
+            calls.proof_jkts.push(serde_json::to_string(&key).unwrap());
+            match self.scenario {
+                Scenario::TokenRedirect => Response::builder()
+                    .status(303)
+                    .header(header::LOCATION, "https://untrusted.example/token")
+                    .body(Bytes::new())
+                    .unwrap(),
+                Scenario::MissingExchangeNonce => token_response(DID, "first", None),
+                Scenario::OmitRefresh => json_response(
+                    200,
+                    Some("token-nonce"),
+                    &json!({
+                        "access_token": "access-only", "token_type": "DPoP", "scope": SCOPE, "sub": DID
+                    }),
+                ),
+                Scenario::SubjectMismatch => {
+                    token_response(OTHER_DID, "first", Some("token-nonce"))
+                }
+                Scenario::WrongThumbprint => json_response(
+                    200,
+                    Some("token-nonce"),
+                    &json!({
+                        "access_token": "access-first", "refresh_token": "refresh-first",
+                        "token_type":"DPoP", "scope":SCOPE, "sub":DID, "dpop_jkt":"unexpected"
+                    }),
+                ),
+                Scenario::MalformedRefreshToken => json_response(
+                    200,
+                    Some("token-nonce"),
+                    &json!({
+                        "access_token": "access-first", "refresh_token": 12,
+                        "token_type":"DPoP", "scope":SCOPE, "sub":DID
+                    }),
+                ),
+                _ => token_response(DID, "first", Some("token-nonce")),
+            }
+        } else {
+            assert_eq!(grant, "refresh_token");
+            assert_eq!(form["refresh_token"], "refresh-first");
+            assert_eq!(proof["nonce"], "token-nonce");
+            let count = {
+                let mut exchanges = self.exchanges.lock().unwrap();
+                exchanges.refreshes += 1;
+                exchanges.refreshes
+            };
+            retry_delay(15).await;
+            if matches!(self.scenario, Scenario::RetainedRefreshToken) {
+                json_response(
+                    200,
+                    None,
+                    &json!({
+                        "access_token": format!("access-rotation-{count}"),
+                        "token_type":"DPoP", "scope":SCOPE, "sub":DID
+                    }),
+                )
+            } else {
+                match self.scenario {
+                    Scenario::TransientRefresh if count == 1 => {
+                        json_response(503, None, &json!({"error":"temporary"}))
+                    }
+                    Scenario::InvalidGrant => {
+                        json_response(400, None, &json!({"error":"invalid_grant"}))
+                    }
+                    Scenario::LostAtproto => json_response(
+                        200,
+                        None,
+                        &json!({
+                            "access_token": "access-no-atproto", "refresh_token":"refresh-no-atproto",
+                            "token_type": "DPoP", "scope": "transition:generic", "sub": DID
+                        }),
+                    ),
+                    _ => token_response(DID, "second", None),
+                }
+            }
+        }
+    }
+
+    async fn service_auth_exchange(&self, request: &Request<Bytes>) -> Response<Bytes> {
+        self.exchanges.lock().unwrap().service_requests += 1;
+        assert_eq!(
+            request.headers()[header::AUTHORIZATION],
+            "DPoP access-first"
+        );
+        validate_proof(request);
+        let mut params: HashMap<_, _> =
+            url::form_urlencoded::parse(request.uri().query().unwrap().as_bytes())
+                .into_owned()
+                .collect();
+        assert_eq!(
+            params.remove("aud").as_deref(),
+            Some("did:web:service.example#atproto_service")
+        );
+        assert_eq!(
+            params.remove("lxm").as_deref(),
+            Some("blue.example.service")
+        );
+        let exp = params.remove("exp").unwrap().parse::<u64>().unwrap();
+        assert!(exp > super::protocol::unix_now().unwrap());
+        match self.scenario {
+            Scenario::ServiceTokenBadExpiration => {
+                json_response(400, None, &json!({"error":"BadExpiration"}))
+            }
+            Scenario::ServiceTokenRejected => {
+                json_response(418, None, &json!({"error":"UnknownFailure"}))
+            }
+            _ => {
+                // The PDS owns this service signing key. The client is
+                // responsible for inspecting the PDS response claims.
+                let key = SoftwareDpopSigner::generate().unwrap();
+                let issuer = if matches!(self.scenario, Scenario::ServiceTokenWrongIssuer) {
+                    OTHER_DID
+                } else {
+                    DID
+                };
+                let input = crate::crypto::jws_signing_input(
+                    &json!({"alg":"ES256","typ":"JWT"}),
+                    &json!({
+                        "iss":issuer,
+                        "aud":"did:web:service.example",
+                        "lxm":"blue.example.service",
+                        "exp":exp
+                    }),
+                )
+                .unwrap();
+                let signature = key.sign(input.as_bytes()).await.unwrap();
+                let token = crate::crypto::finish_es256_jws(input, &signature).unwrap();
+                json_response(200, None, &json!({"token":token}))
+            }
+        }
     }
 }
 
@@ -417,7 +439,7 @@ impl OAuthIdentityResolver for Server {
 struct FixtureAssertionKey(SoftwareDpopSigner);
 
 impl AssertionSigner for FixtureAssertionKey {
-    fn key_id(&self) -> &str {
+    fn key_id(&self) -> &'static str {
         "fixture-key"
     }
 
@@ -426,7 +448,7 @@ impl AssertionSigner for FixtureAssertionKey {
     }
 }
 
-fn json_response(status: u16, nonce: Option<&str>, body: Value) -> Response<Bytes> {
+fn json_response(status: u16, nonce: Option<&str>, body: &Value) -> Response<Bytes> {
     let mut response = Response::builder()
         .status(status)
         .header(header::CONTENT_TYPE, "application/json; charset=utf-8");
@@ -434,7 +456,7 @@ fn json_response(status: u16, nonce: Option<&str>, body: Value) -> Response<Byte
         response = response.header("DPoP-Nonce", nonce);
     }
     response
-        .body(Bytes::from(serde_json::to_vec(&body).unwrap()))
+        .body(Bytes::from(serde_json::to_vec(body).unwrap()))
         .unwrap()
 }
 
@@ -442,7 +464,7 @@ fn token_response(did: &str, rotation: &str, nonce: Option<&str>) -> Response<By
     json_response(
         200,
         nonce,
-        json!({
+        &json!({
             "access_token": format!("access-{rotation}"),
             "refresh_token": format!("refresh-{rotation}"),
             "token_type": "DPoP",
@@ -459,7 +481,7 @@ fn validate_proof(request: &Request<Bytes>) -> Value {
     assert_eq!(header["alg"], "ES256");
     assert_eq!(header["typ"], "dpop+jwt");
     let key: Jwk = serde_json::from_value(header["jwk"].clone()).unwrap();
-    key.verify_test_signature(proof.input.as_bytes(), &proof.signature)
+    key.verify_signature(proof.input.as_bytes(), &proof.signature)
         .unwrap();
     let claims: Value = serde_json::from_slice(&proof.claims).unwrap();
     assert_eq!(claims["htm"], request.method().as_str());
@@ -640,7 +662,7 @@ async fn private_assertions_are_distinct_across_nonce_retry_and_exchange() {
     let key = Jwk::try_from(&public_jwk).unwrap();
     for assertion in &calls.assertions {
         let jws = split_compact_jws(assertion).unwrap();
-        key.verify_test_signature(jws.input.as_bytes(), &jws.signature)
+        key.verify_signature(jws.input.as_bytes(), &jws.signature)
             .unwrap();
         let claims: Value = serde_json::from_slice(&jws.claims).unwrap();
         assert_eq!(claims["aud"], ISSUER);
@@ -684,7 +706,7 @@ async fn cab_nonce_is_private_to_each_assertion_and_backend_client_id_must_match
             );
             let calls = server.exchanges.lock().unwrap();
             assert_eq!(calls.cab.len(), 2);
-            assert!(calls.par.is_empty());
+            assert_eq!(calls.par.len(), 0);
         }
     }
 }
@@ -756,7 +778,7 @@ async fn late_old_token_rejection_does_not_rotate_the_current_session() {
         .unwrap();
     let (_, old_ctx) = auth.prepare(request).await.unwrap();
     client.refresh(&did, true).await.unwrap();
-    let late = json_response(401, None, json!({"error": "ExpiredToken"}));
+    let late = json_response(401, None, &json!({"error": "ExpiredToken"}));
     assert_eq!(
         auth.handle_unauthorized(&late, &old_ctx).await.unwrap(),
         crate::xrpc::UnauthorizedAction::Retry
@@ -978,7 +1000,7 @@ async fn the_backend_is_not_called_for_unsupported_cab_and_reports_typed_refusal
         }
         let calls = server.exchanges.lock().unwrap();
         assert_eq!(calls.cab.len(), count);
-        assert!(calls.par.is_empty());
+        assert_eq!(calls.par.len(), 0);
     }
 }
 

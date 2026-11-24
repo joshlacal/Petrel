@@ -261,7 +261,9 @@ impl SessionAuth {
             .map_err(|error| match error {
                 XrpcError::Xrpc(error) => match error.kind {
                     XrpcErrorKind::Declared(typed) => Error::Declared(typed),
-                    _ => Error::RequestFailed(error.metadata.status.as_u16()),
+                    XrpcErrorKind::Undeclared(_) => {
+                        Error::RequestFailed(error.metadata.status.as_u16())
+                    }
                 },
                 XrpcError::Decode {
                     status: StatusCode::OK,

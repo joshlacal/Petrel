@@ -146,6 +146,7 @@ impl OAuthProtocol {
     ) -> Result<ValidatedAuthorizationServer, MetadataError> {
         let resource_error = match self.discover_pds(server).await {
             Ok(metadata) => return Ok(metadata),
+            Err(error @ MetadataError::Transport(_)) => return Err(error),
             Err(error) => error,
         };
         let issuer = origin(server, false)
@@ -198,7 +199,11 @@ impl OAuthProtocol {
                     .map_err(|_| MetadataError::InvalidOrigin)?;
                 match self.transport.send_dyn(request, &options).await {
                     Ok(response) => break response,
-                    Err(TransportError::Timeout | TransportError::Connect(_)) if attempt < 2 => {
+                    Err(
+                        TransportError::Timeout
+                        | TransportError::Connect(_)
+                        | TransportError::ConnectionLost(_),
+                    ) if attempt < 2 => {
                         retry_delay(100 << attempt).await;
                         attempt += 1;
                     }

@@ -126,7 +126,7 @@ impl OAuthClient {
             Err(StoreError::Unsupported) => {
                 // Embedders without CAS must serialize mutations across clients.
                 let current = self.storage.get_session(&old.session.did).await?;
-                if !current.is_some_and(|record| record.generation() == old.generation()) {
+                if current.is_none_or(|record| record.generation() != old.generation()) {
                     return Ok(false);
                 }
                 self.storage.save_session(new).await?;
@@ -249,7 +249,7 @@ impl OAuthClient {
                 if retryable_refresh_failure(&error) {
                     state.used.retain(|used| *used != digest);
                 }
-                state.failure(now, &error);
+                state.failure(unix_now().unwrap_or(now), &error);
                 Err(error)
             }
         }
@@ -357,14 +357,77 @@ fn retryable_refresh_failure(error: &OAuthError) -> bool {
         error,
         OAuthError::NonceRetryExhausted
             | OAuthError::ServerStatus(429 | 500..=599)
-            | OAuthError::Protocol(OAuthProtocolError::Transport(
-                TransportError::Timeout | TransportError::Connect(_)
-            ))
-            | OAuthError::Protocol(OAuthProtocolError::AssertionBackend(
-                super::AssertionBackendError::Rejected {
+            | OAuthError::Protocol(
+                OAuthProtocolError::Transport(
+                    TransportError::Timeout
+                        | TransportError::Connect(_)
+                        | TransportError::ConnectionLost(_)
+                ) | OAuthProtocolError::AssertionBackend(super::AssertionBackendError::Rejected {
                     status: 429 | 500..=599,
                     ..
-                }
-            ))
+                })
+            )
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+    #[cfg_attr(not(target_arch = "wasm32"), test)]
+    fn breaker_opens_after_three_transient_errors_and_resets_after_success() {
+        let mut state = RefreshState::default();
+        let error = OAuthError::ServerStatus(503);
+        state.failure(100, &error);
+        state.failure(101, &error);
+        assert_eq!(state.retry_after, 0);
+        state.failure(102, &error);
+        assert!((124..=139).contains(&state.retry_after));
+        let retry = state.retry_after;
+        state.failure(retry, &error);
+        assert!((retry + 45..=retry + 74).contains(&state.retry_after));
+        state.success();
+        assert_eq!(state.retry_after, 0);
+        assert_eq!(state.consecutive_failures, 0);
+    }
+
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+    #[cfg_attr(not(target_arch = "wasm32"), test)]
+    fn breaker_does_not_count_nonce_challenges_twice_or_burn_a_token_twice() {
+        let mut state = RefreshState::default();
+        state.failure(100, &OAuthError::NonceRetryExhausted);
+        assert_eq!(state.consecutive_failures, 0);
+        assert!(state.burn("synthetic-refresh-token").is_ok());
+        state.failure(101, &OAuthError::InvalidGrant);
+        assert_eq!(
+            state.burn("synthetic-refresh-token"),
+            Err(OAuthError::UsedRefreshToken)
+        );
+        assert_eq!(state.consecutive_failures, 1);
+    }
+
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+    #[cfg_attr(not(target_arch = "wasm32"), test)]
+    fn refresh_margin_is_capped_and_an_access_only_session_runs_to_expiry() {
+        let did: Did = "did:plc:abcdefghijklmnopqrstuvwx".parse().unwrap();
+        let scope = petrel_oauth_scopes::ScopeSet::parse("atproto").unwrap();
+        let refreshable = |ttl| {
+            Session::new(
+                did.clone(),
+                "access".into(),
+                Some("refresh".into()),
+                1000,
+                ttl,
+                &scope,
+            )
+        };
+        assert!(!refreshable(50).needs_refresh(1039));
+        assert!(refreshable(50).needs_refresh(1040));
+        assert!(!refreshable(600).needs_refresh(1539));
+        assert!(refreshable(600).needs_refresh(1540));
+        let access_only = Session::new(did, "access".into(), None, 1000, 300, &scope);
+        assert!(!access_only.needs_refresh(1299));
+        assert!(access_only.needs_refresh(1300));
+    }
 }

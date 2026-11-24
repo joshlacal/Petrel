@@ -230,6 +230,21 @@ impl AuthorizationServerMetadata {
             .map(|url| endpoint(Some(url), "revocation_endpoint"))
             .transpose()?;
 
+        self.validate_capabilities(client_auth)?;
+
+        Ok(ValidatedAuthorizationServer {
+            metadata: self,
+            authorization_endpoint,
+            token_endpoint,
+            par_endpoint,
+            revocation_endpoint,
+        })
+    }
+
+    fn validate_capabilities(
+        &self,
+        client_auth: ClientAuthenticationMethod,
+    ) -> Result<(), MetadataError> {
         let require = |items: &[String], field, value| {
             if items.iter().any(|item| item == value) {
                 Ok(())
@@ -302,13 +317,7 @@ impl AuthorizationServerMetadata {
             }
         }
 
-        Ok(ValidatedAuthorizationServer {
-            metadata: self,
-            authorization_endpoint,
-            token_endpoint,
-            par_endpoint,
-            revocation_endpoint,
-        })
+        Ok(())
     }
 }
 

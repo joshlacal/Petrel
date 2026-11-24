@@ -23,6 +23,7 @@ impl<D, C> OAuthIdentityAdapter<D, C> {
     }
 
     /// Permit exact loopback PDS endpoints from local development DID documents.
+    #[must_use]
     pub fn with_loopback_development(mut self) -> Self {
         self.allow_loopback = true;
         self
