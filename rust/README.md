@@ -81,6 +81,10 @@ size while native transport also checks IP addresses and compressed wire size.
 For cross-origin OAuth and XRPC, servers must expose `DPoP-Nonce` and
 `WWW-Authenticate` through CORS for the SDK to handle nonce challenges.
 
+Browser embedders can use `crypto::WebCryptoDpopSigner` for non-extractable
+P-256 keys. The signer can validate a restored key handle against its public
+JWK. The embedder supplies persistence for the handle and for session records.
+
 `getrandom` is wired for the 0.2 line only (`getrandom/js`), which is what
 `p256` 0.13 uses. If a later dependency brings `getrandom` 0.3 or 0.4 into the
 wasm graph, add the aliased dependencies described in
@@ -113,6 +117,7 @@ Shared names used by the generator and runtime.
   `parse`, `as_str`, `into_string`, `FromStr`, `Display`, and the bridge and
   serde traits.
 - Wire wrappers: `Cid`, `CidLink`, `Bytes`, `Blob`, `Nullable<T>`.
+- Service audiences and proxy values: `ServiceRef` and `ServiceRefError`.
 - The bridge: `ToValue`, `FromValue`, `ObjectReader`, `ObjectWriter`,
   `to_json`, `from_json`, `to_dag_cbor`, `from_dag_cbor`,
   `serde_bridge::{serialize, deserialize}`, `unknown::{type_of, tagged}`.
