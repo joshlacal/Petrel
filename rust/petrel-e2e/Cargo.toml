@@ -18,13 +18,18 @@ wasm = []
 axum = { workspace = true }
 base64 = { workspace = true }
 p256 = { workspace = true, features = ["pem"] }
-petrel = { workspace = true, features = ["native"] }
-petrel-core = { workspace = true }
 reqwest = { workspace = true, features = ["form"] }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "net"] }
 url = { workspace = true }
+
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+bytes = { workspace = true }
+http = { workspace = true }
+petrel = { workspace = true, features = ["native"] }
+petrel-core = { workspace = true }
 
 [lints]
 workspace = true
