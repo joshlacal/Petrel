@@ -57,6 +57,17 @@ enum Scenario {
     WrongThumbprint,
     MalformedRefreshToken,
     RetainedRefreshToken,
+    TransientRefresh,
+    InvalidGrant,
+    OmitRefresh,
+    LostAtproto,
+    MissingParNonce,
+    RepeatedAsNonce,
+    CabRepeatedNonce,
+    CabDenied,
+    PublicOnly,
+    NoRevocationEndpoint,
+    RevocationFailure,
     TokenRedirect,
     CabNonce,
     CabClientMismatch,
@@ -76,13 +87,15 @@ impl Server {
     }
 
     fn pushed_callback(&self, issuer: &str) -> Url {
-        let state = self.exchanges.lock().unwrap().par[0]["state"].clone();
+        let calls = self.exchanges.lock().unwrap();
+        let index = calls.par.len() - 1;
+        let state = &calls.par[index]["state"];
         let mut callback = Url::parse(REDIRECT).unwrap();
         callback
             .query_pairs_mut()
-            .append_pair("state", &state)
+            .append_pair("state", state)
             .append_pair("iss", issuer)
-            .append_pair("code", "fixture-code");
+            .append_pair("code", &format!("fixture-code-{index}"));
         callback
     }
 
@@ -107,11 +120,14 @@ impl Server {
             }
             (Some("issuer.example"), "/.well-known/oauth-authorization-server") => {
                 assert!(options.anonymous);
-                json_response(
-                    200,
-                    None,
-                    serde_json::to_value(example_metadata(ISSUER)).unwrap(),
-                )
+                let mut metadata = example_metadata(ISSUER);
+                if matches!(self.scenario, Scenario::PublicOnly) {
+                    metadata.token_endpoint_auth_methods_supported = vec!["none".into()];
+                }
+                if matches!(self.scenario, Scenario::NoRevocationEndpoint) {
+                    metadata.revocation_endpoint = None;
+                }
+                json_response(200, None, serde_json::to_value(metadata).unwrap())
             }
             (Some("cab.example"), "/backend/oauth/client-assertion") => {
                 let proof = validate_proof(&request);
@@ -119,8 +135,18 @@ impl Server {
                 let aud = form["aud"].clone();
                 let challenged = calls.cab.len() % 2 == 0;
                 calls.cab.push((aud, proof.clone()));
-                if challenged {
-                    assert!(proof.get("nonce").is_none());
+                if matches!(self.scenario, Scenario::CabDenied) {
+                    json_response(
+                        403,
+                        None,
+                        json!({"error":"access_denied","error_description":"test refusal"}),
+                    )
+                } else if challenged || matches!(self.scenario, Scenario::CabRepeatedNonce) {
+                    if challenged {
+                        assert!(proof.get("nonce").is_none());
+                    } else {
+                        assert_eq!(proof["nonce"], "cab-nonce");
+                    }
                     json_response(400, Some("cab-nonce"), json!({"error":"use_dpop_nonce"}))
                 } else {
                     assert_eq!(proof["nonce"], "cab-nonce");
@@ -143,28 +169,38 @@ impl Server {
                 let proof = validate_proof(&request);
                 assert_eq!(form["client_id"], CLIENT);
                 assert_eq!(form["code_challenge_method"], "S256");
-                assert_eq!(form["scope"], SCOPE);
-                assert!(
-                    std::str::from_utf8(request.body())
-                        .unwrap()
-                        .contains("%2523")
-                );
+                if form["scope"] == SCOPE {
+                    assert!(
+                        std::str::from_utf8(request.body())
+                            .unwrap()
+                            .contains("%2523")
+                    );
+                } else {
+                    assert_eq!(form["scope"], "atproto");
+                }
                 let mut calls = self.exchanges.lock().unwrap();
                 if let Some(assertion) = form.get("client_assertion") {
                     calls.assertions.push(assertion.clone());
                 }
                 calls.par.push(form);
-                if matches!(self.scenario, Scenario::AsNonce) && calls.par.len() == 1 {
+                if matches!(self.scenario, Scenario::RepeatedAsNonce) {
+                    json_response(400, Some("fresh-nonce"), json!({"error":"use_dpop_nonce"}))
+                } else if matches!(self.scenario, Scenario::AsNonce) && calls.par.len() == 1 {
                     assert!(proof.get("nonce").is_none());
                     json_response(400, Some("fresh-nonce"), json!({"error":"use_dpop_nonce"}))
                 } else {
                     if matches!(self.scenario, Scenario::AsNonce) {
                         assert_eq!(proof["nonce"], "fresh-nonce");
                     }
+                    let nonce = (!matches!(self.scenario, Scenario::MissingParNonce))
+                        .then_some("par-nonce");
                     json_response(
                         201,
-                        Some("par-nonce"),
-                        json!({"request_uri":"urn:example:fixture"}),
+                        nonce,
+                        json!({
+                            "request_uri": format!("urn:example:fixture:{}", calls.par.len()),
+                            "expires_in": 60
+                        }),
                     )
                 }
             }
@@ -173,11 +209,15 @@ impl Server {
                 let grant = form["grant_type"].as_str();
                 if grant == "authorization_code" {
                     assert_eq!(proof["nonce"], "par-nonce");
-                    assert_eq!(form["code"], "fixture-code");
+                    let index: usize = form["code"]
+                        .strip_prefix("fixture-code-")
+                        .unwrap()
+                        .parse()
+                        .unwrap();
                     let mut calls = self.exchanges.lock().unwrap();
                     assert_eq!(
                         crate::crypto::pkce_challenge(&form["code_verifier"]),
-                        calls.par.last().unwrap()["code_challenge"]
+                        calls.par[index]["code_challenge"]
                     );
                     calls.tokens += 1;
                     if let Some(assertion) = form.get("client_assertion") {
@@ -195,6 +235,13 @@ impl Server {
                             .body(Bytes::new())
                             .unwrap(),
                         Scenario::MissingExchangeNonce => token_response(DID, "first", None),
+                        Scenario::OmitRefresh => json_response(
+                            200,
+                            Some("token-nonce"),
+                            json!({
+                                "access_token": "access-only", "token_type": "DPoP", "scope": SCOPE, "sub": DID
+                            }),
+                        ),
                         Scenario::SubjectMismatch => {
                             token_response(OTHER_DID, "first", Some("token-nonce"))
                         }
@@ -236,7 +283,23 @@ impl Server {
                             }),
                         )
                     } else {
-                        token_response(DID, "second", None)
+                        match self.scenario {
+                            Scenario::TransientRefresh if count == 1 => {
+                                json_response(503, None, json!({"error":"temporary"}))
+                            }
+                            Scenario::InvalidGrant => {
+                                json_response(400, None, json!({"error":"invalid_grant"}))
+                            }
+                            Scenario::LostAtproto => json_response(
+                                200,
+                                None,
+                                json!({
+                                    "access_token": "access-no-atproto", "refresh_token":"refresh-no-atproto",
+                                    "token_type": "DPoP", "scope": "transition:generic", "sub": DID
+                                }),
+                            ),
+                            _ => token_response(DID, "second", None),
+                        }
                     }
                 }
             }
@@ -247,7 +310,11 @@ impl Server {
                     .unwrap()
                     .revokes
                     .push(form["token"].clone());
-                json_response(200, None, json!({}))
+                if matches!(self.scenario, Scenario::RevocationFailure) {
+                    json_response(503, None, json!({"error":"temporarily_unavailable"}))
+                } else {
+                    json_response(200, None, json!({}))
+                }
             }
             _ => {
                 self.exchanges.lock().unwrap().unexpected_requests += 1;
@@ -642,4 +709,236 @@ async fn a_valid_refresh_response_can_keep_the_same_refresh_token() {
         assert_eq!(refreshed.refresh_token(), Some("refresh-first"));
     }
     assert_eq!(server.exchanges.lock().unwrap().refreshes, 2);
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn scope_and_state_overrides_are_explicit_and_cancellable() {
+    let server = Arc::new(Server::new(Scenario::Public));
+    let client = client(&server, ClientAuth::Public);
+    let target = OAuthTarget::Identifier(DID.parse().unwrap());
+    let options = super::OAuthStartOptions {
+        scope: Some("atproto"),
+        state_prefix: Some("loopback.test"),
+    };
+    let first = client
+        .start_authorization_with_options(target.clone(), options)
+        .await
+        .unwrap();
+    assert!(first.state.starts_with("loopback.test."));
+    {
+        let calls = server.exchanges.lock().unwrap();
+        assert_eq!(calls.par[0]["scope"], "atproto");
+        assert_eq!(calls.par[0]["login_hint"], DID);
+    }
+    let callback = server.pushed_callback(ISSUER);
+    assert!(client.cancel_authorization(&first.state).await.unwrap());
+    assert!(!client.cancel_authorization(&first.state).await.unwrap());
+    assert_eq!(
+        client.complete_authorization(&callback).await.unwrap_err(),
+        OAuthError::UnknownState
+    );
+    let second = client
+        .start_authorization_with_options(target.clone(), options)
+        .await
+        .unwrap();
+    assert_ne!(first.state, second.state);
+    assert_ne!(first.authorize_url, second.authorize_url);
+    let invalid = super::OAuthStartOptions {
+        scope: Some("transition:generic"),
+        ..options
+    };
+    assert_eq!(
+        client
+            .start_authorization_with_options(target, invalid)
+            .await
+            .unwrap_err(),
+        OAuthError::Scope
+    );
+
+    let mut denial = Url::parse(REDIRECT).unwrap();
+    denial
+        .query_pairs_mut()
+        .append_pair("state", &second.state)
+        .append_pair("error", "access_denied");
+    assert_eq!(
+        client.complete_authorization(&denial).await.unwrap_err(),
+        OAuthError::Cancelled
+    );
+    assert_eq!(
+        client.complete_authorization(&denial).await.unwrap_err(),
+        OAuthError::UnknownState
+    );
+    let calls = server.exchanges.lock().unwrap();
+    assert_eq!(calls.tokens, 0);
+    assert_ne!(
+        calls.par[0]["code_challenge"],
+        calls.par[1]["code_challenge"]
+    );
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn refresh_classifies_terminal_and_transient_failures() {
+    for scenario in [
+        Scenario::TransientRefresh,
+        Scenario::InvalidGrant,
+        Scenario::LostAtproto,
+        Scenario::OmitRefresh,
+    ] {
+        let server = Arc::new(Server::new(scenario));
+        let client = client(&server, ClientAuth::Public);
+        start(&client).await;
+        let session = client
+            .complete_authorization(&server.pushed_callback(ISSUER))
+            .await
+            .unwrap();
+        let did = &session.did;
+        match scenario {
+            Scenario::TransientRefresh => {
+                assert_eq!(
+                    client.refresh(did, true).await.unwrap_err(),
+                    OAuthError::ServerStatus(503)
+                );
+                assert_eq!(
+                    client.refresh(did, true).await.unwrap().access_token(),
+                    "access-second"
+                );
+                assert_eq!(server.exchanges.lock().unwrap().refreshes, 2);
+            }
+            Scenario::InvalidGrant => {
+                assert_eq!(
+                    client.refresh(did, true).await.unwrap_err(),
+                    OAuthError::InvalidGrant
+                );
+                assert_eq!(
+                    client.refresh(did, true).await.unwrap_err(),
+                    OAuthError::UsedRefreshToken
+                );
+                assert_eq!(server.exchanges.lock().unwrap().refreshes, 1);
+            }
+            Scenario::LostAtproto => {
+                assert_eq!(
+                    client.refresh(did, true).await.unwrap_err(),
+                    OAuthError::InvalidResponse
+                );
+                assert_eq!(
+                    server.exchanges.lock().unwrap().revokes,
+                    ["refresh-no-atproto"]
+                );
+                assert_eq!(client.session(did).await.unwrap().unwrap().scope(), SCOPE);
+            }
+            Scenario::OmitRefresh => {
+                assert_eq!(session.expires_in, 300);
+                assert!(session.refresh_token().is_none());
+                assert_eq!(
+                    client.refresh(did, false).await.unwrap().access_token(),
+                    "access-only"
+                );
+                assert_eq!(
+                    client.refresh(did, true).await.unwrap_err(),
+                    OAuthError::ExpiredSession
+                );
+                assert_eq!(server.exchanges.lock().unwrap().refreshes, 0);
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn par_nonce_is_required_and_repeated_challenges_are_bounded() {
+    for (scenario, error, expected_calls) in [
+        (Scenario::MissingParNonce, OAuthError::MissingNonce, 1),
+        (
+            Scenario::RepeatedAsNonce,
+            OAuthError::NonceRetryExhausted,
+            2,
+        ),
+    ] {
+        let server = Arc::new(Server::new(scenario));
+        let client = client(&server, ClientAuth::Public);
+        let target = OAuthTarget::Identifier(DID.parse().unwrap());
+        assert_eq!(client.start_authorization(target).await.unwrap_err(), error);
+        assert_eq!(server.exchanges.lock().unwrap().par.len(), expected_calls);
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn the_backend_is_not_called_for_unsupported_cab_and_reports_typed_refusals() {
+    for (scenario, count) in [
+        (Scenario::CabRepeatedNonce, 2),
+        (Scenario::CabDenied, 1),
+        (Scenario::PublicOnly, 0),
+    ] {
+        let server = Arc::new(Server::new(scenario));
+        let auth = ClientAuth::Cab {
+            backend_url: Url::parse(CAB).unwrap(),
+            client_id: CLIENT.into(),
+        };
+        let client = client(&server, auth);
+        let target = OAuthTarget::Identifier(DID.parse().unwrap());
+        let error = client.start_authorization(target).await.unwrap_err();
+        match scenario {
+            Scenario::CabRepeatedNonce => assert_eq!(
+                error,
+                OAuthProtocolError::AssertionBackend(AssertionBackendError::Rejected {
+                    status: 400,
+                    code: Some(super::AssertionBackendErrorCode::UseDpopNonce)
+                })
+                .into()
+            ),
+            Scenario::CabDenied => assert_eq!(
+                error,
+                OAuthProtocolError::AssertionBackend(AssertionBackendError::Rejected {
+                    status: 403,
+                    code: Some(super::AssertionBackendErrorCode::AccessDenied)
+                })
+                .into()
+            ),
+            Scenario::PublicOnly => assert!(matches!(
+                error,
+                OAuthError::Metadata(super::MetadataError::MissingValue { .. })
+            )),
+            _ => unreachable!(),
+        }
+        let calls = server.exchanges.lock().unwrap();
+        assert_eq!(calls.cab.len(), count);
+        assert!(calls.par.is_empty());
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn logout_always_removes_session_and_key_and_reports_confirmed_revocation() {
+    for (scenario, revoked, revoke_requests) in [
+        (Scenario::Public, true, 1),
+        (Scenario::NoRevocationEndpoint, false, 0),
+        (Scenario::RevocationFailure, false, 1),
+    ] {
+        let server = Arc::new(Server::new(scenario));
+        let client = client(&server, ClientAuth::Public);
+        start(&client).await;
+        let session = client
+            .complete_authorization(&server.pushed_callback(ISSUER))
+            .await
+            .unwrap();
+        let did = &session.did;
+        let stored = client.storage.get_session(did).await.unwrap().unwrap();
+        assert_eq!(client.logout(did).await.unwrap(), revoked);
+        assert!(
+            client
+                .storage
+                .get_dpop_key(&stored.dpop_key_id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(client.session(did).await.unwrap().is_none());
+        let calls = server.exchanges.lock().unwrap();
+        assert_eq!(calls.revokes.len(), revoke_requests);
+        assert!(calls.revokes.iter().all(|token| token == "refresh-first"));
+    }
 }

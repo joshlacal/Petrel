@@ -70,7 +70,7 @@ impl AuthProvider for SessionAuth {
                 .bound_key(&record.dpop_key_id, &record.dpop_jkt)
                 .await
                 .map_err(auth_error)?;
-            let nonce = self.client.protocol.nonces.get(&record.dpop_jkt, &uri);
+            let nonce = self.client.resource_nonces.get(&record.dpop_jkt, &uri);
             let proof = dpop_proof(
                 &*key,
                 request.method(),
@@ -186,8 +186,7 @@ impl AuthProvider for SessionAuth {
             {
                 let _ = self
                     .client
-                    .protocol
-                    .nonces
+                    .resource_nonces
                     .put(&record.dpop_jkt, &url, nonce);
             }
         })

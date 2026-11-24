@@ -305,6 +305,31 @@ impl OAuthClient {
         Ok(())
     }
 
+    /// Revokes the current token with the authorization server if it has a
+    /// revocation endpoint. The server must confirm with HTTP 200.
+    pub async fn revoke_session(&self, did: &Did) -> Result<bool, OAuthError> {
+        let lock = self.account_lock(did);
+        let mut state = lock.lock().await;
+        match self.read_record(did, &mut state).await? {
+            Some(record) => Ok(self.revoke_record(&record).await),
+            None => Ok(false),
+        }
+    }
+
+    async fn revoke_record(&self, record: &SessionRecord) -> bool {
+        let Ok(server) = self.validate_account(&record.account) else {
+            return false;
+        };
+        let Ok(key) = self.bound_key(&record.dpop_key_id, &record.dpop_jkt).await else {
+            return false;
+        };
+        let token = record
+            .session
+            .refresh_token()
+            .unwrap_or_else(|| record.session.access_token());
+        self.revoke(&server, &*key, token).await
+    }
+
     /// Tries upstream revocation, then clears local tokens, nonces and the DPoP key.
     pub async fn logout(&self, did: &Did) -> Result<bool, OAuthError> {
         let lock = self.account_lock(did);
@@ -312,24 +337,13 @@ impl OAuthClient {
         let Some(record) = self.read_record(did, &mut state).await? else {
             return Ok(false);
         };
-        let revoked = match (
-            self.validate_account(&record.account),
-            self.bound_key(&record.dpop_key_id, &record.dpop_jkt).await,
-        ) {
-            (Ok(server), Ok(key)) => {
-                let token = record
-                    .session
-                    .refresh_token()
-                    .unwrap_or_else(|| record.session.access_token());
-                self.revoke(&server, &*key, token).await
-            }
-            _ => false,
-        };
+        let revoked = self.revoke_record(&record).await;
 
         let pending_result = self.storage.delete_pending_session(did).await;
         let session_result = self.storage.delete_session(did).await;
         let key_result = self.keys.delete(&record.dpop_key_id).await;
         self.protocol.nonces.clear_key(&record.dpop_jkt);
+        self.resource_nonces.clear_key(&record.dpop_jkt);
         *state = RefreshState::default();
         pending_result?;
         session_result?;

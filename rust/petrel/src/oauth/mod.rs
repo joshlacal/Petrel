@@ -32,7 +32,7 @@ mod resource_auth;
 
 pub use client::{
     DpopKeyStore, OAuthClient, OAuthConfig, OAuthError, OAuthIdentity, OAuthIdentityError,
-    OAuthIdentityResolver, OAuthTarget,
+    OAuthIdentityResolver, OAuthStartOptions, OAuthTarget, PendingOAuthFlow,
 };
 pub use dpop::{DpopError, DpopNonces, dpop_proof, dpop_target};
 pub use identity_adapter::OAuthIdentityAdapter;

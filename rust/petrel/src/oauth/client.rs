@@ -11,6 +11,7 @@ use petrel_core::{AtIdentifier, Did, Handle};
 use petrel_oauth_scopes::ScopeSet;
 use serde::Deserialize;
 use url::Url;
+use web_time::Instant;
 use zeroize::Zeroize;
 
 use crate::{
@@ -181,6 +182,27 @@ impl OAuthConfig {
         })
     }
 
+    /// Constructs public OAuth client metadata for a loopback development listener.
+    pub fn loopback(port: u16, path: &str, scope: &str) -> Result<Self, OAuthError> {
+        if port == 0 || !path.starts_with('/') || path.starts_with("//") {
+            return Err(OAuthError::RedirectUri);
+        }
+        let mut redirect =
+            Url::parse(&format!("http://127.0.0.1:{port}")).map_err(|_| OAuthError::RedirectUri)?;
+        redirect.set_path(path);
+        let query = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("redirect_uri", redirect.as_str())
+            .append_pair("scope", scope)
+            .finish();
+        Ok(Self::new(
+            format!("http://localhost?{query}"),
+            redirect,
+            scope,
+            ClientAuth::Public,
+        )?
+        .with_loopback_development())
+    }
+
     /// Permit explicit loopback HTTP endpoints for local development.
     pub fn with_loopback_development(mut self) -> Self {
         self.allow_loopback = true;
@@ -192,6 +214,26 @@ impl OAuthConfig {
 pub enum OAuthTarget {
     Identifier(AtIdentifier),
     Server(Url),
+}
+
+/// Overrides for one authorization flow.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct OAuthStartOptions<'a> {
+    pub scope: Option<&'a str>,
+    pub state_prefix: Option<&'a str>,
+}
+
+/// The browser URL and state referring to a pending authorization.
+#[derive(Clone)]
+pub struct PendingOAuthFlow {
+    pub authorize_url: Url,
+    pub state: String,
+}
+
+impl fmt::Debug for PendingOAuthFlow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PendingOAuthFlow").finish_non_exhaustive()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -265,6 +307,7 @@ pub struct OAuthClient {
     pub(super) protocol: OAuthProtocol,
     pub(super) storage: SessionStore,
     pub(super) keys: Arc<dyn DpopKeyStore>,
+    pub(super) resource_nonces: DpopNonces,
     resolver: Arc<dyn OAuthIdentityResolver>,
     config: OAuthConfig,
     pub(super) accounts: Mutex<HashMap<Did, Arc<AsyncMutex<RefreshState>>>>,
@@ -272,11 +315,11 @@ pub struct OAuthClient {
 }
 
 struct PendingAuthorization {
-    target: String,
-    state: String,
-    authorize_url: Url,
+    target: (String, String, Option<String>),
+    flow: PendingOAuthFlow,
     created_at: u64,
     reuse_until: u64,
+    finished_at: Instant,
     key_id: String,
     jkt: String,
 }
@@ -310,6 +353,7 @@ impl OAuthClient {
             keys: Arc::new(SoftwareKeyStore {
                 storage: storage.clone(),
             }),
+            resource_nonces: DpopNonces::default(),
             storage,
             resolver,
             config,
@@ -324,20 +368,51 @@ impl OAuthClient {
     }
 
     pub async fn start_authorization(&self, target: OAuthTarget) -> Result<Url, OAuthError> {
+        Ok(self
+            .start_authorization_with_options(target, OAuthStartOptions::default())
+            .await?
+            .authorize_url)
+    }
+
+    pub async fn start_authorization_with_options(
+        &self,
+        target: OAuthTarget,
+        options: OAuthStartOptions<'_>,
+    ) -> Result<PendingOAuthFlow, OAuthError> {
+        let started_at = Instant::now();
+        let requested_scope = options
+            .scope
+            .map(ScopeSet::parse)
+            .transpose()
+            .map_err(|_| OAuthError::Scope)?;
+        let scope = requested_scope.as_ref().unwrap_or(&self.config.scope);
+        if !scope.includes_atproto() {
+            return Err(OAuthError::Scope);
+        }
+        if options
+            .state_prefix
+            .is_some_and(|prefix| !valid_state_prefix(prefix))
+        {
+            return Err(OAuthError::Callback);
+        }
+
         let target_key = match &target {
             OAuthTarget::Identifier(identifier) => identifier.as_str(),
             OAuthTarget::Server(url) => url.as_str(),
-        }
-        .to_owned();
-        // Different targets share a short-lived flow limit. A concurrent start
-        // for the same target reuses the same pushed request and state.
+        };
+        let target_key = (
+            target_key.to_owned(),
+            scope.scope_string(),
+            options.state_prefix.map(str::to_owned),
+        );
+        // Requests already waiting when this push succeeded share its result.
+        // A new invocation starts a fresh flow, even for the same target.
         let mut pending = self.pending.lock().await;
         let now = unix_now()?;
-        if let Some(flow) = pending
-            .iter()
-            .find(|flow| flow.target == target_key && now < flow.reuse_until)
-        {
-            return Ok(flow.authorize_url.clone());
+        if let Some(flow) = pending.iter().find(|flow| {
+            flow.target == target_key && now < flow.reuse_until && started_at <= flow.finished_at
+        }) {
+            return Ok(flow.flow.clone());
         }
         while let Some(index) = pending
             .iter()
@@ -378,6 +453,9 @@ impl OAuthClient {
 
         let key_id = base64url(&random_bytes::<32>()?);
         let state = base64url(&random_bytes::<32>()?);
+        let state = options
+            .state_prefix
+            .map_or_else(|| state.clone(), |prefix| format!("{prefix}.{state}"));
         let key = self.keys.create(&key_id).await?;
         let jkt = match key.public_jwk().thumbprint() {
             Ok(jkt) => jkt,
@@ -389,6 +467,7 @@ impl OAuthClient {
         let (authorize_url, par_lifetime) = match self
             .push_authorization(
                 &server,
+                &target_key.1,
                 &state,
                 &key_id,
                 &jkt,
@@ -407,22 +486,27 @@ impl OAuthClient {
             }
         };
         let created_at = unix_now()?;
+        let flow = PendingOAuthFlow {
+            authorize_url,
+            state,
+        };
         pending.push(PendingAuthorization {
             target: target_key,
-            state,
-            authorize_url: authorize_url.clone(),
+            flow: flow.clone(),
             created_at,
             reuse_until: created_at.saturating_add(par_lifetime),
+            finished_at: Instant::now(),
             key_id,
             jkt,
         });
-        Ok(authorize_url)
+        Ok(flow)
     }
 
     #[allow(clippy::too_many_arguments)]
     async fn push_authorization(
         &self,
         server: &ValidatedAuthorizationServer,
+        scope: &str,
         state: &str,
         key_id: &str,
         jkt: &str,
@@ -439,14 +523,13 @@ impl OAuthClient {
 
         let verifier = zeroize::Zeroizing::new(pkce_verifier()?);
         let challenge = pkce_challenge(&verifier);
-        let scope = self.config.scope.scope_string();
         let mut parameters = vec![
             ("redirect_uri", self.config.redirect_uri.as_str()),
             ("response_type", "code"),
             ("code_challenge_method", "S256"),
             ("code_challenge", challenge.as_str()),
             ("state", state),
-            ("scope", scope.as_str()),
+            ("scope", scope),
         ];
         if let Some(hint) = login_hint {
             parameters.push(("login_hint", hint));
@@ -495,7 +578,7 @@ impl OAuthClient {
     async fn cancel_flow(&self, flow: &PendingAuthorization, now: u64) -> Result<(), OAuthError> {
         match self
             .storage
-            .consume_oauth_state::<OAuthFlowState>(&flow.state, now)
+            .consume_oauth_state::<OAuthFlowState>(&flow.flow.state, now)
             .await
         {
             Ok(None) => return Ok(()),
@@ -507,14 +590,43 @@ impl OAuthClient {
         Ok(())
     }
 
+    /// Spends a pending state and removes its DPoP key.
+    pub async fn cancel_authorization(&self, state: &str) -> Result<bool, OAuthError> {
+        if !valid_state(state) {
+            return Err(OAuthError::UnknownState);
+        }
+        let taken = self
+            .storage
+            .consume_oauth_state::<OAuthFlowState>(state, unix_now()?)
+            .await;
+        let mut pending = self.pending.lock().await;
+        let local = pending
+            .iter()
+            .position(|flow| flow.flow.state == state)
+            .map(|index| pending.swap_remove(index));
+        drop(pending);
+        match taken {
+            Ok(Some(flow)) => {
+                self.protocol.nonces.clear_key(&flow.dpop_jkt);
+                self.keys.delete(&flow.dpop_key_id).await?;
+                Ok(true)
+            }
+            Ok(None) => Ok(false),
+            Err(StoreError::InvalidFlowStateAge) => {
+                if let Some(flow) = local {
+                    self.protocol.nonces.clear_key(&flow.jkt);
+                    self.keys.delete(&flow.key_id).await?;
+                }
+                Ok(false)
+            }
+            Err(error) => Err(error.into()),
+        }
+    }
+
     /// Completes a callback and atomically commits its bound account session.
     pub async fn complete_authorization(&self, callback: &Url) -> Result<Session, OAuthError> {
         let state = callback_parameter(callback, "state")?.ok_or(OAuthError::UnknownState)?;
-        if state.len() != 43
-            || !state
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
-        {
+        if !valid_state(&state) {
             return Err(OAuthError::UnknownState);
         }
         let flow: OAuthFlowState = self
@@ -525,7 +637,7 @@ impl OAuthClient {
         self.pending
             .lock()
             .await
-            .retain(|pending| pending.state != state);
+            .retain(|pending| pending.flow.state != state);
         let result = self.complete_flow(callback, &flow).await;
         if result.is_err() {
             self.protocol.nonces.clear_key(&flow.dpop_jkt);
@@ -654,6 +766,7 @@ impl OAuthClient {
         {
             if old.dpop_jkt != record.dpop_jkt {
                 self.protocol.nonces.clear_key(&old.dpop_jkt);
+                self.resource_nonces.clear_key(&old.dpop_jkt);
             }
             // Once the new session is persisted, cleanup cannot invalidate it.
             let _ = self.keys.delete(&old.dpop_key_id).await;
@@ -771,6 +884,26 @@ fn callback_parameter(url: &Url, name: &str) -> Result<Option<String>, OAuthErro
         return Err(OAuthError::Callback);
     }
     Ok(found)
+}
+
+fn valid_state_prefix(prefix: &str) -> bool {
+    !prefix.is_empty()
+        && prefix.len() <= 64
+        && prefix
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~'))
+}
+
+fn valid_state(state: &str) -> bool {
+    let suffix = match state.rsplit_once('.') {
+        Some((prefix, suffix)) if valid_state_prefix(prefix) => suffix,
+        Some(_) => return false,
+        None => state,
+    };
+    suffix.len() == 43
+        && suffix
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
 }
 
 fn is_callback_parameter(name: &str) -> bool {
