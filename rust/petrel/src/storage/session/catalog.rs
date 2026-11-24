@@ -12,6 +12,7 @@ use crate::{
 use super::{SESSION, SessionStore, decode, encode, payload};
 
 const CATALOG: &str = "accountDIDs";
+const CATALOG_CAS_ATTEMPTS: usize = 8;
 
 #[derive(Default, Deserialize, Serialize)]
 struct AccountCatalog {
@@ -202,7 +203,7 @@ impl SessionStore {
         // This mutex protects clones even if the backend has no CAS.
         // CAS also covers independent clients and native processes.
         let _guard = self.catalog_lock.lock().await;
-        loop {
+        for _ in 0..CATALOG_CAS_ATTEMPTS {
             let raw = self
                 .secrets
                 .get(&self.namespace, CATALOG)
@@ -223,7 +224,7 @@ impl SessionStore {
                 .await
             {
                 Ok(true) => return Ok(change),
-                Ok(false) => continue,
+                Ok(false) => {}
                 Err(StoreError::Unsupported) => {
                     self.secrets.put(&self.namespace, CATALOG, &updated).await?;
                     return Ok(change);
@@ -231,11 +232,14 @@ impl SessionStore {
                 Err(error) => return Err(error),
             }
         }
+        Err(StoreError::Unavailable(
+            "account catalog remained busy".into(),
+        ))
     }
 
     fn emit_selection_change(&self, (previous, current): SelectionChange) {
         if previous != current {
-            self.emit_auth_event(AuthEvent::CurrentAccountChanged { previous, current });
+            self.emit_auth_event(&AuthEvent::CurrentAccountChanged { previous, current });
         }
     }
 }

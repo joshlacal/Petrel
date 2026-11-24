@@ -1,5 +1,5 @@
 use std::future::poll_fn;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::Poll;
 
@@ -30,7 +30,7 @@ async fn catalog_contract(backend: Arc<dyn SecretStore>) {
         .await
         .unwrap();
     assert!(store.get_session(first_did).await.unwrap().is_some());
-    assert!(store.list_account_dids().await.unwrap().is_empty());
+    assert_eq!(store.list_account_dids().await.unwrap(), Vec::<Did>::new());
 
     store.save_session(&first).await.unwrap();
     store.save_session(&first).await.unwrap();
@@ -47,12 +47,9 @@ async fn catalog_contract(backend: Arc<dyn SecretStore>) {
         store.get_account(second_did).await.unwrap().unwrap().did,
         *second_did
     );
-    assert!(
-        other_namespace
-            .list_account_dids()
-            .await
-            .unwrap()
-            .is_empty()
+    assert_eq!(
+        other_namespace.list_account_dids().await.unwrap(),
+        Vec::<Did>::new()
     );
 
     assert!(matches!(
@@ -76,16 +73,22 @@ async fn catalog_contract(backend: Arc<dyn SecretStore>) {
     assert!(store.get_account(second_did).await.unwrap().is_none());
     assert_eq!(
         reopened.list_account_dids().await.unwrap(),
-        [first_did.clone()]
+        std::slice::from_ref(first_did)
     );
 
+    reopened.save_current_did(first_did).await.unwrap();
+    reopened
+        .clear_current_did_if_selected(first_did)
+        .await
+        .unwrap();
+    assert_eq!(store.get_current_did().await.unwrap(), None);
     reopened.save_current_did(first_did).await.unwrap();
     reopened.delete_current_did().await.unwrap();
     assert!(store.get_current_did().await.unwrap().is_none());
     reopened.delete_account(first_did).await.unwrap();
     assert!(store.get_account(first_did).await.unwrap().is_none());
     assert!(store.get_session(first_did).await.unwrap().is_some());
-    assert!(store.list_account_dids().await.unwrap().is_empty());
+    assert_eq!(store.list_account_dids().await.unwrap(), Vec::<Did>::new());
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
@@ -123,7 +126,10 @@ async fn interrupted_session_write_leaves_no_discoverable_orphan() {
     );
 
     let reopened = SessionStore::new(backend.clone(), "petrel").unwrap();
-    assert!(reopened.list_account_dids().await.unwrap().is_empty());
+    assert_eq!(
+        reopened.list_account_dids().await.unwrap(),
+        Vec::<Did>::new()
+    );
     assert!(
         reopened
             .get_account(&first.account.did)
@@ -169,6 +175,26 @@ async fn concurrent_catalog_mutations_preserve_both_accounts() {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn repeated_cas_conflicts_leave_the_previous_catalog_intact() {
+    let backend = Arc::new(TestBackend::new(true));
+    let store = SessionStore::new(backend.clone(), "petrel").unwrap();
+    let first = session(FIRST, "first-token");
+    let second = session(SECOND, "second-token");
+    store.save_account(&first.account).await.unwrap();
+    backend.cas_conflicts.store(100, Ordering::Relaxed);
+
+    assert!(matches!(
+        store.save_account(&second.account).await,
+        Err(StoreError::Unavailable(_))
+    ));
+    assert_eq!(
+        store.list_account_dids().await.unwrap(),
+        [first.account.did]
+    );
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
 async fn observing_selection_and_storage_failure_uses_no_secret_values() {
     let backend = Arc::new(TestBackend::new(true));
     let store = SessionStore::new(backend.clone(), "petrel").unwrap();
@@ -189,10 +215,13 @@ async fn observing_selection_and_storage_failure_uses_no_secret_values() {
         Err(StoreError::Unavailable(_))
     ));
     backend.fail_catalog_read.store(false, Ordering::Relaxed);
-    assert_eq!(store.list_account_dids().await.unwrap(), [did.clone()]);
+    assert_eq!(
+        store.list_account_dids().await.unwrap(),
+        std::slice::from_ref(did)
+    );
     store.delete_account(did).await.unwrap();
     drop(subscription);
-    store.emit_auth_event(AuthEvent::Logout { did: did.clone() });
+    store.emit_auth_event(&AuthEvent::Logout { did: did.clone() });
 
     let events = events.lock().unwrap();
     assert_eq!(events.len(), 3);
@@ -218,6 +247,7 @@ async fn observing_selection_and_storage_failure_uses_no_secret_values() {
 struct TestBackend {
     inner: MemorySecretStore,
     cas: bool,
+    cas_conflicts: AtomicUsize,
     fail_catalog_read: AtomicBool,
     fail_session_write: AtomicBool,
 }
@@ -227,6 +257,7 @@ impl TestBackend {
         Self {
             inner: MemorySecretStore::new(),
             cas,
+            cas_conflicts: AtomicUsize::new(0),
             fail_catalog_read: AtomicBool::new(false),
             fail_session_write: AtomicBool::new(false),
         }
@@ -303,7 +334,18 @@ impl SecretStore for TestBackend {
         new: Option<&'a [u8]>,
     ) -> BoxFuture<'a, Result<bool, StoreError>> {
         if self.cas {
-            self.inner.compare_and_swap(ns, key, expected, new)
+            if key == "accountDIDs"
+                && self
+                    .cas_conflicts
+                    .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |remaining| {
+                        remaining.checked_sub(1)
+                    })
+                    .is_ok()
+            {
+                Box::pin(async { Ok(false) })
+            } else {
+                self.inner.compare_and_swap(ns, key, expected, new)
+            }
         } else {
             Box::pin(async { Err(StoreError::Unsupported) })
         }

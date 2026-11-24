@@ -88,8 +88,8 @@ impl SessionStore {
         self.events.subscribe(observer)
     }
 
-    pub(crate) fn emit_auth_event(&self, event: AuthEvent) {
-        self.events.emit(&event);
+    pub(crate) fn emit_auth_event(&self, event: &AuthEvent) {
+        self.events.emit(event);
     }
 
     fn report_storage_result<T>(
@@ -105,7 +105,7 @@ impl SessionStore {
                 | StoreError::KeyMismatch
                 | StoreError::Other(_))
         ) {
-            self.emit_auth_event(AuthEvent::StorageFailure {
+            self.emit_auth_event(&AuthEvent::StorageFailure {
                 operation,
                 did: did.cloned(),
             });
