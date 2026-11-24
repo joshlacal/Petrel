@@ -13,7 +13,9 @@ use std::str::FromStr;
 
 use sha2::{Digest, Sha256};
 
-use crate::error::CidError;
+use crate::error::{CidError, DecodeError, EncodeError};
+use crate::serde_bridge::{FromValue, ToValue};
+use crate::value::{Value, serde_via_value};
 
 const BASE32_ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
 const MAX_DIGEST_LEN: usize = 64;
@@ -33,6 +35,9 @@ pub enum BlessedKind {
 }
 
 /// A CIDv1, stored as its binary form.
+///
+/// Bare CIDs accept their string or link form on decode and serialize as
+/// strings. Use [`CidLink`](crate::CidLink) for a typed CBOR link.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Cid {
     bytes: Vec<u8>,
@@ -188,6 +193,34 @@ impl FromStr for Cid {
         Self::parse(s)
     }
 }
+
+impl ToValue for Cid {
+    fn to_value(&self) -> Result<Value, EncodeError> {
+        Ok(Value::String(self.to_string()))
+    }
+}
+
+impl FromValue for Cid {
+    fn from_value(value: Value) -> Result<Self, DecodeError> {
+        match value {
+            Value::String(text) => Ok(Self::parse(&text)?),
+            Value::Link(cid) => Ok(cid),
+            Value::Object(mut fields) => {
+                let link = fields
+                    .remove("$link")
+                    .ok_or_else(|| DecodeError::MissingField("$link".into()))?;
+                let text = String::from_value(link).map_err(|error| error.in_field("$link"))?;
+                Ok(Self::parse(&text)?)
+            }
+            other => Err(DecodeError::TypeMismatch {
+                expected: "CID string or link",
+                found: other.kind(),
+            }),
+        }
+    }
+}
+
+serde_via_value!(Cid);
 
 #[cfg(feature = "ipld-interop")]
 impl TryFrom<::cid::Cid> for Cid {

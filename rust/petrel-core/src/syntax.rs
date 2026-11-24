@@ -486,12 +486,16 @@ comparable_by!(Nsid, normalized);
 
 string_newtype!(
     /// An AT Protocol repository record key.
-    RecordKey, SyntaxKind::RecordKey, validate::record_key
+    RecordKey,
+    SyntaxKind::RecordKey,
+    validate::record_key
 );
 
 string_newtype!(
     /// A lexicon CID string, checked for syntax without decoding its multibase.
-    CidString, SyntaxKind::Cid, validate::cid_string
+    CidString,
+    SyntaxKind::Cid,
+    validate::cid_string
 );
 
 impl CidString {
