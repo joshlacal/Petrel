@@ -834,6 +834,11 @@ impl OAuthClient {
             // Once the new session is persisted, cleanup cannot invalidate it.
             let _ = self.keys.delete(&old.dpop_key_id).await;
         }
+        // Once credentials are durable, a separate selection write can be
+        // reported as a storage event without invalidating the new session.
+        if self.storage.save_current_did(&did).await.is_err() {
+            tracing::warn!("could not persist the current OAuth account selection");
+        }
         Ok(session)
     }
 

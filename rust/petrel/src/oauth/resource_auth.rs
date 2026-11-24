@@ -48,7 +48,7 @@ impl AuthProvider for SessionAuth {
                 .await
                 .map_err(auth_error)?
             else {
-                return Err(AuthError::NoSession);
+                return Err(auth_error(self.client.missing_session(&self.did)));
             };
             if origin(&uri, false).as_deref() != Some(&record.account.pds)
                 || !self.client.protocol.permits(&uri)
@@ -242,7 +242,7 @@ impl SessionAuth {
             .client
             .session_record(&self.did)
             .await?
-            .ok_or(OAuthError::MissingSession)?;
+            .ok_or_else(|| self.client.missing_session(&self.did))?;
         let pds = require_canonical_origin(&record.account.pds).map_err(OAuthError::from)?;
         if !self.client.protocol.permits(&pds) {
             return Err(Error::Unavailable);

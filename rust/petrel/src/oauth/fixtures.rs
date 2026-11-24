@@ -22,7 +22,7 @@ use crate::{
 use super::{
     AssertionBackendError, AssertionSigner, ClientAuth, OAuthClient, OAuthConfig, OAuthError,
     OAuthIdentity, OAuthIdentityError, OAuthIdentityResolver, OAuthProtocolError, OAuthTarget,
-    metadata::example_metadata, protocol::retry_delay,
+    metadata::example_metadata,
 };
 
 const ISSUER: &str = "https://issuer.example";
@@ -90,6 +90,7 @@ enum Scenario {
 struct Server {
     scenario: Scenario,
     exchanges: Mutex<Exchanges>,
+    refresh_response_gate: async_lock::Mutex<()>,
 }
 
 impl Server {
@@ -97,6 +98,7 @@ impl Server {
         Self {
             scenario,
             exchanges: Mutex::new(Exchanges::default()),
+            refresh_response_gate: async_lock::Mutex::new(()),
         }
     }
 
@@ -370,7 +372,7 @@ impl Server {
             }
             exchanges.refreshes
         };
-        retry_delay(15).await;
+        drop(self.refresh_response_gate.lock().await);
         if matches!(self.scenario, Scenario::RetainedRefreshToken) {
             json_response(
                 200,
@@ -605,6 +607,33 @@ fn client(server: &Arc<Server>, auth: ClientAuth) -> Arc<OAuthClient> {
     Arc::new(OAuthClient::new(server.clone(), server.clone(), storage, config).unwrap())
 }
 
+async fn run_fifty_concurrent_refreshes(
+    server: &Server,
+    client: &OAuthClient,
+    did: &petrel_core::Did,
+) -> Vec<Result<super::Session, OAuthError>> {
+    use std::{
+        future::{Future, poll_fn},
+        task::Poll,
+    };
+
+    let hold_response = server.refresh_response_gate.lock().await;
+    let mut calls = (0..50)
+        .map(|_| Box::pin(client.refresh(did, true)))
+        .collect::<Vec<_>>();
+    // The memory store reads synchronously. Drive every future through its
+    // initial read before any refresh response can publish a replacement.
+    poll_fn(|cx| {
+        for call in &mut calls {
+            assert!(call.as_mut().poll(cx).is_pending());
+        }
+        Poll::Ready(())
+    })
+    .await;
+    drop(hold_response);
+    join_all(calls).await
+}
+
 async fn start(client: &OAuthClient) {
     let authorize = client
         .start_authorization(OAuthTarget::Identifier(DID.parse().unwrap()))
@@ -635,7 +664,7 @@ async fn flow_refreshes_once_for_fifty_concurrent_calls_and_scopes_auth() {
         OAuthError::UnknownState
     );
     let did = DID.parse().unwrap();
-    let calls = join_all((0..50).map(|_| client.refresh(&did, true))).await;
+    let calls = run_fifty_concurrent_refreshes(&server, &client, &did).await;
     for call in calls {
         assert_eq!(call.unwrap().access_token(), "access-second");
     }
@@ -1213,6 +1242,7 @@ struct FaultStore {
     inner: MemorySecretStore,
     fail_take: std::sync::atomic::AtomicBool,
     fail_primary_session_write: std::sync::atomic::AtomicBool,
+    fail_account_selection_write: std::sync::atomic::AtomicBool,
     pause_pending_session_write: std::sync::atomic::AtomicBool,
     pending_write_started: std::sync::atomic::AtomicBool,
 }
@@ -1239,6 +1269,17 @@ impl crate::storage::SecretStore for FaultStore {
         {
             self.pending_write_started.store(true, Ordering::Relaxed);
             return Box::pin(std::future::pending());
+        }
+        if key == "accountDIDs"
+            && self.fail_account_selection_write.load(Ordering::Relaxed)
+            && serde_json::from_slice::<Value>(value)
+                .is_ok_and(|envelope| envelope["data"]["current"].is_string())
+        {
+            return Box::pin(async {
+                Err(crate::storage::StoreError::Unavailable(
+                    "injected current account write failure".into(),
+                ))
+            });
         }
         if key.starts_with("session.did:")
             && self.fail_primary_session_write.load(Ordering::Relaxed)
@@ -1738,7 +1779,7 @@ async fn elapsed_refresh_backoff_admits_only_one_probe() {
     assert_eq!(server.exchanges.lock().unwrap().refreshes, 3);
 
     client.allow_next_refresh_probe(did).await;
-    let attempts = join_all((0..50).map(|_| client.refresh(did, true))).await;
+    let attempts = run_fifty_concurrent_refreshes(&server, &client, did).await;
     let probes = attempts
         .iter()
         .filter(|attempt| matches!(attempt, Err(OAuthError::ServerStatus(503))))
@@ -1888,4 +1929,111 @@ async fn full_v1_metadata_loads_and_refreshes_without_an_independent_issuer() {
     assert_eq!(calls.resource_metadata_requests, 2);
     assert_eq!(calls.issuer_metadata_requests, 2);
     assert_eq!(calls.refreshes, 1);
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn oauth_operations_publish_session_and_selection_events() {
+    use crate::storage::AuthEvent;
+
+    let server = Arc::new(Server::new(Scenario::InvalidGrant));
+    let client = client(&server, ClientAuth::Public);
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let observed = Arc::clone(&events);
+    let _subscription = client
+        .storage
+        .observe_auth_events(move |event| observed.lock().unwrap().push(event.clone()));
+    let did = DID.parse().unwrap();
+    assert_eq!(
+        client.refresh(&did, true).await.unwrap_err(),
+        OAuthError::MissingSession
+    );
+    start(&client).await;
+    client
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+    assert_eq!(
+        client.storage.get_current_did().await.unwrap().as_ref(),
+        Some(&did)
+    );
+    assert_eq!(
+        client.refresh(&did, true).await.unwrap_err(),
+        OAuthError::InvalidGrant
+    );
+    assert_eq!(
+        client.refresh(&did, true).await.unwrap_err(),
+        OAuthError::UsedRefreshToken
+    );
+    assert!(client.logout(&did).await.unwrap());
+    assert_eq!(client.storage.get_current_did().await.unwrap(), None);
+
+    assert_eq!(
+        *events.lock().unwrap(),
+        [
+            AuthEvent::SessionMissing { did: did.clone() },
+            AuthEvent::CurrentAccountChanged {
+                previous: None,
+                current: Some(did.clone())
+            },
+            AuthEvent::RefreshTokenInvalid { did: did.clone() },
+            AuthEvent::CurrentAccountChanged {
+                previous: Some(did.clone()),
+                current: None
+            },
+            AuthEvent::Logout { did },
+        ]
+    );
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn failure_to_persist_selection_does_not_invalidate_a_durable_sign_in() {
+    use std::sync::atomic::Ordering;
+
+    use crate::storage::AuthEvent;
+
+    let server = Arc::new(Server::new(Scenario::Public));
+    let backend = Arc::new(FaultStore::default());
+    let storage = SessionStore::new(backend.clone(), "fixtures").unwrap();
+    let config = OAuthConfig::new(
+        CLIENT,
+        Url::parse(REDIRECT).unwrap(),
+        SCOPE,
+        ClientAuth::Public,
+    )
+    .unwrap();
+    let client = OAuthClient::new(server.clone(), server.clone(), storage, config).unwrap();
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let observed = Arc::clone(&events);
+    let _subscription = client
+        .storage
+        .observe_auth_events(move |event| observed.lock().unwrap().push(event.clone()));
+    start(&client).await;
+
+    backend
+        .fail_account_selection_write
+        .store(true, Ordering::Relaxed);
+    let session = client
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+    assert_eq!(
+        client
+            .session(&session.did)
+            .await
+            .unwrap()
+            .unwrap()
+            .access_token(),
+        "access-first"
+    );
+    assert_eq!(client.storage.get_current_did().await.unwrap(), None);
+    assert_eq!(server.exchanges.lock().unwrap().revokes.len(), 0);
+    assert_eq!(
+        *events.lock().unwrap(),
+        [AuthEvent::StorageFailure {
+            operation: "save current account",
+            did: Some(session.did.clone())
+        }]
+    );
 }

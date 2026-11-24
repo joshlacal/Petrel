@@ -10,7 +10,7 @@ use super::{
 use crate::{
     crypto::{random_bytes, sha256},
     net::TransportError,
-    storage::{PendingRefresh, StoreError},
+    storage::{AuthEvent, PendingRefresh, StoreError},
 };
 
 #[derive(Default)]
@@ -59,6 +59,12 @@ impl RefreshState {
 }
 
 impl OAuthClient {
+    pub(super) fn missing_session(&self, did: &Did) -> OAuthError {
+        self.storage
+            .emit_auth_event(&AuthEvent::SessionMissing { did: did.clone() });
+        OAuthError::MissingSession
+    }
+
     /// Returns the current in-memory or durable session for a DID.
     pub async fn session(&self, did: &Did) -> Result<Option<Session>, OAuthError> {
         Ok(self.session_record(did).await?.map(|record| record.session))
@@ -158,7 +164,7 @@ impl OAuthClient {
             .storage
             .get_session(did)
             .await?
-            .ok_or(OAuthError::MissingSession)?;
+            .ok_or_else(|| self.missing_session(did))?;
         self.refresh_after(&observed, force).await
     }
 
@@ -170,10 +176,10 @@ impl OAuthClient {
         let did = &observed.session.did;
         let lock = self.account_lock(did);
         let mut state = lock.lock().await;
-        let current = self
-            .read_record(did, &mut state)
-            .await?
-            .ok_or(OAuthError::MissingSession)?;
+        let Some(current) = self.read_record(did, &mut state).await? else {
+            drop(state);
+            return Err(self.missing_session(did));
+        };
         if current.generation() != observed.generation() {
             return Ok(current.session);
         }
@@ -251,6 +257,11 @@ impl OAuthClient {
                     state.used.retain(|used| *used != digest);
                 }
                 state.failure(unix_now().unwrap_or(now), &error);
+                drop(state);
+                if error == OAuthError::InvalidGrant {
+                    self.storage
+                        .emit_auth_event(&AuthEvent::RefreshTokenInvalid { did: did.clone() });
+                }
                 Err(error)
             }
         }
@@ -349,6 +360,11 @@ impl OAuthClient {
         pending_result?;
         session_result?;
         key_result?;
+        let selection_result = self.storage.clear_current_did_if_selected(did).await;
+        drop(state);
+        self.storage
+            .emit_auth_event(&AuthEvent::Logout { did: did.clone() });
+        selection_result?;
         Ok(revoked)
     }
 }
