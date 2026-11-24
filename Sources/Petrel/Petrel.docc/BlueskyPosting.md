@@ -137,7 +137,7 @@ func publishVideoPost(bsky: BskyAgent, data: Data) async throws {
 
 ### Image metadata
 
-Photos carry more than pixels: the GPS position where they were taken, the time, the device, sometimes the owner's name, and thumbnails of the picture before it was cropped. **Every helper that uploads an image removes that metadata by default**: `post(_:images:)`, `uploadImage(_:mimeType:)`, `setAvatar(_:mimeType:)` and `setBanner(_:mimeType:)`.
+Photos carry more than pixels: the GPS position where they were taken, the time, the device, sometimes the owner's name, and thumbnails of the picture before it was cropped. Every helper that uploads an image removes that metadata by default: `post(_:images:)`, `uploadImage(_:mimeType:)`, `setAvatar(_:mimeType:)` and `setBanner(_:mimeType:)`.
 
 - JPEG, PNG, WebP and GIF are rewritten losslessly in pure Swift on every platform, Linux included. Metadata blocks are left out and the compressed image data is copied as it is: the pixels do not change, nothing is re-encoded, and the format stays the same. The ICC colour profile, transparency and animation are kept. Pixel density is kept too. If the image is rotated by its EXIF orientation, that one value is kept so it still displays the right way up.
 - Other image types (HEIC, HEIF, AVIF, TIFF and so on) are decoded and written back in the same format by ImageIO on Apple platforms. On other platforms they are refused with `ImageMetadataStrippingError.unsupportedImageFormat`.
@@ -145,7 +145,7 @@ Photos carry more than pixels: the GPS position where they were taken, the time,
 
 Before any image is uploaded, `post(_:images:)` checks and strips all of them, so a problem with one leaves nothing behind on the PDS. The `mimeType` passed to these helpers must be an `image/*` type.
 
-To upload a file with its metadata intact, say so: pass `stripImageMetadata: false` to `post(_:images:)`, or `stripMetadata: false` to the other three. `uploadBlob(_:mimeType:)` is the raw path: it sends bytes exactly as given and never strips anything. **Video metadata is never removed:** `uploadVideo` sends the file as given, so remove location or device tags yourself first if that matters for your users.
+To upload a file with its metadata intact, say so: pass `stripImageMetadata: false` to `post(_:images:)`, or `stripMetadata: false` to the other three. `uploadBlob(_:mimeType:)` is the raw path: it sends bytes exactly as given and never strips anything. Video metadata is never removed: `uploadVideo` sends the file as given, so remove location or device tags yourself first if that matters for your users.
 
 ``ImageMetadataStripper/stripMetadata(from:mimeType:)`` is the function behind the helpers and can be called directly.
 

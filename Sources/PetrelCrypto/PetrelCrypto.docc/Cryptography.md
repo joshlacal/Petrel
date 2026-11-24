@@ -1,4 +1,4 @@
-# Keys, Signing and Verification
+# Keys, signing and verification
 
 Generate keys, sign data and verify signatures on both AT Protocol curves.
 
@@ -9,9 +9,6 @@ SHA-256, sign the hash with ECDSA, and encode the result as 64 bytes
 (`r || s`, not DER) with the "low-S" value. The same rules apply to `p256`
 and `k256`. ``ATProtoSigner`` produces such signatures and
 ``ATProtoPublicKey`` checks them, whichever curve the key is on.
-
-Each example below is also exercised by
-`Tests/PetrelCryptoTests/CryptographyDocumentationTests.swift`.
 
 ### Generate a key and sign
 

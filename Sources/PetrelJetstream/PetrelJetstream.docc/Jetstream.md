@@ -121,12 +121,12 @@ func useLegacyAPI() async throws {
 
 ## Frames and compression
 
-Without compression Jetstream sends each event as a WebSocket **text** message. The default
+Without compression Jetstream sends each event as a WebSocket text message. The default
 transport of ``JetstreamSubscriptionConfiguration`` accepts text. If you supply your own
 `FirehoseWebSocketSessionFactory`, it must deliver text messages as UTF-8 bytes
 (`FirehoseWebSocketOptions.jetstream`).
 
-With `compression: true` events arrive as **binary** zstd frames compressed with a shared
+With `compression: true` events arrive as binary zstd frames compressed with a shared
 dictionary. On the v2 API the dictionary is fetched from the host
 (`network.bsky.jetstream.getZstdDictionary`). The legacy API has no such endpoint: pass the
 dictionary published in the Jetstream repository (`pkg/models/zstd_dictionary`) as
@@ -204,10 +204,3 @@ Jetstream uses the same WebSocket transport as `PetrelFirehose`, with the same l
 Linux systems whose libcurl lacks WebSocket support. See the *Linux* section of the
 `PetrelFirehose` article "Consuming event streams" for how to plug in another transport.
 
-## Live test
-
-```bash
-JETSTREAM_SMOKE_URL=wss://jetstream2.us-east.bsky.network/subscribe \
-JETSTREAM_SMOKE_V2_URL=https://jetstream2.us-east.bsky.network \
-swift test --filter JetstreamLiveSmokeTests
-```

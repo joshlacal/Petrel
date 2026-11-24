@@ -7,10 +7,10 @@ Lexicon schemas loaded at runtime.
 
 Validation has two layers, and it helps to keep them apart.
 
-The **data model** layer needs no schema. It decides whether some JSON or
+The data model layer needs no schema. It decides whether some JSON or
 DAG-CBOR is a legal atproto value at all. ``LexValue`` is that layer.
 
-The **Lexicon** layer needs a schema. It decides whether a legal value has the
+The Lexicon layer needs a schema. It decides whether a legal value has the
 right shape for a particular record type or endpoint. ``LexiconCatalog`` is
 that layer, and it only accepts ``LexValue`` input, so anything that reaches
 it has already passed the first.
@@ -20,8 +20,6 @@ it has already passed the first.
 Add Lexicon documents to a catalog, then validate. A document is checked
 against the rules of the Lexicon language as it is added; an invalid one
 throws ``LexiconSchemaError`` and is not added.
-
-<!-- Mirrors DocumentationSnippetTests.documentationValidateRecord -->
 
 <!-- compile-example: lexicon-validate-record -->
 ```swift
@@ -56,8 +54,6 @@ tasks.
 A whole directory of Lexicon files loads in one call; subdirectories are
 searched.
 
-<!-- Mirrors DocumentationSnippetTests.documentationLoadDirectory -->
-
 <!-- compile-example: lexicon-load-directory -->
 ```swift
 import Foundation
@@ -74,8 +70,6 @@ func loadCatalog(lexiconsDirectory: URL) throws -> LexiconCatalog {
 
 ``LexiconValidationError`` carries every problem found, each with a JSON
 pointer into the value and a stable reason code.
-
-<!-- Mirrors DocumentationSnippetTests.documentationReadIssues -->
 
 <!-- compile-example: lexicon-read-issues -->
 ```swift
@@ -110,8 +104,6 @@ accept it when it does not. That needs "there is no such schema" to be a
 different outcome from "the data is wrong", so the first is a
 ``LexiconCatalogError`` and the second a ``LexiconValidationError``.
 
-<!-- Mirrors DocumentationSnippetTests.documentationOptimisticValidation -->
-
 <!-- compile-example: lexicon-optimistic-validation -->
 ```swift
 import PetrelLexicon
@@ -145,8 +137,6 @@ of time, ask the catalog for its `referenceProblems()`.
 because the data model depends on distinctions Foundation does not keep: an
 integer is not a float, a repeated key is an error, and `{"$link": …}` with a
 second key is neither a link nor an ordinary object.
-
-<!-- Mirrors DocumentationSnippetTests.documentationStrictParsing -->
 
 <!-- compile-example: lexicon-strict-parsing -->
 ```swift
@@ -186,8 +176,6 @@ deployed data and the official interop vectors do not meet them:
 A ``LexValue`` encodes to canonical DAG-CBOR (DRISL) and hashes to the CID a
 PDS would compute for the same record.
 
-<!-- Mirrors DocumentationSnippetTests.documentationCanonicalBytes -->
-
 <!-- compile-example: lexicon-canonical-bytes -->
 ```swift
 import PetrelLexicon
@@ -206,8 +194,6 @@ func canonicalForm() throws {
 Any `Encodable` value converts to a ``LexValue``, including Petrel's generated
 record types and `ATProtocolValueContainer`. The conversion goes through the
 strict parser, so a typed value is held to the same rules as wire data.
-
-<!-- Mirrors DocumentationSnippetTests.documentationTypedRecord -->
 
 <!-- compile-example: lexicon-typed-record -->
 ```swift
@@ -235,8 +221,6 @@ The schemas behind Petrel's generated types are compiled into this module.
 generated value directly: the type's `typeIdentifier` names the schema. This is
 how to enforce what the Swift types do not carry — a post's `text` is a
 `String`, and only its Lexicon says it may hold at most 300 graphemes.
-
-<!-- Mirrors BundledCatalogTests.validGeneratedRecordPasses and constraintViolationsAreReported -->
 
 <!-- compile-example: lexicon-bundled-catalog -->
 ```swift
@@ -269,8 +253,6 @@ before they are checked: `boolean` accepts exactly `true` or `false`,
 occurrence of its name. Declared defaults are filled in, and the typed result
 is returned.
 
-<!-- Mirrors DocumentationSnippetTests.documentationXRPCParameters -->
-
 <!-- compile-example: lexicon-xrpc-parameters -->
 ```swift
 import Foundation
@@ -300,8 +282,6 @@ Union members normally carry a `$type`. Event-stream messages are the one
 exception: the variant is named by the frame header, so pass the header's `t`
 alongside the body.
 
-<!-- Mirrors DocumentationSnippetTests.documentationSubscriptionMessage -->
-
 <!-- compile-example: lexicon-subscription-message -->
 ```swift
 import PetrelLexicon
@@ -324,8 +304,6 @@ declarations a service may act on. A declaration is dropped when its resource
 is not `repo` or `rpc`, when it carries a parameter this version does not
 know, when a parameter is malformed or uses a wildcard, and when it names a
 collection or endpoint outside the namespace of the set's own NSID.
-
-<!-- Mirrors DocumentationSnippetTests.documentationPermissionSet -->
 
 <!-- compile-example: lexicon-permission-set -->
 ```swift

@@ -40,7 +40,3 @@ unproxied. Set the service once with `ATProtoClient.setServiceDID(_:for:)`, as
 above, or per call with `XRPCCallOptions.proxy`. Errors, per-call options and
 response metadata behave as for every other generated call (see "Calling XRPC
 Endpoints" in the Petrel documentation).
-
-The module is generated from `generator/lexicons/tools` with the same generator
-and overlay manifest (`generator/manifests/petrel-ozone.json`) third parties
-use for their own Lexicons.

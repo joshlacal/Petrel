@@ -4,7 +4,7 @@ Where each requirement of the AT Protocol OAuth profile and permission specifica
 
 ## Overview
 
-Each row names a requirement, the type that implements it, and the test suite that exercises it. Suites are Swift Testing suites; find one by the file of the same name. Most are in `Tests/PetrelOAuthServerTests`. `PinnedNIOOAuthRemoteTransport` (product `PetrelOAuthServerNIO`, trait `OAuthServerNIO`) and the Hummingbird adapter (product `PetrelOAuthServerHummingbird`, trait `OAuthServerHummingbird`) are in this package, while their tests, which run the example server over real sockets, are in the separate `Server/` package: `Server/Tests/PetrelOAuthServerHummingbirdTests` and `Server/Tests/PetrelClientInteropTests`.
+Each row names a requirement, the type that implements it, and the Swift Testing suite that covers it. Most suites are in `Tests/PetrelOAuthServerTests`; tests for the NIO transport and the Hummingbird adapter run the example server over real sockets and live in the separate `Server/` package.
 
 ### Server metadata and transport
 

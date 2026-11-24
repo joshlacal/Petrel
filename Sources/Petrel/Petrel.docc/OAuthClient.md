@@ -1,14 +1,44 @@
-# OAuth Client, Permissions and Account Status
+# Signing In
 
-Sign users in with atproto OAuth, ask for exactly the permissions you need, and find out when an account is deactivated, suspended or taken down.
+Sign users in with atproto OAuth, request only the permissions you need, sign in bots with app passwords, and handle deactivated, suspended and taken-down accounts.
 
 ## Overview
 
-Petrel implements the client side of the [atproto OAuth profile](https://atproto.com/specs/oauth): identity-first and server-first login, pushed authorization requests (PAR), PKCE, per-session DPoP keys with server nonces, verified token responses, single-use refresh tokens and revocation. It also models [permission scopes](https://atproto.com/specs/permission) as types, and reports [account hosting status](https://atproto.com/specs/account) as typed values and errors.
+Petrel implements the client side of the [atproto OAuth profile](https://atproto.com/specs/oauth): pushed authorization requests (PAR), PKCE, per-session DPoP keys with server nonces, verified token responses, single-use refresh tokens and revocation. It models [permission scopes](https://atproto.com/specs/permission) as types and reports [account hosting status](https://atproto.com/specs/account) as typed values and errors.
+
+A sign-in has three steps: start a flow to get an authorization URL, show that URL in a browser, and pass the redirect back to the client.
+
+<!-- compile-example: oauth-authentication -->
+```swift
+import Foundation
+import Petrel
+
+func signIn(redirectURL: URL) async throws {
+    let config = OAuthConfig(
+        clientId: "https://app.example.com/oauth-client-metadata.json",
+        redirectUri: "com.example.app:/callback",
+        scope: "atproto transition:generic"
+    )
+    let client = try await ATProtoClient(oauthConfig: config, namespace: "com.example.app")
+
+    // 1. Start the flow and open the URL in a browser.
+    let authorizationURL = try await client.startOAuthFlow(identifier: "alice.example.com")
+    _ = authorizationURL
+
+    // 2. The user approves; your app receives the redirect.
+    try await client.handleOAuthCallback(url: redirectURL)
+
+    // 3. Authenticated requests are DPoP-signed and refreshed automatically.
+    let (_, session) = try await client.com.atproto.server.getSession()
+    _ = session
+}
+```
+
+Starting the flow resolves the handle to a DID (verifying the handle both ways), reads the PDS from the DID document, and follows the PDS's protected-resource metadata to its authorization server. The callback is accepted only if it carries the `state` of a flow this client started, arrives at the configured redirect URI, and names the same issuer. The token response is accepted only if it is DPoP-bound, includes the `atproto` scope, and its `sub` is the DID the flow was started for. Tokens that fail a check are revoked, not stored.
 
 ### Publish client metadata
 
-An atproto OAuth client is identified by the `https` URL of a JSON document it publishes. ``OAuthConfig`` can check a configuration against the profile's rules and build that document for you:
+An atproto OAuth client is identified by the `https` URL of a JSON document it publishes. ``OAuthConfig`` checks a configuration against the profile's rules and builds that document:
 
 <!-- compile-example: oauth-client-metadata -->
 ```swift
@@ -30,43 +60,72 @@ func generateClientMetadataJSON() throws -> Data {
 }
 ```
 
-A native app's custom redirect scheme must be the client ID's hostname in reverse-domain order, followed by `:/` and a path. During development you can skip publishing anything by using the profile's localhost exception:
+A native app's custom redirect scheme must be the client ID's hostname in reverse-domain order, followed by `:/` and a path. Register that scheme in your app (`CFBundleURLTypes` in `Info.plist` on Apple platforms).
 
-<!-- compile-example: oauth-client-loopback -->
+During development you can skip publishing: ``OAuthConfig/loopback(port:path:scope:)`` uses the profile's localhost exception. See <doc:GettingStarted>.
+
+### Show the authorization URL
+
+In SwiftUI, use `@Environment(\.webAuthenticationSession)` as <doc:GettingStarted> does. In UIKit or AppKit, or when you need the session's other options, wrap `ASWebAuthenticationSession`:
+
+<!-- compile-example: oauth-aswebauth-session -->
 ```swift
+import AuthenticationServices
+import Foundation
 import Petrel
 
-func loopbackConfigExample() -> OAuthConfig {
-    let config = OAuthConfig.loopback(port: 8765, scope: "atproto transition:generic")
-    // config.redirectUri == "http://127.0.0.1:8765/callback"
-    return config
+@MainActor
+final class NativeOAuthCoordinator: NSObject, ASWebAuthenticationPresentationContextProviding {
+    private let anchor: ASPresentationAnchor
+
+    init(anchor: ASPresentationAnchor) {
+        self.anchor = anchor
+    }
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        anchor
+    }
+
+    func signIn(client: ATProtoClient, identifier: String, callbackScheme: String) async throws {
+        let authURL = try await client.startOAuthFlow(identifier: identifier)
+        let callbackURL: URL = try await withCheckedThrowingContinuation { continuation in
+            let session = ASWebAuthenticationSession(
+                url: authURL,
+                callback: .customScheme(callbackScheme)
+            ) { url, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if let url {
+                    continuation.resume(returning: url)
+                } else {
+                    continuation.resume(throwing: AuthError.invalidCallbackURL)
+                }
+            }
+            session.presentationContextProvider = self
+            session.start()
+        }
+        try await client.handleOAuthCallback(url: callbackURL)
+    }
 }
 ```
 
-### Sign in with a handle or DID
+If the redirect reaches your app another way, such as `onOpenURL` or an app delegate, forward it to ``ATProtoClient/handleOAuthCallback(url:)``:
 
-<!-- compile-example: oauth-client-handle-login -->
+<!-- compile-example: oauth-callback -->
 ```swift
 import Foundation
 import Petrel
 
-func signInWithHandle(config: OAuthConfig, redirectURL: URL) async throws {
-    let client = try await ATProtoClient(oauthConfig: config, namespace: "com.example.app")
-
-    // 1. Start the flow and open the URL in a browser.
-    let authorizationURL = try await client.startOAuthFlow(identifier: "alice.example.com")
-    _ = authorizationURL
-
-    // 2. The user approves; your app receives the redirect.
-    try await client.handleOAuthCallback(url: redirectURL)
-
-    // 3. Authenticated requests are DPoP-signed and refreshed automatically.
-    let (_, session) = try await client.com.atproto.server.getSession()
-    _ = session
+func handleOAuthCallbackExample(url: URL, client: ATProtoClient) {
+    Task {
+        do {
+            try await client.handleOAuthCallback(url: url)
+        } catch {
+            print("OAuth callback failed: \(error)")
+        }
+    }
 }
 ```
-
-Starting the flow resolves the handle to a DID (verifying the handle both ways), reads the PDS from the DID document, and follows the PDS's protected-resource metadata to its authorization server. The callback is accepted only if it carries the `state` of a flow this client started, arrives at the configured redirect URI, and names the same issuer; the token response is accepted only if it is DPoP-bound, includes the `atproto` scope, and its `sub` is the DID the flow was started for. Tokens that fail a check are revoked, not stored.
 
 ### Sign in from a hosting provider
 
@@ -96,7 +155,7 @@ Before anything is sent to an authorization server, its metadata is fetched (HTT
 
 ### Ask for permissions
 
-Build scopes from types instead of strings. `ATProtoScope` and `ATProtoScopeSet` come from the `PetrelOAuthScopes` module, which Petrel re-exports; it is the same grammar Petrel's OAuth server uses, and it is held to the reference implementation's accept-or-reject decisions and canonical forms. `ATProtoScope` parses and formats every scope the permission specification defines, and rejects invalid ones:
+Build scopes from types instead of strings. `ATProtoScope` and `ATProtoScopeSet` come from the `PetrelOAuthScopes` module, which Petrel re-exports. `ATProtoScope` parses and formats every scope the permission specification defines, and rejects invalid ones:
 
 <!-- compile-example: oauth-client-typed-scopes -->
 ```swift
@@ -170,7 +229,42 @@ func configureConfidentialClient(
 }
 ```
 
-Implement ``OAuthClientAssertionSigner`` yourself to keep the key in a KMS or HSM. An app whose key lives on a backend it talks to uses `AuthMode.cab(backendURL:)` instead.
+Implement ``OAuthClientAssertionSigner`` yourself to keep the key in a KMS or HSM.
+
+### Other authentication modes
+
+``AuthMode`` selects how a client authenticates. The XRPC call sites are the same in every mode.
+
+| Mode | Keys live | Use it for |
+| :--- | :--- | :--- |
+| `.none` (`ATProtoClient(baseURL:)`) | nowhere | Public queries, such as `https://public.api.bsky.app` |
+| `.publicOAuth` (default) | DPoP key in the client's secure storage | Native apps that talk to the user's PDS directly |
+| `.cab(backendURL:)` | DPoP key on the device, client-assertion key on your backend | Confidential clients that still talk to the PDS directly |
+| `.gateway(_:)` | on your backend | Apps that send every request through a confidential OAuth gateway, configured with ``GatewayConfiguration`` |
+| `.legacy` | session tokens in the client's secure storage | App-password sign-in |
+
+### Sign in with an app password
+
+`loginWithPassword` creates a legacy session for scripts, bots and servers that do not offer OAuth. Create the client with ``AuthMode/legacy`` and pass an app password, never the account's main password. Prefer OAuth for anything a person signs in to interactively.
+
+<!-- compile-example: oauth-legacy-password -->
+```swift
+import Petrel
+
+func signInWithAppPassword(identifier: String, appPassword: String) async throws -> ATProtoClient {
+    let client = try await ATProtoClient(
+        oauthConfig: OAuthConfig.loopback(port: 8765),
+        namespace: "com.example.cli",
+        authMode: .legacy
+    )
+    _ = try await client.loginWithPassword(identifier: identifier, password: appPassword)
+    return client
+}
+```
+
+### Tokens and storage
+
+Petrel refreshes access tokens before they expire and when a server rejects one as expired. Refresh tokens are single-use, so concurrent calls share one refresh. Tokens and DPoP keys are stored under the client's `namespace`: in the keychain on Apple platforms, and in libsecret or an encrypted file on Linux. ``CredentialStorageConfiguration`` selects the storage for one client.
 
 ### Sign out
 

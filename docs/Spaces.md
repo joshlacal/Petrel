@@ -1,13 +1,13 @@
 # AT Protocol Spaces (alpha)
 
-AT Protocol Spaces is Bluesky's proposal for permissioned data: records that live in a *space* owned by an authority account and are readable only by accounts and apps the space's policy admits. Spaces is an **alpha protocol**. Its Lexicons, wire formats and URI syntax change between alpha releases without compatibility guarantees, and Petrel follows each release it adopts with source-breaking changes and no dual support for older formats. Do not build anything on Spaces that you cannot migrate.
+AT Protocol Spaces is Bluesky's proposal for permissioned data: records that live in a *space* owned by an authority account and are readable only by accounts and apps the space's policy admits. Spaces is an alpha protocol. Its Lexicons, wire formats and URI syntax change between alpha releases without compatibility guarantees, and Petrel follows each release it adopts with source-breaking changes and no dual support for older formats. Do not build anything on Spaces that you cannot migrate.
 
-Petrel currently targets the **November 12 alpha**: `bluesky-social/atproto` commit `d4def6e9f521896ed8222f576d54923d00b5fbeb`, published to npm as `0.0.0-spaces-alpha-20261112204144`. Servers running an earlier alpha speak a different credential and MAC format and will not interoperate with this version of Petrel.
+Petrel currently targets the November 12 alpha: `bluesky-social/atproto` commit `d4def6e9f521896ed8222f576d54923d00b5fbeb`, published to npm as `0.0.0-spaces-alpha-20261112204144`. Servers running an earlier alpha speak a different credential and MAC format and will not interoperate with this version of Petrel.
 
 Petrel's Spaces support has two layers:
 
-- **Generated bindings** for every Spaces Lexicon, called like any other XRPC endpoint (`client.com.atproto.space.createSpace(input:)` and so on). They use your client's normal authentication and do not verify response MACs.
-- **A hand-written credential client**, `SpaceCredentialManager`, which exchanges a delegation token for a space credential, signs credential-authenticated reads, and verifies the MACs and archives that come back. `SpaceSTAR` verifies repository archives, and `SpaceRef` and `ATProtocolURI` model space identifiers.
+- Generated bindings for every Spaces Lexicon, called like any other XRPC endpoint (`client.com.atproto.space.createSpace(input:)` and so on). They use your client's normal authentication and do not verify response MACs.
+- A hand-written credential client, `SpaceCredentialManager`, which exchanges a delegation token for a space credential, signs credential-authenticated reads, and verifies the MACs and archives that come back. `SpaceSTAR` verifies repository archives, and `SpaceRef` and `ATProtocolURI` model space identifiers.
 
 ## Space identifiers
 
@@ -48,7 +48,7 @@ The URI syntax is one of the parts of the alpha most likely to change: upstream 
 
 Petrel vendors the `com.atproto.space`, `com.atproto.memberspace`, `com.atproto.managedspace` and `com.atproto.personalspace` Lexicons and generates Swift types and client methods for all of them. The space policy is an open union of `com.atproto.personalspace.policy`, `com.atproto.memberspace.policy` and `com.atproto.managedspace.policy`.
 
-Generated calls behave like every other Petrel endpoint: they return `(responseCode, data)`, use the client's OAuth or session authentication, and are bounded by the client's response limits. They do **not** check response MACs. Owner-authenticated calls (for example `createSpace`, `getSpace`, `listSpaces`, or `getRepo` on your own repository) are authenticated by the owner's OAuth exchange and transport. `getSpace` requires authentication as the space authority; other accounts can read the published `com.atproto.space.policy` record instead.
+Generated calls behave like every other Petrel endpoint: they return `(responseCode, data)`, use the client's OAuth or session authentication, and are bounded by the client's response limits. They do not check response MACs. Owner-authenticated calls (for example `createSpace`, `getSpace`, `listSpaces`, or `getRepo` on your own repository) are authenticated by the owner's OAuth exchange and transport. `getSpace` requires authentication as the space authority; other accounts can read the published `com.atproto.space.policy` record instead.
 
 <!-- compile-example: spaces-list-spaces -->
 ```swift
@@ -159,7 +159,7 @@ Other methods sent through `get`, such as `getBlob`, `listRecords` or `listWrite
 
 Replace your local copy of the repository atomically with a verified snapshot, removing records absent from it.
 
-The standalone verifier checks the archive's internal consistency and that it names the requested space and repo. It does **not** authenticate the author. Use it on its own only for an archive whose transport you already trust, such as the owner's own repository fetched with OAuth (see below) or bytes already returned by `SpaceCredentialManager.get`. Never treat a self-consistent digest on an archive from an untrusted source as proof of who wrote it.
+The standalone verifier checks the archive's internal consistency and that it names the requested space and repo. It does not authenticate the author. Use it on its own only for an archive whose transport you already trust, such as the owner's own repository fetched with OAuth (see below) or bytes already returned by `SpaceCredentialManager.get`. Never treat a self-consistent digest on an archive from an untrusted source as proof of who wrote it.
 
 ## Owner OAuth reads
 

@@ -6,8 +6,6 @@ Where the specification's text and the reference implementation differ, Petrel f
 
 A scope string that one implementation accepts and another rejects, or that two implementations canonicalise differently, breaks sessions in ways that are hard to diagnose: a client's declared scope stops matching what it requests, or a token's scope stops matching what a resource server expects. The network's authorization servers run the reference implementation, `@atproto/oauth-scopes`, so Petrel's rule is parity with it for both the accept-or-reject decision and the canonical form.
 
-Parity is enforced by `UpstreamScopeConformanceTests`, which runs every value in a fixture generated from the reference package at a pinned commit (`Tests/PetrelOAuthScopesTests/UpstreamGoldens/regenerate.sh` regenerates it).
-
 ### Ten cases where a literal reading of the specification would answer differently
 
 Each is pinned individually by `ReferenceParityTests`.
@@ -52,9 +50,9 @@ Nothing in this module decides whether two scopes are "the same" by comparing st
 
 The questions are answered from the parsed values the matchers themselves read:
 
-- **Is a requested scope declared by the client?** ``OAuthScopeAdmissionPolicy/isDeclared(_:by:)``, used by ``OAuthScopeAdmissionPolicy/admit(requested:declaredBy:unknownScopes:)``: some declared scope must grant exactly what the requested one grants. The second scope above is not declared by a client that declared the first. A wildcard beside a specific value, a `type/*` beside `type/subtype`, `manage` beside `read`, a repeated value and the positional or named form of a parameter do not change what a scope grants, so those spellings are interchangeable; a narrower or a wider scope is a different one. The reference authorization server requires the requested string to appear verbatim among the declared ones (`oauth-provider/src/client/client.ts:297-312`), so everything it admits Petrel admits, and Petrel additionally admits another spelling of a declared grant — never another grant. Whenever a scope is admitted, every request it allows is allowed by the declared scopes; `ScopeAdmissionMeaningTests` checks that for every pair of scopes in the reference corpus.
-- **Does a set cover a scope?** `covers(_:)`, likewise from the parsed values.
-- **Are two sets equal?** ``ATProtoScopeSet`` `==` is identity of the strings the token carries, byte for byte, and says so; it is not a statement about grants. Use `covers(_:)` in both directions for that.
+- Is a requested scope declared by the client? ``OAuthScopeAdmissionPolicy/isDeclared(_:by:)``, used by ``OAuthScopeAdmissionPolicy/admit(requested:declaredBy:unknownScopes:)``: some declared scope must grant exactly what the requested one grants. The second scope above is not declared by a client that declared the first. A wildcard beside a specific value, a `type/*` beside `type/subtype`, `manage` beside `read`, a repeated value and the positional or named form of a parameter do not change what a scope grants, so those spellings are interchangeable; a narrower or a wider scope is a different one. The reference authorization server requires the requested string to appear verbatim among the declared ones (`oauth-provider/src/client/client.ts:297-312`), so everything it admits Petrel admits, and Petrel additionally admits another spelling of a declared grant — never another grant. Whenever a scope is admitted, every request it allows is allowed by the declared scopes; `ScopeAdmissionMeaningTests` checks that for every pair of scopes in the reference corpus.
+- Does a set cover a scope? `covers(_:)`, likewise from the parsed values.
+- Are two sets equal? ``ATProtoScopeSet`` `==` is identity of the strings the token carries, byte for byte, and says so; it is not a statement about grants. Use `covers(_:)` in both directions for that.
 
 Three places do work on strings, because a string is what they are about. ``OAuthScopeTokenizer`` rejects a token that appears twice, byte for byte, as a malformed request; two spellings of one grant are not duplicates. ``OAuthScopeBudget`` counts strings and bytes, since it bounds storage. And a scope that does not parse has no meaning to compare, so it is declared, or covered, only by the identical bytes.
 
@@ -80,17 +78,17 @@ An entry of a permission set that carries a field which is JSON `null` or a JSON
 
 Behaviour that follows the reference implementation and is worth knowing when building or comparing scopes:
 
-- **Decoding the parameter part never fails.** It is read as `URLSearchParams` reads it: a malformed percent-escape stays as written and invalid UTF-8 becomes U+FFFD. The scope is still rejected, by the parameter's own validation.
-- **A parsed permission keeps its values as written** — order, duplicates and letter case. Only ``ATProtoScope/canonicalScopeString()`` sorts, removes duplicates and lower-cases.
-- **`==` on ``ATProtoScope`` is structural.** It compares the values as written, including whether a parameter was stated or left to its default, so two scopes granting the same access can be unequal. To ask whether one grant includes another use `covers(_:)` on an ``ATProtoScopeSet``.
-- **An empty `actions` list means every action**, exactly as leaving `action` out of the scope string does.
-- **Only the builders and `parse` validate.** The permission types' own initializers (`RepoPermission(collection:action:)` and the others) take what they are given. A value assembled that way which no scope string can describe has no ``ATProtoScope/scopeString`` and grants nothing in a set.
-- **`did:web:localhost%3A`** — a port separator with no port — is accepted as an audience, as the URL parser behind the reference accepts `http://localhost:`.
-- **A scope value is split on SPACE only** (RFC 6749 §3.3), and on the byte: a space followed by a combining mark still separates two tokens. Tabs and newlines are part of a token, which then is not a valid scope. Leading, trailing and repeated spaces are tolerated, by ``ATProtoScopeSet/init(strict:)`` as well.
-- **``ATProtoScopeSet/rawScopes`` is a `Set<String>`**, which cannot hold two strings that differ in bytes and are canonically equivalent. Given both in one scope value, ``ATProtoScopeSet/init(scope:)`` keeps the ASCII one — the only one that can be a scope — in either order.
-- **A set parsed from a string holds the strings as given.** ``ATProtoScopeSet/scopes`` and ``ATProtoScopeSet/scopeString`` are in sorted order of those strings, not the order given, and two spellings of one permission are two members; ``ATProtoScopeSet/normalizedScopeString`` folds them, and keeps strings it does not recognise as they are.
-- **`transition:generic` does not reach `chat.bsky.` methods**, and `transition:chat.bsky` reaches only those. A need for every method on a service is therefore covered by the two together, not by either alone.
-- **A scope that does not parse is covered only by the identical string.** `covers` cannot reason about a scope this version does not understand, so it does not report it as covered unless the granted set holds exactly that string.
+- Decoding the parameter part never fails: It is read as `URLSearchParams` reads it: a malformed percent-escape stays as written and invalid UTF-8 becomes U+FFFD. The scope is still rejected, by the parameter's own validation.
+- A parsed permission keeps its values as written — order, duplicates and letter case. Only ``ATProtoScope/canonicalScopeString()`` sorts, removes duplicates and lower-cases.
+- `==` on ``ATProtoScope`` is structural: It compares the values as written, including whether a parameter was stated or left to its default, so two scopes granting the same access can be unequal. To ask whether one grant includes another use `covers(_:)` on an ``ATProtoScopeSet``.
+- An empty `actions` list means every action, exactly as leaving `action` out of the scope string does.
+- Only the builders and `parse` validate: The permission types' own initializers (`RepoPermission(collection:action:)` and the others) take what they are given. A value assembled that way which no scope string can describe has no ``ATProtoScope/scopeString`` and grants nothing in a set.
+- `did:web:localhost%3A` — a port separator with no port — is accepted as an audience, as the URL parser behind the reference accepts `http://localhost:`.
+- A scope value is split on SPACE only (RFC 6749 §3.3), and on the byte: a space followed by a combining mark still separates two tokens. Tabs and newlines are part of a token, which then is not a valid scope. Leading, trailing and repeated spaces are tolerated, by ``ATProtoScopeSet/init(strict:)`` as well.
+- ``ATProtoScopeSet/rawScopes`` is a `Set<String>`, which cannot hold two strings that differ in bytes and are canonically equivalent. Given both in one scope value, ``ATProtoScopeSet/init(scope:)`` keeps the ASCII one — the only one that can be a scope — in either order.
+- A set parsed from a string holds the strings as given: ``ATProtoScopeSet/scopes`` and ``ATProtoScopeSet/scopeString`` are in sorted order of those strings, not the order given, and two spellings of one permission are two members; ``ATProtoScopeSet/normalizedScopeString`` folds them, and keeps strings it does not recognise as they are.
+- `transition:generic` does not reach `chat.bsky.` methods, and `transition:chat.bsky` reaches only those. A need for every method on a service is therefore covered by the two together, not by either alone.
+- A scope that does not parse is covered only by the identical string: `covers` cannot reason about a scope this version does not understand, so it does not report it as covered unless the granted set holds exactly that string.
 
 ### Where Petrel is stricter than the reference
 
