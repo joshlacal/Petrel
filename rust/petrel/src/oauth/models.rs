@@ -15,7 +15,12 @@ pub struct Account {
     pub handle: Option<Handle>,
     /// Canonical PDS origin, with no trailing slash.
     pub pds: String,
-    pub authorization_server: AuthorizationServerMetadata,
+    /// The issuer metadata validated when the account was last authorized.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization_server: Option<AuthorizationServerMetadata>,
+    /// The issuer bound at authorization, retained independently of the metadata document.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_issuer: Option<String>,
 }
 
 /// Tokens issued to one account. Debug output does not contain credentials.

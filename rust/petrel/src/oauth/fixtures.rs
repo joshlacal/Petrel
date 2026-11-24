@@ -47,6 +47,9 @@ struct Exchanges {
     proof_jkts: Vec<String>,
     unexpected_requests: usize,
     service_requests: usize,
+    resource_metadata_requests: usize,
+    issuer_metadata_requests: usize,
+    resource_issuer_override: Option<&'static str>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -125,18 +128,7 @@ impl Server {
         let response = match (uri.host(), uri.path()) {
             (Some("pds.example"), "/.well-known/oauth-protected-resource") => {
                 assert!(options.anonymous);
-                let issuer = if matches!(self.scenario, Scenario::PdsIssuerChanged)
-                    && self.exchanges.lock().unwrap().did_refreshes > 0
-                {
-                    "https://other-issuer.example"
-                } else {
-                    ISSUER
-                };
-                json_response(
-                    200,
-                    None,
-                    &json!({"resource":PDS,"authorization_servers":[issuer]}),
-                )
+                self.resource_metadata()
             }
             (Some("issuer.example"), "/.well-known/oauth-protected-resource") => {
                 assert!(options.anonymous);
@@ -144,6 +136,7 @@ impl Server {
             }
             (Some("other-issuer.example"), "/.well-known/oauth-authorization-server") => {
                 assert!(options.anonymous);
+                self.exchanges.lock().unwrap().issuer_metadata_requests += 1;
                 json_response(
                     200,
                     None,
@@ -153,6 +146,7 @@ impl Server {
             }
             (Some("issuer.example"), "/.well-known/oauth-authorization-server") => {
                 assert!(options.anonymous);
+                self.exchanges.lock().unwrap().issuer_metadata_requests += 1;
                 let mut metadata = example_metadata(ISSUER);
                 if matches!(self.scenario, Scenario::PublicOnly) {
                     metadata.token_endpoint_auth_methods_supported = vec!["none".into()];
@@ -184,6 +178,23 @@ impl Server {
         };
         Ok(response)
     }
+    fn resource_metadata(&self) -> Response<Bytes> {
+        let mut exchanges = self.exchanges.lock().unwrap();
+        exchanges.resource_metadata_requests += 1;
+        let issuer = exchanges.resource_issuer_override.unwrap_or_else(|| {
+            if matches!(self.scenario, Scenario::PdsIssuerChanged) && exchanges.did_refreshes > 0 {
+                "https://other-issuer.example"
+            } else {
+                ISSUER
+            }
+        });
+        json_response(
+            200,
+            None,
+            &json!({"resource":PDS,"authorization_servers":[issuer]}),
+        )
+    }
+
     fn cab_exchange(
         &self,
         request: &Request<Bytes>,
@@ -1739,4 +1750,142 @@ async fn elapsed_refresh_backoff_admits_only_one_probe() {
     assert_eq!(probes, 1);
     assert_eq!(deferred, 49);
     assert_eq!(server.exchanges.lock().unwrap().refreshes, 4);
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn a_bound_issuer_allows_missing_metadata_to_be_restored_from_the_pds() {
+    let server = Arc::new(Server::new(Scenario::Public));
+    let client = client(&server, ClientAuth::Public);
+    start(&client).await;
+    let session = client
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+    let did = &session.did;
+    let mut record = client.storage.get_session(did).await.unwrap().unwrap();
+    assert_eq!(record.account.expected_issuer.as_deref(), Some(ISSUER));
+    record.account.authorization_server = None;
+    client.storage.save_session(&record).await.unwrap();
+
+    let restored = client.refresh(did, true).await.unwrap();
+    assert_eq!(restored.access_token(), "access-second");
+    let record = client.storage.get_session(did).await.unwrap().unwrap();
+    assert_eq!(record.account.authorization_server.unwrap().issuer, ISSUER);
+    assert_eq!(record.account.expected_issuer.as_deref(), Some(ISSUER));
+    let calls = server.exchanges.lock().unwrap();
+    assert_eq!(calls.resource_metadata_requests, 3);
+    assert_eq!(calls.issuer_metadata_requests, 3);
+    assert_eq!(calls.refreshes, 1);
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn recovery_never_sends_tokens_to_an_unbound_or_invalid_issuer() {
+    for case in [
+        "issuer absent",
+        "issuer noncanonical",
+        "issuer drift",
+        "present metadata invalid",
+    ] {
+        let server = Arc::new(Server::new(Scenario::Public));
+        let client = client(&server, ClientAuth::Public);
+        start(&client).await;
+        let session = client
+            .complete_authorization(&server.pushed_callback(ISSUER))
+            .await
+            .unwrap();
+        let did = &session.did;
+        let mut record = client.storage.get_session(did).await.unwrap().unwrap();
+
+        let expected = match case {
+            "issuer absent" => {
+                record.account.authorization_server = None;
+                record.account.expected_issuer = None;
+                OAuthError::MissingIssuer
+            }
+            "issuer noncanonical" => {
+                record.account.authorization_server = None;
+                record.account.expected_issuer = Some(format!("{ISSUER}/"));
+                OAuthError::Metadata(super::MetadataError::InvalidOrigin)
+            }
+            "issuer drift" => {
+                record.account.authorization_server = None;
+                server.exchanges.lock().unwrap().resource_issuer_override =
+                    Some("https://other-issuer.example");
+                OAuthError::Metadata(super::MetadataError::IssuerMismatch)
+            }
+            "present metadata invalid" => {
+                record
+                    .account
+                    .authorization_server
+                    .as_mut()
+                    .unwrap()
+                    .token_endpoint = None;
+                OAuthError::Metadata(super::MetadataError::InvalidEndpoint("token_endpoint"))
+            }
+            _ => unreachable!(),
+        };
+        client.storage.save_session(&record).await.unwrap();
+        assert_eq!(
+            client.refresh(did, true).await.unwrap_err(),
+            expected,
+            "{case}"
+        );
+
+        let calls = server.exchanges.lock().unwrap();
+        assert_eq!(
+            calls.resource_metadata_requests,
+            if case == "issuer drift" { 3 } else { 2 }
+        );
+        assert_eq!(calls.issuer_metadata_requests, 2);
+        assert_eq!(calls.refreshes, 0);
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn full_v1_metadata_loads_and_refreshes_without_an_independent_issuer() {
+    #[derive(serde::Serialize)]
+    struct AccountV1<'a> {
+        did: &'a petrel_core::Did,
+        handle: Option<&'a petrel_core::Handle>,
+        pds: &'a str,
+        authorization_server: &'a super::AuthorizationServerMetadata,
+    }
+
+    let server = Arc::new(Server::new(Scenario::Public));
+    let client = client(&server, ClientAuth::Public);
+    start(&client).await;
+    let session = client
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+    let did = &session.did;
+    let mut record = client.storage.get_session(did).await.unwrap().unwrap();
+    let old = AccountV1 {
+        did: &record.account.did,
+        handle: record.account.handle.as_ref(),
+        pds: &record.account.pds,
+        authorization_server: record.account.authorization_server.as_ref().unwrap(),
+    };
+    let legacy_encoding = serde_json::to_vec(&old).unwrap();
+    record.account = serde_json::from_slice(&legacy_encoding).unwrap();
+    assert!(record.account.expected_issuer.is_none());
+    assert_eq!(
+        serde_json::to_vec(&record.account).unwrap(),
+        legacy_encoding
+    );
+    client.storage.save_session(&record).await.unwrap();
+
+    assert_eq!(
+        client.refresh(did, true).await.unwrap().access_token(),
+        "access-second"
+    );
+    let updated = client.storage.get_session(did).await.unwrap().unwrap();
+    assert_eq!(updated.account.expected_issuer.as_deref(), Some(ISSUER));
+    let calls = server.exchanges.lock().unwrap();
+    assert_eq!(calls.resource_metadata_requests, 2);
+    assert_eq!(calls.issuer_metadata_requests, 2);
+    assert_eq!(calls.refreshes, 1);
 }

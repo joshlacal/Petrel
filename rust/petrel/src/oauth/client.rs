@@ -74,6 +74,8 @@ pub enum OAuthError {
     KeyBinding,
     #[error("no OAuth session for the account")]
     MissingSession,
+    #[error("session lacks a trusted issuer for OAuth metadata recovery")]
+    MissingIssuer,
     #[error("the stored session changed before the refresh could be committed")]
     SessionChanged,
     #[error("rotated tokens are awaiting durable storage")]
@@ -810,7 +812,8 @@ impl OAuthClient {
                 did: did.clone(),
                 handle: identity.handle,
                 pds,
-                authorization_server: server.metadata().clone(),
+                authorization_server: Some(server.metadata().clone()),
+                expected_issuer: Some(server.issuer().to_owned()),
             },
             session: session.clone(),
             dpop_key_id: flow.dpop_key_id.clone(),
@@ -855,7 +858,7 @@ impl OAuthClient {
         Ok(key)
     }
 
-    pub(super) fn validate_account(
+    pub(super) async fn resolve_account_server(
         &self,
         account: &Account,
     ) -> Result<ValidatedAuthorizationServer, OAuthError> {
@@ -863,11 +866,30 @@ impl OAuthClient {
         if !self.protocol.permits(&pds) {
             return Err(OAuthError::Identity);
         }
-        let metadata = &account.authorization_server;
-        let server = metadata
-            .clone()
-            .validate(&metadata.issuer, self.config.authentication.method())?;
-        if is_loopback(&require_canonical_origin(server.issuer())?) && !is_loopback(&pds) {
+
+        let expected = account.expected_issuer.as_deref();
+        if let Some(expected) = expected {
+            let issuer = require_canonical_origin(expected)?;
+            if !self.protocol.permits(&issuer) || (is_loopback(&issuer) && !is_loopback(&pds)) {
+                return Err(OAuthError::Identity);
+            }
+        }
+        let Some(metadata) = &account.authorization_server else {
+            let issuer = expected.ok_or(OAuthError::MissingIssuer)?;
+            return Ok(self
+                .protocol
+                .discover_pds_with_issuer(&pds, Some(issuer))
+                .await?);
+        };
+
+        // Old Rust v1 records with a complete metadata document remain valid.
+        // An invalid present document must never trigger a discovery fallback.
+        let server = metadata.clone().validate(
+            expected.unwrap_or(&metadata.issuer),
+            self.config.authentication.method(),
+        )?;
+        let issuer = require_canonical_origin(server.issuer())?;
+        if !self.protocol.permits(&issuer) || (is_loopback(&issuer) && !is_loopback(&pds)) {
             return Err(OAuthError::Identity);
         }
         server.validates_resource(&account.pds)?;

@@ -196,7 +196,8 @@ impl OAuthClient {
             return Err(OAuthError::RefreshBackoff);
         }
         let server = self
-            .validate_account(&current.account)
+            .resolve_account_server(&current.account)
+            .await
             .inspect_err(|error| state.failure(now, error))?;
         let key = self
             .bound_key(&current.dpop_key_id, &current.dpop_jkt)
@@ -238,10 +239,10 @@ impl OAuthClient {
                     state.used.retain(|used| *used != digest);
                 }
                 state.success();
-                let new = SessionRecord {
-                    session: session.clone(),
-                    ..current.clone()
-                };
+                let mut new = current.clone();
+                new.session = session.clone();
+                new.account.authorization_server = Some(server.metadata().clone());
+                new.account.expected_issuer = Some(server.issuer().to_owned());
                 self.persist_refresh(&mut state, &current, new).await?;
                 Ok(session)
             }
@@ -317,7 +318,7 @@ impl OAuthClient {
     }
 
     async fn revoke_record(&self, record: &SessionRecord) -> bool {
-        let Ok(server) = self.validate_account(&record.account) else {
+        let Ok(server) = self.resolve_account_server(&record.account).await else {
             return false;
         };
         let Ok(key) = self.bound_key(&record.dpop_key_id, &record.dpop_jkt).await else {

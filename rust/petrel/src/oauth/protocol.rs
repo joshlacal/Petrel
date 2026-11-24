@@ -124,6 +124,14 @@ impl OAuthProtocol {
         &self,
         pds: &Url,
     ) -> Result<ValidatedAuthorizationServer, MetadataError> {
+        self.discover_pds_with_issuer(pds, None).await
+    }
+
+    pub(super) async fn discover_pds_with_issuer(
+        &self,
+        pds: &Url,
+        expected_issuer: Option<&str>,
+    ) -> Result<ValidatedAuthorizationServer, MetadataError> {
         let origin = origin(pds, false)
             .filter(|_| self.permits(pds))
             .ok_or(MetadataError::InvalidOrigin)?;
@@ -131,6 +139,11 @@ impl OAuthProtocol {
             .fetch(MetadataDocument::ProtectedResource, &origin)
             .await?;
         let issuer = prm.validate(&origin)?;
+        if let Some(expected) = expected_issuer
+            && issuer != expected
+        {
+            return Err(MetadataError::IssuerMismatch);
+        }
         if is_loopback(&require_canonical_origin(issuer)?) && !is_loopback(pds) {
             return Err(MetadataError::InvalidOrigin);
         }
