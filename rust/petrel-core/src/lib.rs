@@ -6,16 +6,6 @@
 //! the typed-to-[`Value`] bridge that generated types are written against, and
 //! the XRPC endpoint traits.
 //!
-//! # Status
-//!
-//! Created by Lane 0 of the Petrel Rust program (plan:
-//! `docs/execution-plans/2026-11-24-petrel-rust.md` in the Catbird+Petrel
-//! workspace repo). Lane 0 froze the public names and proved the serialization
-//! design with the `spike` integration test. Lane A owns this crate from here
-//! and replaces the minimal bodies (identifier validators, datetime and
-//! language parsers, decode limits, the TID generator) with full ports of the
-//! Swift runtime, without renaming anything exported below.
-//!
 //! # One model, two codecs
 //!
 //! Every generated type implements [`ToValue`] and [`FromValue`]. JSON and
@@ -46,15 +36,16 @@ pub mod xrpc;
 pub use cid::Cid;
 pub use datetime::Datetime;
 pub use error::{CidError, DagCborError, DecodeError, EncodeError, SyntaxError, SyntaxKind};
-pub use language::Language;
+pub use language::{Language, LanguageTag};
 pub use serde_bridge::{
     FromValue, ObjectReader, ObjectWriter, ToValue, from_dag_cbor, from_json, to_dag_cbor, to_json,
 };
 pub use syntax::{
-    AtIdentifier, AtUri, CidString, Did, Handle, Nsid, RecordKey, SpaceRef, Tid, Uri,
+    AtIdentifier, AtUri, AtprotoMethod, CidString, Did, Handle, Nsid, RecordKey, SpaceRef, Tid, Uri,
 };
+pub use tid::TidGenerator;
 pub use value::{Blob, Bytes, CidLink, Nullable, Value};
 pub use xrpc::{
-    Collection, DeclaredXrpcError, RecordKeyType, ToQueryParams, XrpcInput, XrpcMethod, XrpcOutput,
-    XrpcRequest,
+    Collection, DeclaredXrpcError, RateLimit, RecordKeyType, ToQueryParams, XrpcErrorBody,
+    XrpcInput, XrpcMethod, XrpcOutput, XrpcRequest,
 };
