@@ -34,6 +34,11 @@ pub struct SendOptions {
     /// Refuse a response body larger than this many bytes after decoding.
     /// `None` uses the transport default.
     pub max_response_bytes: Option<u64>,
+    /// Allow direct access to an exact loopback destination for local
+    /// development. Remote-to-loopback redirects are still refused.
+    pub allow_loopback: bool,
+    /// Suppress client headers and credentials for third-party discovery.
+    pub anonymous: bool,
 }
 
 impl SendOptions {
