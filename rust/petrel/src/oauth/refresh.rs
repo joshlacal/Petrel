@@ -10,6 +10,7 @@ use super::{
 use crate::{
     crypto::{random_bytes, sha256},
     net::TransportError,
+    storage::{PendingRefresh, StoreError},
 };
 
 #[derive(Default)]
@@ -17,7 +18,7 @@ pub(super) struct RefreshState {
     used: VecDeque<[u8; 32]>,
     consecutive_failures: u8,
     retry_after: u64,
-    pending: Option<SessionRecord>,
+    pending: Option<PendingRefresh>,
 }
 
 impl RefreshState {
@@ -36,7 +37,7 @@ impl RefreshState {
     fn failure(&mut self, now: u64, error: &OAuthError) {
         let (base, cap): (u64, u64) = match error {
             // A challenge handled by XRPC or the AS sender does not count.
-            OAuthError::MissingNonce => return,
+            OAuthError::MissingNonce | OAuthError::NonceRetryExhausted => return,
             OAuthError::Metadata(_) => (60, 7_200),
             OAuthError::Protocol(OAuthProtocolError::Transport(_))
             | OAuthError::ServerStatus(500..=599) => (30, 3_600),
@@ -68,19 +69,84 @@ impl OAuthClient {
         did: &Did,
     ) -> Result<Option<SessionRecord>, OAuthError> {
         let lock = self.account_lock(did);
-        let refresh = lock.lock().await;
-        self.read_record(did, &refresh).await
+        let mut refresh = lock.lock().await;
+        self.read_record(did, &mut refresh).await
     }
 
     async fn read_record(
         &self,
         did: &Did,
-        refresh: &RefreshState,
+        refresh: &mut RefreshState,
     ) -> Result<Option<SessionRecord>, OAuthError> {
-        if let Some(record) = &refresh.pending {
-            return Ok(Some(record.clone()));
+        let committed = self.storage.get_session(did).await?;
+        let Some(current) = committed else {
+            refresh.pending = None;
+            return Ok(None);
+        };
+        let pending = match &refresh.pending {
+            Some(pending) => Some(pending.clone()),
+            None => self.storage.get_pending_refresh(did).await?,
+        };
+        let Some(pending) = pending else {
+            return Ok(Some(current));
+        };
+        if pending.based_on != current.generation() {
+            refresh.pending = None;
+            self.clear_pending_refresh(&pending).await;
+            return Ok(Some(current));
         }
-        Ok(self.storage.get_session(did).await?)
+
+        match self.commit_refresh(&current, &pending.record).await {
+            Ok(true) => {
+                refresh.pending = None;
+                self.clear_pending_refresh(&pending).await;
+                Ok(Some(pending.record))
+            }
+            Ok(false) => {
+                refresh.pending = None;
+                self.clear_pending_refresh(&pending).await;
+                Ok(self.storage.get_session(did).await?)
+            }
+            Err(_) => {
+                // Reading succeeded and this is the predecessor's replacement.
+                // Preserve it in memory if the durable promotion still fails.
+                let record = pending.record.clone();
+                refresh.pending = Some(pending);
+                Ok(Some(record))
+            }
+        }
+    }
+
+    async fn commit_refresh(
+        &self,
+        old: &SessionRecord,
+        new: &SessionRecord,
+    ) -> Result<bool, StoreError> {
+        match self.storage.compare_and_swap_session(old, new).await {
+            Err(StoreError::Unsupported) => {
+                // Embedders without CAS must serialize mutations across clients.
+                let current = self.storage.get_session(&old.session.did).await?;
+                if !current.is_some_and(|record| record.generation() == old.generation()) {
+                    return Ok(false);
+                }
+                self.storage.save_session(new).await?;
+                Ok(true)
+            }
+            result => result,
+        }
+    }
+
+    async fn clear_pending_refresh(&self, pending: &PendingRefresh) {
+        if let Err(StoreError::Unsupported) = self
+            .storage
+            .compare_and_delete_pending_refresh(pending)
+            .await
+        {
+            let _ = self
+                .storage
+                .delete_pending_session(&pending.record.session.did)
+                .await;
+        }
     }
 
     /// Refreshes the account session if due, or immediately if `force` is set.
@@ -108,16 +174,17 @@ impl OAuthClient {
             .read_record(did, &state)
             .await?
             .ok_or(OAuthError::MissingSession)?;
-        if current.dpop_jkt != observed.dpop_jkt
-            || current.session.access_token() != observed.session.access_token()
-            || current.session.created_at != observed.session.created_at
-            || current.session.refresh_token() != observed.session.refresh_token()
-        {
+        if current.generation() != observed.generation() {
             return Ok(current.session);
         }
         let now = unix_now()?;
         if !force && !current.session.needs_refresh(now) {
             return Ok(current.session);
+        }
+        if state.pending.is_some() {
+            // The active slot is still the predecessor. A second rotation
+            // would create a replacement that cannot be safely published.
+            return Err(OAuthError::RefreshPersistencePending);
         }
         let Some(token) = current.session.refresh_token() else {
             if !force && now < current.session.expires_at() {
@@ -152,7 +219,7 @@ impl OAuthClient {
                         if &subject != did {
                             return Err(OAuthError::InvalidResponse);
                         }
-                        tokens.session(subject, unix_now()?, Some(token))
+                        tokens.session(subject, unix_now()?, Some(token), &current.dpop_jkt)
                     });
                     if session.is_err() {
                         self.revoke_returned(&server, &*key, response.body()).await;
@@ -166,12 +233,16 @@ impl OAuthClient {
 
         match result {
             Ok(session) => {
+                if session.refresh_token() == Some(token) {
+                    // RFC 6749 allows the issuer to keep the existing refresh token.
+                    state.used.retain(|used| *used != digest);
+                }
                 state.success();
                 let new = SessionRecord {
                     session: session.clone(),
-                    ..current
+                    ..current.clone()
                 };
-                self.persist_refresh(&mut state, new).await;
+                self.persist_refresh(&mut state, &current, new).await?;
                 Ok(session)
             }
             Err(error) => {
@@ -184,31 +255,61 @@ impl OAuthClient {
         }
     }
 
-    async fn persist_refresh(&self, state: &mut RefreshState, current: SessionRecord) {
+    async fn persist_refresh(
+        &self,
+        state: &mut RefreshState,
+        old: &SessionRecord,
+        current: SessionRecord,
+    ) -> Result<(), OAuthError> {
+        let pending = PendingRefresh {
+            based_on: old.generation(),
+            record: current,
+        };
+        // Keep the replacement under the account lock before the next await,
+        // including if the caller drops its future during a storage operation.
+        state.pending = Some(pending.clone());
+        let durable_pending = self.storage.save_pending_refresh(&pending).await.is_ok();
         for attempt in 0..3 {
-            if self.storage.save_session(&current).await.is_ok() {
-                state.pending = None;
-                let _ = self
-                    .storage
-                    .delete_pending_session(&current.session.did)
-                    .await;
-                return;
-            }
-            if attempt < 2 {
-                retry_delay(150 << attempt).await;
+            match self.commit_refresh(old, &pending.record).await {
+                Ok(true) => {
+                    state.pending = None;
+                    if durable_pending {
+                        self.clear_pending_refresh(&pending).await;
+                    }
+                    return Ok(());
+                }
+                Ok(false) => {
+                    state.pending = None;
+                    if durable_pending {
+                        self.clear_pending_refresh(&pending).await;
+                    }
+                    let committed = self.storage.get_session(&old.session.did).await?;
+                    return if committed
+                        .is_some_and(|record| record.generation() == pending.record.generation())
+                    {
+                        Ok(())
+                    } else {
+                        Err(OAuthError::SessionChanged)
+                    };
+                }
+                Err(_) if attempt < 2 => retry_delay(150 << attempt).await,
+                Err(_) => {
+                    if !durable_pending {
+                        tracing::warn!(
+                            "rotated OAuth session is only available until this process exits"
+                        );
+                    }
+                }
             }
         }
-        // The refresh token was accepted by the server. Keep its replacement
-        // available even if the durable session slot cannot be updated yet.
-        let _ = self.storage.save_pending_session(&current).await;
-        state.pending = Some(current);
+        Ok(())
     }
 
     /// Tries upstream revocation, then clears local tokens, nonces and the DPoP key.
     pub async fn logout(&self, did: &Did) -> Result<bool, OAuthError> {
         let lock = self.account_lock(did);
         let mut state = lock.lock().await;
-        let Some(record) = self.read_record(did, &state).await? else {
+        let Some(record) = self.read_record(did, &mut state).await? else {
             return Ok(false);
         };
         let revoked = match (
@@ -240,7 +341,8 @@ impl OAuthClient {
 fn retryable_refresh_failure(error: &OAuthError) -> bool {
     matches!(
         error,
-        OAuthError::ServerStatus(429 | 500..=599)
+        OAuthError::NonceRetryExhausted
+            | OAuthError::ServerStatus(429 | 500..=599)
             | OAuthError::Protocol(OAuthProtocolError::Transport(
                 TransportError::Timeout | TransportError::Connect(_)
             ))

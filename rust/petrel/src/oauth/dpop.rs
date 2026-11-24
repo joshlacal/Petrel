@@ -12,7 +12,7 @@ use crate::crypto::{
     sha256,
 };
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum DpopError {
     #[error("invalid HTTP target for DPoP")]
     Target,

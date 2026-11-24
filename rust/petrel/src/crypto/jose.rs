@@ -55,8 +55,7 @@ pub fn pkce_verifier() -> Result<String, CryptoError> {
 }
 
 /// A public P-256 JWK. Member order is the RFC 7638 canonical order.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(try_from = "JwkFields")]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub(crate) struct Jwk {
     crv: &'static str,
     kty: &'static str,
@@ -71,6 +70,14 @@ struct JwkFields {
     kty: String,
     x: String,
     y: String,
+}
+
+impl<'de> Deserialize<'de> for Jwk {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        JwkFields::deserialize(deserializer)?
+            .try_into()
+            .map_err(serde::de::Error::custom)
+    }
 }
 
 impl TryFrom<JwkFields> for Jwk {
@@ -172,7 +179,7 @@ impl SoftwareDpopSigner {
     pub fn to_bytes(&self) -> Zeroizing<[u8; 32]> {
         let bytes = Zeroizing::new(self.key.to_bytes());
         let mut output = Zeroizing::new([0; 32]);
-        output.copy_from_slice(bytes.as_slice());
+        output.copy_from_slice(&bytes[..]);
         output
     }
 
@@ -238,14 +245,15 @@ pub(crate) fn finish_es256_jws(
     Ok(input)
 }
 
-pub(crate) struct CompactJws<'a> {
-    pub input: &'a str,
+pub(crate) struct CompactJws {
+    #[cfg(test)]
+    pub input: String,
     pub header: Vec<u8>,
     pub claims: Vec<u8>,
     pub signature: Vec<u8>,
 }
 
-pub(crate) fn split_compact_jws(compact: &str) -> Result<CompactJws<'_>, CryptoError> {
+pub(crate) fn split_compact_jws(compact: &str) -> Result<CompactJws, CryptoError> {
     // Bound the scan before splitting, including when the input has no dots.
     if compact.len() > 2 * (MAX_JWS_JSON_BYTES * 4).div_ceil(3) + 256 {
         return Err(CryptoError::TooLarge);
@@ -256,7 +264,8 @@ pub(crate) fn split_compact_jws(compact: &str) -> Result<CompactJws<'_>, CryptoE
         return Err(CryptoError::InvalidJws);
     }
     Ok(CompactJws {
-        input,
+        #[cfg(test)]
+        input: input.to_owned(),
         header: decode_base64url(header, MAX_JWS_JSON_BYTES)?,
         claims: decode_base64url(claims, MAX_JWS_JSON_BYTES)?,
         signature: decode_base64url(signature, 132)?,

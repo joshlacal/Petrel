@@ -3,6 +3,7 @@ use std::fmt;
 use petrel_core::{Did, Handle};
 use petrel_oauth_scopes::ScopeSet;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
 use super::AuthorizationServerMetadata;
@@ -97,6 +98,24 @@ pub struct SessionRecord {
     pub session: Session,
     pub dpop_key_id: String,
     pub dpop_jkt: String,
+}
+
+impl SessionRecord {
+    pub(crate) fn generation(&self) -> [u8; 32] {
+        let mut hash = Sha256::new();
+        for value in [
+            self.session.did.as_str(),
+            self.dpop_key_id.as_str(),
+            self.session.access_token(),
+            self.session.refresh_token().unwrap_or_default(),
+        ] {
+            hash.update(u64::try_from(value.len()).unwrap_or(u64::MAX).to_be_bytes());
+            hash.update(value.as_bytes());
+        }
+        hash.update(self.session.created_at.to_be_bytes());
+        hash.update(self.session.expires_in.to_be_bytes());
+        hash.finalize().into()
+    }
 }
 
 /// State consumed exactly once by the callback handler.

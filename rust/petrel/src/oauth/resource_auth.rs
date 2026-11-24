@@ -91,11 +91,13 @@ impl AuthProvider for SessionAuth {
                 .headers_mut()
                 .insert(header::AUTHORIZATION, authorization);
             request.headers_mut().insert("dpop", dpop);
+            let session_generation = record.generation();
             Ok((
                 request,
                 AuthCtx {
                     did: Some(self.did.clone()),
                     jkt: Some(record.dpop_jkt),
+                    session_generation: Some(session_generation),
                 },
             ))
         })
@@ -147,6 +149,18 @@ impl AuthProvider for SessionAuth {
             };
             if ctx.jkt.as_deref() != Some(&record.dpop_jkt) {
                 return Ok(UnauthorizedAction::GiveUp);
+            }
+
+            if ctx
+                .session_generation
+                .is_some_and(|sent| sent != record.generation())
+            {
+                // This 401 refers to the previous access token on the same key.
+                self.client
+                    .refresh_after(&record, false)
+                    .await
+                    .map_err(auth_error)?;
+                return Ok(UnauthorizedAction::Retry);
             }
 
             self.client

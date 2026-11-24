@@ -15,7 +15,7 @@ use crate::{
     crypto::{CryptoError, DpopSigner, Jwk, SoftwareDpopSigner, split_compact_jws},
     net::{HttpTransport, SendOptions, TransportError},
     rt::BoxFuture,
-    storage::{MemorySecretStore, SessionStore},
+    storage::{MemorySecretStore, PendingRefresh, SessionStore},
     xrpc::AuthProvider,
 };
 
@@ -54,6 +54,9 @@ enum Scenario {
     AsNonce,
     MissingExchangeNonce,
     SubjectMismatch,
+    WrongThumbprint,
+    MalformedRefreshToken,
+    RetainedRefreshToken,
     TokenRedirect,
     CabNonce,
     CabClientMismatch,
@@ -195,15 +198,46 @@ impl Server {
                         Scenario::SubjectMismatch => {
                             token_response(OTHER_DID, "first", Some("token-nonce"))
                         }
+                        Scenario::WrongThumbprint => json_response(
+                            200,
+                            Some("token-nonce"),
+                            json!({
+                                "access_token": "access-first", "refresh_token": "refresh-first",
+                                "token_type":"DPoP", "scope":SCOPE, "sub":DID, "dpop_jkt":"unexpected"
+                            }),
+                        ),
+                        Scenario::MalformedRefreshToken => json_response(
+                            200,
+                            Some("token-nonce"),
+                            json!({
+                                "access_token": "access-first", "refresh_token": 12,
+                                "token_type":"DPoP", "scope":SCOPE, "sub":DID
+                            }),
+                        ),
                         _ => token_response(DID, "first", Some("token-nonce")),
                     }
                 } else {
                     assert_eq!(grant, "refresh_token");
                     assert_eq!(form["refresh_token"], "refresh-first");
                     assert_eq!(proof["nonce"], "token-nonce");
-                    self.exchanges.lock().unwrap().refreshes += 1;
+                    let count = {
+                        let mut exchanges = self.exchanges.lock().unwrap();
+                        exchanges.refreshes += 1;
+                        exchanges.refreshes
+                    };
                     retry_delay(15).await;
-                    token_response(DID, "second", None)
+                    if matches!(self.scenario, Scenario::RetainedRefreshToken) {
+                        json_response(
+                            200,
+                            None,
+                            json!({
+                                "access_token": format!("access-rotation-{count}"),
+                                "token_type":"DPoP", "scope":SCOPE, "sub":DID
+                            }),
+                        )
+                    } else {
+                        token_response(DID, "second", None)
+                    }
                 }
             }
             (Some("issuer.example"), "/revoke") => {
@@ -395,6 +429,18 @@ async fn metadata_bindings_and_callback_are_enforced_before_or_after_exchange() 
             1,
         ),
         (
+            Scenario::WrongThumbprint,
+            ISSUER,
+            OAuthError::InvalidResponse,
+            1,
+        ),
+        (
+            Scenario::MalformedRefreshToken,
+            ISSUER,
+            OAuthError::InvalidResponse,
+            1,
+        ),
+        (
             Scenario::TokenRedirect,
             ISSUER,
             OAuthProtocolError::Redirect.into(),
@@ -425,9 +471,11 @@ async fn metadata_bindings_and_callback_are_enforced_before_or_after_exchange() 
         assert_eq!(calls.unexpected_requests, 0);
         if matches!(
             scenario,
-            Scenario::MissingExchangeNonce | Scenario::SubjectMismatch
+            Scenario::MissingExchangeNonce | Scenario::SubjectMismatch | Scenario::WrongThumbprint
         ) {
             assert_eq!(calls.revokes, ["refresh-first"]);
+        } else if matches!(scenario, Scenario::MalformedRefreshToken) {
+            assert_eq!(calls.revokes, ["access-first"]);
         }
     }
 }
@@ -500,4 +548,98 @@ async fn cab_nonce_is_private_to_each_assertion_and_backend_client_id_must_match
             assert!(calls.par.is_empty());
         }
     }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn restart_promotes_only_the_pending_replacement_for_the_active_generation() {
+    let server = Arc::new(Server::new(Scenario::Public));
+    let client = client(&server, ClientAuth::Public);
+    start(&client).await;
+    client
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+    let did = DID.parse().unwrap();
+    let config = OAuthConfig::new(
+        CLIENT,
+        Url::parse(REDIRECT).unwrap(),
+        SCOPE,
+        ClientAuth::Public,
+    )
+    .unwrap();
+    let storage = client.storage.clone();
+    let old = storage.get_session(&did).await.unwrap().unwrap();
+    let replacement = super::SessionRecord {
+        session: super::Session::new(
+            did.clone(),
+            "access-after-restart".into(),
+            Some("refresh-after-restart".into()),
+            old.session.created_at + 1,
+            300,
+            &petrel_oauth_scopes::ScopeSet::parse(SCOPE).unwrap(),
+        ),
+        ..old.clone()
+    };
+    let pending = PendingRefresh {
+        based_on: old.generation(),
+        record: replacement,
+    };
+    storage.save_pending_refresh(&pending).await.unwrap();
+
+    let reopened =
+        OAuthClient::new(server.clone(), server.clone(), storage.clone(), config).unwrap();
+    let session = reopened.session(&did).await.unwrap().unwrap();
+    assert_eq!(session.access_token(), "access-after-restart");
+    assert!(storage.get_pending_refresh(&did).await.unwrap().is_none());
+
+    // A delayed pending publication from the prior generation is ignored.
+    storage.save_pending_refresh(&pending).await.unwrap();
+    let session = reopened.session(&did).await.unwrap().unwrap();
+    assert_eq!(session.access_token(), "access-after-restart");
+    assert!(storage.get_pending_refresh(&did).await.unwrap().is_none());
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn late_old_token_rejection_does_not_rotate_the_current_session() {
+    let server = Arc::new(Server::new(Scenario::Public));
+    let client = client(&server, ClientAuth::Public);
+    start(&client).await;
+    client
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+    let did: petrel_core::Did = DID.parse().unwrap();
+    let auth = client.session_auth(did.clone());
+    let request = Request::get(format!("{PDS}/xrpc/example"))
+        .body(Bytes::new())
+        .unwrap();
+    let (_, old_ctx) = auth.prepare(request).await.unwrap();
+    client.refresh(&did, true).await.unwrap();
+    let late = json_response(401, None, json!({"error": "ExpiredToken"}));
+    assert_eq!(
+        auth.handle_unauthorized(&late, &old_ctx).await.unwrap(),
+        crate::xrpc::UnauthorizedAction::Retry
+    );
+    assert_eq!(server.exchanges.lock().unwrap().refreshes, 1);
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn a_valid_refresh_response_can_keep_the_same_refresh_token() {
+    let server = Arc::new(Server::new(Scenario::RetainedRefreshToken));
+    let client = client(&server, ClientAuth::Public);
+    start(&client).await;
+    client
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+    let did = DID.parse().unwrap();
+    for expected in ["access-rotation-1", "access-rotation-2"] {
+        let refreshed = client.refresh(&did, true).await.unwrap();
+        assert_eq!(refreshed.access_token(), expected);
+        assert_eq!(refreshed.refresh_token(), Some("refresh-first"));
+    }
+    assert_eq!(server.exchanges.lock().unwrap().refreshes, 2);
 }

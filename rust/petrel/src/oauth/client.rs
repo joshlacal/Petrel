@@ -24,7 +24,7 @@ use crate::{
 
 use super::{
     ClientAuth, MetadataError, OAuthProtocolError, Session, SessionRecord,
-    dpop::{DpopNonces, nonce_header, oauth_error_code},
+    dpop::{DpopNonces, nonce_header, oauth_error_code, use_dpop_nonce},
     metadata::{
         ValidatedAuthorizationServer, endpoint_url, is_loopback, origin, require_canonical_origin,
     },
@@ -57,6 +57,8 @@ pub enum OAuthError {
     AuthorizationRejected,
     #[error("OAuth response did not contain a valid DPoP nonce")]
     MissingNonce,
+    #[error("authorization server still requires a DPoP nonce after the nonce retry")]
+    NonceRetryExhausted,
     #[error("authorization server rejected the grant")]
     InvalidGrant,
     #[error("authorization server returned HTTP {0}")]
@@ -71,6 +73,10 @@ pub enum OAuthError {
     KeyBinding,
     #[error("no OAuth session for the account")]
     MissingSession,
+    #[error("the stored session changed before the refresh could be committed")]
+    SessionChanged,
+    #[error("rotated tokens are awaiting durable storage")]
+    RefreshPersistencePending,
     #[error("the OAuth session has expired")]
     ExpiredSession,
     #[error("the authorization server did not rotate the refresh token")]
@@ -262,13 +268,15 @@ pub struct OAuthClient {
     resolver: Arc<dyn OAuthIdentityResolver>,
     config: OAuthConfig,
     pub(super) accounts: Mutex<HashMap<Did, Arc<AsyncMutex<RefreshState>>>>,
-    pending: AsyncMutex<HashMap<String, PendingAuthorization>>,
+    pending: AsyncMutex<Vec<PendingAuthorization>>,
 }
 
 struct PendingAuthorization {
+    target: String,
     state: String,
     authorize_url: Url,
     created_at: u64,
+    reuse_until: u64,
     key_id: String,
     jkt: String,
 }
@@ -306,7 +314,7 @@ impl OAuthClient {
             resolver,
             config,
             accounts: Mutex::new(HashMap::new()),
-            pending: AsyncMutex::new(HashMap::new()),
+            pending: AsyncMutex::new(Vec::new()),
         })
     }
 
@@ -325,20 +333,18 @@ impl OAuthClient {
         // for the same target reuses the same pushed request and state.
         let mut pending = self.pending.lock().await;
         let now = unix_now()?;
-        if let Some(flow) = pending.get(&target_key)
-            && now.saturating_sub(flow.created_at) <= 600
+        if let Some(flow) = pending
+            .iter()
+            .find(|flow| flow.target == target_key && now < flow.reuse_until)
         {
             return Ok(flow.authorize_url.clone());
         }
-        let expired = pending
+        while let Some(index) = pending
             .iter()
-            .filter(|(_, flow)| now.saturating_sub(flow.created_at) > 600)
-            .map(|(target, _)| target.clone())
-            .collect::<Vec<_>>();
-        for target in expired {
-            if let Some(flow) = pending.remove(&target) {
-                self.cancel_flow(&flow, now).await?;
-            }
+            .position(|flow| now.saturating_sub(flow.created_at) > 600)
+        {
+            let flow = pending.swap_remove(index);
+            self.cancel_flow(&flow, now).await?;
         }
         if pending.len() >= 8 {
             return Err(OAuthError::AuthorizationRejected);
@@ -380,7 +386,7 @@ impl OAuthClient {
                 return Err(error.into());
             }
         };
-        let authorize_url = match self
+        let (authorize_url, par_lifetime) = match self
             .push_authorization(
                 &server,
                 &state,
@@ -400,16 +406,16 @@ impl OAuthClient {
                 return Err(error);
             }
         };
-        pending.insert(
-            target_key,
-            PendingAuthorization {
-                state,
-                authorize_url: authorize_url.clone(),
-                created_at: unix_now()?,
-                key_id,
-                jkt,
-            },
-        );
+        let created_at = unix_now()?;
+        pending.push(PendingAuthorization {
+            target: target_key,
+            state,
+            authorize_url: authorize_url.clone(),
+            created_at,
+            reuse_until: created_at.saturating_add(par_lifetime),
+            key_id,
+            jkt,
+        });
         Ok(authorize_url)
     }
 
@@ -424,10 +430,11 @@ impl OAuthClient {
         expected_did: Option<Did>,
         expected_pds: Option<String>,
         login_hint: Option<&str>,
-    ) -> Result<Url, OAuthError> {
+    ) -> Result<(Url, u64), OAuthError> {
         #[derive(Deserialize)]
         struct ParResponse {
             request_uri: String,
+            expires_in: Option<u64>,
         }
 
         let verifier = zeroize::Zeroizing::new(pkce_verifier()?);
@@ -482,7 +489,7 @@ impl OAuthClient {
         self.storage
             .save_oauth_state(state, unix_now()?, &stored)
             .await?;
-        Ok(authorize)
+        Ok((authorize, par.expires_in.unwrap_or(30).min(600)))
     }
 
     async fn cancel_flow(&self, flow: &PendingAuthorization, now: u64) -> Result<(), OAuthError> {
@@ -491,7 +498,8 @@ impl OAuthClient {
             .consume_oauth_state::<OAuthFlowState>(&flow.state, now)
             .await
         {
-            Ok(_) | Err(StoreError::InvalidFlowStateAge) => {}
+            Ok(None) => return Ok(()),
+            Ok(Some(_)) | Err(StoreError::InvalidFlowStateAge) => {}
             Err(error) => return Err(error.into()),
         }
         self.protocol.nonces.clear_key(&flow.jkt);
@@ -517,7 +525,7 @@ impl OAuthClient {
         self.pending
             .lock()
             .await
-            .retain(|_, pending| pending.state != state);
+            .retain(|pending| pending.state != state);
         let result = self.complete_flow(callback, &flow).await;
         if result.is_err() {
             self.protocol.nonces.clear_key(&flow.dpop_jkt);
@@ -623,7 +631,8 @@ impl OAuthClient {
         if verified.issuer() != server.issuer() {
             return Err(OAuthError::IdentityChanged);
         }
-        let session = tokens.session(did.clone(), unix_now()?, None)?;
+        server.validates_resource(&pds)?;
+        let session = tokens.session(did.clone(), unix_now()?, None, &flow.dpop_jkt)?;
         let record = SessionRecord {
             account: Account {
                 did: did.clone(),
@@ -698,32 +707,20 @@ impl OAuthClient {
         key: &dyn DpopSigner,
         body: &[u8],
     ) {
-        #[derive(Deserialize)]
-        struct Revocable {
-            #[serde(default)]
-            access_token: Option<String>,
-            #[serde(default)]
-            refresh_token: Option<String>,
-        }
-
-        impl Drop for Revocable {
-            fn drop(&mut self) {
-                self.access_token.zeroize();
-                self.refresh_token.zeroize();
+        let Ok(fields) =
+            serde_json::from_slice::<HashMap<String, &serde_json::value::RawValue>>(body)
+        else {
+            return;
+        };
+        for field in ["refresh_token", "access_token"] {
+            if let Some(value) = fields.get(field)
+                && let Ok(token) = serde_json::from_str::<String>(value.get())
+                && !token.is_empty()
+            {
+                let token = zeroize::Zeroizing::new(token);
+                let _ = self.revoke(server, key, &token).await;
+                break;
             }
-        }
-
-        if let Ok(tokens) = serde_json::from_slice::<Revocable>(body)
-            && let Some(token) = tokens
-                .refresh_token
-                .as_deref()
-                .filter(|token| !token.is_empty())
-                .or(tokens
-                    .access_token
-                    .as_deref()
-                    .filter(|token| !token.is_empty()))
-        {
-            let _ = self.revoke(server, key, token).await;
         }
     }
 
@@ -753,6 +750,9 @@ pub(super) fn require_success(response: &Response<Bytes>) -> Result<(), OAuthErr
     ) && oauth_error_code(response.body()) == Some("invalid_grant")
     {
         return Err(OAuthError::InvalidGrant);
+    }
+    if use_dpop_nonce(response) {
+        return Err(OAuthError::NonceRetryExhausted);
     }
     Err(OAuthError::ServerStatus(response.status().as_u16()))
 }
@@ -802,6 +802,7 @@ pub(super) struct TokenResponse {
     expires_in: Option<u64>,
     sub: String,
     scope: String,
+    dpop_jkt: Option<String>,
 }
 
 impl TokenResponse {
@@ -818,10 +819,15 @@ impl TokenResponse {
         did: Did,
         now: u64,
         old_refresh: Option<&str>,
+        expected_jkt: &str,
     ) -> Result<Session, OAuthError> {
         if !self.token_type.eq_ignore_ascii_case("dpop")
             || !valid_access_token(&self.access_token)
             || self.refresh_token.as_ref().is_some_and(String::is_empty)
+            || self
+                .dpop_jkt
+                .as_ref()
+                .is_some_and(|jkt| jkt != expected_jkt)
         {
             return Err(OAuthError::InvalidResponse);
         }
