@@ -14,9 +14,8 @@ the data path:
 | `PetrelRepo` | Reads, verifies and writes repositories: CAR files, Merkle Search Trees, signed commits, record proofs and commit diffs | Verifies signatures and tree structure |
 | `PetrelPLC` | Reads the `did:plc` directory and verifies an identity's audit log offline | Verifies the operation chain from genesis |
 
-Each product has its own documentation with the full API; this article shows where each
-fits. Add the products you need next to `Petrel` in your package manifest and import them
-separately.
+Each product has its own documentation with the full API. Add the ones you need next to
+`Petrel` in your package manifest and import them separately.
 
 ## Jetstream: filtered JSON
 
@@ -55,12 +54,10 @@ func printNewPosts(limit: Int) async throws {
 }
 ```
 
-Frames the subscription cannot use arrive as `JetstreamSubscriptionEvent.ignoredFrame(_:)`
-instead of being dropped silently. A cursor storage that throws ends the stream with
-`JetstreamSubscriptionError.cursorStorageFailure(operation:message:)` rather than skipping
-or losing a position. `JetstreamClient` adds archive backfill followed by the live stream.
-The `PetrelJetstream` documentation covers both, the v2 and legacy Jetstream APIs, and
-compression.
+A frame the subscription cannot use arrives as `.ignoredFrame`; it is not dropped
+silently. A cursor storage that throws ends the stream with
+`JetstreamSubscriptionError.cursorStorageFailure(operation:message:)`, so no position is
+skipped. `JetstreamClient` adds archive backfill followed by the live stream.
 
 ## The firehose
 
@@ -121,8 +118,7 @@ func verifyFirehoseCommit(_ commit: RelayCommitEvent) async throws {
 `PetrelFirehose` also reads any other subscription, such as
 `com.atproto.label.subscribeLabels`, with `EventStreamSubscription`, and the generated
 subscription methods on ``ATProtoClient`` (see <doc:XRPCClient>) are available for simple
-cases. The `PetrelFirehose` documentation covers cursors, reconnection, backpressure and what
-ends a stream.
+cases.
 
 ## Repositories
 
@@ -152,9 +148,6 @@ func createRepository() async throws -> Data {
 }
 ```
 
-The `PetrelRepo` documentation covers reading large repositories, record proofs and
-verifying a commit diff.
-
 ## `did:plc` identities
 
 ``IdentityResolver`` resolves a DID document and checks the handle in both directions (see
@@ -180,11 +173,3 @@ func verifyAuditLogOffline(auditLogJSON: Data, did: String) throws -> PLCVerifie
     try PLCAuditLogVerifier.verify(json: auditLogJSON, did: did)
 }
 ```
-
-The `PetrelPLC` documentation covers reading, rotating keys and recovery.
-
-## Next Steps
-
-- Resolve handles and DIDs in <doc:Identity>.
-- Verify incoming service-auth tokens in your own service in <doc:ServiceAuthentication>.
-- See how the modules map to the protocol in <doc:ArchitectureAndMentalModel>.

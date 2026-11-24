@@ -120,26 +120,26 @@ func makeSubscription() -> EventStreamSubscription<ComAtprotoSyncSubscribeRepos.
 Sequenced messages carry a `seq`. The cursor is the `seq` of the last event your application
 finished processing; Petrel sends it as the `cursor` query parameter on every (re)connection.
 
-- **Storage.** Implement ``FirehoseCursorStorage`` over your database. The in-memory
+- Storage: Implement ``FirehoseCursorStorage`` over your database. The in-memory
   implementation forgets the cursor when the process exits.
-- **Acknowledging.** With `autoAcknowledge: true` the cursor of an event is saved when your
+- Acknowledging: With `autoAcknowledge: true` the cursor of an event is saved when your
   loop asks for the *next* element, which is the first moment the event is known to be
   handled. If the process dies while handling event N, the stored cursor is still N-1 and N
   is delivered again: at-least-once. With `autoAcknowledge: false` (the default) call
   ``FirehoseSubscription/acknowledge(sequence:)`` yourself, for example after a database
   commit.
-- **Starting point.** No cursor starts at the live tip. `0` asks for the oldest event the
+- Starting point: No cursor starts at the live tip. `0` asks for the oldest event the
   server still has. A cursor inside the server's window resumes there.
-- **Replay at the cursor.** The specification says the server sends events with `seq`
+- Replay at the cursor: The specification says the server sends events with `seq`
   greater than *or equal to* the cursor. The event at the cursor was already processed, so
   that one replayed copy is dropped. Servers that resume after the cursor work the same.
-- **Outdated cursor.** The server sends `#info` with name `OutdatedCursor` and continues from
+- Outdated cursor: The server sends `#info` with name `OutdatedCursor` and continues from
   its oldest event. You receive the info event, a ``FirehoseSubscriptionEvent/sequenceGap(expected:received:)``,
   and then the events.
-- **Gaps.** Sequence numbers "may contain arbitrary gaps". A gap is reported as an element
+- Gaps: Sequence numbers "may contain arbitrary gaps". A gap is reported as an element
   and the stream goes on. If you need every event, treat a gap as a reason to resynchronise
   the affected repositories.
-- **Reconnect without an acknowledgement.** If nothing was acknowledged yet, a reconnect
+- Reconnect without an acknowledgement: If nothing was acknowledged yet, a reconnect
   resumes from the last sequence delivered in this process, so events are not skipped.
 
 ## What is skipped and what ends the stream
@@ -320,15 +320,5 @@ that the operations invert the new tree to `prevData`, and that every created or
 record block matches its CID. After it succeeds, the event's ``RelayCommitEvent/records()``
 are authentic. ``RelaySyncEvent/verify(keyResolver:limits:now:maximumClockSkew:)`` does the
 same for a `#sync` event. Both apply `RepositoryCommitDiff` from `PetrelRepo`; the
-`PetrelRepo` article "Working with Repositories" describes it.
+`PetrelRepo` article "Working with repositories" describes it.
 
-## Live tests
-
-The test suite has loopback tests against a real WebSocket server on a local socket, and
-live smoke tests that are skipped unless an endpoint is named:
-
-```bash
-FIREHOSE_SMOKE_URL=wss://bsky.network/xrpc/com.atproto.sync.subscribeRepos \
-LABELS_SMOKE_URL=https://mod.bsky.app \
-swift test --filter FirehoseLiveSmokeTests
-```

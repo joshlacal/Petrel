@@ -42,7 +42,7 @@ enum StatusphereCLI {
         let createdAt = ATProtocolDate(date: Date(timeIntervalSince1970: 1_762_944_000))
         let statusRecord = XyzStatusphereStatus(
             status: "🚀",
-            mood: "xyz.statusphere.defs#shipping",
+            mood: "xyz.statusphere.status#shipping",
             note: "Shipping custom ATmosphere schemas with Petrel 2.0",
             createdAt: createdAt
         )

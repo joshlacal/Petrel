@@ -1,10 +1,10 @@
-# JetstreamLiveCLI — Filtered ATmosphere Event Streaming
+# JetstreamLiveCLI
 
 `JetstreamLiveCLI` is a standalone Swift 6 command-line package demonstrating `PetrelJetstream` and `PetrelFirehose` with server-side collection/DID filters, optional `zstd` WebSocket compression, typed `AppBskyFeedPost` decoding, arbitrary custom-collection inspection, and atomic file-backed cursor persistence (`FirehoseCursorStorage`).
 
 No account, API key, or authentication is required.
 
-## Quick Start
+## Quick start
 
 ```bash
 cd Examples/JetstreamLiveCLI
@@ -22,7 +22,7 @@ swift run JetstreamLiveCLI \
   --limit 0
 ```
 
-## CLI Reference
+## CLI reference
 
 ```text
 --host <url>            Jetstream host (default: https://jetstream2.us-east.bsky.network)

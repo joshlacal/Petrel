@@ -6,7 +6,7 @@ This directory contains self-contained, runnable Swift 6 starter projects and sc
 
 | Example | Type | What It Demonstrates | Credentials Required |
 | :--- | :--- | :--- | :--- |
-| [`LoopbackOAuthSwiftUI/`](LoopbackOAuthSwiftUI/) | SwiftUI App Package | Zero-deploy `OAuthConfig.loopback(port: 8765)` + `NWListener`, `WebAuthenticationSession` custom-scheme mode, Keychain session restore, paginated `getTimeline`, and live `RichText` facet composer | Any ATProto / Bluesky account (OAuth) |
+| [`LoopbackOAuthSwiftUI/`](LoopbackOAuthSwiftUI/) | SwiftUI App Package | Local-development OAuth with `OAuthConfig.loopback(port: 8765)` + `NWListener`, `WebAuthenticationSession` custom-scheme mode, Keychain session restore, paginated `getTimeline`, and live `RichText` facet composer | Any ATProto / Bluesky account (OAuth) |
 | [`StatusphereOverlay/`](StatusphereOverlay/) | Overlay Library + CLI | Custom `xyz.statusphere.*` Lexicons, `"kind": "overlay"` manifest, generated `PetrelStatusphere` Swift package, `PetrelStatusphereLexicons.register()`, `CIDv1` DAG-CBOR hashing, and live PDS record read/write | None for `--demo` & `list`; App Password for `post` |
 | [`JetstreamLiveCLI/`](JetstreamLiveCLI/) | Swift 6 CLI Package | Filtered live `PetrelJetstream` streaming, `zstd` dictionary compression, keyword filtering, custom collection wildcards (`xyz.statusphere.*`), and durable file-backed `FirehoseCursorStorage` | None |
 | [`FirehoseDemo.swift`](FirehoseDemo.swift) | Root Package Executable | Binary `com.atproto.sync.subscribeRepos` (`PetrelFirehose`), labeler streams (`com.atproto.label.subscribeLabels`), and Jetstream in ~120 lines | None |
@@ -32,7 +32,7 @@ cd Examples/JetstreamLiveCLI
 swift run JetstreamLiveCLI --keyword swift --compress --limit 10
 ```
 
-### 3. Zero-Deploy OAuth + SwiftUI Reference App (`LoopbackOAuthSwiftUI`)
+### 3. Loopback OAuth and SwiftUI example (`LoopbackOAuthSwiftUI`)
 
 ```bash
 cd Examples/LoopbackOAuthSwiftUI

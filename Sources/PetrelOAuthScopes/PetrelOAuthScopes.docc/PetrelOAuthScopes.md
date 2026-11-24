@@ -19,7 +19,7 @@ func checkGrant() throws {
 }
 ```
 
-The grammar is held to the reference implementation, `@atproto/oauth-scopes`: the test suite runs every value of a fixture generated from that package and requires the same accept-or-reject decision and the same canonical string. See <doc:ReferenceParity> for the places where that differs from a literal reading of the specification.
+Parsing and canonical strings match the reference implementation, `@atproto/oauth-scopes`. See <doc:ReferenceParity> for the places where that differs from a literal reading of the specification.
 
 ## Topics
 

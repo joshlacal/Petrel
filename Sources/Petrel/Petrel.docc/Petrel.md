@@ -4,8 +4,7 @@ A Swift 6 SDK for the AT Protocol and Bluesky: typed XRPC calls, OAuth, identity
 
 ## Overview
 
-Petrel is a Swift 6 SDK for the AT Protocol and Bluesky. The `Petrel` module gives you
-``ATProtoClient``, which carries a typed method for every query, procedure and
+The `Petrel` module gives you ``ATProtoClient``, which carries a typed method for every query, procedure and
 subscription in the bundled Lexicons (`com.atproto.*`, `app.bsky.*`, `chat.bsky.*`),
 grouped by NSID: `app.bsky.feed.getTimeline` is `client.app.bsky.feed.getTimeline`.
 Authentication (atproto OAuth with PAR, PKCE and DPoP, or app passwords), token refresh,
@@ -16,7 +15,8 @@ higher-level helpers: posting with rich-text facets, images and replies, the soc
 verbs, preferences, and moderation decisions. See <doc:ReadingFeedsAndThreads>,
 <doc:BlueskyPosting>, <doc:BlueskyModeration> and <doc:BlueskyPreferences>.
 
-To generate the same typed API for your own Lexicons, see <doc:CustomLexicons>.
+<doc:LexiconTypesInSwift> shows how a Lexicon becomes Swift. To generate the same typed
+API for your own Lexicons, see <doc:CustomLexicons>.
 
 ### Modules
 
@@ -49,7 +49,7 @@ shows how the streaming and repository modules fit together.
 
 - <doc:GettingStarted>
 - <doc:ArchitectureAndMentalModel>
-- <doc:RosettaStone>
+- <doc:LexiconTypesInSwift>
 - <doc:StreamingAndVerification>
 
 ### Client & Networking
@@ -64,7 +64,6 @@ shows how the streaming and repository modules fit together.
 
 - <doc:XRPCClient>
 - <doc:CustomLexicons>
-- <doc:CustomLexiconsAndOverlays>
 - ``ATProtoXRPCError``
 - ``XRPCResponseDecodingError``
 - ``XRPCCallOptions``
@@ -83,7 +82,6 @@ shows how the streaming and repository modules fit together.
 
 ### Authentication, OAuth & Scopes
 
-- <doc:Authentication>
 - <doc:OAuthClient>
 - ``OAuthConfig``
 - ``GatewayConfiguration``

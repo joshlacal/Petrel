@@ -1,6 +1,6 @@
-# StatusphereOverlay — Custom ATmosphere Lexicon Example
+# StatusphereOverlay
 
-`StatusphereOverlay` demonstrates how to build an ATmosphere application with **custom Lexicon schemas** (`xyz.statusphere.status` and `xyz.statusphere.getStatuses`) compiled into a standalone Swift 6 overlay library (`PetrelStatusphere`) on top of `Petrel`.
+`StatusphereOverlay` shows custom Lexicon schemas (`xyz.statusphere.status` and `xyz.statusphere.getStatuses`) compiled into a standalone Swift 6 overlay library (`PetrelStatusphere`) on top of `Petrel`.
 
 ## Layout
 
@@ -24,7 +24,7 @@ Examples/StatusphereOverlay/
         └── StatusphereCLI.swift                   # Offline round-trip demo + live PDS read/write CLI
 ```
 
-## Quick Start (Zero Credentials Required)
+## Quick start (no account needed)
 
 Run the self-contained verification demo to construct a typed `XyzStatusphereStatus` record, encode it to canonical JSON and deterministic DAG-CBOR, compute its `CIDv1` hash, and hydrate wire JSON dynamically through `ATProtocolValueContainer` after calling `PetrelStatusphereLexicons.register()`:
 
@@ -33,7 +33,7 @@ cd Examples/StatusphereOverlay
 swift run StatusphereCLI --demo
 ```
 
-## Reading & Writing Live Custom Records on Any PDS
+## Reading and writing records on a PDS
 
 Inspect `xyz.statusphere.status` records stored in any AT Protocol user's Personal Data Server (resolving their handle bidirectionally via `IdentityResolver` first):
 
@@ -49,11 +49,11 @@ cd Examples/StatusphereOverlay
 swift run StatusphereCLI post \
   --handle your-handle.bsky.social \
   --emoji "🚀" \
-  --mood "xyz.statusphere.defs#shipping" \
+  --mood "xyz.statusphere.status#shipping" \
   --note "Testing custom Lexicon overlays with Petrel 2.0"
 ```
 
-## Regenerating the Overlay
+## Regenerating the overlay
 
 From the Petrel repository root:
 

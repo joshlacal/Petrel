@@ -95,7 +95,7 @@ the end. A `nil` or empty cursor means there are no more pages.
 
 ## Read the home timeline
 
-`getTimeline` needs a signed-in client (see <doc:Authentication>). It is the feed the
+`getTimeline` needs a signed-in client (see <doc:OAuthClient>). It is the feed the
 account's Following tab shows:
 
 <!-- compile-example: feeds-timeline -->

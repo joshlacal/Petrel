@@ -39,7 +39,7 @@ when it opens the archive, and refuses conflicting duplicate blocks.
 
 ## Topics
 
-### Content Addressing (CID & Multihash)
+### Content addressing
 
 - ``CID``
 - ``CIDCodec``
@@ -47,7 +47,7 @@ when it opens the archive, and refuses conflicting duplicate blocks.
 - ``ATProtoLink``
 - ``CIDAsLink``
 
-### Deterministic DAG-CBOR & Ordered Maps
+### DAG-CBOR
 
 - ``DAGCBOR``
 - ``DAGCBORError``
@@ -56,7 +56,7 @@ when it opens the archive, and refuses conflicting duplicate blocks.
 - ``DAGCBORCodable``
 - ``OrderedCBORMap``
 
-### CAR v1 Archives & JSON Coding
+### CAR archives and JSON coding
 
 - ``CARReader``
 - ``CARReaderError``

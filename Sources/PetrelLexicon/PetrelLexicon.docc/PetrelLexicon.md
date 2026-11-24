@@ -9,8 +9,6 @@ Petrel's generated API covers the Lexicons it was built with. `PetrelLexicon`
 is for everything else: schemas that arrive as JSON, records of types the
 application has never seen, and servers that must check what clients send.
 
-It has three parts.
-
 - ``LexValue`` is a strict value of the AT Protocol data model. It parses JSON
   and DAG-CBOR, rejects what the data model forbids (floats, malformed `$link`
   / `$bytes` / blob objects, a `$type` that is not a non-empty string), and
@@ -19,8 +17,6 @@ It has three parts.
   version 1, and checks it against the rules of the language.
 - ``LexiconCatalog`` holds documents and validates records, XRPC parameters,
   request and response bodies, and subscription messages against them.
-
-<!-- Mirrors DocumentationSnippetTests.documentationValidateRecord -->
 
 <!-- compile-example: lexicon-overview-validate-record -->
 ```swift
@@ -46,10 +42,8 @@ document that is not a valid Lexicon, ``LexiconValidationError`` for data that
 breaks its schema, and ``LexiconCatalogError`` when the schema asked for is
 not in the catalog.
 
-The behaviour is pinned to the official
-[atproto-interop-tests](https://github.com/bluesky-social/atproto-interop-tests)
-files, which the test suite runs in full: `data-model`, `lexicon` (including
-its `catalog`), and `syntax`.
+Behaviour matches the official [atproto-interop-tests](https://github.com/bluesky-social/atproto-interop-tests)
+files for `data-model`, `lexicon` and `syntax`.
 
 ## Topics
 

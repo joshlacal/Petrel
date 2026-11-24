@@ -1,4 +1,4 @@
-# Service Authentication
+# Service authentication
 
 Mint inter-service JWTs, and authenticate the requests that carry them.
 
@@ -19,9 +19,6 @@ This module covers both directions:
 - ``ServiceAuthVerifier`` takes an `Authorization` header and returns the
   verified caller, resolving the issuer's key through a
   ``ServiceAuthKeyResolver``.
-
-The snippets on this page are also exercised by
-`Tests/PetrelCryptoTests/ServiceAuthDocumentationTests.swift`.
 
 ## Mint a token
 
@@ -116,24 +113,24 @@ struct FeedGenerator {
 
 `verify` performs, in order:
 
-1. **Decoding.** Three base64url segments, a duplicate-free JSON header and
+1. Decoding: Three base64url segments, a duplicate-free JSON header and
    payload, and none of the token types that are not service tokens
    (`at+jwt`, `refresh+jwt`, `dpop+jwt`).
-2. **Expiry.** `exp` must not be in the past (five seconds of clock skew by
+2. Expiry: `exp` must not be in the past (five seconds of clock skew by
    default), and the token must not live longer than
    ``ServiceAuthVerifier/Configuration/maximumLifetime`` — one hour by default,
    which is the longest a reference PDS issues.
-3. **Audience.** `aud` must be one of the values in the
+3. Audience: `aud` must be one of the values in the
    ``ServiceAuthAudience``.
-4. **Method.** `lxm` is checked by a ``ServiceAuthMethodPolicy``.
-5. **Issuer and key.** `iss` must be a DID. The token's `kid` (default
+4. Method: `lxm` is checked by a ``ServiceAuthMethodPolicy``.
+5. Issuer and key: `iss` must be a DID. The token's `kid` (default
    `#atproto`) must be a key this service accepts.
-6. **Signature.** The key comes from the ``ServiceAuthKeyResolver``. If the
+6. Signature: The key comes from the ``ServiceAuthKeyResolver``. If the
    signature does not verify, the resolver is asked once more with
    `forceRefresh: true`, so an issuer that has just rotated its key is not
    locked out until a cache expires. Either S value is accepted, as the
    specification requires for JWTs.
-7. **Replay.** With a ``ServiceAuthReplayStore``, each `jti` is accepted once.
+7. Replay: With a ``ServiceAuthReplayStore``, each `jti` is accepted once.
 
 The result is a ``VerifiedServiceAuth``: the issuer's DID, the key that
 verified the token, and the claims.
@@ -229,17 +226,6 @@ func verifyWithKnownKey(token: String, issuerKey: ATProtoPublicKey) throws -> Se
 
 To look inside a token without verifying it — for example one a PDS just
 issued to you — use ``ServiceJWT/inspect(_:)``.
-
-## Interoperability
-
-`Tests/PetrelTests/Vectors/service-auth` holds tokens minted by the TypeScript
-reference implementation, by OpenSSL and by `jose`, on both curves and with
-both S heights, together with the verdict of the reference `verifyJwt` on each;
-the test suite requires Petrel to reach the same verdict with the same error
-name. The same directory holds Petrel-minted tokens and the reference
-verifier's acceptance of them. Its README lists the four cases where Petrel's
-defaults are deliberately stricter than the reference, and the option that
-relaxes each of the three that are configurable.
 
 ## Topics
 

@@ -1,4 +1,4 @@
-# Resolving Lexicons from the Network
+# Resolving Lexicons from the network
 
 Find the schema for an NSID the way the specification describes: one DNS
 lookup, one DID resolution, one record fetch.
@@ -14,8 +14,6 @@ record on the NSID's authority domain.
 The authority domain of an NSID is everything but its final name segment, in
 reverse order. The TXT record lives at `_lexicon.` plus that domain, and its
 value is `did=` followed by the DID of the publishing repository.
-
-<!-- Mirrors DocumentationSnippetTests.documentationAuthorityName -->
 
 <!-- compile-example: lexicon-authority-name -->
 ```swift
@@ -41,8 +39,6 @@ fine, and two different values are a conflict that fails the resolution.
 With Petrel's identity layer, one initializer wires up all three steps: the
 system DNS resolver for the TXT lookup, an `IdentityResolver` for the DID, and
 a credential-free HTTP transport for the record.
-
-<!-- Mirrors DocumentationSnippetTests.documentationResolveWithIdentity -->
 
 <!-- compile-example: lexicon-resolve-with-identity -->
 ```swift
@@ -74,8 +70,6 @@ each step can use whatever the application already has:
 - ``LexiconRecordFetching`` fetches one record from a repository. The default
   is ``LexiconHTTPRecordFetcher``, an unauthenticated
   `com.atproto.repo.getRecord` request.
-
-<!-- Mirrors DocumentationSnippetTests.documentationResolve -->
 
 <!-- compile-example: lexicon-resolve-custom-steps -->
 ```swift

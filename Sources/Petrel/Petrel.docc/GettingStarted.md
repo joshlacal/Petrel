@@ -1,6 +1,6 @@
 # Getting Started
 
-Install Petrel 2.0, run a public XRPC query, sign in locally with loopback OAuth, sign in from SwiftUI with `WebAuthenticationSession`, and generate your production client metadata.
+Install Petrel, run a public query, sign in, and publish a post.
 
 ## Installation
 
@@ -69,7 +69,7 @@ A production atproto OAuth client is identified by the `https` URL of a client m
 import Foundation
 import Petrel
 
-func signInWithZeroDeployLoopback(handle: String) async throws -> ATProtoClient {
+func signInWithLoopback(handle: String) async throws -> ATProtoClient {
     // The atproto OAuth localhost exception:
     //   clientId    -> "http://localhost?redirect_uri=http%3A%2F%2F127.0.0.1%3A8765%2Fcallback&scope=..."
     //   redirectUri -> "http://127.0.0.1:8765/callback"
@@ -136,41 +136,14 @@ struct QuickstartSignInButton: View {
 }
 ```
 
-## Publish client metadata for production
+## Before you ship
 
-Before you ship, ask ``OAuthConfig`` to check your configuration (including that a custom redirect scheme is the client ID's hostname in reverse-domain order) and build the client metadata document to serve at the client ID URL:
+The loopback client is for development only. A released app publishes a client metadata document and uses its URL as the client ID. <doc:OAuthClient> shows how to build the document, and covers scopes, app passwords and account status.
 
-<!-- compile-example: getting-started-client-metadata -->
-```swift
-import Foundation
-import Petrel
+## Where to go next
 
-func buildProductionClientMetadata() throws -> Data {
-    let config = OAuthConfig(
-        clientId: "https://yourapp.example.com/oauth-client-metadata.json",
-        redirectUri: "com.example.yourapp:/oauth/callback",
-        scope: "atproto transition:generic"
-    )
-    try config.validate()
-
-    let document = try config.clientMetadataDocument(
-        applicationType: .native,
-        clientName: "YourApp"
-    )
-    return try JSONSerialization.data(
-        withJSONObject: document,
-        options: [.prettyPrinted, .sortedKeys]
-    )
-}
-```
-
-Serve those bytes at `https://yourapp.example.com/oauth-client-metadata.json` with `Content-Type: application/json`, register `com.example.yourapp` under `CFBundleURLTypes` in `Info.plist` (or the equivalent for your platform). The client then works with any PDS whose authorization server follows the atproto OAuth profile.
-
-## Next Steps
-
-- Learn how DIDs, PDS repositories, relays, AppViews and `AuthMode` fit together in <doc:ArchitectureAndMentalModel>.
-- Make typed and untyped calls, page through results and handle errors in <doc:XRPCClient>.
-- Post, moderate and edit preferences with the Bluesky helpers in <doc:BlueskyPosting>, <doc:BlueskyModeration> and <doc:BlueskyPreferences>.
-- Look up how a Lexicon construct maps to Swift in <doc:RosettaStone>, and compile custom `xyz.myapp.*` Lexicon overlay packages in <doc:CustomLexicons> and <doc:CustomLexiconsAndOverlays>.
-- Dive deeper into OAuth scopes, confidential backends, and account hosting status in <doc:Authentication> and <doc:OAuthClient>.
-- Explore runnable starter packages in [`Examples/`](https://github.com/joshlacal/Petrel/tree/main/Examples) (`LoopbackOAuthSwiftUI`, `StatusphereOverlay`, `JetstreamLiveCLI`).
+- <doc:ArchitectureAndMentalModel> explains DIDs, the PDS, relays and AppViews.
+- <doc:XRPCClient> covers typed and untyped calls, paging and errors.
+- <doc:ReadingFeedsAndThreads>, <doc:BlueskyPosting>, <doc:BlueskyModeration> and <doc:BlueskyPreferences> cover the Bluesky helpers.
+- <doc:LexiconTypesInSwift> and <doc:CustomLexicons> cover the generated API and how to generate one for your own Lexicons.
+- [`Examples/`](https://github.com/joshlacal/Petrel/tree/main/Examples) has runnable packages: `LoopbackOAuthSwiftUI`, `StatusphereOverlay` and `JetstreamLiveCLI`.

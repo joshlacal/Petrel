@@ -6,9 +6,7 @@ Embed an AT Protocol OAuth authorization server in a Swift service, and protect 
 
 A PDS has two OAuth jobs. As an *authorization server* it authenticates the account holder, shows what an application is asking for, and issues tokens. As a *resource server* it checks those tokens on every API request. This guide wires up both.
 
-Every Swift snippet on this page is typechecked against the current API by the repository's documentation validator (`Scripts/validate-documentation.sh`). `DocumentationExampleTests` in the package's test suite runs the same server setup, with a stub transport in place of `PinnedNIOOAuthRemoteTransport`.
-
-### 0. Add the packages
+### Add the packages
 
 `PetrelOAuthServer` itself depends only on `PetrelOAuthScopes`, `PetrelCrypto` and swift-crypto, not on a web framework. `PinnedNIOOAuthRemoteTransport`, the pinned SwiftNIO transport for client-metadata fetches, lives in `PetrelOAuthServerNIO` (package trait `OAuthServerNIO`), while the Hummingbird adapter lives in `PetrelOAuthServerHummingbird` (package trait `OAuthServerHummingbird`, which also enables `OAuthServerNIO` and re-exports `PetrelOAuthServerNIO`). For a Hummingbird server, enable `OAuthServerHummingbird` and add both products:
 
@@ -39,7 +37,7 @@ Enabling a trait needs `swift-tools-version: 6.1` or later in your own manifest.
 
 If you use another web framework, enable `traits: ["OAuthServerNIO"]` and depend on `PetrelOAuthServer` and `PetrelOAuthServerNIO` to use `PinnedNIOOAuthRemoteTransport` without pulling in Hummingbird (or depend on `PetrelOAuthServer` alone and supply your own pinning ``OAuthRemoteTransport``).
 
-### 1. Connect your accounts
+### Connect your accounts
 
 The server owns the OAuth protocol and nothing about accounts. Tell it how to check a password and how to look an account up by DID:
 
@@ -61,7 +59,7 @@ struct MyAccounts: OAuthAccountAuthenticating {
 
 `account(did:)` is consulted before every code and token is issued, so returning `nil` for a deactivated account stops its sessions from refreshing. To require a second factor, return `.secondFactorRequired` from `signIn` and implement `verifySecondFactor`.
 
-### 2. Create the server
+### Create the server
 
 <!-- compile-example: oauth-server-create -->
 ```swift
@@ -96,7 +94,7 @@ Client metadata documents are fetched from URLs that clients choose, so the tran
 
 Expired requests, codes, sessions and single-use markers are purged from the store automatically: ``OAuthAuthorizationServer/handle(_:)`` runs ``OAuthAuthorizationServer/purgeExpiredState()`` at most once per ``OAuthAuthorizationServerConfiguration/expiredStatePurgeInterval`` (five minutes by default). Set the interval to `nil` to run the purge from a scheduled job instead; then you must call `purgeExpiredState()` yourself, or the store grows without bound.
 
-### 3. Route requests to it
+### Route requests to the server
 
 The server is framework-agnostic. Register ``OAuthAuthorizationServer/routes`` with your framework and forward each request:
 
@@ -124,7 +122,7 @@ func makeRouter(server: OAuthAuthorizationServer, publicOrigin: URL) -> Router<O
     let router = Router(context: OAuthServerRequestContext.self)
     OAuthServerHummingbird.addRoutes(to: router, server: server)
 
-    // A protected route: see step 4.
+    // A protected route: see "Protect your API" below.
     let verifier = OAuthResourceServerVerifier(authorizationServer: server)
     router.get("/xrpc/com.atproto.server.getSession") { request, _ -> Response in
         switch await OAuthServerHummingbird.authenticate(request, verifier: verifier, publicOrigin: publicOrigin) {
@@ -138,7 +136,7 @@ func makeRouter(server: OAuthAuthorizationServer, publicOrigin: URL) -> Router<O
 }
 ```
 
-### 4. Protect your API
+### Protect your API
 
 Create a verifier that shares the server's stores, authenticate each request, then check the scope the request needs:
 
@@ -167,7 +165,7 @@ Build the verifier once with `OAuthResourceServerVerifier(authorizationServer: s
 
 A resource server deployed apart from the authorization server uses signed access tokens instead: configure the server with `accessTokenFormat: .signedJWT(key)`, and build the verifier from the keys published at `/oauth/jwks`. Signed access tokens live at most 15 minutes, because a stateless resource server checks only the signature and cannot see a revocation. To rotate the signing key, keep the old public key in ``OAuthAuthorizationServerConfiguration/retiringAccessTokenKeys`` for at least one access-token lifetime: it stays in the JWKS and its tokens keep verifying.
 
-### 5. Try it
+### Run the example server
 
 The repository ships a runnable example with one demo account, in the separate `Server/` package:
 
@@ -180,10 +178,10 @@ It accepts any `http://localhost` development client, which is how the profile l
 
 ## Going further
 
-- **Your own pages.** Implement ``OAuthInterfaceRendering`` to replace the built-in sign-in and consent pages. The server keeps control of the flow, the form targets and the security headers.
-- **Permission sets.** To accept `include:` scopes, pass `lexiconResolver:` an `AuthenticatedOAuthLexiconResolver` from the `PetrelOAuthServerLexicon` product, wrapped in ``CachingOAuthLexiconResolver``. It proves each set came from its authority's signed repository. Without a resolver, a request that names a permission set is refused with `invalid_scope`.
-- **Trusted clients.** A client's self-declared name and logo are shown only for the `client_id` values in ``OAuthAuthorizationServerConfiguration/trustedClientIDs``.
-- **Session management.** ``OAuthAuthorizationServer/sessions(subject:)``, ``OAuthAuthorizationServer/revokeSession(id:subject:)`` and ``OAuthAuthorizationServer/revokeAllSessions(subject:)`` list and revoke an account's sessions. The server serves no "connected applications" page and no route for these: that page is the host's job, behind its own account sign-in and CSRF protection, and must always pass the subject of the signed-in account.
+- Your own pages: Implement ``OAuthInterfaceRendering`` to replace the built-in sign-in and consent pages. The server keeps control of the flow, the form targets and the security headers.
+- Permission sets: To accept `include:` scopes, pass `lexiconResolver:` an `AuthenticatedOAuthLexiconResolver` from the `PetrelOAuthServerLexicon` product, wrapped in ``CachingOAuthLexiconResolver``. It proves each set came from its authority's signed repository. Without a resolver, a request that names a permission set is refused with `invalid_scope`.
+- Trusted clients: A client's self-declared name and logo are shown only for the `client_id` values in ``OAuthAuthorizationServerConfiguration/trustedClientIDs``.
+- Session management: ``OAuthAuthorizationServer/sessions(subject:)``, ``OAuthAuthorizationServer/revokeSession(id:subject:)`` and ``OAuthAuthorizationServer/revokeAllSessions(subject:)`` list and revoke an account's sessions. The server serves no "connected applications" page and no route for these: that page is the host's job, behind its own account sign-in and CSRF protection, and must always pass the subject of the signed-in account.
 
 ## Limits
 

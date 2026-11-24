@@ -1,13 +1,8 @@
-# Working with Repositories
+# Working with repositories
 
 Read an exported repository, check a record proof, and make a signed commit.
 
 ## Overview
-
-Every example on this page is typechecked against the current API by the
-repository's documentation validator. The body of each example is also run, on
-a real repository export, by
-`Tests/PetrelRepoTests/RepositoryDocumentationTests.swift`.
 
 Add the product to your target and import it:
 
