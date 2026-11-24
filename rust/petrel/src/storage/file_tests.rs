@@ -28,6 +28,38 @@ async fn encrypted_file_store_contract() {
     );
 }
 
+#[tokio::test]
+async fn file_compare_and_swap_compares_plaintext_and_preserves_newer_writes() {
+    let root = tempfile::tempdir().unwrap();
+    let path = store_path(&root);
+    let store = FileSecretStore::open(&path, &KEY).unwrap();
+    let second = FileSecretStore::open(&path, &KEY).unwrap();
+    assert!(
+        store
+            .compare_and_swap("petrel", "item", None, Some(b"first"))
+            .await
+            .unwrap()
+    );
+    second.put("petrel", "item", b"newer").await.unwrap();
+    assert!(
+        !store
+            .compare_and_swap("petrel", "item", Some(b"first"), None)
+            .await
+            .unwrap()
+    );
+    assert_eq!(
+        store.get("petrel", "item").await.unwrap().as_deref(),
+        Some(b"newer".as_slice())
+    );
+    assert!(
+        store
+            .compare_and_swap("petrel", "item", Some(b"newer"), None)
+            .await
+            .unwrap()
+    );
+    assert!(second.get("petrel", "item").await.unwrap().is_none());
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn independently_opened_stores_claim_state_once() {
     let root = tempfile::tempdir().unwrap();

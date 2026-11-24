@@ -116,6 +116,20 @@ impl SessionStore {
         self.save(PENDING_SESSION, did.as_str(), pending).await
     }
 
+    /// Removes the pending record only if another writer hasn't replaced it.
+    pub async fn compare_and_delete_pending_refresh(
+        &self,
+        pending: &PendingRefresh,
+    ) -> Result<bool, StoreError> {
+        let did = &pending.record.session.did;
+        validate_record(&pending.record, did)?;
+        let key = item_key(PENDING_SESSION, did.as_str())?;
+        let expected = encode(pending)?;
+        self.secrets
+            .compare_and_swap(&self.namespace, &key, Some(&expected), None)
+            .await
+    }
+
     /// Removes the pending replacement for this DID.
     pub async fn delete_pending_session(&self, did: &Did) -> Result<(), StoreError> {
         self.delete(PENDING_SESSION, did.as_str()).await
@@ -163,9 +177,9 @@ impl SessionStore {
         };
         let bytes = Zeroizing::new(bytes);
         let state: BorrowedTimed<'_> = decode(payload(&bytes)?)?;
-        if !now
+        if now
             .checked_sub(state.issued_at)
-            .is_some_and(|age| age <= MAX_FLOW_AGE_SECONDS)
+            .is_none_or(|age| age > MAX_FLOW_AGE_SECONDS)
         {
             return Err(StoreError::InvalidFlowStateAge);
         }

@@ -107,6 +107,24 @@ async fn pending_session_is_available_without_changing_committed_state() {
     let pending = reopened.get_pending_refresh(did).await.unwrap().unwrap();
     assert_eq!(pending.based_on, [21; 32]);
     assert_eq!(pending.record.session.access_token(), "pending-token");
+
+    let replacement = PendingRefresh {
+        based_on: [22; 32],
+        record: session(FIRST, "newer-pending-token"),
+    };
+    reopened.save_pending_refresh(&replacement).await.unwrap();
+    assert!(
+        !reopened
+            .compare_and_delete_pending_refresh(&pending)
+            .await
+            .unwrap()
+    );
+    assert!(
+        reopened
+            .compare_and_delete_pending_refresh(&replacement)
+            .await
+            .unwrap()
+    );
     reopened.delete_pending_session(did).await.unwrap();
     assert!(reopened.get_pending_refresh(did).await.unwrap().is_none());
     assert!(reopened.get_session(did).await.unwrap().is_some());
