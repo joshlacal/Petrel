@@ -29,7 +29,7 @@ is_generated_entry() {
     .nojekyll | css | data | developer-og-twitter.jpg | developer-og.jpg | \
       documentation | downloads | favicon.ico | favicon.svg | images | img | \
       index | index.html | js | link-hierarchy.json | linkable-entities.json | \
-      metadata.json | theme-settings.json | videos)
+      metadata.json | theme-settings.json | tutorials | videos)
       return 0
       ;;
     *)
@@ -43,10 +43,14 @@ is_generated_entry() {
 [[ -z $(find "$SOURCE" -type l -print -quit) ]] || \
   fail "generated output must not contain symbolic links"
 
+unexpected=()
 while IFS= read -r -d '' path; do
   entry=${path##*/}
-  is_generated_entry "$entry" || fail "unexpected generated top-level entry: $entry"
+  is_generated_entry "$entry" || unexpected+=("$entry")
 done < <(find "$SOURCE" -mindepth 1 -maxdepth 1 -print0)
+# Name every unexpected entry at once, so one failed run shows them all.
+[[ ${#unexpected[@]} -eq 0 ]] || \
+  fail "unexpected generated top-level entries: ${unexpected[*]}"
 
 generated_entries=(
   css
@@ -66,6 +70,7 @@ generated_entries=(
   linkable-entities.json
   metadata.json
   theme-settings.json
+  tutorials
   videos
 )
 

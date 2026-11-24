@@ -28,6 +28,7 @@ make_output() {
     "$output/documentation/petrel" \
     "$output/downloads" \
     "$output/images" \
+    "$output/tutorials" \
     "$output/videos"
   printf 'generated-marker\n' > "$output/.nojekyll"
   printf 'fresh-index\n' > "$output/index.html"
@@ -36,6 +37,8 @@ make_output() {
   printf '{}\n' > "$output/link-hierarchy.json"
   printf '[]\n' > "$output/linkable-entities.json"
   printf '{}\n' > "$output/theme-settings.json"
+  # DocC 6.1 writes tutorials/ even for a catalog with no tutorials.
+  printf 'fresh-tutorials\n' > "$output/tutorials/index.html"
 }
 
 repository=$TMP/success/repository
@@ -52,6 +55,7 @@ test "$(cat "$repository/docs/css/site.css")" = fresh-css
 test "$(cat "$repository/docs/link-hierarchy.json")" = '{}'
 test "$(cat "$repository/docs/linkable-entities.json")" = '[]'
 test "$(cat "$repository/docs/theme-settings.json")" = '{}'
+test "$(cat "$repository/docs/tutorials/index.html")" = fresh-tutorials
 test ! -e "$repository/docs/documentation/stale.html"
 
 repository=$TMP/unexpected/repository
