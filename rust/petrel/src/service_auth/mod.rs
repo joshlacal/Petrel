@@ -15,6 +15,7 @@
 
 mod token;
 
-pub use token::{ServiceAuthClaims, ServiceAuthRequestError, ServiceAuthToken, ServiceRef};
+pub use petrel_core::{ServiceRef, ServiceRefError};
+pub use token::{ServiceAuthClaims, ServiceAuthRequestError, ServiceAuthToken};
 
-pub(crate) use token::requested_expiration;
+pub(crate) use token::{has_valid_curve_key, requested_expiration};

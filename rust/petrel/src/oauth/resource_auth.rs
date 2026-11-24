@@ -224,13 +224,14 @@ impl SessionAuth {
 
         use crate::{
             service_auth::{
-                ServiceAuthRequestError as Error, ServiceAuthToken, requested_expiration,
+                ServiceAuthRequestError as Error, ServiceAuthToken, has_valid_curve_key,
+                requested_expiration,
             },
             xrpc::{CallOptions, Error as XrpcError, XrpcClient, XrpcErrorKind},
         };
 
         let aud = audience.to_string();
-        if aud.len() > 2048 {
+        if aud.len() > 2048 || !has_valid_curve_key(audience) {
             return Err(Error::InvalidRequest);
         }
         let now =

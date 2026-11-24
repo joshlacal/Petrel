@@ -1,97 +1,11 @@
-use std::{fmt, str::FromStr, time::Duration};
+use std::{fmt, time::Duration};
 
 use http::HeaderValue;
-use petrel_core::{Did, Nsid};
+use petrel_core::{Did, Nsid, ServiceRef};
 use serde::{Deserialize, Deserializer, de::IgnoredAny};
 use zeroize::Zeroizing;
 
 use crate::crypto::split_compact_jws;
-
-/// A DID with an optional DID document service fragment.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ServiceRef {
-    did: Did,
-    service_id: Option<String>,
-}
-
-impl ServiceRef {
-    pub const PROXY_HEADER: &'static str = "atproto-proxy";
-    pub const BSKY_APPVIEW: &'static str = "bsky_appview";
-    pub const BSKY_CHAT: &'static str = "bsky_chat";
-    pub const BSKY_FEED_GENERATOR: &'static str = "bsky_fg";
-    pub const BSKY_NOTIFICATION: &'static str = "bsky_notif";
-    pub const ATPROTO_LABELER: &'static str = "atproto_labeler";
-    pub const ATPROTO_PDS: &'static str = "atproto_pds";
-
-    pub fn new(did: Did, service_id: Option<&str>) -> Result<Self, ServiceAuthRequestError> {
-        let service_id = service_id.map(|id| id.strip_prefix('#').unwrap_or(id));
-        if service_id.is_some_and(|id| !valid_service_id(id)) {
-            return Err(ServiceAuthRequestError::InvalidRequest);
-        }
-        Ok(Self {
-            did,
-            service_id: service_id.map(str::to_owned),
-        })
-    }
-
-    pub fn did(&self) -> &Did {
-        &self.did
-    }
-
-    pub fn service_id(&self) -> Option<&str> {
-        self.service_id.as_deref()
-    }
-
-    pub fn proxy_header_value(&self) -> Result<HeaderValue, ServiceAuthRequestError> {
-        if self.service_id.is_none() {
-            return Err(ServiceAuthRequestError::InvalidRequest);
-        }
-        HeaderValue::from_str(&self.to_string())
-            .map_err(|_| ServiceAuthRequestError::InvalidRequest)
-    }
-}
-
-fn valid_service_id(fragment: &str) -> bool {
-    !fragment.is_empty()
-        && fragment.len() <= 512
-        && fragment.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'~' | b':' | b'%' | b'-')
-        })
-}
-
-impl FromStr for ServiceRef {
-    type Err = ServiceAuthRequestError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        if let Some((did, fragment)) = value.split_once('#') {
-            if !valid_service_id(fragment) {
-                return Err(ServiceAuthRequestError::InvalidRequest);
-            }
-            Self::new(
-                did.parse()
-                    .map_err(|_| ServiceAuthRequestError::InvalidRequest)?,
-                Some(fragment),
-            )
-        } else {
-            Self::new(
-                value
-                    .parse()
-                    .map_err(|_| ServiceAuthRequestError::InvalidRequest)?,
-                None,
-            )
-        }
-    }
-}
-
-impl fmt::Display for ServiceRef {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.did)?;
-        if let Some(service_id) = &self.service_id {
-            write!(f, "#{service_id}")?;
-        }
-        Ok(())
-    }
-}
 
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum ServiceAuthRequestError {
@@ -153,6 +67,10 @@ impl ServiceAuthToken {
         }
 
         let compact = Zeroizing::new(compact);
+        if compact.len() > 32 * 1024 || compact.split('.').any(|segment| segment.len() > 16 * 1024)
+        {
+            return Err(ServiceAuthRequestError::InvalidToken);
+        }
         let jws = split_compact_jws(&compact).map_err(|_| ServiceAuthRequestError::InvalidToken)?;
         if jws.signature.len() != 64 || jws.header.len() > 4 * 1024 {
             return Err(ServiceAuthRequestError::InvalidToken);
@@ -184,14 +102,8 @@ impl ServiceAuthToken {
             return Err(ServiceAuthRequestError::InvalidToken);
         }
         let claims = ServiceAuthClaims {
-            issuer: claims
-                .iss
-                .parse()
-                .map_err(|_| ServiceAuthRequestError::InvalidToken)?,
-            audience: claims
-                .aud
-                .parse()
-                .map_err(|_| ServiceAuthRequestError::InvalidToken)?,
+            issuer: inspect_reference(&claims.iss)?,
+            audience: inspect_reference(&claims.aud)?,
             issued_at: claims.iat,
             expires_at: claims.exp,
             method: claims.lxm,
@@ -233,6 +145,28 @@ impl ServiceAuthToken {
             return Err(ServiceAuthRequestError::UnexpectedClaims);
         }
         Ok(())
+    }
+}
+
+fn inspect_reference(input: &str) -> Result<ServiceRef, ServiceAuthRequestError> {
+    let reference = ServiceRef::parse(input).map_err(|_| ServiceAuthRequestError::InvalidToken)?;
+    if !has_valid_curve_key(&reference) {
+        return Err(ServiceAuthRequestError::InvalidToken);
+    }
+    Ok(reference)
+}
+
+pub(crate) fn has_valid_curve_key(reference: &ServiceRef) -> bool {
+    let Some(multibase) = reference.did().as_str().strip_prefix("did:key:z") else {
+        return true;
+    };
+    let Ok(decoded) = bs58::decode(multibase).into_vec() else {
+        return false;
+    };
+    match decoded.as_slice() {
+        [0x80, 0x24, sec1 @ ..] => p256::PublicKey::from_sec1_bytes(sec1).is_ok(),
+        [0xe7, 0x01, sec1 @ ..] => k256::PublicKey::from_sec1_bytes(sec1).is_ok(),
+        _ => false,
     }
 }
 
@@ -282,7 +216,7 @@ mod tests {
     #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
     async fn service_auth_checks_claims_and_redacts_token() {
         let key = SoftwareDpopSigner::generate().unwrap();
-        let issuer = "did:plc:account";
+        let issuer = "did:plc:abcdefghijklmnopqrstuvwx";
         let audience = "did:web:service.example";
         let expected_audience = format!("{audience}#atproto_service").parse().unwrap();
         let issuer_did = issuer.parse().unwrap();
@@ -297,7 +231,7 @@ mod tests {
                 Ok(()),
             ),
             (
-                "did:plc:other",
+                "did:plc:zyxwvutsrqponmlkjihgfedc",
                 audience,
                 method.as_str(),
                 100,

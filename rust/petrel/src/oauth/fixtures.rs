@@ -29,7 +29,7 @@ const ISSUER: &str = "https://issuer.example";
 const PDS: &str = "https://pds.example";
 const CAB: &str = "https://cab.example/backend";
 const DID: &str = "did:plc:abcdefghijklmnopqrstuvwx";
-const OTHER_DID: &str = "did:plc:otherabcdefghijklmnopq";
+const OTHER_DID: &str = "did:plc:zyxwvutsrqponmlkjihgfedc";
 const REDIRECT: &str = "https://client.example/callback";
 const CLIENT: &str = "https://client.example/client.json";
 const SCOPE: &str = "atproto rpc:app.bsky.feed.getTimeline?aud=did:web:app.example%23bsky_appview";
