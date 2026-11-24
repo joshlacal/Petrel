@@ -46,7 +46,8 @@ fn canonical(input: &str) -> Option<String> {
         .ok()
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn scope_values() {
     let fixture = corpus();
     for row in rows(&fixture, "values", 184) {
@@ -86,7 +87,8 @@ fn scope_values() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn whole_scope_strings() {
     let fixture = corpus();
     for row in rows(&fixture, "strings", 8) {
@@ -97,7 +99,8 @@ fn whole_scope_strings() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn granular_and_transition_permissions() {
     let fixture = corpus();
     let grants = fixture["matches"].as_object().unwrap();
@@ -137,7 +140,8 @@ fn granular_and_transition_permissions() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn missing_scope_diagnostics() {
     let fixture = corpus();
     let none = ScopeSet::parse("atproto").unwrap();
@@ -161,7 +165,8 @@ fn missing_scope_diagnostics() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn permission_set_expansion_and_authority() {
     let fixture = corpus();
     for row in rows(&fixture, "includes", 9) {
@@ -186,7 +191,8 @@ fn permission_set_expansion_and_authority() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn atom_syntax() {
     let fixture = corpus();
     for row in rows(&fixture, "didRefs", 66) {
@@ -222,7 +228,8 @@ fn atom_syntax() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn percent_encoders() {
     let fixture = corpus();
     for row in rows(&fixture, "encoders", 19) {

@@ -26,7 +26,8 @@ pub use identifiers::{
     is_record_key,
 };
 pub use include::{
-    IncludedPermission, LexiconPermission, LexiconPermissionSet, is_parent_authority_of,
+    ExpansionRejection, ExpansionRejectionReason, IncludedPermission, LexiconPermission,
+    LexiconPermissionSet, ScopeExpansion, is_parent_authority_of,
 };
 pub use syntax::{
     ScopeParameterBag, ScopeParseError, ScopeStringSyntax, SingleLookup, encode_form_component,
@@ -119,7 +120,8 @@ fn is_scope_token(value: &str) -> bool {
 mod tests {
     use super::*;
 
-    #[test]
+    #[cfg_attr(not(target_arch = "wasm32"), test)]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
     fn space_is_the_only_separator() {
         assert_eq!(
             ScopeSet::parse("  atproto   future:ABC  ")
@@ -139,7 +141,8 @@ mod tests {
         }
     }
 
-    #[test]
+    #[cfg_attr(not(target_arch = "wasm32"), test)]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
     fn detects_only_the_exact_base_scope() {
         for value in ["", "  ", "ATProto", "future:atproto", "atproto:extra"] {
             assert!(!ScopeSet::parse(value).unwrap().includes_atproto());
@@ -151,7 +154,8 @@ mod tests {
         );
     }
 
-    #[test]
+    #[cfg_attr(not(target_arch = "wasm32"), test)]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
     fn keeps_catmos_tokens_and_unknown_scope_bytes() {
         let tokens = [
             "atproto",

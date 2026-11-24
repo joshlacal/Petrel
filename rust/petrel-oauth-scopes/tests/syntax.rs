@@ -1,6 +1,7 @@
 use petrel_oauth_scopes::{AtProtoScope, ScopeParseError, ScopeStringSyntax, SingleLookup};
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn scope_parts_and_parameter_order() {
     type Case<'a> = (&'a str, &'a str, Option<&'a str>, &'a [(&'a str, &'a str)]);
     let cases: &[Case<'_>] = &[
@@ -86,7 +87,8 @@ fn scope_parts_and_parameter_order() {
     );
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn checks_resource_prefix_at_the_delimiter() {
     for (scope, prefix, result) in [
         ("prefix", "prefix", true),
@@ -110,7 +112,8 @@ fn checks_resource_prefix_at_the_delimiter() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn percent_decoding_is_strict_only_in_the_positional_part() {
     for input in [
         "repo:%",
@@ -152,7 +155,8 @@ fn percent_decoding_is_strict_only_in_the_positional_part() {
     );
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn scope_syntax_matches_reference_escaping() {
     for (raw, canonical, stable) in [
         ("my-res", "my-res", true),
@@ -208,7 +212,8 @@ fn scope_syntax_matches_reference_escaping() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn accepts_only_the_rfc6749_token_alphabet() {
     for byte in 0..=u8::MAX {
         let one = char::from(byte).to_string();
