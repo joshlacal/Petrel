@@ -61,7 +61,7 @@ impl petrel_core::FromValue for Input {
             rkey: reader.required("rkey")?,
             validate: reader.optional_strict("validate")?,
             record: reader.required("record")?,
-            swap_record: reader.optional_nullable("swapRecord"),
+            swap_record: reader.optional_nullable_strict("swapRecord")?,
             swap_commit: reader.optional_strict("swapCommit")?,
         })
     }

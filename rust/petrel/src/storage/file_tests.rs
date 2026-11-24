@@ -255,3 +255,32 @@ async fn swift_interop_exchange() {
         .await
         .unwrap();
 }
+
+#[tokio::test]
+async fn one_damaged_entry_does_not_lock_the_rest_of_the_store() {
+    let root = tempfile::tempdir().unwrap();
+    let path = store_path(&root);
+    let store = FileSecretStore::open(&path, &KEY).unwrap();
+    store
+        .put("interop", "swift-token", b"damaged")
+        .await
+        .unwrap();
+    store.put("interop", "other", b"intact").await.unwrap();
+    fs::write(path.join("aW50ZXJvcC5zd2lmdC10b2tlbg"), b"corrupt").unwrap();
+    drop(store);
+
+    let reopened = FileSecretStore::open(&path, &KEY).unwrap();
+    assert_eq!(
+        reopened.get("interop", "other").await.unwrap().as_deref(),
+        Some(b"intact".as_slice())
+    );
+    assert!(matches!(
+        reopened.get("interop", "swift-token").await,
+        Err(StoreError::Corrupt(_))
+    ));
+    // The wrong key is still refused outright.
+    assert!(matches!(
+        FileSecretStore::open(&path, &[9; 32]),
+        Err(StoreError::KeyMismatch)
+    ));
+}

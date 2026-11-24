@@ -55,6 +55,10 @@ impl fmt::Debug for FileSecretStore {
 
 impl FileSecretStore {
     /// Opens or creates a directory with an embedder-supplied AES-256 key.
+    ///
+    /// On Unix no component of `directory` may be a symbolic link, so that
+    /// the store cannot be redirected. Pass a canonical path: system
+    /// locations such as macOS's `/var` and `/tmp` are links.
     pub fn open(directory: impl AsRef<Path>, key: &[u8; 32]) -> Result<Self, StoreError> {
         let store = Self {
             directory: Directory::open(directory.as_ref()).map_err(io_error)?,
@@ -97,22 +101,28 @@ impl FileSecretStore {
         Self::open(directory, key)
     }
 
+    /// Checks that `key` is this directory's key. Returns whether the
+    /// directory already records one.
+    ///
+    /// With a key marker present the marker alone decides. A damaged entry
+    /// is then reported as [`StoreError::Corrupt`] when it is read, and does
+    /// not make every other entry unreadable. Without a marker (a directory
+    /// written before markers existed) any entry the key cannot open means
+    /// the key is wrong.
     fn validate_contents(&self) -> Result<bool, StoreError> {
         let marker = self.read_encrypted(KEY_CHECK_FILENAME)?;
         if let Some(ref marker) = marker {
             self.verify_key_check(marker)?;
         }
         for name in self.directory.names().map_err(io_error)? {
+            // Reading checks each entry's owner and mode, so a file someone
+            // else could have written still refuses the whole directory.
             if namespaced_key(&name).is_some()
                 && let Some(ciphertext) = self.read_encrypted(&name)?
+                && marker.is_none()
             {
-                self.decrypt(&ciphertext).map_err(|error| {
-                    if marker.is_some() {
-                        error
-                    } else {
-                        StoreError::KeyMismatch
-                    }
-                })?;
+                self.decrypt(&ciphertext)
+                    .map_err(|_| StoreError::KeyMismatch)?;
             }
         }
         Ok(marker.is_some())

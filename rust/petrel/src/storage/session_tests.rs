@@ -317,3 +317,40 @@ async fn backend_read_failure_is_not_an_absent_session() {
         Err(StoreError::Unavailable(_))
     ));
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn refresh_replaces_a_record_another_encoder_wrote() {
+    // The same record as another writer would store it: different key
+    // order, an escaped slash, and a field this version does not know.
+    let (backend, sessions) = in_memory();
+    let original = session(FIRST, "before-refresh");
+    let refreshed = session(FIRST, "after-refresh");
+    sessions.save_session(&original).await.unwrap();
+
+    let key = format!("session.{FIRST}");
+    let stored = backend.get("petrel", &key).await.unwrap().unwrap();
+    let mut envelope: serde_json::Value = serde_json::from_slice(&stored).unwrap();
+    envelope["data"]["added_by_a_newer_version"] = json!(true);
+    let foreign = serde_json::to_string_pretty(&envelope)
+        .unwrap()
+        .replace("https://", "https:\\/\\/");
+    assert_ne!(foreign.as_bytes(), stored.as_slice());
+    backend
+        .put("petrel", &key, foreign.as_bytes())
+        .await
+        .unwrap();
+
+    assert!(
+        sessions
+            .compare_and_swap_session(&original, &refreshed)
+            .await
+            .unwrap()
+    );
+    let saved = sessions
+        .get_session(&original.account.did)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(saved.session.access_token(), "after-refresh");
+}

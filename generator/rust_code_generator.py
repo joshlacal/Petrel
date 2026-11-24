@@ -349,7 +349,7 @@ class RustCodeGenerator(BaseCodeGenerator):
                     raise ValueError(
                         f"{self.lexicon_id} query parameter default {value!r} is not in its enum"
                     )
-                return f"{base_rust_type}::from_str({rust_string_literal(value)}).unwrap()"
+                return f"<{base_rust_type} as core::str::FromStr>::from_str({rust_string_literal(value)}).unwrap()"
             if base_rust_type == "String":
                 return f"{rust_string_literal(value)}.to_owned()"
             return None

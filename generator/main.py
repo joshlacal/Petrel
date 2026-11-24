@@ -926,10 +926,9 @@ async def generate_rust_from_lexicons_recursive(
     cycle_detector.detect_cycles()
     boxed_fields = compute_rust_boxed_fields(cycle_detector.schemas_by_ref)
 
-    try:
-        from rust_code_generator import RustCodeGenerator
-    except ImportError:
-        RustCodeGenerator = None
+    # No fallback: a generator that cannot be imported must fail the run. A
+    # stub written through the closed projection would replace every module.
+    from rust_code_generator import RustCodeGenerator
 
     def add_expected_file(relative_path, content):
         if relative_path in expected_files:
@@ -954,23 +953,16 @@ async def generate_rust_from_lexicons_recursive(
     for lexicon, mod_parts in lexicon_entries:
         lexicon_id = lexicon.get('id', '')
         overrides = property_type_overrides.pop(lexicon_id, None)
-        if RustCodeGenerator is not None:
-            rust_code = RustCodeGenerator(
-                lexicon,
-                cycle_detector,
-                emit_ids=emit_ids,
-                crate_path=crate_path,
-                reference_crate=reference_crate,
-                overlay=overlay,
-                property_type_overrides=overrides,
-                boxed_fields=boxed_fields,
-            ).convert()
-        else:
-            validate_lexicon_schema(lexicon)
-            rust_code = (
-                f"// Lexicon: 1, ID: {lexicon_id}\n"
-                f'pub const TYPE_IDENTIFIER: &str = "{lexicon_id}";\n'
-            )
+        rust_code = RustCodeGenerator(
+            lexicon,
+            cycle_detector,
+            emit_ids=emit_ids,
+            crate_path=crate_path,
+            reference_crate=reference_crate,
+            overlay=overlay,
+            property_type_overrides=overrides,
+            boxed_fields=boxed_fields,
+        ).convert()
 
         if mod_parts in dir_children:
             if mod_parts in prefix_module_bodies:

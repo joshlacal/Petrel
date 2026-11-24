@@ -139,6 +139,31 @@ class RustCodeGenerationTests(unittest.TestCase):
         proc_code = RustCodeGenerator(proc).convert()
         self.assertIn('note: reader.optional_strict("note")?,', proc_code)
 
+    def test_strict_input_rejects_a_malformed_optional_nullable_field(self):
+        # A compare-and-swap field such as putRecord's swapRecord is optional
+        # and nullable. Reading it leniently would turn a malformed value into
+        # "absent" and skip the check the caller asked for.
+        proc = {
+            "lexicon": 1,
+            "id": "com.example.put",
+            "defs": {
+                "main": {
+                    "type": "procedure",
+                    "input": {
+                        "encoding": "application/json",
+                        "schema": {
+                            "type": "object",
+                            "nullable": ["swap"],
+                            "properties": {"swap": {"type": "string", "format": "cid"}},
+                        },
+                    },
+                }
+            },
+        }
+        code = RustCodeGenerator(proc).convert()
+        self.assertIn('swap: reader.optional_nullable_strict("swap")?,', code)
+        self.assertNotIn('reader.optional_nullable("swap")', code)
+
     def test_petrel_api_cargo_features_match_computed_namespace_graph(self):
         manifest = json.loads((GENERATOR_DIR / "manifests" / "petrel-core.json").read_text(encoding="utf-8"))
         excl = tuple(manifest["lexicons"]["exclude_namespaces"])

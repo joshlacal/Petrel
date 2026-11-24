@@ -7,14 +7,28 @@ which needs an OAuth client that can ask a client assertion backend (CAB: a
 small server that signs the client's identity proof, so the app never holds the
 signing key) for a fresh assertion on every token request.
 
-**Status: in development.** The governing plan is
+**Status: implemented, not yet released.** Phases 0 to 3 of the Petrel Rust
+program are built and tested: the generated API crates, the runtime, and OAuth
+against the Swift example authorization server and client assertion backend.
+Nothing is published to crates.io. The Catmos desktop app is the first
+consumer. The governing plan is
 `docs/execution-plans/2026-11-24-petrel-rust.md` in the Catbird+Petrel
 workspace repository, with decisions logged in `docs/DECISIONS.md` there under
 the tag `petrel-rust`.
 
+Known gaps, all outside phases 0 to 3:
+
+- Subscriptions are declared but there is no event-stream frame decoder.
+- Objects nested inside an XRPC input decode leniently: a malformed optional
+  field is kept in `extra_data` instead of being rejected. A server built on
+  these types must check for that until the generator emits a strict path.
+- The file store runs blocking file I/O inside its async methods and does not
+  bind a ciphertext to its file name. Both follow the Swift store it shares a
+  format with.
+
 ## Crates
 
-| Crate | What it is | Owner lane |
+| Crate | What it is | Built by lane |
 |---|---|---|
 | `petrel-core` | Identifiers, the data-model `Value`, strict DAG-CBOR, the typed-to-`Value` bridge, XRPC endpoint traits. No HTTP, no crypto beyond SHA-256. | A |
 | `petrel-api` | API types generated from `generator/manifests/petrel-core.json`. | B |
@@ -91,22 +105,10 @@ wasm graph, add the aliased dependencies described in
 `maps/rust-deps-wasm.md`; `cargo tree -i getrandom` on the wasm target shows
 whether that has happened.
 
-## Rules for lanes working in parallel
+## The shared contracts
 
-Six lanes build in these crates at the same time. To keep them out of each
-other's way:
-
-- **Do not edit** `rust/Cargo.toml`, `rust/petrel/Cargo.toml` or
-  `rust/petrel/src/lib.rs`. Every dependency and every module is already
-  declared. If something is missing, ask the integrator.
-- Each `petrel` module is a directory (`src/oauth/mod.rs` and so on). Add
-  files inside the directories your lane owns.
-- The interface contracts are frozen. Changing one needs a dated `petrel-rust`
-  entry in `docs/DECISIONS.md` and an update to the plan's contracts section.
-
-## The frozen contracts
-
-Shared names used by the generator and runtime.
+Names shared by the generator and the runtime. Changing one needs a dated
+`petrel-rust` entry in `docs/DECISIONS.md`.
 
 **`petrel_core`**
 

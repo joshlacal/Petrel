@@ -210,7 +210,9 @@ fn is_nonce_parameter(input: &str) -> bool {
         .filter(|(scheme, _)| scheme.eq_ignore_ascii_case("DPoP"))
         .map_or(input, |(_, value)| value);
     parameter.split_once('=').is_some_and(|(key, value)| {
-        key.trim().eq_ignore_ascii_case("error") && value.trim() == "\"use_dpop_nonce\""
+        // An auth parameter value may be a token or a quoted string.
+        key.trim().eq_ignore_ascii_case("error")
+            && matches!(value.trim(), "\"use_dpop_nonce\"" | "use_dpop_nonce")
     })
 }
 
@@ -291,6 +293,9 @@ mod tests {
         assert!(!www_authenticate_nonce(
             "DPoP error=\"use_dpop_nonce_extra\""
         ));
+        // The unquoted token form of the same parameter.
+        assert!(www_authenticate_nonce("DPoP error=use_dpop_nonce"));
+        assert!(!www_authenticate_nonce("DPoP error=use_dpop_nonce_extra"));
         assert!(!use_dpop_nonce(&http::Response::new(
             br#"{"error":"use_dpop_nonce"}"#.as_slice()
         )));

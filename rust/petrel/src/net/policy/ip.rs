@@ -12,7 +12,7 @@ pub(super) fn is_private_or_reserved(address: IpAddr) -> bool {
                 | [0x64, 0xff9b, 1, ..]               // Local-use NAT64
                 | [0x100, 0, 0, 0, ..]                // Discard
                 | [0x2001, 0 | 0xdb8, ..]             // Teredo and documentation
-                | [0xfc00..=0xfdff | 0xfe80..=0xffff, ..] => true, // Local and multicast
+                | [0xfc00..=0xffff, ..] => true,      // Local, reserved and multicast
                 _ => false,
             }
         }
@@ -27,6 +27,7 @@ fn is_private_v4(address: Ipv4Addr) -> bool {
             | [169, 254, ..]
             | [172, 16..=31, ..]
             | [192, 0, 0 | 2, _]
+            | [192, 88, 99, _]
             | [192, 168, ..]
             | [198, 18 | 19, ..]
             | [198, 51, 100, _]
@@ -38,6 +39,7 @@ fn embedded_ipv4(address: Ipv6Addr) -> Option<Ipv4Addr> {
     let bytes = address.octets();
     match address.segments() {
         [0, 0, 0, 0, 0, 0xffff, ..]            // IPv4-mapped
+        | [0, 0, 0, 0, 0xffff, 0, ..]          // IPv4-translated
         | [0x64, 0xff9b, 0, 0, 0, 0, ..] =>  // Well-known NAT64
             Some(Ipv4Addr::new(bytes[12], bytes[13], bytes[14], bytes[15])),
         [0x2002, ..] =>                       // 6to4
@@ -115,7 +117,12 @@ mod tests {
             ("2003::", false),
             ("fc00::", true),
             ("fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", true),
-            ("fe00::", false),
+            ("fe00::", true),
+            ("fe7f::1", true),
+            ("::ffff:0:127.0.0.1", true),
+            ("::ffff:0:1.1.1.1", false),
+            ("192.88.99.1", true),
+            ("192.88.100.1", false),
             ("fe80::1", true),
             ("febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff", true),
             ("fec0::", true),

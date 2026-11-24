@@ -133,8 +133,11 @@ impl SessionStore {
 
     /// Replaces the committed record only when it still matches `expected`.
     ///
-    /// Compares the serialized bytes for the same DID in one backend operation.
-    /// A concurrent sign-in changes those bytes and leaves the newer record intact.
+    /// The stored record must hold the same tokens and key as `expected`. The
+    /// swap itself is made against the bytes actually stored, so a record
+    /// written by another encoder (a different field order, an escaped slash,
+    /// a field this version does not know) still compares equal. A concurrent
+    /// sign-in changes the stored bytes and leaves the newer record intact.
     /// Backends without compare-and-swap return [`StoreError::Unsupported`].
     pub async fn compare_and_swap_session(
         &self,
@@ -142,15 +145,24 @@ impl SessionStore {
         replacement: &SessionRecord,
     ) -> Result<bool, StoreError> {
         let did = &expected.session.did;
-        validate_record(expected, did)?;
-        validate_record(replacement, did)?;
-        let key = item_key(SESSION, did.as_str())?;
-        let expected = encode(expected)?;
-        let replacement = encode(replacement)?;
-        let result = self
-            .secrets
-            .compare_and_swap(&self.namespace, &key, Some(&expected), Some(&replacement))
-            .await;
+        let result = async {
+            validate_record(expected, did)?;
+            validate_record(replacement, did)?;
+            let key = item_key(SESSION, did.as_str())?;
+            let Some(stored) = self.secrets.get(&self.namespace, &key).await? else {
+                return Ok(false);
+            };
+            let stored = Zeroizing::new(stored);
+            let current: SessionRecord = decode(payload(&stored)?)?;
+            if current.generation() != expected.generation() {
+                return Ok(false);
+            }
+            let replacement = encode(replacement)?;
+            self.secrets
+                .compare_and_swap(&self.namespace, &key, Some(&stored), Some(&replacement))
+                .await
+        }
+        .await;
         self.report_storage_result(Some(did), "replace session", result)
     }
 

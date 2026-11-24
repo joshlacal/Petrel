@@ -101,7 +101,11 @@ impl petrel_core::FromValue for {{ name }} {
 {% elif prop.required_nullable %}
             {{ prop.ident }}: reader.required_nullable({{ prop.wire_literal }})?,
 {% elif prop.tri_state %}
+{% if lenient %}
             {{ prop.ident }}: reader.optional_nullable({{ prop.wire_literal }}),
+{% else %}
+            {{ prop.ident }}: reader.optional_nullable_strict({{ prop.wire_literal }})?,
+{% endif %}
 {% elif prop.wire_optional %}
 {% if lenient %}
             {{ prop.ident }}: reader.optional({{ prop.wire_literal }}),
