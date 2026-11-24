@@ -10,28 +10,39 @@
 //! - the only tag is 42, wrapping a byte string `0x00 ‖ binary CID`;
 //! - exactly one top-level item, no trailing bytes.
 //!
-//! Lane 0 implemented the codec the serialization spike needs. Lane A (work
-//! package C6) adds the node and container count limits from
-//! `Sources/PetrelCore/CID.swift:760` ([`Limits`] carries only the depth
-//! limit today) and the malformed-input goldens.
-
 use std::collections::BTreeMap;
 
 use crate::cid::Cid;
 use crate::error::DagCborError;
 use crate::value::Value;
 
-/// Decode limits. Lane A adds node and container caps.
+/// Bounds on recursive work when decoding a DAG-CBOR value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Limits {
     /// Maximum nesting depth of arrays and maps.
     pub max_depth: usize,
+    /// Maximum number of values, including containers and the root.
+    pub max_nodes: usize,
+    /// Maximum number of elements in one array or entries in one map.
+    pub max_container_elements: usize,
 }
 
 impl Limits {
-    /// Limits for records and XRPC bodies.
-    pub const STANDARD: Self = Self { max_depth: 64 };
+    /// Limits for ordinary values and XRPC bodies.
+    pub const STANDARD: Self = Self {
+        max_depth: 64,
+        max_nodes: 10_000,
+        max_container_elements: 65_536,
+    };
+
+    /// Limits for one repository block. Each value occupies at least one
+    /// byte, so this admits any value count a 1 MB block can contain.
+    pub const REPOSITORY_BLOCK: Self = Self {
+        max_depth: 64,
+        max_nodes: 1_000_000,
+        max_container_elements: 1_000_000,
+    };
 }
 
 impl Default for Limits {
@@ -123,22 +134,32 @@ pub fn decode(bytes: &[u8]) -> Result<Value, DagCborError> {
 
 /// Decodes one canonical DAG-CBOR item.
 pub fn decode_with(bytes: &[u8], limits: Limits) -> Result<Value, DagCborError> {
+    let (value, remainder) = decode_prefix_with(bytes, limits)?;
+    if !remainder.is_empty() {
+        return Err(DagCborError::TrailingBytes);
+    }
+    Ok(value)
+}
+
+/// Decodes the first canonical item and returns the remaining bytes.
+///
+/// Use this only in a framed format that permits more bytes after an item.
+pub fn decode_prefix_with(bytes: &[u8], limits: Limits) -> Result<(Value, &[u8]), DagCborError> {
     let mut reader = Reader {
         bytes,
         pos: 0,
         limits,
+        remaining_nodes: limits.max_nodes,
     };
     let value = reader.item(0)?;
-    if reader.pos != bytes.len() {
-        return Err(DagCborError::TrailingBytes);
-    }
-    Ok(value)
+    Ok((value, &bytes[reader.pos..]))
 }
 
 struct Reader<'a> {
     bytes: &'a [u8],
     pos: usize,
     limits: Limits,
+    remaining_nodes: usize,
 }
 
 impl<'a> Reader<'a> {
@@ -186,14 +207,28 @@ impl<'a> Reader<'a> {
         Ok((major, arg))
     }
 
-    /// A length that must fit in the remaining input (each element of an
-    /// array or map takes at least one byte), so a hostile head cannot make
-    /// the decoder reserve memory it will never fill.
+    /// A byte or text string length must fit in the remaining input.
     fn length(&self, arg: u64) -> Result<usize, DagCborError> {
         usize::try_from(arg)
             .ok()
             .filter(|len| *len <= self.bytes.len() - self.pos)
             .ok_or(DagCborError::LengthExceedsInput)
+    }
+
+    fn container_length(&self, arg: u64, bytes_per_element: usize) -> Result<usize, DagCborError> {
+        let len = usize::try_from(arg).map_err(|_| DagCborError::LengthExceedsInput)?;
+        if len > self.limits.max_container_elements {
+            return Err(DagCborError::ContainerLimitExceeded(
+                self.limits.max_container_elements,
+            ));
+        }
+        if len > (self.bytes.len() - self.pos) / bytes_per_element {
+            return Err(DagCborError::LengthExceedsInput);
+        }
+        if len > self.remaining_nodes {
+            return Err(DagCborError::NodeLimitExceeded(self.limits.max_nodes));
+        }
+        Ok(len)
     }
 
     fn text(&mut self, arg: u64) -> Result<&'a str, DagCborError> {
@@ -202,6 +237,10 @@ impl<'a> Reader<'a> {
     }
 
     fn item(&mut self, depth: usize) -> Result<Value, DagCborError> {
+        self.remaining_nodes = self
+            .remaining_nodes
+            .checked_sub(1)
+            .ok_or(DagCborError::NodeLimitExceeded(self.limits.max_nodes))?;
         let (major, arg) = self.head()?;
         match major {
             0 => i64::try_from(arg)
@@ -217,7 +256,7 @@ impl<'a> Reader<'a> {
             3 => Ok(Value::String(self.text(arg)?.to_owned())),
             4 => {
                 let depth = self.descend(depth)?;
-                let len = self.length(arg)?;
+                let len = self.container_length(arg, 1)?;
                 let mut items = Vec::with_capacity(len);
                 for _ in 0..len {
                     items.push(self.item(depth)?);
@@ -247,7 +286,7 @@ impl<'a> Reader<'a> {
 
     fn map(&mut self, arg: u64, depth: usize) -> Result<Value, DagCborError> {
         let depth = self.descend(depth)?;
-        let len = self.length(arg)?;
+        let len = self.container_length(arg, 2)?;
         let mut map = BTreeMap::new();
         let mut previous: Option<&'a str> = None;
         for _ in 0..len {
