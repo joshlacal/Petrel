@@ -36,7 +36,7 @@
 //! `None`. A required field that does not decode fails the whole object.
 //! XRPC inputs use [`ObjectReader::optional_strict`] instead.
 //!
-//! # Known cost, for Lane A
+//! # Preservation of optional fields
 //!
 //! [`ObjectReader::optional`] clones the raw value before decoding so it can
 //! keep it on failure. If profiling shows this matters, give [`FromValue`] a
@@ -48,6 +48,7 @@ use std::collections::BTreeMap;
 use serde::de::Error as _;
 use serde::ser::Error as _;
 
+use crate::cid::Cid;
 use crate::dagcbor;
 use crate::error::{DecodeError, EncodeError};
 use crate::value::{Nullable, Value};
@@ -81,10 +82,23 @@ pub fn to_dag_cbor<T: ToValue + ?Sized>(value: &T) -> Result<Vec<u8>, EncodeErro
     Ok(dagcbor::encode(&value.to_value()?))
 }
 
+/// Computes the CID of a typed value's canonical DAG-CBOR representation.
+pub fn cid_of<T: ToValue + ?Sized>(value: &T) -> Result<Cid, EncodeError> {
+    Ok(value.to_value()?.cid())
+}
+
 /// Decodes a typed value from canonical DAG-CBOR. Non-canonical input is
 /// refused.
 pub fn from_dag_cbor<T: FromValue>(bytes: &[u8]) -> Result<T, DecodeError> {
     T::from_value(dagcbor::decode(bytes)?)
+}
+
+/// Decodes a typed canonical DAG-CBOR value using custom resource limits.
+pub fn from_dag_cbor_with<T: FromValue>(
+    bytes: &[u8],
+    limits: dagcbor::Limits,
+) -> Result<T, DecodeError> {
+    T::from_value(dagcbor::decode_with(bytes, limits)?)
 }
 
 /// Body of a generated `impl serde::Serialize`.
@@ -127,7 +141,13 @@ impl FromValue for Value {
 
 impl ToValue for String {
     fn to_value(&self) -> Result<Value, EncodeError> {
-        Ok(Value::String(self.clone()))
+        self.as_str().to_value()
+    }
+}
+
+impl ToValue for str {
+    fn to_value(&self) -> Result<Value, EncodeError> {
+        Ok(Value::String(self.to_owned()))
     }
 }
 
@@ -317,6 +337,15 @@ impl ObjectReader {
     /// strict decode API is "decode, then require this to be empty".
     pub fn degraded(&self) -> impl Iterator<Item = &str> {
         self.degraded.keys().map(String::as_str)
+    }
+
+    /// Finishes while rejecting optional fields that failed typed decoding.
+    /// Unknown fields remain valid and are returned as extra data.
+    pub fn finish_strict(self) -> Result<Option<BTreeMap<String, Value>>, DecodeError> {
+        if let Some((key, _)) = self.degraded.first_key_value() {
+            return Err(DecodeError::DegradedField(key.clone()));
+        }
+        Ok(self.finish())
     }
 
     /// Finishes an object or record: everything not read (minus `$type`) plus

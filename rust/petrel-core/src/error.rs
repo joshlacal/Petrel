@@ -82,6 +82,9 @@ pub enum CidError {
     /// The bytes or the string are not a well-formed CIDv1.
     #[error("invalid CID: {0}")]
     Invalid(String),
+    /// The CID is well formed but does not use a blessed AT Protocol format.
+    #[error("CID is not a blessed AT Protocol link")]
+    NotBlessed,
 }
 
 /// Strict DAG-CBOR decoding refused the input.
@@ -127,6 +130,12 @@ pub enum DagCborError {
     /// Nesting is deeper than the limit.
     #[error("nesting deeper than {0} levels")]
     DepthExceeded(usize),
+    /// More values were found than the resource limit allows.
+    #[error("DAG-CBOR exceeds the {0}-node limit")]
+    NodeLimitExceeded(usize),
+    /// An array or map has too many entries.
+    #[error("DAG-CBOR container exceeds the {0}-entry limit")]
+    ContainerLimitExceeded(usize),
     /// A declared length is larger than the remaining input.
     #[error("declared length exceeds the remaining input")]
     LengthExceedsInput,
@@ -159,6 +168,44 @@ pub enum DecodeError {
     /// The JSON text was refused (syntax error, float, duplicate key, ...).
     #[error("invalid JSON: {0}")]
     Json(String),
+    /// Two JSON members decoded to the same key.
+    #[error("duplicate JSON key `{0}`")]
+    DuplicateKey(String),
+    /// The JSON structure nests too deeply.
+    #[error("JSON nesting exceeds {0} levels")]
+    JsonDepthExceeded(usize),
+    /// A JSON number is fractional or outside the signed 64-bit range.
+    #[error("number is not an exact signed 64-bit integer")]
+    NonInteger,
+    /// A record must be an object with a nonempty type identifier.
+    #[error("expected a record object with a nonempty `$type`")]
+    NotARecord,
+    /// A framing type was present with an invalid value.
+    #[error("`$type` must be a nonempty string")]
+    InvalidType,
+    /// A bytes wrapper has the wrong shape or invalid base64.
+    #[error("malformed `$bytes` wrapper")]
+    MalformedBytes,
+    /// A link wrapper has the wrong shape.
+    #[error("malformed `$link` wrapper")]
+    MalformedLink,
+    /// A blob object is invalid.
+    #[error("malformed blob: {0}")]
+    MalformedBlob(Box<DecodeError>),
+    /// A typed value was requested with an incompatible type identifier.
+    #[error("expected `$type` `{expected}`, found `{found}`")]
+    TypeIdMismatch {
+        /// The identifier of the requested type.
+        expected: String,
+        /// The identifier from the wire.
+        found: String,
+    },
+    /// A field that would have degraded under lenient decoding.
+    #[error("optional field `{0}` did not match its lexicon type")]
+    DegradedField(String),
+    /// A typed projection would have dropped or changed wire data.
+    #[error("typed value does not preserve the wire value")]
+    LossyProjection,
     /// A union member has no `$type`, or it is not a string.
     #[error("union value has no `$type`")]
     MissingType,
