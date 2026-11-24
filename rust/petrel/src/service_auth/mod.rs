@@ -12,3 +12,7 @@
 //! Out of scope for phases 0 to 3: *verifying* service-auth tokens (mls-ds
 //! and circle-appview already do that with their own code), and Space
 //! credentials (`catbird-atproto/atproto-spaces` already implements them).
+
+mod token;
+
+pub use token::{ServiceAuthClaims, ServiceAuthRequestError, ServiceAuthToken, ServiceRef};

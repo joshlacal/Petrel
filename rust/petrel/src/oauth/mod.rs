@@ -23,6 +23,7 @@
 
 mod client;
 mod dpop;
+mod identity_adapter;
 mod metadata;
 mod models;
 mod protocol;
@@ -34,6 +35,7 @@ pub use client::{
     OAuthIdentityResolver, OAuthTarget,
 };
 pub use dpop::{DpopError, DpopNonces, dpop_proof, dpop_target};
+pub use identity_adapter::OAuthIdentityAdapter;
 pub use metadata::{
     AuthorizationServerMetadata, ClientAuthenticationMethod, MetadataDocument, MetadataError,
     ProtectedResourceMetadata, ValidatedAuthorizationServer,
@@ -102,3 +104,6 @@ impl fmt::Debug for ClientAuth {
         }
     }
 }
+
+#[cfg(test)]
+mod fixtures;

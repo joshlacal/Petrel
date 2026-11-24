@@ -326,3 +326,23 @@ mod tests {
         assert_eq!(decode_base64url("AB", 4), Err(CryptoError::InvalidEncoding));
     }
 }
+
+#[cfg(test)]
+impl Jwk {
+    pub(crate) fn verify_test_signature(
+        &self,
+        input: &[u8],
+        signature: &[u8],
+    ) -> Result<(), CryptoError> {
+        use p256::ecdsa::signature::Verifier;
+
+        let signature =
+            Signature::from_slice(signature).map_err(|_| CryptoError::InvalidSignature)?;
+        if signature.normalize_s().is_some() {
+            return Err(CryptoError::InvalidSignature);
+        }
+        self.verifying_key()?
+            .verify(input, &signature)
+            .map_err(|_| CryptoError::InvalidSignature)
+    }
+}
