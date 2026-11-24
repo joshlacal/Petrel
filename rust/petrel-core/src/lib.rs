@@ -27,6 +27,7 @@ pub mod datetime;
 pub mod error;
 pub mod language;
 pub mod serde_bridge;
+pub mod service_ref;
 pub mod syntax;
 pub mod tid;
 pub mod unknown;
@@ -40,6 +41,7 @@ pub use language::{Language, LanguageTag};
 pub use serde_bridge::{
     FromValue, ObjectReader, ObjectWriter, ToValue, from_dag_cbor, from_json, to_dag_cbor, to_json,
 };
+pub use service_ref::{ServiceRef, ServiceRefError};
 pub use syntax::{
     AtIdentifier, AtUri, AtprotoMethod, CidString, Did, Handle, Nsid, RecordKey, SpaceRef, Tid, Uri,
 };
