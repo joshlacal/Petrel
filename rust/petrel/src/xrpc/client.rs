@@ -317,6 +317,29 @@ impl XrpcClient {
         self.raw(Method::POST, nsid, params, body, options).await
     }
 
+    /// Sends a raw call through the same authentication, nonce and retry
+    /// pipeline as [`Self::query`] and [`Self::procedure`], and returns the
+    /// HTTP response as the server sent it, error statuses included.
+    ///
+    /// For embedders that forward a response to their own protocol code,
+    /// which needs the original status and body of an XRPC error.
+    pub async fn exchange(
+        &self,
+        method: Method,
+        nsid: &str,
+        params: impl IntoIterator<Item = (impl AsRef<str>, impl AsRef<str>)>,
+        body: Option<XrpcBody>,
+        options: &CallOptions,
+    ) -> Result<Response<Bytes>, Error> {
+        if !matches!(method, Method::GET | Method::POST) {
+            return Err(
+                TransportError::InvalidRequest("XRPC uses GET and POST only".to_owned()).into(),
+            );
+        }
+        let call = self.build(method, nsid, params, body, None, options)?;
+        self.execute(call, options).await
+    }
+
     async fn raw(
         &self,
         method: Method,

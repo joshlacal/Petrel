@@ -33,8 +33,12 @@
 //! value does not decode becomes `None`, and its raw value is kept in
 //! `extra_data` under the same key, so re-encoding reproduces the original
 //! bytes. The raw value is written back only while the typed field is still
-//! `None`. A required field that does not decode fails the whole object.
-//! XRPC inputs use [`ObjectReader::optional_strict`] instead.
+//! `None`. One case does not round-trip: an explicit `null` in an optional
+//! field that the lexicon does not mark nullable reads as absent and is not
+//! written back, so a record's CID is that of its original bytes, never of
+//! the re-encoded value. A required field that does not decode fails the
+//! whole object. XRPC inputs use [`ObjectReader::optional_strict`] and
+//! [`ObjectReader::optional_nullable_strict`] instead.
 //!
 //! # Preservation of optional fields
 //!
@@ -330,6 +334,22 @@ impl ObjectReader {
                     None
                 }
             }
+        }
+    }
+
+    /// The tri-state field of a strict object (an XRPC input): absent is
+    /// `None`, `null` is `Some(Nullable::Null)`, and a value that does not
+    /// decode is an error, never silently "absent".
+    pub fn optional_nullable_strict<T: FromValue>(
+        &mut self,
+        name: &str,
+    ) -> Result<Option<Nullable<T>>, DecodeError> {
+        match self.fields.remove(name) {
+            None => Ok(None),
+            Some(Value::Null) => Ok(Some(Nullable::Null)),
+            Some(value) => T::from_value(value)
+                .map(|typed| Some(Nullable::Value(typed)))
+                .map_err(|error| error.in_field(name)),
         }
     }
 

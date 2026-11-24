@@ -79,7 +79,13 @@ fn previous_revision() {
         generator.next_after(&future).unwrap().timestamp_micros(),
         1001
     );
-    assert_eq!(generator.next().unwrap().timestamp_micros(), 102);
+    // Following a future TID moves the local sequence with it: a second
+    // call cannot repeat the identifier, and `next` keeps increasing.
+    assert_eq!(
+        generator.next_after(&future).unwrap().timestamp_micros(),
+        1002
+    );
+    assert_eq!(generator.next().unwrap().timestamp_micros(), 1003);
     for first in "234567ab".chars() {
         let tid = Tid::parse(format!("{first}222222222222")).unwrap();
         assert!(generator.next_after(&tid).unwrap() > tid);

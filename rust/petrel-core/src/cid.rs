@@ -209,6 +209,11 @@ impl FromValue for Cid {
                 let link = fields
                     .remove("$link")
                     .ok_or_else(|| DecodeError::MissingField("$link".into()))?;
+                if !fields.is_empty() {
+                    return Err(DecodeError::Custom(
+                        "a `$link` object must have no other fields".into(),
+                    ));
+                }
                 let text = String::from_value(link).map_err(|error| error.in_field("$link"))?;
                 Ok(Self::parse(&text)?)
             }

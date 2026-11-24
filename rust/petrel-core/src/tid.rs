@@ -74,7 +74,8 @@ impl TidGenerator {
     /// Produces an identifier that sorts after `previous`.
     ///
     /// When `previous` is ahead of the local sequence, the result uses its
-    /// timestamp plus one. The local sequence stays anchored to the local clock.
+    /// timestamp plus one and the local sequence moves up to it, so every
+    /// identifier this generator returns is still strictly increasing.
     pub fn next_after(&self, previous: &Tid) -> Result<Tid, SyntaxError> {
         if previous.has_high_bit() {
             return Err(failure("cannot follow a TID with its high bit set"));
@@ -83,12 +84,18 @@ impl TidGenerator {
             return Err(failure("cannot follow a TID with the maximum timestamp"));
         }
 
-        let candidate = self.next()?;
-        if candidate > *previous {
-            Ok(candidate)
-        } else {
-            Tid::from_parts(previous.timestamp_micros() + 1, self.clock_id)
+        let now = (self.clock)();
+        let mut last = self
+            .last
+            .lock()
+            .map_err(|_| failure("generator lock poisoned"))?;
+        let mut timestamp = now.max(*last + 1);
+        if Tid::from_parts(timestamp, self.clock_id)? <= *previous {
+            timestamp = previous.timestamp_micros() + 1;
         }
+        let tid = Tid::from_parts(timestamp, self.clock_id)?;
+        *last = timestamp;
+        Ok(tid)
     }
 }
 

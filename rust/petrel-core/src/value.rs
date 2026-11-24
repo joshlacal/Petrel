@@ -231,6 +231,17 @@ impl Serialize for Value {
                 seq.end()
             }
             Self::Object(map) => {
+                // DAG-CBOR can hold a map whose only key is `$link` or
+                // `$bytes`. Written as JSON it would read back as a link or
+                // as bytes, so it has no JSON form.
+                if map.len() == 1
+                    && let Some((key, Self::String(_))) = map.iter().next()
+                    && matches!(key.as_str(), "$link" | "$bytes")
+                {
+                    return Err(serde::ser::Error::custom(format!(
+                        "an object whose only field is `{key}` cannot be written as JSON"
+                    )));
+                }
                 let mut out = serializer.serialize_map(Some(map.len()))?;
                 for (key, item) in map {
                     out.serialize_entry(key, item)?;
@@ -706,7 +717,12 @@ impl<'a> BlobFields<'a> {
                 .ok_or_else(|| DecodeError::MissingField(name.into()))
         };
         let reference = match required("ref")? {
-            Value::Link(cid) if cid.is_blessed() => cid,
+            Value::Link(cid) if cid.blessed_kind() == Some(BlessedKind::Raw) => cid,
+            Value::Link(cid) if cid.is_blessed() => {
+                return Err(
+                    DecodeError::Custom("blob ref must use the raw codec".into()).in_field("ref"),
+                );
+            }
             Value::Link(_) => return Err(DecodeError::from(CidError::NotBlessed).in_field("ref")),
             other => {
                 return Err(DecodeError::TypeMismatch {
