@@ -1,5 +1,5 @@
 use std::future::poll_fn;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::Poll;
 
@@ -181,7 +181,7 @@ async fn repeated_cas_conflicts_leave_the_previous_catalog_intact() {
     let first = session(FIRST, "first-token");
     let second = session(SECOND, "second-token");
     store.save_account(&first.account).await.unwrap();
-    backend.cas_conflicts.store(100, Ordering::Relaxed);
+    *backend.cas_conflicts.lock().unwrap() = 100;
 
     assert!(matches!(
         store.save_account(&second.account).await,
@@ -247,7 +247,7 @@ async fn observing_selection_and_storage_failure_uses_no_secret_values() {
 struct TestBackend {
     inner: MemorySecretStore,
     cas: bool,
-    cas_conflicts: AtomicUsize,
+    cas_conflicts: Mutex<usize>,
     fail_catalog_read: AtomicBool,
     fail_session_write: AtomicBool,
 }
@@ -257,7 +257,7 @@ impl TestBackend {
         Self {
             inner: MemorySecretStore::new(),
             cas,
-            cas_conflicts: AtomicUsize::new(0),
+            cas_conflicts: Mutex::new(0),
             fail_catalog_read: AtomicBool::new(false),
             fail_session_write: AtomicBool::new(false),
         }
@@ -333,21 +333,16 @@ impl SecretStore for TestBackend {
         expected: Option<&'a [u8]>,
         new: Option<&'a [u8]>,
     ) -> BoxFuture<'a, Result<bool, StoreError>> {
-        if self.cas {
-            if key == "accountDIDs"
-                && self
-                    .cas_conflicts
-                    .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |remaining| {
-                        remaining.checked_sub(1)
-                    })
-                    .is_ok()
-            {
-                Box::pin(async { Ok(false) })
-            } else {
-                self.inner.compare_and_swap(ns, key, expected, new)
-            }
-        } else {
-            Box::pin(async { Err(StoreError::Unsupported) })
+        if !self.cas {
+            return Box::pin(async { Err(StoreError::Unsupported) });
         }
+        if key == "accountDIDs" {
+            let mut remaining = self.cas_conflicts.lock().unwrap();
+            if let Some(next) = remaining.checked_sub(1) {
+                *remaining = next;
+                return Box::pin(async { Ok(false) });
+            }
+        }
+        self.inner.compare_and_swap(ns, key, expected, new)
     }
 }
