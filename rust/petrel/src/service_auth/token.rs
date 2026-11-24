@@ -93,7 +93,7 @@ impl fmt::Display for ServiceRef {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum ServiceAuthRequestError {
     #[error("invalid service-auth request")]
     InvalidRequest,
@@ -103,6 +103,12 @@ pub enum ServiceAuthRequestError {
     UnexpectedClaims,
     #[error("the PDS returned HTTP {0} for getServiceAuth")]
     RequestFailed(u16),
+    #[error("the PDS rejected the service-auth request: {0}")]
+    Declared(petrel_api::generated::com::atproto::server::get_service_auth::Error),
+    #[error("service-auth session is unavailable")]
+    Session(#[from] crate::oauth::OAuthError),
+    #[error("service-auth request could not be completed")]
+    Unavailable,
 }
 
 /// Unverified contents of a service-auth token.
@@ -209,7 +215,7 @@ impl ServiceAuthToken {
         Ok(header)
     }
 
-    pub(super) fn validate_claims(
+    pub(crate) fn validate_claims(
         &self,
         session_did: &Did,
         audience: &ServiceRef,
@@ -238,7 +244,7 @@ fn visible_ascii(value: &str, limit: usize) -> bool {
     !value.is_empty() && value.len() <= limit && value.bytes().all(|byte| byte.is_ascii_graphic())
 }
 
-pub(super) fn requested_expiration(
+pub(crate) fn requested_expiration(
     lifetime: Option<Duration>,
     now: i64,
 ) -> Result<Option<i64>, ServiceAuthRequestError> {

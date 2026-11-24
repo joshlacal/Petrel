@@ -205,3 +205,78 @@ fn auth_error(error: OAuthError) -> AuthError {
         _ => AuthError::RefreshFailed(error.to_string()),
     }
 }
+
+impl SessionAuth {
+    /// Requests a service-auth token from this session's PDS.
+    ///
+    /// The PDS signs the token on behalf of the session DID. Petrel checks
+    /// the returned claims, and the receiving service verifies the signature.
+    pub async fn get_service_auth(
+        &self,
+        audience: &crate::service_auth::ServiceRef,
+        method: Option<&petrel_core::Nsid>,
+        lifetime: Option<std::time::Duration>,
+    ) -> Result<crate::service_auth::ServiceAuthToken, crate::service_auth::ServiceAuthRequestError>
+    {
+        use petrel_api::generated::com::atproto::server::get_service_auth::{
+            GetServiceAuth, Parameters,
+        };
+
+        use crate::{
+            service_auth::{
+                ServiceAuthRequestError as Error, ServiceAuthToken, requested_expiration,
+            },
+            xrpc::{CallOptions, Error as XrpcError, XrpcClient, XrpcErrorKind},
+        };
+
+        let aud = audience.to_string();
+        if aud.len() > 2048 {
+            return Err(Error::InvalidRequest);
+        }
+        let now =
+            i64::try_from(unix_now().map_err(OAuthError::from)?).map_err(|_| Error::Unavailable)?;
+        let exp = requested_expiration(lifetime, now)?;
+        let record = self
+            .client
+            .session_record(&self.did)
+            .await?
+            .ok_or(OAuthError::MissingSession)?;
+        let pds = require_canonical_origin(&record.account.pds).map_err(OAuthError::from)?;
+        if !self.client.protocol.permits(&pds) {
+            return Err(Error::Unavailable);
+        }
+
+        let xrpc = XrpcClient::new(pds, Arc::clone(&self.client.protocol.transport))
+            .map_err(|_| Error::Unavailable)?
+            .with_auth_provider(Arc::new(self.clone()));
+        let mut call_options = CallOptions::default();
+        call_options.transport.allow_loopback = self.client.protocol.allow_loopback;
+        let mut parameters = Parameters::new(aud);
+        parameters.exp = exp;
+        parameters.lxm = method.cloned();
+
+        let (response, metadata) = xrpc
+            .send_with_metadata::<GetServiceAuth>(parameters, (), &call_options)
+            .await
+            .map_err(|error| match error {
+                XrpcError::Xrpc(error) => match error.kind {
+                    XrpcErrorKind::Declared(typed) => Error::Declared(typed),
+                    _ => Error::RequestFailed(error.metadata.status.as_u16()),
+                },
+                XrpcError::Decode {
+                    status: StatusCode::OK,
+                    ..
+                } => Error::InvalidToken,
+                XrpcError::Decode { status, .. } => Error::RequestFailed(status.as_u16()),
+                _ => Error::Unavailable,
+            })?;
+        if metadata.status != StatusCode::OK {
+            return Err(Error::RequestFailed(metadata.status.as_u16()));
+        }
+        let token = ServiceAuthToken::inspect(response.token)?;
+        let now =
+            i64::try_from(unix_now().map_err(OAuthError::from)?).map_err(|_| Error::Unavailable)?;
+        token.validate_claims(&self.did, audience, method, now)?;
+        Ok(token)
+    }
+}

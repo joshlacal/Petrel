@@ -16,3 +16,5 @@
 mod token;
 
 pub use token::{ServiceAuthClaims, ServiceAuthRequestError, ServiceAuthToken, ServiceRef};
+
+pub(crate) use token::requested_expiration;

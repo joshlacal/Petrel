@@ -45,6 +45,7 @@ struct Exchanges {
     did_refreshes: usize,
     proof_jkts: Vec<String>,
     unexpected_requests: usize,
+    service_requests: usize,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -68,6 +69,9 @@ enum Scenario {
     PublicOnly,
     NoRevocationEndpoint,
     RevocationFailure,
+    ServiceTokenWrongIssuer,
+    ServiceTokenBadExpiration,
+    ServiceTokenRejected,
     TokenRedirect,
     CabNonce,
     CabClientMismatch,
@@ -108,7 +112,9 @@ impl Server {
         let form: HashMap<_, _> = url::form_urlencoded::parse(request.body())
             .into_owned()
             .collect();
-        assert!(request.headers().get(header::AUTHORIZATION).is_none());
+        if uri.path() != "/xrpc/com.atproto.server.getServiceAuth" {
+            assert!(request.headers().get(header::AUTHORIZATION).is_none());
+        }
         let response = match (uri.host(), uri.path()) {
             (Some("pds.example"), "/.well-known/oauth-protected-resource") => {
                 assert!(options.anonymous);
@@ -316,6 +322,59 @@ impl Server {
                     json_response(200, None, json!({}))
                 }
             }
+            (Some("pds.example"), "/xrpc/com.atproto.server.getServiceAuth") => {
+                self.exchanges.lock().unwrap().service_requests += 1;
+                assert_eq!(
+                    request.headers()[header::AUTHORIZATION],
+                    "DPoP access-first"
+                );
+                validate_proof(&request);
+                let mut params: HashMap<_, _> =
+                    url::form_urlencoded::parse(uri.query().unwrap().as_bytes())
+                        .into_owned()
+                        .collect();
+                assert_eq!(
+                    params.remove("aud").as_deref(),
+                    Some("did:web:service.example#atproto_service")
+                );
+                assert_eq!(
+                    params.remove("lxm").as_deref(),
+                    Some("blue.example.service")
+                );
+                let exp = params.remove("exp").unwrap().parse::<u64>().unwrap();
+                assert!(exp > super::protocol::unix_now().unwrap());
+                match self.scenario {
+                    Scenario::ServiceTokenBadExpiration => {
+                        json_response(400, None, json!({"error":"BadExpiration"}))
+                    }
+                    Scenario::ServiceTokenRejected => {
+                        json_response(418, None, json!({"error":"UnknownFailure"}))
+                    }
+                    _ => {
+                        // The PDS owns this service signing key. The client is
+                        // responsible for inspecting the PDS response claims.
+                        let key = SoftwareDpopSigner::generate().unwrap();
+                        let issuer = if matches!(self.scenario, Scenario::ServiceTokenWrongIssuer) {
+                            OTHER_DID
+                        } else {
+                            DID
+                        };
+                        let input = crate::crypto::jws_signing_input(
+                            &json!({"alg":"ES256","typ":"JWT"}),
+                            &json!({
+                                "iss":issuer,
+                                "aud":"did:web:service.example",
+                                "lxm":"blue.example.service",
+                                "exp":exp
+                            }),
+                        )
+                        .unwrap();
+                        let signature = key.sign(input.as_bytes()).await.unwrap();
+                        let token = crate::crypto::finish_es256_jws(input, &signature).unwrap();
+                        json_response(200, None, json!({"token":token}))
+                    }
+                }
+            }
             _ => {
                 self.exchanges.lock().unwrap().unexpected_requests += 1;
                 panic!("unexpected fixture endpoint");
@@ -404,8 +463,21 @@ fn validate_proof(request: &Request<Bytes>) -> Value {
         .unwrap();
     let claims: Value = serde_json::from_slice(&proof.claims).unwrap();
     assert_eq!(claims["htm"], request.method().as_str());
-    assert_eq!(claims["htu"], request.uri().to_string());
-    assert!(claims.get("ath").is_none());
+    let url = Url::parse(&request.uri().to_string()).unwrap();
+    assert_eq!(claims["htu"], super::dpop_target(&url).unwrap());
+    if let Some(authorization) = request.headers().get(header::AUTHORIZATION) {
+        let token = authorization
+            .to_str()
+            .unwrap()
+            .strip_prefix("DPoP ")
+            .unwrap();
+        assert_eq!(
+            claims["ath"],
+            crate::crypto::base64url(&crate::crypto::sha256(token.as_bytes()))
+        );
+    } else {
+        assert!(claims.get("ath").is_none());
+    }
     claims
 }
 
@@ -940,5 +1012,68 @@ async fn logout_always_removes_session_and_key_and_reports_confirmed_revocation(
         let calls = server.exchanges.lock().unwrap();
         assert_eq!(calls.revokes.len(), revoke_requests);
         assert!(calls.revokes.iter().all(|token| token == "refresh-first"));
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn typed_service_auth_uses_the_session_did_and_generated_endpoint() {
+    use crate::service_auth::ServiceAuthRequestError as Error;
+    use petrel_api::generated::com::atproto::server::get_service_auth::Error as EndpointError;
+    use std::time::Duration;
+
+    for (scenario, expected) in [
+        (Scenario::CabNonce, None),
+        (
+            Scenario::ServiceTokenWrongIssuer,
+            Some(Error::UnexpectedClaims),
+        ),
+        (
+            Scenario::ServiceTokenBadExpiration,
+            Some(Error::Declared(EndpointError::BadExpiration)),
+        ),
+        (
+            Scenario::ServiceTokenRejected,
+            Some(Error::RequestFailed(418)),
+        ),
+    ] {
+        let server = Arc::new(Server::new(scenario));
+        let mode = if matches!(scenario, Scenario::CabNonce) {
+            ClientAuth::Cab {
+                backend_url: Url::parse(CAB).unwrap(),
+                client_id: CLIENT.into(),
+            }
+        } else {
+            ClientAuth::Public
+        };
+        let client = client(&server, mode);
+        start(&client).await;
+        let session = client
+            .complete_authorization(&server.pushed_callback(ISSUER))
+            .await
+            .unwrap();
+        let auth = client.session_auth(session.did.clone());
+        let audience = "did:web:service.example#atproto_service".parse().unwrap();
+        let method = "blue.example.service".parse().unwrap();
+
+        let invalid = auth
+            .get_service_auth(&audience, Some(&method), Some(Duration::ZERO))
+            .await;
+        assert_eq!(invalid.unwrap_err(), Error::InvalidRequest);
+        assert_eq!(server.exchanges.lock().unwrap().service_requests, 0);
+
+        let result = auth
+            .get_service_auth(&audience, Some(&method), Some(Duration::from_secs(60)))
+            .await;
+        if let Some(expected) = expected {
+            assert_eq!(result.unwrap_err(), expected);
+        } else {
+            let token = result.unwrap();
+            assert_eq!(token.claims().issuer.did(), &session.did);
+            assert_eq!(token.claims().audience.did(), audience.did());
+            assert_eq!(token.claims().method.as_ref(), Some(&method));
+            assert!(token.authorization_header_value().unwrap().is_sensitive());
+        }
+        assert_eq!(server.exchanges.lock().unwrap().service_requests, 1);
     }
 }
