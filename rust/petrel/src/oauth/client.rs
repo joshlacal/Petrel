@@ -679,7 +679,7 @@ impl OAuthClient {
             match self.cancel_authorization(&state).await {
                 Ok(false) => return Err(OAuthError::UnknownState),
                 Err(_) => {
-                    tracing::warn!("could not remove a denied OAuth authorization from storage")
+                    tracing::warn!("could not remove a denied OAuth authorization from storage");
                 }
                 Ok(true) => {}
             }
