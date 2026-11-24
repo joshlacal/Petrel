@@ -17,6 +17,11 @@
 //!   internal.
 
 mod jose;
+#[cfg(all(target_arch = "wasm32", target_os = "unknown", feature = "wasm"))]
+mod web_crypto;
+
+#[cfg(all(target_arch = "wasm32", target_os = "unknown", feature = "wasm"))]
+pub use web_crypto::WebCryptoDpopSigner;
 
 pub(crate) use jose::{Jwk, finish_es256_jws, jws_signing_input, split_compact_jws};
 pub use jose::{
