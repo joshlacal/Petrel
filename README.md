@@ -8,6 +8,7 @@ event streams, PLC and an embeddable OAuth authorization server.
 
 - Swift 6.1 or later. macOS 15+, iOS 18+, tvOS 18+, Linux ([LINUX_SUPPORT.md](LINUX_SUPPORT.md)).
 - Documentation: [joshlacal.github.io/Petrel](https://joshlacal.github.io/Petrel/documentation/petrel/)
+- Videos: [How a Petrel request works and From Lexicon to Swift](https://docs.catbird.blue/videos/), about 90 seconds each
 - License: MIT. Maintainer: [@josh.uno](https://bsky.app/profile/josh.uno) on Bluesky.
 
 CI runs the
