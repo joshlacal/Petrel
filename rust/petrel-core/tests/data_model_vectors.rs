@@ -413,6 +413,7 @@ fn converts_cid_crate_values_without_changing_binary_links() {
 fn typed_values_preserve_cid_strings_links_bytes_and_blobs() {
     let raw = Cid::for_raw(b"blob");
     let text: CidString = raw.to_string().parse().unwrap();
+    assert_eq!(text.cid().as_ref(), Some(&raw));
     let link = CidLink::new(raw).unwrap();
     let bytes = Bytes(vec![1, 2, 3]);
     let blob = Blob::TypedWithCid {
@@ -460,6 +461,25 @@ fn typed_values_preserve_cid_strings_links_bytes_and_blobs() {
     let blob: Blob = from_json(legacy).unwrap();
     let decoded: Blob = from_dag_cbor(&to_dag_cbor(&blob).unwrap()).unwrap();
     assert_eq!(to_json(&decoded).unwrap(), legacy);
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+fn bare_cid_accepts_link_form_but_serializes_as_string() {
+    let cid = Cid::for_dag_cbor(b"record");
+    let json = serde_json::to_vec(&cid.to_string()).unwrap();
+    let link = serde_json::to_vec(&serde_json::json!({"$link": cid.to_string()})).unwrap();
+    assert_eq!(serde_json::from_slice::<Cid>(&json).unwrap(), cid);
+    assert_eq!(serde_json::from_slice::<Cid>(&link).unwrap(), cid);
+    assert_eq!(serde_json::to_vec(&cid).unwrap(), json);
+    assert!(serde_json::from_str::<Cid>(r#""bgarbage""#).is_err());
+
+    let cbor = to_dag_cbor(&cid).unwrap();
+    assert_eq!(
+        dagcbor::decode(&cbor).unwrap(),
+        Value::String(cid.to_string())
+    );
+    assert_eq!(from_dag_cbor::<Cid>(&cbor).unwrap(), cid);
 }
 
 #[derive(Debug, PartialEq, Eq)]
