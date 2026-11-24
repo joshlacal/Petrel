@@ -23,10 +23,16 @@ use crate::rt::{BoxFuture, MaybeSend, MaybeSync};
 mod callback;
 #[cfg(test)]
 mod contract_tests;
+#[cfg(all(feature = "file-store", any(unix, windows)))]
+mod file;
+#[cfg(all(test, feature = "file-store", any(unix, windows)))]
+mod file_tests;
 mod memory;
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
 pub use callback::CallbackSecretStore;
+#[cfg(all(feature = "file-store", any(unix, windows)))]
+pub use file::FileSecretStore;
 pub use memory::MemorySecretStore;
 
 /// A secret store operation failed.
