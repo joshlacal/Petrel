@@ -258,6 +258,21 @@ impl ToQueryParams for () {
     fn to_query_params(&self, _: &mut Vec<(&'static str, String)>) {}
 }
 
+/// Query parameters whose cursor can be carried into the next request.
+pub trait CursorParams: ToQueryParams {
+    /// The current opaque pagination cursor, if supplied.
+    fn cursor(&self) -> Option<&str>;
+
+    /// Updates the pagination cursor without changing the other parameters.
+    fn set_cursor(&mut self, cursor: Option<String>);
+}
+
+/// A query response that may identify another page.
+pub trait CursorOutput: XrpcOutput {
+    /// The opaque cursor returned by the server, if supplied.
+    fn cursor(&self) -> Option<&str>;
+}
+
 /// A type that can be one query parameter value.
 pub trait QueryValue {
     /// The unencoded value text.
