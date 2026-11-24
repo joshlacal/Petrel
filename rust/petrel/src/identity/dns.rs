@@ -68,9 +68,13 @@ mod native {
                 Ok(answer) => Ok(answer
                     .answers()
                     .iter()
-                    .filter_map(|record| match record.data() {
+                    .filter_map(|record| match &record.data {
                         RData::TXT(txt) => {
-                            let joined: Vec<u8> = txt.iter().flatten().copied().collect();
+                            let joined: Vec<u8> = txt
+                                .txt_data
+                                .iter()
+                                .flat_map(|chunk| chunk.iter().copied())
+                                .collect();
                             String::from_utf8(joined).ok()
                         }
                         _ => None,

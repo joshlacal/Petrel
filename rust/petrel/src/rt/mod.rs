@@ -50,3 +50,13 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 /// A boxed future for traits stored as `dyn`: not `Send` on `wasm32`.
 #[cfg(target_arch = "wasm32")]
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+
+mod timing;
+
+pub use timing::DeadlineElapsed;
+#[cfg(any(
+    all(not(target_arch = "wasm32"), feature = "native"),
+    all(target_arch = "wasm32", feature = "wasm")
+))]
+pub use timing::{sleep, timeout};
+pub use web_time::{Instant, SystemTime, UNIX_EPOCH};

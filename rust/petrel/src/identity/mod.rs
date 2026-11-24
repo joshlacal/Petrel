@@ -1,15 +1,23 @@
-//! Identity resolution: handles, DIDs and DID documents.
+//! Resolve DIDs and verify bidirectional handle claims without account credentials.
 //!
-//! Stub created by Lane 0. Lane D owns this module (map:
-//! `docs/execution-plans/2026-11-24-petrel-rust/maps/network-identity.md`,
-//! packages I1 to I3) and adds:
-//!
-//! - the DID document model and the `did:web` and `did:plc` fetch rules;
-//! - handle resolution over DNS TXT (`_atproto.<handle>`): hickory under the
-//!   `native` feature, DNS over HTTPS under `wasm` (endpoint configurable,
-//!   default Cloudflare; note that a DoH provider sees handle lookups), plus
-//!   the HTTPS `/.well-known/atproto-did` fallback on both;
-//! - the resolver with its cache and bidirectional handle verification.
-//!
-//! Requests to third-party hosts (handle hosts, `did:web` hosts, the PLC
-//! directory) carry no credentials and no client headers.
+//! Native DNS uses the operating system's resolver configuration. The browser
+//! can use DNS-over-HTTPS, whose operator sees the handle being queried.
+
+mod cache;
+mod dns;
+mod document;
+mod resolver;
+mod web;
+
+pub use cache::{CacheEntry, CachePolicy, IdentityCache, InMemoryIdentityCache};
+#[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
+pub use dns::HickoryResolver;
+pub use dns::{DnsError, DnsResolver, DohResolver};
+pub use document::{
+    DidDocument, Service, ServiceKind, SigningCurve, SigningKey, VerificationMethod,
+};
+pub use resolver::{
+    HandleConflictPolicy, HandleLookup, HandleStrategy, HandleVerification, IdentityError,
+    IdentityOptions, IdentityResolver, ResolvedIdentity,
+};
+pub use web::{DidWebError, DidWebIdentifier};

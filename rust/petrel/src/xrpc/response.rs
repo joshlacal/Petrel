@@ -2,7 +2,7 @@ use std::{fmt, time::Duration};
 
 use bytes::Bytes;
 use http::{HeaderMap, Response, StatusCode};
-use serde::Deserialize;
+use petrel_core::xrpc::{RateLimit, XrpcErrorBody};
 
 /// Metadata reported by an XRPC server, including headers on HTTP errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,12 +21,7 @@ impl ResponseMetadata {
     }
 
     pub fn rate_limit(&self) -> Option<RateLimit> {
-        Some(RateLimit {
-            limit: self.header("ratelimit-limit")?.trim().parse().ok()?,
-            remaining: self.header("ratelimit-remaining")?.trim().parse().ok()?,
-            reset: self.header("ratelimit-reset")?.trim().parse().ok()?,
-            policy: self.header("ratelimit-policy").map(str::to_owned),
-        })
+        RateLimit::parse(|name| self.header(name))
     }
 
     pub fn retry_after(&self) -> Option<Duration> {
@@ -49,16 +44,6 @@ impl ResponseMetadata {
     fn header(&self, name: &str) -> Option<&str> {
         self.headers.get(name)?.to_str().ok()
     }
-}
-
-/// Numeric request quota for a server's current rate-limit window.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RateLimit {
-    pub limit: u64,
-    pub remaining: u64,
-    /// When the window ends, in seconds since the Unix epoch.
-    pub reset: u64,
-    pub policy: Option<String>,
 }
 
 pub(crate) fn retry_after(headers: &HeaderMap) -> Option<Duration> {
@@ -109,13 +94,6 @@ impl XrpcLabeler {
     }
 }
 
-/// An error envelope sent by an XRPC endpoint.
-#[derive(Debug, Deserialize)]
-pub struct XrpcErrorBody {
-    pub error: String,
-    pub message: Option<String>,
-}
-
 /// A server error can be declared in the lexicon or discovered at runtime.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum XrpcErrorKind<E> {
@@ -137,7 +115,7 @@ impl<E> XrpcError<E> {
         diagnostic_limit: usize,
         declare: impl FnOnce(&str) -> Option<E>,
     ) -> Self {
-        let body = serde_json::from_slice::<XrpcErrorBody>(response.body()).ok();
+        let body = XrpcErrorBody::parse(response.body());
         let (code, message) = if let Some(body) = body {
             let message = body.message.map(|message| {
                 let mut end = diagnostic_limit.min(message.len());
@@ -222,7 +200,7 @@ mod tests {
             Some(RateLimit {
                 limit: 200,
                 remaining: 12,
-                reset: 20_250_204,
+                reset_unix_seconds: 20_250_204.0,
                 policy: Some("200;w=300".to_owned()),
             }),
         );

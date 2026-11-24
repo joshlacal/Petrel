@@ -14,8 +14,8 @@
 //! size and decompression caps, and the Petrel-level redirect follower.
 //! Embedders such as Tauri can supply their own [`HttpTransport`].
 //!
-//! Known limit, to document rather than hide: the browser build cannot
-//! enforce IP rules, wire-byte caps or redirect policy.
+//! Browser Fetch cannot enforce connection-IP, wire-byte, or decompression
+//! ratio limits. It caps the decoded stream and blocks opaque redirects.
 
 use std::future::Future;
 use std::sync::Arc;
@@ -61,6 +61,9 @@ pub enum TransportError {
     /// The connection could not be made or was lost.
     #[error("connection failed: {0}")]
     Connect(String),
+    /// The connection dropped after the request may have been sent.
+    #[error("connection interrupted: {0}")]
+    ConnectionLost(String),
     /// The address policy refused the destination (private range, bad
     /// scheme, and so on). Never retried.
     #[error("destination refused by policy: {0}")]
@@ -113,3 +116,19 @@ impl<T: HttpTransport> DynHttpTransport for T {
 /// A transport shared between the XRPC client, the OAuth client and the
 /// identity resolver.
 pub type SharedTransport = Arc<dyn DynHttpTransport>;
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
+mod body;
+#[cfg(all(target_arch = "wasm32", feature = "wasm"))]
+mod browser;
+#[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
+mod native;
+pub mod policy;
+mod redirect;
+
+#[cfg(all(target_arch = "wasm32", feature = "wasm"))]
+pub use browser::FetchTransport;
+#[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
+pub use native::ReqwestTransport;
+pub use policy::Origin;
+pub use redirect::{RedirectPolicy, ResponseOrigin, send_with_redirects};

@@ -94,8 +94,8 @@ pub trait AuthProvider: MaybeSend + MaybeSync {
     /// per account. Called by the pipeline before each send.
     fn refresh_if_needed(&self) -> BoxFuture<'_, Result<(), AuthError>>;
 
-    /// Reacts to a 401. Not called for a DPoP nonce challenge, which the
-    /// pipeline handles itself.
+    /// Reacts to a 401 or a 400 carrying `ExpiredToken`. The
+    /// pipeline handles DPoP nonce challenges directly.
     fn handle_unauthorized<'a>(
         &'a self,
         response: &'a http::Response<Bytes>,
@@ -112,3 +112,11 @@ pub trait AuthProvider: MaybeSend + MaybeSync {
         ctx: &'a AuthCtx,
     ) -> BoxFuture<'a, ()>;
 }
+
+mod client;
+mod pages;
+mod response;
+
+pub use client::{CallOptions, Error, Sleeper, XrpcBody, XrpcClient};
+pub use petrel_core::xrpc::{RateLimit, XrpcErrorBody};
+pub use response::{ResponseMetadata, XrpcError, XrpcErrorKind, XrpcLabeler, XrpcResponse};

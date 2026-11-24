@@ -175,6 +175,7 @@ impl<D: DnsResolver + 'static> Resolve for FilteringDns<D> {
 
 fn map_reqwest(error: reqwest::Error) -> TransportError {
     let mut source = error.source();
+    let mut connection_lost = false;
     while let Some(cause) = source {
         if let Some(policy) = cause.downcast_ref::<PolicyError>() {
             return if *policy == PolicyError::NoAddresses {
@@ -183,6 +184,15 @@ fn map_reqwest(error: reqwest::Error) -> TransportError {
                 TransportError::PolicyViolation(policy.to_string())
             };
         }
+        if let Some(io) = cause.downcast_ref::<std::io::Error>() {
+            connection_lost |= matches!(
+                io.kind(),
+                std::io::ErrorKind::ConnectionReset
+                    | std::io::ErrorKind::ConnectionAborted
+                    | std::io::ErrorKind::BrokenPipe
+                    | std::io::ErrorKind::UnexpectedEof
+            );
+        }
         source = cause.source();
     }
     if error.is_timeout() {
@@ -190,6 +200,9 @@ fn map_reqwest(error: reqwest::Error) -> TransportError {
     }
     if error.is_connect() {
         return TransportError::Connect(error.without_url().to_string());
+    }
+    if connection_lost {
+        return TransportError::ConnectionLost(error.without_url().to_string());
     }
     TransportError::Other(error.without_url().to_string())
 }
