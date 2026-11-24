@@ -328,6 +328,7 @@ struct PendingAuthorization {
     created_at: u64,
     reuse_until: u64,
     finished_at: Instant,
+    denied: bool,
     key_id: String,
     jkt: String,
 }
@@ -419,7 +420,10 @@ impl OAuthClient {
         let mut pending = self.pending.lock().await;
         let now = unix_now()?;
         if let Some(flow) = pending.iter().find(|flow| {
-            flow.target == target_key && now < flow.reuse_until && started_at <= flow.finished_at
+            !flow.denied
+                && flow.target == target_key
+                && now < flow.reuse_until
+                && started_at <= flow.finished_at
         }) {
             return Ok(flow.flow.clone());
         }
@@ -437,9 +441,10 @@ impl OAuthClient {
         let resolved = self.resolve_target(&target).await?;
         let key_id = base64url(&random_bytes::<32>()?);
         let state = base64url(&random_bytes::<32>()?);
-        let state = options
-            .state_prefix
-            .map_or_else(|| state.clone(), |prefix| format!("{prefix}.{state}"));
+        let state = match options.state_prefix {
+            Some(prefix) => format!("{prefix}.{state}"),
+            None => state,
+        };
         let key = self.keys.create(&key_id).await?;
         let jkt = match key.public_jwk().thumbprint() {
             Ok(jkt) => jkt,
@@ -470,6 +475,7 @@ impl OAuthClient {
             created_at,
             reuse_until: created_at.saturating_add(par_lifetime),
             finished_at: Instant::now(),
+            denied: false,
             key_id,
             jkt,
         });
@@ -600,16 +606,32 @@ impl OAuthClient {
         if !valid_state(state) {
             return Err(OAuthError::UnknownState);
         }
+        let known = {
+            let mut pending = self.pending.lock().await;
+            if let Some(flow) = pending.iter_mut().find(|flow| flow.flow.state == state) {
+                flow.denied = true;
+                true
+            } else {
+                false
+            }
+        };
         let taken = self
             .storage
             .consume_oauth_state::<OAuthFlowState>(state, unix_now()?)
             .await;
-        let mut pending = self.pending.lock().await;
-        let local = pending
-            .iter()
-            .position(|flow| flow.flow.state == state)
-            .map(|index| pending.swap_remove(index));
-        drop(pending);
+        if let Err(error) = &taken
+            && *error != StoreError::InvalidFlowStateAge
+        {
+            // Keep the in-process denial marker if the store could not
+            // atomically take this locally created state.
+            return Err(error.clone().into());
+        }
+        if matches!(taken, Ok(None)) {
+            // If a callback took the record while this cancellation was
+            // marking it, leave the marker for that consumer to observe.
+            return Ok(known);
+        }
+        let local = self.remove_pending(state).await;
         match taken {
             Ok(Some(flow)) => {
                 self.protocol.nonces.clear_key(&flow.dpop_jkt);
@@ -628,21 +650,59 @@ impl OAuthClient {
         }
     }
 
+    async fn remove_pending(&self, state: &str) -> Option<PendingAuthorization> {
+        let mut pending = self.pending.lock().await;
+        pending
+            .iter()
+            .position(|flow| flow.flow.state == state)
+            .map(|index| pending.swap_remove(index))
+    }
+
     /// Completes a callback and atomically commits its bound account session.
     pub async fn complete_authorization(&self, callback: &Url) -> Result<Session, OAuthError> {
         let state = callback_parameter(callback, "state")?.ok_or(OAuthError::UnknownState)?;
         if !valid_state(&state) {
             return Err(OAuthError::UnknownState);
         }
+        if self
+            .pending
+            .lock()
+            .await
+            .iter()
+            .any(|flow| flow.denied && flow.flow.state == state)
+        {
+            return Err(OAuthError::UnknownState);
+        }
+        if same_redirect(callback, &self.config.redirect_uri)
+            && let Some(error) = callback_parameter(callback, "error")?
+        {
+            match self.cancel_authorization(&state).await {
+                Ok(false) => return Err(OAuthError::UnknownState),
+                Err(_) => {
+                    tracing::warn!("could not remove a denied OAuth authorization from storage")
+                }
+                Ok(true) => {}
+            }
+            return Err(if error == "access_denied" {
+                OAuthError::Cancelled
+            } else {
+                OAuthError::AuthorizationRejected
+            });
+        }
         let flow: OAuthFlowState = self
             .storage
             .consume_oauth_state(&state, unix_now()?)
             .await?
             .ok_or(OAuthError::UnknownState)?;
-        self.pending
-            .lock()
+        if self
+            .remove_pending(&state)
             .await
-            .retain(|pending| pending.flow.state != state);
+            .is_some_and(|local| local.denied)
+        {
+            self.protocol.nonces.clear_key(&flow.dpop_jkt);
+            self.keys.delete(&flow.dpop_key_id).await?;
+            return Err(OAuthError::UnknownState);
+        }
         let result = self.complete_flow(callback, &flow).await;
         if result.is_err() {
             self.protocol.nonces.clear_key(&flow.dpop_jkt);
@@ -660,13 +720,6 @@ impl OAuthClient {
             || !same_redirect(callback, &self.config.redirect_uri)
         {
             return Err(OAuthError::RedirectUri);
-        }
-        if let Some(error) = callback_parameter(callback, "error")? {
-            return Err(if error == "access_denied" {
-                OAuthError::Cancelled
-            } else {
-                OAuthError::AuthorizationRejected
-            });
         }
         let issuer = callback_parameter(callback, "iss")?.ok_or(OAuthError::Callback)?;
         if issuer != flow.expected_issuer

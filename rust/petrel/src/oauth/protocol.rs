@@ -155,13 +155,14 @@ impl OAuthProtocol {
         match self.discover_issuer(&issuer).await {
             Ok(metadata) => Ok(metadata),
             Err(error)
-                if matches!(
-                    resource_error,
-                    MetadataError::UnexpectedStatus {
-                        document: MetadataDocument::ProtectedResource,
-                        status: 404,
-                    }
-                ) =>
+                if matches!(error, MetadataError::Transport(_))
+                    || matches!(
+                        resource_error,
+                        MetadataError::UnexpectedStatus {
+                            document: MetadataDocument::ProtectedResource,
+                            status: 404,
+                        }
+                    ) =>
             {
                 Err(error)
             }

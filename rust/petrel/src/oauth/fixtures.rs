@@ -42,6 +42,7 @@ struct Exchanges {
     tokens: usize,
     refreshes: usize,
     revokes: Vec<String>,
+    revocation_attempts: usize,
     did_refreshes: usize,
     proof_jkts: Vec<String>,
     unexpected_requests: usize,
@@ -69,9 +70,13 @@ enum Scenario {
     PublicOnly,
     NoRevocationEndpoint,
     RevocationFailure,
+    RevocationStaleNonce,
     ServiceTokenWrongIssuer,
     ServiceTokenBadExpiration,
     ServiceTokenRejected,
+    PdsOriginChanged,
+    PdsIssuerChanged,
+    FrozenIssuerResourceMismatch,
     TokenRedirect,
     CabNonce,
     CabClientMismatch,
@@ -118,10 +123,30 @@ impl Server {
         let response = match (uri.host(), uri.path()) {
             (Some("pds.example"), "/.well-known/oauth-protected-resource") => {
                 assert!(options.anonymous);
+                let issuer = if matches!(self.scenario, Scenario::PdsIssuerChanged)
+                    && self.exchanges.lock().unwrap().did_refreshes > 0
+                {
+                    "https://other-issuer.example"
+                } else {
+                    ISSUER
+                };
                 json_response(
                     200,
                     None,
-                    &json!({"resource":PDS,"authorization_servers":[ISSUER]}),
+                    &json!({"resource":PDS,"authorization_servers":[issuer]}),
+                )
+            }
+            (Some("issuer.example"), "/.well-known/oauth-protected-resource") => {
+                assert!(options.anonymous);
+                json_response(404, None, &json!({}))
+            }
+            (Some("other-issuer.example"), "/.well-known/oauth-authorization-server") => {
+                assert!(options.anonymous);
+                json_response(
+                    200,
+                    None,
+                    &serde_json::to_value(example_metadata("https://other-issuer.example"))
+                        .unwrap(),
                 )
             }
             (Some("issuer.example"), "/.well-known/oauth-authorization-server") => {
@@ -133,6 +158,12 @@ impl Server {
                 if matches!(self.scenario, Scenario::NoRevocationEndpoint) {
                     metadata.revocation_endpoint = None;
                 }
+                if matches!(self.scenario, Scenario::FrozenIssuerResourceMismatch)
+                    && self.exchanges.lock().unwrap().did_refreshes == 0
+                {
+                    metadata.protected_resources =
+                        Some(vec!["https://other-resource.example".into()]);
+                }
                 json_response(200, None, &serde_json::to_value(metadata).unwrap())
             }
             (Some("cab.example"), "/backend/oauth/client-assertion") => {
@@ -140,19 +171,7 @@ impl Server {
             }
             (Some("issuer.example"), "/par") => self.par_exchange(&request, form),
             (Some("issuer.example"), "/token") => self.token_exchange(&request, &form).await,
-            (Some("issuer.example"), "/revoke") => {
-                validate_proof(&request);
-                self.exchanges
-                    .lock()
-                    .unwrap()
-                    .revokes
-                    .push(form["token"].clone());
-                if matches!(self.scenario, Scenario::RevocationFailure) {
-                    json_response(503, None, &json!({"error":"temporarily_unavailable"}))
-                } else {
-                    json_response(200, None, &json!({}))
-                }
-            }
+            (Some("issuer.example"), "/revoke") => self.revoke_exchange(&request, &form),
             (Some("pds.example"), "/xrpc/com.atproto.server.getServiceAuth") => {
                 self.service_auth_exchange(&request).await
             }
@@ -351,6 +370,35 @@ impl Server {
         }
     }
 
+    fn revoke_exchange(
+        &self,
+        request: &Request<Bytes>,
+        form: &HashMap<String, String>,
+    ) -> Response<Bytes> {
+        let proof = validate_proof(request);
+        let mut exchanges = self.exchanges.lock().unwrap();
+        exchanges.revocation_attempts += 1;
+        if let Some(assertion) = form.get("client_assertion") {
+            exchanges.assertions.push(assertion.clone());
+        }
+        if matches!(self.scenario, Scenario::RevocationStaleNonce) {
+            if exchanges.revocation_attempts == 1 {
+                assert_eq!(proof["nonce"], "token-nonce");
+                return json_response(
+                    400,
+                    Some("revocation-nonce"),
+                    &json!({"error":"use_dpop_nonce"}),
+                );
+            }
+            assert_eq!(proof["nonce"], "revocation-nonce");
+        }
+        if matches!(self.scenario, Scenario::RevocationFailure) {
+            return json_response(503, None, &json!({"error":"temporarily_unavailable"}));
+        }
+        exchanges.revokes.push(form["token"].clone());
+        json_response(200, None, &json!({}))
+    }
+
     async fn service_auth_exchange(&self, request: &Request<Bytes>) -> Response<Bytes> {
         self.exchanges.lock().unwrap().service_requests += 1;
         assert_eq!(
@@ -427,10 +475,15 @@ impl OAuthIdentityResolver for Server {
             if force_refresh {
                 self.exchanges.lock().unwrap().did_refreshes += 1;
             }
+            let pds = if force_refresh && matches!(self.scenario, Scenario::PdsOriginChanged) {
+                "https://pds.example:8443"
+            } else {
+                PDS
+            };
             Ok(OAuthIdentity {
                 did: DID.parse().unwrap(),
                 handle: None,
-                pds: Url::parse(PDS).unwrap(),
+                pds: Url::parse(pds).unwrap(),
             })
         })
     }
@@ -1032,7 +1085,8 @@ async fn logout_always_removes_session_and_key_and_reports_confirmed_revocation(
         );
         assert!(client.session(did).await.unwrap().is_none());
         let calls = server.exchanges.lock().unwrap();
-        assert_eq!(calls.revokes.len(), revoke_requests);
+        assert_eq!(calls.revocation_attempts, revoke_requests);
+        assert_eq!(calls.revokes.len(), usize::from(revoked));
         assert!(calls.revokes.iter().all(|token| token == "refresh-first"));
     }
 }
@@ -1098,4 +1152,390 @@ async fn typed_service_auth_uses_the_session_did_and_generated_endpoint() {
         }
         assert_eq!(server.exchanges.lock().unwrap().service_requests, 1);
     }
+}
+
+#[derive(Default)]
+struct FaultStore {
+    inner: MemorySecretStore,
+    fail_take: std::sync::atomic::AtomicBool,
+    fail_primary_session_write: std::sync::atomic::AtomicBool,
+    pause_pending_session_write: std::sync::atomic::AtomicBool,
+    pending_write_started: std::sync::atomic::AtomicBool,
+}
+
+impl crate::storage::SecretStore for FaultStore {
+    fn get<'a>(
+        &'a self,
+        ns: &'a str,
+        key: &'a str,
+    ) -> BoxFuture<'a, Result<Option<Vec<u8>>, crate::storage::StoreError>> {
+        self.inner.get(ns, key)
+    }
+
+    fn put<'a>(
+        &'a self,
+        ns: &'a str,
+        key: &'a str,
+        value: &'a [u8],
+    ) -> BoxFuture<'a, Result<(), crate::storage::StoreError>> {
+        use std::sync::atomic::Ordering;
+
+        if key.starts_with("session.pending.")
+            && self.pause_pending_session_write.load(Ordering::Relaxed)
+        {
+            self.pending_write_started.store(true, Ordering::Relaxed);
+            return Box::pin(std::future::pending());
+        }
+        if key.starts_with("session.did:")
+            && self.fail_primary_session_write.load(Ordering::Relaxed)
+        {
+            return Box::pin(async {
+                Err(crate::storage::StoreError::Unavailable(
+                    "injected primary write failure".into(),
+                ))
+            });
+        }
+        self.inner.put(ns, key, value)
+    }
+
+    fn delete<'a>(
+        &'a self,
+        ns: &'a str,
+        key: &'a str,
+    ) -> BoxFuture<'a, Result<(), crate::storage::StoreError>> {
+        self.inner.delete(ns, key)
+    }
+
+    fn take<'a>(
+        &'a self,
+        ns: &'a str,
+        key: &'a str,
+    ) -> BoxFuture<'a, Result<Option<Vec<u8>>, crate::storage::StoreError>> {
+        if self.fail_take.load(std::sync::atomic::Ordering::Relaxed) {
+            return Box::pin(async {
+                Err(crate::storage::StoreError::Unavailable(
+                    "injected store failure".into(),
+                ))
+            });
+        }
+        self.inner.take(ns, key)
+    }
+
+    fn delete_namespace<'a>(
+        &'a self,
+        namespace: &'a str,
+    ) -> BoxFuture<'a, Result<(), crate::storage::StoreError>> {
+        self.inner.delete_namespace(namespace)
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn denied_local_flow_stays_denied_when_state_consumption_failed() {
+    use crate::storage::SecretStore as _;
+    use std::sync::atomic::Ordering;
+
+    let server = Arc::new(Server::new(Scenario::Public));
+    let backend = Arc::new(FaultStore::default());
+    let storage = SessionStore::new(backend.clone(), "fixtures").unwrap();
+    let config = OAuthConfig::new(
+        CLIENT,
+        Url::parse(REDIRECT).unwrap(),
+        SCOPE,
+        ClientAuth::Public,
+    )
+    .unwrap();
+    let client = OAuthClient::new(server.clone(), server.clone(), storage, config).unwrap();
+    let flow = client
+        .start_authorization_with_options(
+            OAuthTarget::Identifier(DID.parse().unwrap()),
+            super::OAuthStartOptions::default(),
+        )
+        .await
+        .unwrap();
+
+    let mut denied = Url::parse(REDIRECT).unwrap();
+    denied
+        .query_pairs_mut()
+        .append_pair("error", "access_denied")
+        .append_pair("state", &flow.state);
+    backend.fail_take.store(true, Ordering::Relaxed);
+    assert_eq!(
+        client.complete_authorization(&denied).await.unwrap_err(),
+        OAuthError::Cancelled
+    );
+    backend.fail_take.store(false, Ordering::Relaxed);
+    assert!(
+        backend
+            .get("fixtures", &format!("oauthState.{}", flow.state))
+            .await
+            .unwrap()
+            .is_some()
+    );
+    assert_eq!(
+        client
+            .complete_authorization(&server.pushed_callback(ISSUER))
+            .await
+            .unwrap_err(),
+        OAuthError::UnknownState
+    );
+    assert_eq!(server.exchanges.lock().unwrap().tokens, 0);
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn final_identity_binding_rejects_pds_port_issuer_or_resource_changes() {
+    for (scenario, server_first, expected) in [
+        (
+            Scenario::PdsOriginChanged,
+            false,
+            OAuthError::IdentityChanged,
+        ),
+        (
+            Scenario::PdsIssuerChanged,
+            false,
+            OAuthError::IdentityChanged,
+        ),
+        (
+            Scenario::PdsIssuerChanged,
+            true,
+            OAuthError::IdentityChanged,
+        ),
+        (
+            Scenario::FrozenIssuerResourceMismatch,
+            true,
+            OAuthError::Metadata(super::MetadataError::ResourceNotProtected),
+        ),
+    ] {
+        let server = Arc::new(Server::new(scenario));
+        let client = client(&server, ClientAuth::Public);
+        let target = if server_first {
+            OAuthTarget::Server(Url::parse(ISSUER).unwrap())
+        } else {
+            OAuthTarget::Identifier(DID.parse().unwrap())
+        };
+        client.start_authorization(target).await.unwrap();
+        assert_eq!(
+            client
+                .complete_authorization(&server.pushed_callback(ISSUER))
+                .await
+                .unwrap_err(),
+            expected
+        );
+        assert!(
+            client
+                .session(&DID.parse().unwrap())
+                .await
+                .unwrap()
+                .is_none()
+        );
+        let exchanges = server.exchanges.lock().unwrap();
+        assert_eq!(exchanges.did_refreshes, 1);
+        assert_eq!(exchanges.tokens, 1);
+        assert_eq!(exchanges.revokes, ["refresh-first"]);
+        assert_eq!(exchanges.par[0].contains_key("login_hint"), !server_first);
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn resource_and_authorization_nonces_are_separate_even_on_one_origin() {
+    let server = Arc::new(Server::new(Scenario::Public));
+    let client = client(&server, ClientAuth::Public);
+    start(&client).await;
+    client
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+    let did = DID.parse().unwrap();
+    let record = client.storage.get_session(&did).await.unwrap().unwrap();
+    let resource = Url::parse(&format!("{PDS}/xrpc/example")).unwrap();
+    client
+        .protocol
+        .nonces
+        .put(&record.dpop_jkt, &resource, "as-only-nonce")
+        .unwrap();
+    let auth = client.session_auth(did);
+    let make_request = || Request::get(resource.as_str()).body(Bytes::new()).unwrap();
+    let (request, ctx) = auth.prepare(make_request()).await.unwrap();
+    let proof = validate_proof(&request);
+    assert!(proof.get("nonce").is_none());
+
+    auth.update_dpop_nonce(PDS, "resource-only-nonce", &ctx)
+        .await;
+    let (request, _) = auth.prepare(make_request()).await.unwrap();
+    let proof = validate_proof(&request);
+    assert_eq!(proof["nonce"], "resource-only-nonce");
+    assert_eq!(
+        client
+            .protocol
+            .nonces
+            .get(&record.dpop_jkt, &resource)
+            .as_deref(),
+        Some("as-only-nonce")
+    );
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn cab_revocation_retries_with_a_fresh_assertion_and_proof() {
+    let server = Arc::new(Server::new(Scenario::RevocationStaleNonce));
+    let client = client(
+        &server,
+        ClientAuth::Cab {
+            backend_url: Url::parse(CAB).unwrap(),
+            client_id: CLIENT.into(),
+        },
+    );
+    start(&client).await;
+    let session = client
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+    assert!(client.revoke_session(&session.did).await.unwrap());
+    assert!(client.session(&session.did).await.unwrap().is_some());
+
+    let calls = server.exchanges.lock().unwrap();
+    assert_eq!(calls.revocation_attempts, 2);
+    assert_eq!(calls.revokes, ["refresh-first"]);
+    assert_eq!(
+        calls.assertions,
+        [
+            "fixture-assertion-2",
+            "fixture-assertion-4",
+            "fixture-assertion-6",
+            "fixture-assertion-8"
+        ]
+    );
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn cancelled_refresh_does_not_lose_the_received_token_replacement() {
+    use std::{
+        future::{Future, poll_fn},
+        sync::atomic::Ordering,
+        task::Poll,
+    };
+
+    let server = Arc::new(Server::new(Scenario::Public));
+    let backend = Arc::new(FaultStore::default());
+    let storage = SessionStore::new(backend.clone(), "fixtures").unwrap();
+    let config = OAuthConfig::new(
+        CLIENT,
+        Url::parse(REDIRECT).unwrap(),
+        SCOPE,
+        ClientAuth::Public,
+    )
+    .unwrap();
+    let client = OAuthClient::new(server.clone(), server.clone(), storage.clone(), config).unwrap();
+    start(&client).await;
+    let session = client
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+    backend
+        .pause_pending_session_write
+        .store(true, Ordering::Relaxed);
+    let mut refresh = Box::pin(client.refresh(&session.did, true));
+    poll_fn(|cx| {
+        assert!(refresh.as_mut().poll(cx).is_pending());
+        if backend.pending_write_started.load(Ordering::Relaxed) {
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
+    })
+    .await;
+    drop(refresh);
+    backend
+        .pause_pending_session_write
+        .store(false, Ordering::Relaxed);
+
+    let recovered = client.session(&session.did).await.unwrap().unwrap();
+    assert_eq!(recovered.access_token(), "access-second");
+    assert_eq!(
+        storage
+            .get_session(&session.did)
+            .await
+            .unwrap()
+            .unwrap()
+            .session
+            .access_token(),
+        "access-second"
+    );
+    assert_eq!(server.exchanges.lock().unwrap().refreshes, 1);
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn durable_pending_refresh_survives_a_new_client_after_primary_write_failure() {
+    use std::sync::atomic::Ordering;
+
+    let server = Arc::new(Server::new(Scenario::Public));
+    let backend = Arc::new(FaultStore::default());
+    let storage = SessionStore::new(backend.clone(), "fixtures").unwrap();
+    let config = OAuthConfig::new(
+        CLIENT,
+        Url::parse(REDIRECT).unwrap(),
+        SCOPE,
+        ClientAuth::Public,
+    )
+    .unwrap();
+    let client = OAuthClient::new(
+        server.clone(),
+        server.clone(),
+        storage.clone(),
+        config.clone(),
+    )
+    .unwrap();
+    start(&client).await;
+    let session = client
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+    backend
+        .fail_primary_session_write
+        .store(true, Ordering::Relaxed);
+    assert_eq!(
+        client
+            .refresh(&session.did, true)
+            .await
+            .unwrap()
+            .access_token(),
+        "access-second"
+    );
+    assert_eq!(
+        storage
+            .get_session(&session.did)
+            .await
+            .unwrap()
+            .unwrap()
+            .session
+            .access_token(),
+        "access-first"
+    );
+    assert!(
+        storage
+            .get_pending_refresh(&session.did)
+            .await
+            .unwrap()
+            .is_some()
+    );
+
+    drop(client);
+    backend
+        .fail_primary_session_write
+        .store(false, Ordering::Relaxed);
+    let reopened = OAuthClient::new(server.clone(), server.clone(), storage, config).unwrap();
+    assert_eq!(
+        reopened
+            .session(&session.did)
+            .await
+            .unwrap()
+            .unwrap()
+            .access_token(),
+        "access-second"
+    );
+    assert_eq!(server.exchanges.lock().unwrap().refreshes, 1);
 }
