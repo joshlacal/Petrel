@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [SemVer](https://semver.org/).
 
-## [2.0.0] - Unreleased
+## [2.0.0] - 2026-11-24
 
 Petrel 2.0.0 turns the single `Petrel` library of 1.1.0 into a family of products that together
 cover the AT Protocol SDK feature set: identity, cryptography, service auth, repositories, PLC,
