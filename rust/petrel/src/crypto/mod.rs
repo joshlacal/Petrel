@@ -16,6 +16,14 @@
 //!   bytes or as [`EcPublicJwk`], so the later move to the 0.14 line stays
 //!   internal.
 
+mod jose;
+
+pub(crate) use jose::{Jwk, finish_es256_jws, jws_signing_input, split_compact_jws};
+pub use jose::{
+    MAX_JWS_JSON_BYTES, SoftwareDpopSigner, base64url, decode_base64url, normalize_es256,
+    pkce_challenge, pkce_verifier, random_bytes, sha256,
+};
+
 use crate::rt::{BoxFuture, MaybeSend, MaybeSync};
 
 /// A P-256 public key as a JWK (`kty: "EC"`, `crv: "P-256"`).
@@ -31,6 +39,20 @@ pub struct EcPublicJwk {
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum CryptoError {
+    #[error("operating system entropy unavailable")]
+    Entropy,
+    #[error("invalid P-256 key")]
+    InvalidKey,
+    #[error("invalid ES256 signature")]
+    InvalidSignature,
+    #[error("ES256 signing failed")]
+    SigningFailed,
+    #[error("invalid base64url")]
+    InvalidEncoding,
+    #[error("encoded value exceeds its size limit")]
+    TooLarge,
+    #[error("invalid compact JWS")]
+    InvalidJws,
     /// The key could not be used (missing, wrong type, not permitted).
     #[error("key unavailable: {0}")]
     KeyUnavailable(String),

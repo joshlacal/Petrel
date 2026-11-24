@@ -21,6 +21,27 @@
 //! - Fail closed where Swift is loose (plan decision 14): verify the
 //!   `client_id` a CAB returns.
 
+mod client;
+mod dpop;
+mod metadata;
+mod models;
+mod protocol;
+mod refresh;
+mod resource_auth;
+
+pub use client::{
+    DpopKeyStore, OAuthClient, OAuthConfig, OAuthError, OAuthIdentity, OAuthIdentityError,
+    OAuthIdentityResolver, OAuthTarget,
+};
+pub use dpop::{DpopError, DpopNonces, dpop_proof, dpop_target};
+pub use metadata::{
+    AuthorizationServerMetadata, ClientAuthenticationMethod, MetadataDocument, MetadataError,
+    ProtectedResourceMetadata, ValidatedAuthorizationServer,
+};
+pub use models::{Account, Session, SessionRecord};
+pub use protocol::{AssertionBackendError, AssertionBackendErrorCode, OAuthProtocolError};
+pub use resource_auth::SessionAuth;
+
 use std::fmt;
 use std::sync::Arc;
 
