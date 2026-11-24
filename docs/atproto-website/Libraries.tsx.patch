@@ -1,0 +1,30 @@
+diff --git a/src/components/Libraries.tsx b/src/components/Libraries.tsx
+index 0c5cae6..72b69a5 100644
+--- a/src/components/Libraries.tsx
++++ b/src/components/Libraries.tsx
+@@ -255,7 +255,24 @@ const community: LibraryGroupProp[] = [
+           plc: 'none',
+           oauthServer: 'none',
+         },
+-      }
++      },
++      {
++        href: 'https://github.com/joshlacal/Petrel',
++        sdkName: 'Petrel',
++        maintainer: { handle: 'josh.uno' },
++        status: {
++          identifiers: 'full',
++          bskyHelpers: 'full',
++          lexicon: 'full',
++          identity: 'full',
++          streaming: 'full',
++          serviceAuth: 'full',
++          crypto: 'full',
++          repo: 'full',
++          plc: 'full',
++          oauthServer: 'full',
++        },
++      },
+     ],
+   },
+   {

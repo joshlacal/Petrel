@@ -502,6 +502,9 @@ The Spaces lexicons track an unreleased atproto proposal and change between alph
   transports), and every Swift code block in the README, GETTING_STARTED.md and the catalogs is
   typechecked in CI by
   `Scripts/validate-documentation.sh`. (#77)
+- Documentation: a "Reading Feeds and Threads" guide (timeline, author feeds, custom feeds,
+  threads and paging), and `.github/workflows/docs-pages.yml`, which publishes the combined
+  DocC site from `main` to https://joshlacal.github.io/Petrel/.
 - CI: a scheduled `Live network smoke` workflow runs the firehose, labeler, Jetstream and identity
   live tests (never on pull requests). (#61)
 - CI: `Scripts/tests/check-app-specific-names.sh` fails a pull request that names a specific

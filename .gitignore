@@ -43,13 +43,14 @@ Server/keys/
 #
 # Committing it put ~30,000 files and 160 MB into this repository's history, and
 # a bulk overwrite of docs/ once deleted docs/cab-backend-contract.md as
-# collateral. The built site is now published from the `docs-site` branch by
-# Scripts/publish-documentation.sh rather than tracked on the main line.
+# collateral. The built site is now deployed to GitHub Pages by
+# .github/workflows/docs-pages.yml (or, by hand, to the `docs-site` branch by
+# Scripts/publish-documentation.sh --publish) rather than tracked on the main line.
 #
 # This list mirrors `generated_entries` in Scripts/install-generated-documentation.sh,
 # which still installs into docs/ for local preview and for the release pipeline.
 # Keep the two lists in step. Hand-authored files in docs/ stay tracked:
-# docs/cab-backend-contract.md and docs/releases/.
+# docs/cab-backend-contract.md, docs/releases/ and docs/atproto-website/.
 /docs/.nojekyll
 /docs/css/
 /docs/data/

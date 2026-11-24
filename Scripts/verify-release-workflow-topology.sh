@@ -181,6 +181,7 @@ expected_action_pins = {
   "peter-evans/create-pull-request" => "22a9089034f40e5a961c8808d113e2c98fb63676", # v7.0.11
   "anthropics/claude-code-action" => "1298632ce7736903d02a1435002705aa2a594a6c", # v1.0.175
   "actions/upload-artifact" => "ea165f8d65b6e75b540449e92b4886f43607fa02", # v4.6.2
+  "actions/deploy-pages" => "d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e", # v4.0.5
 }
 loaded_workflows = {}
 workflow_paths = Dir.glob([
@@ -191,6 +192,7 @@ expected_workflow_inventory = [
   "claude-code-review.yml",
   "claude.yml",
   "docc.yml",
+  "docs-pages.yml",
   "generator.yml",
   "kotlin.yml",
   "lint.yml",
@@ -220,8 +222,11 @@ workflow_paths.each do |path|
   jobs_for_security = loaded["jobs"]
   fail!("#{label} jobs must be a mapping") unless jobs_for_security.is_a?(Hash)
   jobs_for_security.each do |job_name, job|
+    # The Pages deploy job is the one non-Claude job that holds write scopes;
+    # its exact shape is checked below.
+    pages_deploy_job = label == "docs-pages.yml" && job_name == "deploy"
     fail!("#{label} #{job_name} must not declare job-level permissions") if
-      job.key?("permissions") && !claude_workflow_inventory.include?(label)
+      job.key?("permissions") && !claude_workflow_inventory.include?(label) && !pages_deploy_job
     steps = job["steps"]
     fail!("#{label} #{job_name} steps must be an array") unless steps.is_a?(Array)
     steps.each do |step|
@@ -243,10 +248,38 @@ workflow_paths.each do |path|
 end
 
 read_only_permissions = {"contents" => "read"}
-["docc.yml", "generator.yml", "kotlin.yml", "lint.yml", "live-network.yml", "oauth-server.yml", "release.yml", "swift.yml"].each do |label|
+["docc.yml", "docs-pages.yml", "generator.yml", "kotlin.yml", "lint.yml", "live-network.yml", "oauth-server.yml", "release.yml", "swift.yml"].each do |label|
   fail!("#{label} must use read-only default permissions") unless
     loaded_workflows.fetch(label)["permissions"] == read_only_permissions
 end
+# docs-pages.yml deploys the DocC site. It may run only for pushes to main or
+# by hand, never for a pull request, and only its deploy job, whose sole step is
+# the pinned deploy-pages action, holds the Pages and OIDC scopes.
+pages_workflow = loaded_workflows.fetch("docs-pages.yml")
+fail!("docs-pages.yml top-level topology must be exact") unless
+  pages_workflow.keys == ["name", "on", "permissions", "concurrency", "jobs"]
+fail!("docs-pages.yml must run only for pushes to main and by hand") unless
+  pages_workflow["on"] == {"push" => {"branches" => ["main"]}, "workflow_dispatch" => nil}
+pages_jobs = pages_workflow["jobs"]
+fail!("docs-pages.yml jobs must be build-site and deploy") unless
+  pages_jobs.keys == ["build-site", "deploy"]
+fail!("docs-pages.yml build-site must inherit read-only permissions") if
+  pages_jobs.fetch("build-site").key?("permissions")
+pages_deploy = pages_jobs.fetch("deploy")
+fail!("docs-pages.yml deploy job topology must be exact") unless
+  pages_deploy.keys == ["name", "needs", "runs-on", "permissions", "environment", "steps"] &&
+    pages_deploy["needs"] == "build-site" &&
+    pages_deploy["runs-on"] == "ubuntu-24.04"
+fail!("docs-pages.yml deploy job must hold only pages: write and id-token: write") unless
+  pages_deploy["permissions"] == {"pages" => "write", "id-token" => "write"}
+fail!("docs-pages.yml deploy job must use the github-pages environment") unless
+  pages_deploy.dig("environment", "name") == "github-pages"
+pages_deploy_steps = pages_deploy["steps"]
+fail!("docs-pages.yml deploy job must run only the pinned deploy-pages action") unless
+  pages_deploy_steps.length == 1 &&
+    pages_deploy_steps[0].keys.sort == ["id", "uses"] &&
+    pages_deploy_steps[0]["uses"].start_with?("actions/deploy-pages@")
+
 expected_claude_permissions = {
   "contents" => "read",
   "pull-requests" => "read",
@@ -513,7 +546,7 @@ dependency_contract = "Scripts/tests/validate-dependency-requirements-contract.s
       contract_occurrences.reject { |job, _| job == "macos" }.values.all?(&:zero?)
 end
 
-["docc.yml", "generator.yml", "kotlin.yml", "lint.yml", "sync-lexicons.yml"].each do |label|
+["docc.yml", "docs-pages.yml", "generator.yml", "kotlin.yml", "lint.yml", "sync-lexicons.yml"].each do |label|
   body = File.binread(File.join(workflow_directory, label))
   fail!("dependency gate must not run from #{label}") if body.include?(dependency_gate)
   fail!("dependency contract must not run from #{label}") if body.include?(dependency_contract)

@@ -18,6 +18,7 @@ vectors (syntax, crypto, data-model, mst, firehose and lexicon) in CI on macOS a
 | **Version** | 2.0.0 |
 | **Swift** | Swift 6.1 or later (`swift-tools-version: 6.1`) |
 | **Platforms** | macOS 15+, iOS 18+, tvOS 18+, Linux (see [LINUX_SUPPORT.md](LINUX_SUPPORT.md)) |
+| **Documentation** | [joshlacal.github.io/Petrel](https://joshlacal.github.io/Petrel/documentation/petrel/) |
 | **License** | MIT |
 | **Maintainer** | [@josh.uno](https://bsky.app/profile/josh.uno) on Bluesky |
 
@@ -337,6 +338,10 @@ Standalone Swift 6 starter packages live under [`Examples/`](Examples/README.md)
 - [`Examples/PostCLIDemo`](Examples/PostCLIDemo) and `swift run FirehoseDemo`: minimal posting and binary firehose CLI demos.
 
 ## Documentation
+
+The full documentation, with guides and the API reference for every product, is published
+at [joshlacal.github.io/Petrel](https://joshlacal.github.io/Petrel/documentation/petrel/).
+It is built from `main` by `.github/workflows/docs-pages.yml`.
 
 - [GETTING_STARTED.md](GETTING_STARTED.md): installation, public calls, OAuth, posting and errors.
 - [CODEGEN.md](CODEGEN.md): `petrel-gen` CLI, `PetrelLexgen` / `PetrelCodegenPlugin` SwiftPM plugins, and custom Swift/Kotlin Lexicon overlay packages.
