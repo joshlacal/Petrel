@@ -15,6 +15,8 @@
 
 use std::fmt;
 
+use crate::{Cid, Nsid, RecordKey, Tid};
+
 use crate::error::{DecodeError, EncodeError};
 use crate::serde_bridge::{FromValue, ObjectReader, ToValue, from_json, to_json};
 use crate::value::{Bytes, Value};
@@ -70,6 +72,21 @@ pub enum RecordKeyType {
     Any,
     /// `literal:<value>`, for example `literal:self`. Holds the value.
     Literal(&'static str),
+    /// A key rule newer than this SDK. Only generic key syntax is checked.
+    Other(&'static str),
+}
+
+impl RecordKeyType {
+    /// Whether the value is a valid key for this collection.
+    pub fn accepts(self, value: &str) -> bool {
+        RecordKey::parse(value).is_ok()
+            && match self {
+                Self::Tid => Tid::parse(value).is_ok(),
+                Self::Nsid => Nsid::parse(value).is_ok(),
+                Self::Literal(literal) => value == literal,
+                Self::Any | Self::Other(_) => true,
+            }
+    }
 }
 
 /// A request body.
@@ -180,13 +197,57 @@ impl FromValue for XrpcErrorBody {
     }
 }
 
+impl ToValue for XrpcErrorBody {
+    fn to_value(&self) -> Result<Value, EncodeError> {
+        let mut writer = crate::serde_bridge::ObjectWriter::new();
+        writer.field("error", &self.error)?;
+        writer.optional("message", &self.message)?;
+        Ok(writer.finish())
+    }
+}
+
+crate::value::serde_via_value!(XrpcErrorBody);
+
+/// Rate-limit state reported in an XRPC response.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RateLimit {
+    /// The request quota for the current window.
+    pub limit: i64,
+    /// Requests left in the current window.
+    pub remaining: i64,
+    /// The window's end, in seconds since the Unix epoch.
+    pub reset_unix_seconds: f64,
+    /// The optional server-supplied description of the rate-limit window.
+    pub policy: Option<String>,
+}
+
+impl RateLimit {
+    /// Reads the response headers through an accessor keyed by lowercase name.
+    /// Returns None if limit, remaining or reset is absent or malformed.
+    pub fn parse<'a>(get: impl Fn(&str) -> Option<&'a str>) -> Option<Self> {
+        let limit = get("ratelimit-limit")?.trim().parse().ok()?;
+        let remaining = get("ratelimit-remaining")?.trim().parse().ok()?;
+        let reset_unix_seconds: f64 = get("ratelimit-reset")?.trim().parse().ok()?;
+        if !reset_unix_seconds.is_finite() {
+            return None;
+        }
+        let policy = get("ratelimit-policy").map(str::to_owned);
+        Some(Self {
+            limit,
+            remaining,
+            reset_unix_seconds,
+            policy,
+        })
+    }
+}
+
 /// Query parameters of one endpoint, as ordered name/value pairs.
 ///
 /// The generator writes each impl out explicitly with the helpers below;
 /// there is no reflection. Rules (from the Swift generator): an absent
 /// optional emits nothing, an array emits one pair per element, booleans are
-/// `true`/`false`, integers are decimal, and string formats emit their raw
-/// string. A lexicon `default` is the field's value in the generated
+/// `true`/`false`, integers are decimal, and string formats keep their wire spelling except for handles in query
+/// parameters, which are lowercased. A lexicon `default` is the field's value in the generated
 /// `Default` impl and is therefore *sent*.
 pub trait ToQueryParams {
     /// Appends this endpoint's pairs, in lexicon property order.
@@ -216,6 +277,12 @@ impl QueryValue for bool {
 }
 
 impl QueryValue for i64 {
+    fn to_query_value(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl QueryValue for Cid {
     fn to_query_value(&self) -> String {
         self.to_string()
     }
