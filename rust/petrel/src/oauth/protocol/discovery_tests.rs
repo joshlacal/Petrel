@@ -309,6 +309,32 @@ async fn server_target_reports_the_direct_issuer_failure_only_after_prm_404() {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn server_target_propagates_transport_failure_from_the_direct_issuer_fallback() {
+    let calls = fixture_transport([
+        Exchange::new(
+            PDS,
+            ProtectedResource,
+            Ok(json_response(&json!({"unexpected": true}))),
+        ),
+        Exchange::new(
+            PDS,
+            AuthorizationServer,
+            Err(TransportError::PolicyViolation("fixture refusal".into())),
+        ),
+    ]);
+    let protocol = public_protocol(calls.clone());
+    assert_eq!(
+        protocol
+            .discover_server(&Url::parse(PDS).unwrap())
+            .await
+            .unwrap_err(),
+        MetadataError::Transport(AuthorizationServer)
+    );
+    calls.assert_finished();
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
 async fn retries_transient_metadata_transport_failures_until_the_third_attempt() {
     let transport = fixture_transport([
         Exchange::new(
