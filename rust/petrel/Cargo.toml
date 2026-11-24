@@ -72,6 +72,8 @@ js-sys = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true, features = [
     "AbortController",
     "AbortSignal",
+    "Crypto",
+    "CryptoKey",
     "Headers",
     "ReadableStream",
     "ReadableStreamDefaultReader",
@@ -82,6 +84,7 @@ web-sys = { workspace = true, optional = true, features = [
     "RequestRedirect",
     "Response",
     "ResponseType",
+    "SubtleCrypto",
     "Window",
     "WorkerGlobalScope",
 ] }
