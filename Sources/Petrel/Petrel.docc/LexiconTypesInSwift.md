@@ -76,7 +76,7 @@ A parameter's Lexicon `default` is its initializer default, so `limit=50` is sen
 
 ## Records and unknown values
 
-A `record` is a struct whose `typeIdentifier` is its NSID. Endpoints that work with any collection, such as `com.atproto.repo.createRecord` and `getRecord`, declare the record as `unknown`, which is ``ATProtocolValueContainer`` in Swift. Wrap a record in `.knownType(_:)` to write it, and call `decoded(_:)` to read one back:
+A `record` is a struct whose `typeIdentifier` is its NSID. Endpoints that work with any collection, such as `com.atproto.repo.createRecord` and `getRecord`, declare the record as `unknown`, which is ``ATProtocolValueContainer`` in Swift. Wrap a record in `.knownType(_:)` to write it. To read one back, match the `.knownType` case and cast the value to the type you expect:
 
 <!-- compile-example: rosetta-record-crud -->
 ```swift
@@ -116,11 +116,22 @@ func writeAndReadPostRecord(client: ATProtoClient, repoDID: DID) async throws {
         )
     )
 
-    if let hydrated = fetched?.value.decoded(AppBskyFeedPost.self) {
-        print("Round-tripped text: \(hydrated.text)")
+    switch fetched?.value {
+    case let .knownType(value):
+        if let post = value as? AppBskyFeedPost {
+            print("Round-tripped text: \(post.text)")
+        }
+    case let .unknownType(type, _):
+        print("No decoder registered for \(type)")
+    default:
+        break
     }
 }
 ```
+
+``ATProtocolValueContainer`` is an enum. When the JSON's `$type` names a type Petrel has a decoder for, the value arrives as `.knownType`, holding the decoded struct as `any ATProtocolValue`; cast it with `as?`. A `$type` with no registered decoder arrives as `.unknownType(type, raw)`, with the raw value kept so it can be written back unchanged. Generated types for the bundled Lexicons are registered automatically; register your own with ``ATProtocolValueContainer/registerDecoder(forType:as:)`` (see <doc:CustomLexicons>).
+
+`value.decoded(AppBskyFeedPost.self)` is shorthand for the `.knownType` match and cast, and returns `nil` in every other case. The other articles use it where the record type is already known.
 
 To post to Bluesky, use ``BskyAgent`` instead (see <doc:BlueskyPosting>); it builds facets and embeds for you.
 
