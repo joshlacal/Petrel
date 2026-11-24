@@ -1,0 +1,25 @@
+[package]
+name = "petrel-core"
+description = "AT Protocol data model for Petrel: identifiers, Value, strict DAG-CBOR, the typed<->Value bridge and the XRPC endpoint traits. No HTTP, no crypto beyond SHA-256."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+# Browser support hooks (clock and randomness for the TID generator). Lane A
+# wires the dependencies; the feature exists now so `--features wasm` is valid
+# across the workspace.
+wasm = []
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+base64 = { workspace = true }
+sha2 = { workspace = true }
+
+[lints]
+workspace = true

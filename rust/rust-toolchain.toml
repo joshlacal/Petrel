@@ -1,0 +1,6 @@
+# Any stable toolchain at or above the workspace MSRV (1.88) works. This file
+# only makes sure the wasm target and the lint tools are present.
+[toolchain]
+channel = "stable"
+components = ["clippy", "rustfmt"]
+targets = ["wasm32-unknown-unknown"]

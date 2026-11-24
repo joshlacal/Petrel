@@ -1,0 +1,93 @@
+# Petrel Rust workspace.
+#
+# Shared file: created by Lane 0 of the Petrel Rust program and changed only by
+# the integrator. Lanes add code under their own crate/module directories and
+# never edit this manifest. Every dependency any lane is expected to need is
+# pinned here; an unused entry costs nothing (it is not resolved until a member
+# references it with `workspace = true`).
+[workspace]
+resolver = "3"
+members = [
+    "petrel-core",
+    "petrel-api",
+    "petrel-oauth-scopes",
+    "petrel",
+    "petrel-e2e",
+]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/joshlacal/Petrel"
+
+[workspace.dependencies]
+# Workspace members
+petrel-core = { path = "petrel-core", version = "0.0.0" }
+petrel-api = { path = "petrel-api", version = "0.0.0" }
+petrel-oauth-scopes = { path = "petrel-oauth-scopes", version = "0.0.0" }
+petrel = { path = "petrel", version = "0.0.0", default-features = false }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+serde_html_form = "0.4"
+base64 = "0.22"
+
+# Errors
+thiserror = "2"
+
+# Crypto (RustCrypto 0.13 line: matches every sibling lockfile; keep these
+# types out of public APIs so the later 0.14 bump stays internal)
+sha2 = { version = "0.10", default-features = false, features = ["std"] }
+p256 = { version = "0.13", default-features = false, features = ["ecdsa", "std", "jwk"] }
+k256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"] }
+getrandom = "0.2"
+aes-gcm = "0.10"
+hkdf = "0.12"
+zeroize = "1"
+
+# HTTP model, URLs, async plumbing (runtime-agnostic)
+http = "1"
+bytes = "1"
+url = "2.5"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+web-time = "1.1"
+tracing = { version = "0.1", default-features = false, features = ["std"] }
+
+# Native-only (never in the wasm32 graph)
+reqwest = { version = "0.13", default-features = false }
+tokio = { version = "1", default-features = false }
+hickory-resolver = { version = "0.26", default-features = false, features = ["tokio", "system-config"] }
+
+# wasm32-unknown-unknown only
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = "0.3"
+gloo-timers = { version = "0.4", features = ["futures"] }
+
+# Optional interop (feature-gated in petrel-core by Lane A)
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+time = { version = "0.3", default-features = false, features = ["std"] }
+jiff = { version = "0.2", default-features = false, features = ["std"] }
+cid = { version = "0.11", default-features = false, features = ["std"] }
+
+# Test-only
+wasm-bindgen-test = "0.3"
+tempfile = "3"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+# Protocol prose is full of names like CIDv1 and WebCrypto that are not code.
+doc_markdown = "allow"
