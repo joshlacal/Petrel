@@ -172,13 +172,15 @@ impl SessionStore {
         value: &T,
     ) -> Result<(), StoreError> {
         let key = item_key(base, suffix)?;
-        let bytes = Zeroizing::new(
-            serde_json::to_vec(&Envelope {
+        let mut bytes = Zeroizing::new(Vec::new());
+        serde_json::to_writer(
+            &mut *bytes,
+            &Envelope {
                 v: VERSION,
                 data: value,
-            })
-            .map_err(|_| StoreError::Other("could not encode a typed secret".into()))?,
-        );
+            },
+        )
+        .map_err(|_| StoreError::Other("could not encode a typed secret".into()))?;
         self.secrets.put(&self.namespace, &key, &bytes).await
     }
 

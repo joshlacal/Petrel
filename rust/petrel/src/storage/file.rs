@@ -35,6 +35,10 @@ const KEY_CHECK_PLAINTEXT: &[u8] = b"petrel.encrypted-files.key-check.v1";
 /// directory private on Windows, where file data is flushed before an
 /// atomic rename but directory metadata cannot be explicitly flushed.
 ///
+/// Container compatibility applies to raw secret bytes with supported
+/// names. A namespace cannot contain a period. The typed session records
+/// written by [`super::SessionStore`] have a separate Rust JSON format.
+///
 /// Operations use blocking filesystem I/O. Rust instances serialize
 /// mutations with an advisory lock. Coordinate independently running Swift
 /// and Rust writers externally when using a directory from both runtimes.
