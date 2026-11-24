@@ -219,6 +219,54 @@ class RustCodeGenerationTests(unittest.TestCase):
             # No inner doc comment appears after pub mod
             self.assertNotIn("//!", mod_rs[pub_mod_pos:])
 
+    def test_cursor_params_and_cursor_output_emitted_only_for_string_cursors(self):
+        paginated_query = {
+            "lexicon": 1,
+            "id": "com.example.listItems",
+            "defs": {
+                "main": {
+                    "type": "query",
+                    "parameters": {
+                        "type": "params",
+                        "properties": {
+                            "limit": {"type": "integer"},
+                            "cursor": {"type": "string"},
+                        },
+                    },
+                    "output": {
+                        "encoding": "application/json",
+                        "schema": {
+                            "type": "object",
+                            "required": ["items"],
+                            "properties": {
+                                "cursor": {"type": "string"},
+                                "items": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                    },
+                }
+            },
+        }
+        code = RustCodeGenerator(paginated_query).convert()
+        self.assertIn("impl petrel_core::xrpc::CursorParams for Parameters", code)
+        self.assertIn("impl petrel_core::xrpc::CursorOutput for Output", code)
+
+        int_cursor_sub = {
+            "lexicon": 1,
+            "id": "com.example.subscribeEvents",
+            "defs": {
+                "main": {
+                    "type": "subscription",
+                    "parameters": {
+                        "type": "params",
+                        "properties": {"cursor": {"type": "integer"}},
+                    },
+                }
+            },
+        }
+        sub_code = RustCodeGenerator(int_cursor_sub).convert()
+        self.assertNotIn("CursorParams", sub_code)
+
 
 if __name__ == "__main__":
     unittest.main()

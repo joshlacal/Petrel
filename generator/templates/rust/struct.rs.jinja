@@ -130,6 +130,14 @@ impl petrel_core::XrpcOutput for {{ name }} {
         petrel_core::from_json(body)
     }
 }
+{% if cursor_expr %}
+
+impl petrel_core::xrpc::CursorOutput for {{ name }} {
+    fn cursor(&self) -> Option<&str> {
+        {{ cursor_expr }}
+    }
+}
+{% endif %}
 
 impl serde::Serialize for {{ name }} {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {

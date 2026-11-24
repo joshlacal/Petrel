@@ -30,6 +30,16 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::xrpc::CursorParams for Parameters {
+    fn cursor(&self) -> Option<&str> {
+        self.cursor.as_deref()
+    }
+
+    fn set_cursor(&mut self, cursor: Option<String>) {
+        self.cursor = cursor;
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
     FutureCursor,

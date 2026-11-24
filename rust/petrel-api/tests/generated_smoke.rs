@@ -1,11 +1,15 @@
 #![cfg(all(feature = "app_bsky", feature = "com_atproto"))]
 
+use petrel_api::generated::app::bsky::feed::get_timeline::{
+    Output as GetTimelineOutput, Parameters as GetTimelineParams,
+};
 use petrel_api::generated::app::bsky::feed::post::{Post, ReplyRef};
 use petrel_api::generated::com::atproto::repo::put_record::{Input as PutRecordInput, PutRecord};
 use petrel_api::generated::com::atproto::repo::strong_ref::StrongRef;
 use petrel_api::generated::com::atproto::server::get_service_auth::{
     GetServiceAuth, Output as GetServiceAuthOutput, Parameters as GetServiceAuthParams,
 };
+use petrel_core::xrpc::{CursorOutput, CursorParams};
 use petrel_core::{
     Collection, DeclaredXrpcError, Nullable, RecordKeyType, ToQueryParams, Value, XrpcMethod,
     XrpcOutput, XrpcRequest, from_dag_cbor, from_json, to_dag_cbor, to_json,
@@ -71,4 +75,15 @@ fn get_service_auth_xrpc_surface() {
     assert_eq!(out.token, "jwt-abc");
     let err = <GetServiceAuth as XrpcRequest>::Error::from_wire_name("SomeUndeclaredError");
     assert!(!err.is_declared());
+}
+
+#[test]
+fn get_timeline_implements_cursor_params_and_cursor_output() {
+    let mut params = GetTimelineParams::new();
+    assert_eq!(CursorParams::cursor(&params), None);
+    params.set_cursor(Some("page-2".to_owned()));
+    assert_eq!(CursorParams::cursor(&params), Some("page-2"));
+
+    let out = GetTimelineOutput::from_body(br#"{"cursor":"page-3","feed":[]}"#).unwrap();
+    assert_eq!(CursorOutput::cursor(&out), Some("page-3"));
 }

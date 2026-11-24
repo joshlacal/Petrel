@@ -39,6 +39,16 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::xrpc::CursorParams for Parameters {
+    fn cursor(&self) -> Option<&str> {
+        self.cursor.as_deref()
+    }
+
+    fn set_cursor(&mut self, cursor: Option<String>) {
+        self.cursor = cursor;
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     pub cursor: Option<String>,
@@ -89,6 +99,12 @@ impl petrel_core::XrpcInput for Output {
 impl petrel_core::XrpcOutput for Output {
     fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
         petrel_core::from_json(body)
+    }
+}
+
+impl petrel_core::xrpc::CursorOutput for Output {
+    fn cursor(&self) -> Option<&str> {
+        self.cursor.as_deref()
     }
 }
 

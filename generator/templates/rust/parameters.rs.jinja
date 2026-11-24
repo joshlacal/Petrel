@@ -51,3 +51,15 @@ impl petrel_core::ToQueryParams for Parameters {
 {% endfor %}
     }
 }
+{% if cursor_ident %}
+
+impl petrel_core::xrpc::CursorParams for Parameters {
+    fn cursor(&self) -> Option<&str> {
+        self.{{ cursor_ident }}.as_deref()
+    }
+
+    fn set_cursor(&mut self, cursor: Option<String>) {
+        self.{{ cursor_ident }} = cursor;
+    }
+}
+{% endif %}

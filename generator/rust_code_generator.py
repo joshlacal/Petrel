@@ -294,6 +294,15 @@ class RustCodeGenerator(BaseCodeGenerator):
             def_name=def_name,
         )
         required_params = [p for p in props if p["in_new_params"]]
+        cursor_expr: Optional[str] = None
+        if not is_record:
+            for prop in props:
+                if prop["name"] == "cursor":
+                    if prop["rust_type"] == "Option<String>":
+                        cursor_expr = f"self.{prop['ident']}.as_deref()"
+                    elif prop["rust_type"] == "String":
+                        cursor_expr = f"Some(self.{prop['ident']}.as_str())"
+                    break
         return self.template_manager.struct_template.render(
             name=name,
             lexicon_id=self.lexicon_id,
@@ -308,6 +317,7 @@ class RustCodeGenerator(BaseCodeGenerator):
             lenient=lenient,
             is_record=is_record,
             record_key_expr=self._record_key_expr(record_key) if is_record else "",
+            cursor_expr=cursor_expr,
         )
 
     def _parameter_default_expr(
@@ -388,10 +398,19 @@ class RustCodeGenerator(BaseCodeGenerator):
             })
 
         required_params = [p for p in props if p["in_new_params"]]
+        cursor_ident = next(
+            (
+                p["ident"]
+                for p in props
+                if p["name"] == "cursor" and p["rust_type"] == "Option<String>"
+            ),
+            None,
+        )
         code = self.template_manager.parameters_template.render(
             properties=props,
             required_params=required_params,
             all_optional=len(required_params) == 0,
+            cursor_ident=cursor_ident,
         )
         return code, "Parameters"
 
