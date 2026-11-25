@@ -472,8 +472,8 @@ async fn public_car_counts_foreign_blocks_toward_max_block_count() {
 
     // Pre-populated store containing identical copies still counts every distinct CAR block
     // toward `block_count`, `total_block_bytes`, and `max_block_count`.
-    let (b1_cid, b1_bytes) = cbor_block(&Value::Integer(1));
-    let (b2_cid, b2_bytes) = cbor_block(&Value::Integer(2));
+    let (b1_cid, b1_bytes) = cbor_block(&Value::String("abc".into()));
+    let (b2_cid, b2_bytes) = cbor_block(&Value::String("def".into()));
     let (b3_cid, b3_bytes) = cbor_block(&Value::Integer(3));
     let three_car = PublicRepositoryCAR::write(
         std::slice::from_ref(&b1_cid),
@@ -525,4 +525,107 @@ async fn public_car_counts_foreign_blocks_toward_max_block_count() {
         parsed_prepop.total_block_bytes,
         b1_bytes.len() + b2_bytes.len() + b3_bytes.len()
     );
+}
+
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+fn car_reader_and_car_repository_enforce_limits() {
+    use petrel_repo::error::{LimitError, LimitKind};
+
+    let (b1_cid, b1_bytes) = cbor_block(&Value::String("abc".into()));
+    let (b2_cid, b2_bytes) = cbor_block(&Value::String("def".into()));
+    let car = PublicRepositoryCAR::write(
+        std::slice::from_ref(&b1_cid),
+        &[
+            RepositoryBlock::new(b1_cid.clone(), b1_bytes),
+            RepositoryBlock::new(b2_cid, b2_bytes.clone()),
+        ],
+    )
+    .unwrap();
+
+    // 1. Archive byte limit
+    let tiny_car_limits = RepositoryLimits {
+        max_import_car_bytes: 8,
+        ..RepositoryLimits::standard()
+    };
+    assert!(matches!(
+        CARReader::parse_with_limits(&car, &tiny_car_limits),
+        Err(CARReaderError::Limit(LimitError::Exceeded {
+            kind: LimitKind::ImportCarBytes,
+            ..
+        }))
+    ));
+
+    // 2. Single-block byte limit
+    let tiny_block_limits = RepositoryLimits {
+        max_single_block_bytes: 1,
+        ..RepositoryLimits::standard()
+    };
+    assert!(matches!(
+        CARReader::parse_with_limits(&car, &tiny_block_limits),
+        Err(CARReaderError::Limit(LimitError::Exceeded {
+            kind: LimitKind::SingleBlockBytes,
+            ..
+        }))
+    ));
+
+    // 3. Block count limit
+    let one_block_limits = RepositoryLimits {
+        max_block_count: 1,
+        max_record_count: 1,
+        max_mst_node_count: 1,
+        ..RepositoryLimits::standard()
+    };
+    assert!(matches!(
+        CARReader::parse_with_limits(&car, &one_block_limits),
+        Err(CARReaderError::Limit(LimitError::Exceeded {
+            kind: LimitKind::BlockCount,
+            ..
+        }))
+    ));
+
+    // 4. CARRepository::parse_with_limits enforces max_record_count and max_car_roots
+    let did = common::test_did();
+    let signer = common::deterministic_p256_signer();
+    let mut rec_map = BTreeMap::new();
+    rec_map.insert(
+        "$type".to_owned(),
+        Value::String("app.bsky.feed.post".into()),
+    );
+    rec_map.insert("text".to_owned(), Value::String("ok".into()));
+    let (rec_cid, rec_bytes) = cbor_block(&Value::Object(rec_map));
+    let (mst, mst_blocks) = petrel_repo::mst::tree::build_mst_from_entries(
+        vec![
+            ("app.bsky.feed.post/r1".to_owned(), rec_cid.clone()),
+            ("app.bsky.feed.post/r2".to_owned(), rec_cid.clone()),
+        ],
+        petrel_repo::mst::MstOptions::default(),
+    )
+    .unwrap();
+    let mut commit = BTreeMap::new();
+    commit.insert("did".to_owned(), Value::String(did.as_str().to_owned()));
+    commit.insert("rev".to_owned(), Value::String("3jzfcijpj2z2a".into()));
+    commit.insert("data".to_owned(), Value::Link(mst.root_cid().clone()));
+    commit.insert("prev".to_owned(), Value::Null);
+    commit.insert("version".to_owned(), Value::Integer(3));
+    let unsigned = dagcbor::encode(&Value::Object(commit.clone()));
+    let sig = signer.sign_sync(&unsigned).unwrap();
+    commit.insert("sig".to_owned(), Value::Bytes(sig));
+    let (commit_cid, commit_bytes) = cbor_block(&Value::Object(commit));
+    let mut repo_blocks = vec![
+        (commit_cid.as_bytes().to_vec(), commit_bytes),
+        (rec_cid.as_bytes().to_vec(), rec_bytes),
+    ];
+    for b in mst_blocks {
+        repo_blocks.push((b.cid.as_bytes().to_vec(), b.bytes));
+    }
+    let repo_car = common::encode_raw_car(std::slice::from_ref(&commit_cid), &repo_blocks);
+
+    assert!(matches!(
+        CARRepository::parse_with_limits(&repo_car, &one_block_limits),
+        Err(CARReaderError::Limit(LimitError::Exceeded { .. }))
+    ));
+    let parsed_repo =
+        CARRepository::parse_with_limits(&repo_car, &RepositoryLimits::standard()).unwrap();
+    assert_eq!(parsed_repo.records.len(), 2);
 }

@@ -1942,3 +1942,247 @@ async fn non_blessed_leaf_link_preserved_under_data_model_and_rejected_under_str
         }
     }
 }
+
+#[allow(clippy::too_many_lines)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn open_car_source_rolls_back_on_error_and_open_store_enforces_block_count() {
+    use petrel_repo::block_store::BlockStore as _;
+    use petrel_repo::car::PublicRepositoryCAR;
+    use petrel_repo::error::{LimitError, LimitKind, RepositoryError};
+
+    let did = common::test_did();
+    let signer = P256Keypair::generate().unwrap();
+    let other_signer = P256Keypair::generate().unwrap();
+    let limits = RepositoryLimits::standard();
+    let policy = RepositoryReadPolicy::strict();
+
+    // Create a valid signed empty repo CAR + a signed populated CAR sharing one record CID.
+    let empty_repo = Repository::create(did.clone(), &signer).await.unwrap();
+    let empty_cid = empty_repo.commit().cid.clone();
+    let empty_car = empty_repo.export_car().await.unwrap();
+
+    // Verify `open_store` enforces combined `max_block_count` on an empty repository (2 blocks).
+    let one_block_limits = RepositoryLimits {
+        max_block_count: 1,
+        max_record_count: 1,
+        max_mst_node_count: 1,
+        ..limits
+    };
+    let two_block_limits = RepositoryLimits {
+        max_block_count: 2,
+        max_record_count: 2,
+        max_mst_node_count: 2,
+        ..limits
+    };
+    let err_empty = Repository::open_store(
+        empty_cid.clone(),
+        Arc::clone(empty_repo.store()),
+        OpenVerification::SigningKey(signer.public_key().clone()),
+        Some(&did),
+        one_block_limits,
+        policy,
+        true,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        err_empty,
+        RepositoryError::Limit(LimitError::Exceeded {
+            kind: LimitKind::BlockCount,
+            observed: 2,
+            limit: 1,
+        })
+    ));
+    assert!(
+        Repository::open_store(
+            empty_cid.clone(),
+            Arc::clone(empty_repo.store()),
+            OpenVerification::SigningKey(signer.public_key().clone()),
+            Some(&did),
+            two_block_limits,
+            policy,
+            true,
+        )
+        .await
+        .is_ok()
+    );
+
+    // Populated repo where two keys share the exact same record CID: 1 commit + 1 MST + 1 record = 3 blocks.
+    let shared_val = post_record_value("shared");
+    let batch = WriteBatch::new(vec![
+        create_op("app.bsky.feed.post", "r1", &shared_val).unwrap(),
+        create_op("app.bsky.feed.post", "r2", &shared_val).unwrap(),
+    ])
+    .unwrap();
+    let populated = empty_repo.commit_writes(batch, &signer).await.unwrap();
+    let err_shared = Repository::open_store(
+        populated.commit.cid.clone(),
+        Arc::clone(populated.repository.store()),
+        OpenVerification::SigningKey(signer.public_key().clone()),
+        Some(&did),
+        two_block_limits,
+        policy,
+        true,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        err_shared,
+        RepositoryError::Limit(LimitError::Exceeded {
+            kind: LimitKind::BlockCount,
+            observed: 3,
+            limit: 2,
+        })
+    ));
+    let three_block_limits = RepositoryLimits {
+        max_block_count: 3,
+        max_record_count: 3,
+        max_mst_node_count: 3,
+        ..limits
+    };
+    assert!(
+        Repository::open_store(
+            populated.commit.cid.clone(),
+            Arc::clone(populated.repository.store()),
+            OpenVerification::SigningKey(signer.public_key().clone()),
+            Some(&did),
+            three_block_limits,
+            policy,
+            true,
+        )
+        .await
+        .is_ok()
+    );
+
+    // `open_car_source` rolls back newly added blocks when verification fails while keeping pre-existing blocks.
+    let pre_bytes = dagcbor::encode(&Value::String("pre-existing".into()));
+    let pre_cid = Cid::for_dag_cbor(&pre_bytes);
+    let mem_store = Arc::new(InMemoryBlockStore::new());
+    mem_store.put_block(&pre_cid, &pre_bytes).await.unwrap();
+    let mut source = petrel_repo::DataCARByteSource::new(empty_car.clone());
+    let err_sig = Repository::open_car_source(
+        &mut source,
+        Arc::clone(&mem_store),
+        OpenVerification::SigningKey(other_signer.public_key().clone()),
+        Some(&did),
+        limits,
+        policy,
+        true,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(err_sig, RepositoryError::Commit(_)));
+    assert_eq!(mem_store.all_cids().await.unwrap(), vec![pre_cid.clone()]);
+
+    // Also confirm failed rollback when `verifies_tree` fails after valid commit verification (block_count = 1).
+    let mut source2 = petrel_repo::DataCARByteSource::new(empty_car);
+    let err_limit = Repository::open_car_source(
+        &mut source2,
+        Arc::clone(&mem_store),
+        OpenVerification::SigningKey(signer.public_key().clone()),
+        Some(&did),
+        one_block_limits,
+        policy,
+        true,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        err_limit,
+        RepositoryError::Car(petrel_repo::error::CARError::Limit(LimitError::Exceeded {
+            kind: LimitKind::BlockCount,
+            ..
+        }))
+    ));
+    assert_eq!(mem_store.all_cids().await.unwrap(), vec![pre_cid]);
+
+    // `verify_record_proof` fails closed on non-DAG-CBOR leaf even under `data_model()`.
+    let raw_leaf = Cid::for_raw(b"\xa0");
+    let (mst, mst_blocks) = petrel_repo::mst::tree::build_mst_from_entries(
+        vec![("app.bsky.feed.post/bad".to_owned(), raw_leaf.clone())],
+        petrel_repo::mst::MstOptions {
+            policy: RepositoryReadPolicy::data_model(),
+            ..petrel_repo::mst::MstOptions::default()
+        },
+    )
+    .unwrap();
+    let bad_commit = CommitCodec::prepare(
+        &CommitDescriptor {
+            did: did.clone(),
+            rev: RepositoryTid::parse("3jzfcijpj2z2b").unwrap(),
+            data_cid: mst.root_cid().clone(),
+            prev_cid: None,
+        },
+        &signer,
+        &limits,
+    )
+    .await
+    .unwrap();
+    let mut proof_blocks = vec![RepositoryBlock::new(
+        bad_commit.cid.clone(),
+        bad_commit.signed_commit_bytes,
+    )];
+    proof_blocks.extend(mst_blocks);
+    proof_blocks.push(RepositoryBlock::new(raw_leaf, b"\xa0".to_vec()));
+    let bad_car =
+        PublicRepositoryCAR::write(std::slice::from_ref(&bad_commit.cid), &proof_blocks).unwrap();
+    let err_proof = Repository::verify_record_proof_with_options(
+        &bad_car,
+        &did,
+        "app.bsky.feed.post",
+        "bad",
+        OpenVerification::SigningKey(signer.public_key().clone()),
+        limits,
+        RepositoryReadPolicy::data_model(),
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        err_proof,
+        RepositoryError::ProofFailure(_) | RepositoryError::MissingBlock(_)
+    ));
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[tokio::test]
+async fn open_car_source_rolls_back_file_block_store_on_error() {
+    use petrel_repo::block_store::BlockStore as _;
+
+    let did = common::test_did();
+    let signer = P256Keypair::generate().unwrap();
+    let wrong_signer = P256Keypair::generate().unwrap();
+    let limits = RepositoryLimits::standard();
+    let policy = RepositoryReadPolicy::strict();
+
+    let repo = Repository::create(did.clone(), &signer).await.unwrap();
+    let car = repo.export_car().await.unwrap();
+
+    let dir = tempfile::tempdir().unwrap();
+    let store_path = dir.path().join("rollback.carframes");
+    let file_store = Arc::new(petrel_repo::FileBlockStore::open(&store_path).unwrap());
+
+    let pre_bytes = dagcbor::encode(&Value::String("kept".into()));
+    let pre_cid = Cid::for_dag_cbor(&pre_bytes);
+    file_store.put_block(&pre_cid, &pre_bytes).await.unwrap();
+    file_store.synchronize().await.unwrap();
+
+    let mut source = petrel_repo::DataCARByteSource::new(car);
+    let err = Repository::open_car_source(
+        &mut source,
+        Arc::clone(&file_store),
+        OpenVerification::SigningKey(wrong_signer.public_key().clone()),
+        Some(&did),
+        limits,
+        policy,
+        true,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(err, petrel_repo::RepositoryError::Commit(_)));
+    assert_eq!(file_store.all_cids().await.unwrap(), vec![pre_cid.clone()]);
+    drop(file_store);
+
+    let reopened = petrel_repo::FileBlockStore::open(&store_path).unwrap();
+    assert_eq!(reopened.all_cids().await.unwrap(), vec![pre_cid]);
+}

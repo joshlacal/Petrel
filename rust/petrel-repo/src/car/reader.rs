@@ -8,7 +8,7 @@ use sha2::{Digest as _, Sha256};
 use crate::block_store::{BlockStore, InMemoryBlockStore, RepositoryBlock};
 use crate::car::varint;
 use crate::car::writer;
-use crate::error::{CARError, CARReaderError};
+use crate::error::{CARError, CARReaderError, LimitError, LimitKind};
 use crate::limits::RepositoryLimits;
 use crate::types::RepositoryReadPolicy;
 
@@ -614,126 +614,201 @@ pub struct CARReader {
 }
 
 impl CARReader {
-    /// Parses a complete CAR v1 archive from bytes following `CARReader.swift`.
-    #[allow(clippy::too_many_lines)]
+    /// Parses a complete CAR v1 archive from bytes following `CARReader.swift`
+    /// under [`RepositoryLimits::network_scale`].
     pub fn parse(data: &[u8]) -> Result<Self, CARReaderError> {
-        let mut cursor: usize = 0;
+        Self::parse_with_limits(data, &RepositoryLimits::network_scale())
+    }
 
-        let header_len_u64 = read_car_reader_varint(data, &mut cursor)?;
-        let header_len =
-            usize::try_from(header_len_u64).map_err(|_| CARReaderError::InvalidVarint)?;
-        if header_len == 0 || cursor.saturating_add(header_len) > data.len() {
-            return Err(CARReaderError::Truncated);
+    /// Parses a complete CAR v1 archive enforcing explicit [`RepositoryLimits`]
+    /// (`max_import_car_bytes`, header cap, `max_single_block_bytes`, `max_block_count`).
+    #[allow(clippy::too_many_lines)]
+    pub fn parse_with_limits(
+        data: &[u8],
+        limits: &RepositoryLimits,
+    ) -> Result<Self, CARReaderError> {
+        parse_car_reader_internal(data, limits, true)
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn parse_car_reader_internal(
+    data: &[u8],
+    limits: &RepositoryLimits,
+    collect_raw_blocks: bool,
+) -> Result<CARReader, CARReaderError> {
+    limits
+        .validate()
+        .map_err(|err| CARReaderError::InvalidHeader(err.to_string()))?;
+    if data.len() > limits.max_import_car_bytes {
+        return Err(CARReaderError::Limit(LimitError::Exceeded {
+            kind: LimitKind::ImportCarBytes,
+            observed: data.len(),
+            limit: limits.max_import_car_bytes,
+        }));
+    }
+
+    let mut cursor: usize = 0;
+
+    let header_len_u64 = read_car_reader_varint(data, &mut cursor)?;
+    let header_len = usize::try_from(header_len_u64).map_err(|_| CARReaderError::InvalidVarint)?;
+    if header_len > MAXIMUM_HEADER_BYTES {
+        return Err(CARReaderError::InvalidHeader(format!(
+            "CAR header size {header_len} exceeds limit {MAXIMUM_HEADER_BYTES}"
+        )));
+    }
+    if header_len == 0 || cursor.saturating_add(header_len) > data.len() {
+        return Err(CARReaderError::Truncated);
+    }
+    let header_bytes = &data[cursor..cursor + header_len];
+    cursor += header_len;
+
+    let header_val = dagcbor::decode(header_bytes)
+        .map_err(|err| CARReaderError::InvalidHeader(err.to_string()))?;
+    let Value::Object(map) = header_val else {
+        return Err(CARReaderError::InvalidHeader(
+            "header must be a CBOR map".into(),
+        ));
+    };
+    for key in map.keys() {
+        if key != "version" && key != "roots" {
+            return Err(CARReaderError::InvalidHeader(format!(
+                "unexpected key {key:?} in header"
+            )));
         }
-        let header_bytes = &data[cursor..cursor + header_len];
-        cursor += header_len;
-
-        let header_val = dagcbor::decode(header_bytes)
-            .map_err(|err| CARReaderError::InvalidHeader(err.to_string()))?;
-        let Value::Object(map) = header_val else {
+    }
+    let version = match map.get("version") {
+        Some(Value::Integer(1)) => 1,
+        Some(Value::Integer(other)) => return Err(CARReaderError::UnsupportedVersion(*other)),
+        _ => {
             return Err(CARReaderError::InvalidHeader(
-                "header must be a CBOR map".into(),
+                "missing integer version".into(),
+            ));
+        }
+    };
+    let Some(Value::Array(roots_arr)) = map.get("roots") else {
+        return Err(CARReaderError::InvalidHeader("missing roots array".into()));
+    };
+    if roots_arr.is_empty() {
+        return Err(CARReaderError::MissingRoots);
+    }
+
+    let mut roots = Vec::with_capacity(roots_arr.len());
+    let mut raw_roots = Vec::with_capacity(if collect_raw_blocks {
+        roots_arr.len()
+    } else {
+        0
+    });
+    for item in roots_arr {
+        let Value::Link(cid) = item else {
+            return Err(CARReaderError::InvalidHeader(
+                "root entry must be a CID link".into(),
             ));
         };
-        for key in map.keys() {
-            if key != "version" && key != "roots" {
-                return Err(CARReaderError::InvalidHeader(format!(
-                    "unexpected key {key:?} in header"
-                )));
-            }
-        }
-        let version = match map.get("version") {
-            Some(Value::Integer(1)) => 1,
-            Some(Value::Integer(other)) => return Err(CARReaderError::UnsupportedVersion(*other)),
-            _ => {
-                return Err(CARReaderError::InvalidHeader(
-                    "missing integer version".into(),
-                ));
-            }
-        };
-        let Some(Value::Array(roots_arr)) = map.get("roots") else {
-            return Err(CARReaderError::InvalidHeader("missing roots array".into()));
-        };
-        if roots_arr.is_empty() {
-            return Err(CARReaderError::MissingRoots);
-        }
-
-        let mut roots = Vec::with_capacity(roots_arr.len());
-        let mut raw_roots = Vec::with_capacity(roots_arr.len());
-        for item in roots_arr {
-            let Value::Link(cid) = item else {
-                return Err(CARReaderError::InvalidHeader(
-                    "root entry must be a CID link".into(),
-                ));
-            };
+        if collect_raw_blocks {
             raw_roots.push(cid.as_bytes().to_vec());
-            roots.push(cid.clone());
         }
+        roots.push(cid.clone());
+    }
 
-        let mut blocks = BTreeMap::new();
-        let mut raw_blocks: BTreeMap<Vec<u8>, Vec<u8>> = BTreeMap::new();
+    let mut blocks: BTreeMap<Cid, Vec<u8>> = BTreeMap::new();
+    let mut raw_blocks: BTreeMap<Vec<u8>, Vec<u8>> = BTreeMap::new();
+    let mut seen_v0_digests: HashMap<[u8; 34], [u8; 32]> = HashMap::new();
 
-        while cursor < data.len() {
-            let block_len_u64 = read_car_reader_varint(data, &mut cursor)?;
-            let block_len =
-                usize::try_from(block_len_u64).map_err(|_| CARReaderError::InvalidVarint)?;
-            if block_len == 0 {
-                return Err(CARReaderError::InvalidCid("zero-length block frame".into()));
-            }
-            if cursor.saturating_add(block_len) > data.len() {
-                return Err(CARReaderError::Truncated);
-            }
-            let frame = &data[cursor..cursor + block_len];
-            cursor += block_len;
+    while cursor < data.len() {
+        let block_len_u64 = read_car_reader_varint(data, &mut cursor)?;
+        let block_len =
+            usize::try_from(block_len_u64).map_err(|_| CARReaderError::InvalidVarint)?;
+        if block_len == 0 {
+            return Err(CARReaderError::InvalidCid("zero-length block frame".into()));
+        }
+        if cursor.saturating_add(block_len) > data.len() {
+            return Err(CARReaderError::Truncated);
+        }
+        let frame = &data[cursor..cursor + block_len];
+        cursor += block_len;
 
-            if frame.len() >= 34 && frame[0] == 0x12 && frame[1] == 0x20 {
-                // CIDv0: sha2-256 multihash (34 bytes).
-                let raw_cid = frame[..34].to_vec();
-                let payload = &frame[34..];
-                let digest: [u8; 32] = Sha256::digest(payload).into();
-                if digest.as_slice() != &raw_cid[2..34] {
-                    return Err(CARReaderError::HashMismatch("CIDv0".into()));
-                }
-                if let Some(existing) = raw_blocks.get(&raw_cid) {
-                    if existing.as_slice() != payload {
-                        return Err(CARReaderError::ConflictingDuplicateBlock("CIDv0".into()));
-                    }
-                } else {
-                    raw_blocks.insert(raw_cid, payload.to_vec());
-                }
-                continue;
+        if frame.len() >= 34 && frame[0] == 0x12 && frame[1] == 0x20 {
+            // CIDv0: sha2-256 multihash (34 bytes).
+            let raw_cid: [u8; 34] = frame[..34].try_into().expect("slice len checked >= 34");
+            let payload = &frame[34..];
+            if payload.len() > limits.max_single_block_bytes {
+                return Err(CARReaderError::Limit(LimitError::Exceeded {
+                    kind: LimitKind::SingleBlockBytes,
+                    observed: payload.len(),
+                    limit: limits.max_single_block_bytes,
+                }));
             }
-
-            let (cid, cid_len) = parse_cid_for_car_reader(frame)?;
-            if cid_len > frame.len() {
-                return Err(CARReaderError::Truncated);
+            let digest: [u8; 32] = Sha256::digest(payload).into();
+            if digest.as_slice() != &raw_cid[2..34] {
+                return Err(CARReaderError::HashMismatch("CIDv0".into()));
             }
-            let payload = &frame[cid_len..];
-            if cid.hash_code() != 0x12 {
-                return Err(CARReaderError::UnsupportedMultihash(cid.hash_code()));
-            }
-            if !cid.matches_content(payload) {
-                return Err(CARReaderError::HashMismatch(cid.to_string()));
-            }
-            let raw_cid = cid.as_bytes().to_vec();
-            if let Some(existing) = raw_blocks.get(&raw_cid) {
-                if existing.as_slice() != payload {
-                    return Err(CARReaderError::ConflictingDuplicateBlock(cid.to_string()));
+            if let Some(prev_digest) = seen_v0_digests.get(&raw_cid) {
+                if prev_digest != &digest {
+                    return Err(CARReaderError::ConflictingDuplicateBlock("CIDv0".into()));
                 }
             } else {
-                raw_blocks.insert(raw_cid, payload.to_vec());
-                blocks.insert(cid, payload.to_vec());
+                let total_seen = blocks.len().saturating_add(seen_v0_digests.len());
+                if total_seen >= limits.max_block_count {
+                    return Err(CARReaderError::Limit(LimitError::Exceeded {
+                        kind: LimitKind::BlockCount,
+                        observed: total_seen + 1,
+                        limit: limits.max_block_count,
+                    }));
+                }
+                seen_v0_digests.insert(raw_cid, digest);
+                if collect_raw_blocks {
+                    raw_blocks.insert(raw_cid.to_vec(), payload.to_vec());
+                }
             }
+            continue;
         }
 
-        Ok(Self {
-            version,
-            roots,
-            raw_roots,
-            blocks,
-            raw_blocks,
-        })
+        let (cid, cid_len) = parse_cid_for_car_reader(frame)?;
+        if cid_len > frame.len() {
+            return Err(CARReaderError::Truncated);
+        }
+        let payload = &frame[cid_len..];
+        if payload.len() > limits.max_single_block_bytes {
+            return Err(CARReaderError::Limit(LimitError::Exceeded {
+                kind: LimitKind::SingleBlockBytes,
+                observed: payload.len(),
+                limit: limits.max_single_block_bytes,
+            }));
+        }
+        if cid.hash_code() != 0x12 {
+            return Err(CARReaderError::UnsupportedMultihash(cid.hash_code()));
+        }
+        if !cid.matches_content(payload) {
+            return Err(CARReaderError::HashMismatch(cid.to_string()));
+        }
+        if let Some(existing) = blocks.get(&cid) {
+            if existing.as_slice() != payload {
+                return Err(CARReaderError::ConflictingDuplicateBlock(cid.to_string()));
+            }
+        } else {
+            let total_seen = blocks.len().saturating_add(seen_v0_digests.len());
+            if total_seen >= limits.max_block_count {
+                return Err(CARReaderError::Limit(LimitError::Exceeded {
+                    kind: LimitKind::BlockCount,
+                    observed: total_seen + 1,
+                    limit: limits.max_block_count,
+                }));
+            }
+            if collect_raw_blocks {
+                raw_blocks.insert(cid.as_bytes().to_vec(), payload.to_vec());
+            }
+            blocks.insert(cid, payload.to_vec());
+        }
     }
+
+    Ok(CARReader {
+        version,
+        roots,
+        raw_roots,
+        blocks,
+        raw_blocks,
+    })
 }
 
 fn read_car_reader_varint(data: &[u8], cursor: &mut usize) -> Result<u64, CARReaderError> {
@@ -807,9 +882,26 @@ pub type CARArchive = CARRepository;
 impl CARRepository {
     /// Parses a repository CAR v1 archive without cryptographic signature verification,
     /// validating commit structure and traversing the MST with cycle detection,
-    /// max depth 128, prefix bounds, and strictly increasing `collection/rkey` keys.
+    /// max depth 128, prefix bounds, strictly increasing `collection/rkey` keys, and
+    /// [`RepositoryLimits::network_scale`].
     pub fn parse(data: &[u8]) -> Result<Self, CARReaderError> {
-        let reader = CARReader::parse(data)?;
+        Self::parse_with_limits(data, &RepositoryLimits::network_scale())
+    }
+
+    /// Parses a repository CAR v1 archive enforcing explicit [`RepositoryLimits`].
+    #[allow(clippy::too_many_lines)]
+    pub fn parse_with_limits(
+        data: &[u8],
+        limits: &RepositoryLimits,
+    ) -> Result<Self, CARReaderError> {
+        let mut reader = parse_car_reader_internal(data, limits, false)?;
+        if reader.roots.len() > limits.max_car_roots {
+            return Err(CARReaderError::InvalidHeader(format!(
+                "CAR root count {} exceeds limit {}",
+                reader.roots.len(),
+                limits.max_car_roots
+            )));
+        }
         let root = reader
             .roots
             .first()
@@ -876,7 +968,9 @@ impl CARRepository {
 
         let mut visited = HashSet::new();
         let mut collections: BTreeMap<String, BTreeMap<String, Cid>> = BTreeMap::new();
-        let mut records: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+        let mut record_cids: Vec<(String, Cid)> = Vec::new();
+        let mut cid_refcounts: HashMap<Cid, usize> = HashMap::new();
+        let mut mst_node_count = 0_usize;
         let mut last_key: Option<String> = None;
 
         traverse_mst_node(
@@ -884,10 +978,29 @@ impl CARRepository {
             &reader.blocks,
             0,
             &mut visited,
+            &mut mst_node_count,
+            limits.max_mst_node_count,
+            limits.max_record_count,
             &mut last_key,
             &mut collections,
-            &mut records,
+            &mut record_cids,
+            &mut cid_refcounts,
         )?;
+
+        let mut records: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+        for (full_key, value_cid) in record_cids {
+            if let Some(remaining) = cid_refcounts.get_mut(&value_cid) {
+                let bytes_opt = if *remaining <= 1 {
+                    reader.blocks.remove(&value_cid)
+                } else {
+                    *remaining -= 1;
+                    reader.blocks.get(&value_cid).cloned()
+                };
+                if let Some(record_bytes) = bytes_opt {
+                    records.insert(full_key, record_bytes);
+                }
+            }
+        }
 
         Ok(Self {
             did,
@@ -902,21 +1015,33 @@ impl CARRepository {
     }
 }
 
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 fn traverse_mst_node(
     node_cid: &Cid,
     blocks: &BTreeMap<Cid, Vec<u8>>,
     depth: usize,
     visited: &mut HashSet<Cid>,
+    mst_node_count: &mut usize,
+    max_mst_node_count: usize,
+    max_record_count: usize,
     last_key: &mut Option<String>,
     collections: &mut BTreeMap<String, BTreeMap<String, Cid>>,
-    records: &mut BTreeMap<String, Vec<u8>>,
+    record_cids: &mut Vec<(String, Cid)>,
+    cid_refcounts: &mut HashMap<Cid, usize>,
 ) -> Result<(), CARReaderError> {
     if depth > MAXIMUM_MST_TRAVERSAL_DEPTH {
         return Err(CARReaderError::MstDepthLimitExceeded);
     }
     if !visited.insert(node_cid.clone()) {
         return Err(CARReaderError::MstCycle(node_cid.to_string()));
+    }
+    *mst_node_count = mst_node_count.saturating_add(1);
+    if *mst_node_count > max_mst_node_count {
+        return Err(CARReaderError::Limit(LimitError::Exceeded {
+            kind: LimitKind::MstNodeCount,
+            observed: *mst_node_count,
+            limit: max_mst_node_count,
+        }));
     }
     let node_bytes = blocks
         .get(node_cid)
@@ -936,9 +1061,13 @@ fn traverse_mst_node(
                 blocks,
                 depth + 1,
                 visited,
+                mst_node_count,
+                max_mst_node_count,
+                max_record_count,
                 last_key,
                 collections,
-                records,
+                record_cids,
+                cid_refcounts,
             )?,
             Value::Null => {}
             _ => {
@@ -1013,8 +1142,16 @@ fn traverse_mst_node(
                 "MST entry missing value link 'v'".into(),
             ));
         };
-        if let Some(record_bytes) = blocks.get(value_cid) {
-            records.insert(full_key.clone(), record_bytes.clone());
+        if record_cids.len() >= max_record_count {
+            return Err(CARReaderError::Limit(LimitError::Exceeded {
+                kind: LimitKind::RecordCount,
+                observed: record_cids.len() + 1,
+                limit: max_record_count,
+            }));
+        }
+        if blocks.contains_key(value_cid) {
+            *cid_refcounts.entry(value_cid.clone()).or_insert(0) += 1;
+            record_cids.push((full_key.clone(), value_cid.clone()));
         }
         collections
             .entry(collection.to_owned())
@@ -1028,9 +1165,13 @@ fn traverse_mst_node(
                     blocks,
                     depth + 1,
                     visited,
+                    mst_node_count,
+                    max_mst_node_count,
+                    max_record_count,
                     last_key,
                     collections,
-                    records,
+                    record_cids,
+                    cid_refcounts,
                 )?,
                 Value::Null => {}
                 _ => {

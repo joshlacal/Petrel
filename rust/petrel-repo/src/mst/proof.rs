@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use petrel::rt::BoxFuture;
 use petrel_core::Cid;
+use petrel_core::cid::BlessedKind;
 
 use crate::block_store::{BlockMap, BlockSource};
 use crate::error::MstError;
@@ -115,7 +116,9 @@ fn verify_path<'a>(
             .get_block(node_cid)
             .await?
             .ok_or_else(|| MstError::MissingBlock(node_cid.clone()))?;
-        if node_cid.hash_code() == 0x12 && !node_cid.matches_content(&bytes) {
+        if node_cid.blessed_kind() != Some(BlessedKind::DagCbor)
+            || !node_cid.matches_content(&bytes)
+        {
             return Err(MstError::InvalidProof(format!(
                 "proof node CID hash mismatch for {node_cid}"
             )));
@@ -145,23 +148,37 @@ fn verify_path<'a>(
         }
 
         if view.entries.is_empty() {
-            return match view.left {
-                Some(left_cid) => {
-                    let next_layer = expected_layer.map(|l| l.saturating_sub(1));
-                    verify_path(
-                        &left_cid,
-                        key,
-                        expected_key_depth,
-                        source,
-                        options,
-                        next_layer,
-                        lower_bound,
-                        upper_bound,
-                        depth + 1,
-                    )
-                    .await
+            return if let Some(left_cid) = view.left {
+                if depth == 0 {
+                    return Err(MstError::NonCanonical(
+                        "non-empty MST root cannot have zero entries and a left pointer".into(),
+                    ));
                 }
-                None => Ok(None),
+                if expected_layer == Some(0) {
+                    return Err(MstError::InvalidNode(
+                        "layer-0 node cannot point to a left subtree".into(),
+                    ));
+                }
+                let next_layer = expected_layer.and_then(|l| l.checked_sub(1));
+                verify_path(
+                    &left_cid,
+                    key,
+                    expected_key_depth,
+                    source,
+                    options,
+                    next_layer,
+                    lower_bound,
+                    upper_bound,
+                    depth + 1,
+                )
+                .await
+            } else {
+                if depth != 0 {
+                    return Err(MstError::NonCanonical(
+                        "empty MST node only permitted as tree root".into(),
+                    ));
+                }
+                Ok(None)
             };
         }
 

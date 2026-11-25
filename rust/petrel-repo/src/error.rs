@@ -134,6 +134,8 @@ pub enum CARReaderError {
     MstDepthLimitExceeded,
     #[error("MST key ordering invalid: {0}")]
     InvalidMstOrder(String),
+    #[error("limit exceeded: {0}")]
+    Limit(#[from] LimitError),
     #[error("I/O error: {0}")]
     Io(String),
 }

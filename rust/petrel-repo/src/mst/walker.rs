@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use petrel::rt::{BoxFuture, MaybeSend, MaybeSync};
 use petrel_core::Cid;
+use petrel_core::cid::BlessedKind;
 
 use crate::block_store::BlockSource;
 use crate::error::MstError;
@@ -141,8 +142,8 @@ where
             .await?
             .ok_or_else(|| MstError::MissingBlock(node_cid.clone()))?;
         if options.verify_block_hashes
-            && node_cid.hash_code() == 0x12
-            && !node_cid.matches_content(&bytes)
+            && (node_cid.blessed_kind() != Some(BlessedKind::DagCbor)
+                || !node_cid.matches_content(&bytes))
         {
             return Err(MstError::InvalidNode(format!(
                 "MST node hash mismatch for {node_cid}"

@@ -63,6 +63,11 @@ pub trait BlockStore: BlockSource {
     /// Deletes a block by CID if present (used when pruning or testing).
     fn delete_block<'a>(&'a self, cid: &'a Cid) -> BoxFuture<'a, Result<bool, BlockStoreError>>;
 
+    /// Flushes any buffered block writes or deletions to durable storage (no-op for in-memory stores).
+    fn flush(&self) -> BoxFuture<'_, Result<(), BlockStoreError>> {
+        Box::pin(async { Ok(()) })
+    }
+
     /// Number of distinct blocks currently stored.
     fn len(&self) -> BoxFuture<'_, Result<usize, BlockStoreError>>;
 
@@ -115,7 +120,7 @@ impl InMemoryBlockStore {
     {
         let mut state = InMemoryState::default();
         for (cid, bytes) in blocks {
-            verify_cid_if_sha256(&cid, &bytes)?;
+            verify_cid_matches_content(&cid, &bytes)?;
             if let Some(existing) = state.blocks.get(&cid) {
                 if existing != &bytes {
                     return Err(BlockStoreError::ConflictingBlock(cid));
@@ -184,7 +189,7 @@ impl BlockStore for InMemoryBlockStore {
                     max,
                 });
             }
-            verify_cid_if_sha256(cid, bytes)?;
+            verify_cid_matches_content(cid, bytes)?;
             let mut guard = self.inner.write().await;
             if let Some(existing) = guard.blocks.get(cid) {
                 if existing.as_slice() != bytes {
@@ -242,8 +247,8 @@ impl BlockStore for InMemoryBlockStore {
     }
 }
 
-pub(crate) fn verify_cid_if_sha256(cid: &Cid, bytes: &[u8]) -> Result<(), BlockStoreError> {
-    if cid.hash_code() == 0x12 && !cid.matches_content(bytes) {
+pub(crate) fn verify_cid_matches_content(cid: &Cid, bytes: &[u8]) -> Result<(), BlockStoreError> {
+    if !cid.matches_content(bytes) {
         return Err(BlockStoreError::HashMismatch(cid.clone()));
     }
     Ok(())
@@ -264,7 +269,7 @@ mod file_store {
     use crate::car::varint;
     use crate::error::BlockStoreError;
 
-    use super::{BlockSource, BlockStore, verify_cid_if_sha256};
+    use super::{BlockSource, BlockStore, verify_cid_matches_content};
 
     const WRITE_BUFFER_THRESHOLD: usize = 1 << 20;
 
@@ -392,6 +397,7 @@ mod file_store {
                 .writer
                 .write_all(&self.write_buffer)
                 .and_then(|()| self.writer.flush())
+                .and_then(|()| self.writer.sync_all_data())
             {
                 // Roll back any partially appended frame bytes so retry and reopen stay clean.
                 let _ = self.writer.set_file_len(self.file_len);
@@ -459,12 +465,20 @@ mod file_store {
                 .map_err(|err| BlockStoreError::Io(err.to_string()))?
                 .len();
 
-            let (index, disk_bytes) = scan_existing_frames(
+            let (index, disk_bytes, valid_file_len) = scan_existing_frames(
                 &mut reader,
                 file_len,
                 max_block_count,
                 max_single_block_bytes,
             )?;
+            if valid_file_len < file_len {
+                writer
+                    .set_len(valid_file_len)
+                    .map_err(|err| BlockStoreError::Io(err.to_string()))?;
+                writer
+                    .sync_all()
+                    .map_err(|err| BlockStoreError::Io(err.to_string()))?;
+            }
 
             Ok(Self {
                 state: Arc::new(RwLock::new(FileState {
@@ -478,7 +492,7 @@ mod file_store {
                     pending_bytes: 0,
                     pending_deletes: HashSet::new(),
                     write_buffer: Vec::new(),
-                    file_len,
+                    file_len: valid_file_len,
                 })),
                 max_block_count,
                 max_single_block_bytes,
@@ -501,12 +515,13 @@ mod file_store {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn scan_existing_frames(
         file: &mut File,
         file_len: u64,
         max_block_count: Option<usize>,
         max_single_block_bytes: Option<usize>,
-    ) -> Result<(HashMap<Cid, DiskEntry>, usize), BlockStoreError> {
+    ) -> Result<(HashMap<Cid, DiskEntry>, usize, u64), BlockStoreError> {
         file.seek(SeekFrom::Start(0))
             .map_err(|err| BlockStoreError::Io(err.to_string()))?;
         let mut reader = BufReader::new(file);
@@ -515,22 +530,33 @@ mod file_store {
         let mut total_bytes: usize = 0;
 
         while offset < file_len {
-            let (frame_len_u64, varint_bytes) = read_varint_from_reader(&mut reader)?;
+            let frame_start = offset;
+            let Some((frame_len_u64, varint_bytes)) = try_read_varint_from_reader(&mut reader)?
+            else {
+                // Torn trailing varint at EOF; truncate back to the last complete frame.
+                return Ok((index, total_bytes, frame_start));
+            };
             offset = offset.saturating_add(varint_bytes as u64);
 
             if frame_len_u64 == 0 {
                 // Deletion tombstone: `0x00 || varint(cid_len) || cid_bytes`
-                let (tombstone_bytes_u64, cid_varint_bytes) = read_varint_from_reader(&mut reader)?;
+                let Some((tombstone_bytes_u64, cid_varint_bytes)) =
+                    try_read_varint_from_reader(&mut reader)?
+                else {
+                    return Ok((index, total_bytes, frame_start));
+                };
                 offset = offset.saturating_add(cid_varint_bytes as u64);
                 let tombstone_cid_len = usize::try_from(tombstone_bytes_u64).map_err(|_| {
                     BlockStoreError::CorruptStore("tombstone CID length overflow".into())
                 })?;
-                if tombstone_cid_len == 0
-                    || offset.saturating_add(tombstone_cid_len as u64) > file_len
-                {
+                if tombstone_cid_len == 0 {
                     return Err(BlockStoreError::CorruptStore(
-                        "truncated deletion tombstone in block store".into(),
+                        "zero-length deletion tombstone CID in block store".into(),
                     ));
+                }
+                if offset.saturating_add(tombstone_cid_len as u64) > file_len {
+                    // Torn trailing tombstone frame at EOF.
+                    return Ok((index, total_bytes, frame_start));
                 }
                 let mut cid_buf = vec![0_u8; tombstone_cid_len];
                 reader
@@ -549,9 +575,8 @@ mod file_store {
             let frame_len = usize::try_from(frame_len_u64)
                 .map_err(|_| BlockStoreError::CorruptStore("frame length overflow".into()))?;
             if offset.saturating_add(frame_len as u64) > file_len {
-                return Err(BlockStoreError::CorruptStore(
-                    "truncated frame in block store".into(),
-                ));
+                // Torn trailing block frame at EOF.
+                return Ok((index, total_bytes, frame_start));
             }
 
             let mut frame = vec![0_u8; frame_len];
@@ -572,7 +597,7 @@ mod file_store {
                     max,
                 });
             }
-            verify_cid_if_sha256(&cid, payload)?;
+            verify_cid_matches_content(&cid, payload)?;
 
             if let Some(existing) = index.get(&cid).copied() {
                 let mut existing_bytes = vec![0_u8; existing.payload_len];
@@ -614,21 +639,27 @@ mod file_store {
             offset = offset.saturating_add(frame_len as u64);
         }
 
-        Ok((index, total_bytes))
+        Ok((index, total_bytes, offset))
     }
 
-    fn read_varint_from_reader<R: Read>(reader: &mut R) -> Result<(u64, usize), BlockStoreError> {
+    fn try_read_varint_from_reader<R: Read>(
+        reader: &mut R,
+    ) -> Result<Option<(u64, usize)>, BlockStoreError> {
         let mut buf = [0_u8; 9];
         for idx in 0..9 {
             let mut b = [0_u8; 1];
-            reader
-                .read_exact(&mut b)
-                .map_err(|err| BlockStoreError::CorruptStore(err.to_string()))?;
+            match reader.read_exact(&mut b) {
+                Ok(()) => {}
+                Err(err) if err.kind() == std::io::ErrorKind::UnexpectedEof => {
+                    return Ok(None);
+                }
+                Err(err) => return Err(BlockStoreError::Io(err.to_string())),
+            }
             buf[idx] = b[0];
             if b[0] & 0x80 == 0 {
                 let (val, consumed) = varint::decode(&buf[..=idx])
                     .map_err(|err| BlockStoreError::CorruptStore(err.to_string()))?;
-                return Ok((val, consumed));
+                return Ok(Some((val, consumed)));
             }
         }
         Err(BlockStoreError::CorruptStore(
@@ -688,7 +719,7 @@ mod file_store {
                         max,
                     });
                 }
-                verify_cid_if_sha256(cid, bytes)?;
+                verify_cid_matches_content(cid, bytes)?;
                 let mut guard = self.state.write().await;
                 if let Some(pending) = guard.pending_puts.get(cid) {
                     if pending.as_slice() != bytes {
@@ -751,6 +782,10 @@ mod file_store {
                     Ok(false)
                 }
             })
+        }
+
+        fn flush(&self) -> BoxFuture<'_, Result<(), BlockStoreError>> {
+            Box::pin(async move { self.synchronize().await })
         }
 
         fn len(&self) -> BoxFuture<'_, Result<usize, BlockStoreError>> {
@@ -885,6 +920,99 @@ mod file_store {
             );
             assert_eq!(reopened.len().await.unwrap(), 1);
             assert_eq!(reopened.total_bytes().await.unwrap(), blk_b.len());
+        }
+
+        #[tokio::test]
+        async fn file_store_recovers_torn_trailing_frames_and_rejects_unblessed_cids() {
+            let dir = tempfile::tempdir().unwrap();
+            let store_path = dir.path().join("torn.carframes");
+            let store = FileBlockStore::open(&store_path).unwrap();
+
+            let blk_a = b"\xa1\x61a\x01".to_vec();
+            let cid_a = Cid::for_dag_cbor(&blk_a);
+            let blk_b = b"\xa1\x61b\x02".to_vec();
+            let cid_b = Cid::for_dag_cbor(&blk_b);
+
+            // Non-SHA-256 and unblessed (dag-pb 0x70) CIDs fail closed in both InMemory and File stores.
+            let sha512_cid = Cid::from_bytes(&{
+                let mut raw = vec![0x01, 0x71, 0x13, 0x20];
+                raw.extend_from_slice(&[0xaa; 32]);
+                raw
+            })
+            .unwrap();
+            let dag_pb_cid = Cid::from_bytes(&{
+                let mut raw = vec![0x01, 0x70, 0x12, 0x20];
+                raw.extend_from_slice(&[0xbb; 32]);
+                raw
+            })
+            .unwrap();
+            let mem = crate::block_store::InMemoryBlockStore::new();
+            for bad in [&sha512_cid, &dag_pb_cid] {
+                assert!(matches!(
+                    mem.put_block(bad, &blk_a).await,
+                    Err(BlockStoreError::HashMismatch(_))
+                ));
+                assert!(matches!(
+                    store.put_block(bad, &blk_a).await,
+                    Err(BlockStoreError::HashMismatch(_))
+                ));
+            }
+
+            store.put_block(&cid_a, &blk_a).await.unwrap();
+            store.put_block(&cid_b, &blk_b).await.unwrap();
+            store.synchronize().await.unwrap();
+            assert!(store.delete_block(&cid_a).await.unwrap());
+            store.synchronize().await.unwrap();
+            drop(store);
+
+            let baseline_len = std::fs::metadata(&store_path).unwrap().len();
+
+            // 1. Append torn partial live frame (varint length + partial bytes).
+            {
+                let mut f = OpenOptions::new().append(true).open(&store_path).unwrap();
+                f.write_all(&[0x30, 0x01, 0x71, 0x12, 0x20]).unwrap();
+                f.flush().unwrap();
+            }
+            let recovered = FileBlockStore::open(&store_path).unwrap();
+            assert_eq!(std::fs::metadata(&store_path).unwrap().len(), baseline_len);
+            assert_eq!(recovered.get_block(&cid_a).await.unwrap(), None);
+            assert_eq!(
+                recovered.get_block(&cid_b).await.unwrap(),
+                Some(blk_b.clone())
+            );
+            drop(recovered);
+
+            // 2. Append torn deletion tombstone (`0x00 || 0x24 || partial cid`).
+            {
+                let mut f = OpenOptions::new().append(true).open(&store_path).unwrap();
+                f.write_all(&[0x00, 0x24, 0x01, 0x71, 0x12]).unwrap();
+                f.flush().unwrap();
+            }
+            let recovered = FileBlockStore::open(&store_path).unwrap();
+            assert_eq!(std::fs::metadata(&store_path).unwrap().len(), baseline_len);
+            assert_eq!(
+                recovered.get_block(&cid_b).await.unwrap(),
+                Some(blk_b.clone())
+            );
+            drop(recovered);
+
+            // 3. Append incomplete multi-byte varint at EOF.
+            {
+                let mut f = OpenOptions::new().append(true).open(&store_path).unwrap();
+                f.write_all(&[0x80]).unwrap();
+                f.flush().unwrap();
+            }
+            let recovered = FileBlockStore::open(&store_path).unwrap();
+            assert_eq!(std::fs::metadata(&store_path).unwrap().len(), baseline_len);
+            assert_eq!(recovered.get_block(&cid_b).await.unwrap(), Some(blk_b));
+            drop(recovered);
+
+            // 4. Mid-stream payload corruption still fails hard on reopen.
+            let mut bytes = std::fs::read(&store_path).unwrap();
+            let mid = bytes.len() / 2;
+            bytes[mid] ^= 0xff;
+            std::fs::write(&store_path, bytes).unwrap();
+            assert!(FileBlockStore::open(&store_path).is_err());
         }
     }
 }

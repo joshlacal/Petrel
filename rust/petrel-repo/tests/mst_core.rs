@@ -334,3 +334,113 @@ async fn new_blocks_since_reads_zero_unchanged_subtrees() {
     let delta_cids: std::collections::BTreeSet<Cid> = delta.into_iter().map(|b| b.cid).collect();
     assert_eq!(delta_cids, expected_cids);
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn mst_proof_and_validation_reject_empty_left_anomalies_and_non_sha256_cids() {
+    use petrel::rt::BoxFuture;
+    use petrel_repo::block_store::BlockSource;
+    use petrel_repo::error::BlockStoreError;
+
+    // A source that allows storing arbitrary bytes under unblessed / non-SHA-256 CIDs
+    // (simulating an untrusted network peer, bypassing BlockStore write checks).
+    #[derive(Debug, Default)]
+    struct UncheckedSource(BTreeMap<Cid, Vec<u8>>);
+
+    impl BlockSource for UncheckedSource {
+        fn get_block<'a>(
+            &'a self,
+            cid: &'a Cid,
+        ) -> BoxFuture<'a, Result<Option<Vec<u8>>, BlockStoreError>> {
+            Box::pin(async move { Ok(self.0.get(cid).cloned()) })
+        }
+    }
+
+    let options = MstOptions::default();
+
+    // 1. Empty root node with `left` pointer must fail proof verification as NonCanonical.
+    let (leaf_cid, leaf_bytes) = encode_mst_node(&MstNodeView {
+        left: None,
+        entries: vec![MstNodeEntryView {
+            key: "com.example.item/r0".into(),
+            value: synthetic_val(1),
+            tree: None,
+        }],
+    })
+    .unwrap();
+    let (empty_root_cid, empty_root_bytes) = encode_mst_node(&MstNodeView {
+        left: Some(leaf_cid.clone()),
+        entries: vec![],
+    })
+    .unwrap();
+    let mut store = UncheckedSource::default();
+    store.0.insert(leaf_cid.clone(), leaf_bytes.clone());
+    store.0.insert(empty_root_cid.clone(), empty_root_bytes);
+
+    let err_empty_root =
+        MstProof::verify_membership(&empty_root_cid, "com.example.item/r0", &store, &options)
+            .await
+            .unwrap_err();
+    assert!(matches!(err_empty_root, MstError::NonCanonical(_)));
+
+    // 2. Layer-0 parent node with empty child having `left` pointer must fail InvalidNode.
+    // Pick a height-1 key lexicographically after `"com.example.item/r0"` so querying `"com.example.item/r0"` descends `left`.
+    let layer1_key = (0..200_usize)
+        .map(|i| format!("com.example.item/z{i}"))
+        .find(|k| petrel_repo::mst::key_depth(k.as_bytes()) == 1)
+        .unwrap();
+    let (empty_layer0_cid, empty_layer0_bytes) = encode_mst_node(&MstNodeView {
+        left: Some(leaf_cid.clone()),
+        entries: vec![],
+    })
+    .unwrap();
+    let (parent_cid, parent_bytes) = encode_mst_node(&MstNodeView {
+        left: Some(empty_layer0_cid.clone()),
+        entries: vec![MstNodeEntryView {
+            key: layer1_key,
+            value: synthetic_val(2),
+            tree: None,
+        }],
+    })
+    .unwrap();
+    store.0.insert(empty_layer0_cid, empty_layer0_bytes);
+    store.0.insert(parent_cid.clone(), parent_bytes);
+    let err_layer0 =
+        MstProof::verify_membership(&parent_cid, "com.example.item/r0", &store, &options)
+            .await
+            .unwrap_err();
+    assert!(matches!(err_layer0, MstError::InvalidNode(_)));
+
+    // 3. Non-SHA-256 (0x13) and Raw (0x55) MST node CIDs are rejected by proof, validation, and walker.
+    let sha512_cid = Cid::from_bytes(&{
+        let mut raw = vec![0x01, 0x71, 0x13, 0x20];
+        raw.extend_from_slice(&[0x11; 32]);
+        raw
+    })
+    .unwrap();
+    let raw_cid = Cid::for_raw(&leaf_bytes);
+    store.0.insert(sha512_cid.clone(), leaf_bytes.clone());
+    store.0.insert(raw_cid.clone(), leaf_bytes);
+    let source_arc: Arc<dyn BlockSource> = Arc::new(store);
+    let walker = MstWalker::new(MstWalkOptions::default());
+    for bad_node in [sha512_cid, raw_cid] {
+        assert!(matches!(
+            MstProof::verify_membership(
+                &bad_node,
+                "com.example.item/r0",
+                source_arc.as_ref(),
+                &options
+            )
+            .await,
+            Err(MstError::InvalidProof(_))
+        ));
+        assert!(matches!(
+            MstValidation::validate_full(&bad_node, source_arc.as_ref(), &options, 10, false).await,
+            Err(MstError::InvalidNode(_))
+        ));
+        assert!(matches!(
+            walker.collect_entries(&bad_node, &source_arc).await,
+            Err(MstError::InvalidNode(_))
+        ));
+    }
+}

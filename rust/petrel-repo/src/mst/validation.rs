@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use petrel::rt::BoxFuture;
 use petrel_core::Cid;
+use petrel_core::cid::BlessedKind;
 
 use crate::block_store::BlockSource;
 use crate::error::MstError;
@@ -14,6 +15,7 @@ pub struct MstStats {
     pub record_count: usize,
     pub unverifiable_record_count: usize,
     pub node_count: usize,
+    pub unique_block_count: usize,
     pub tree_depth: usize,
     pub root_layer: usize,
     pub total_mst_block_bytes: usize,
@@ -48,6 +50,7 @@ impl MstValidation {
             max_record_count,
             verify_record_blocks,
             seen_cids: HashSet::new(),
+            unique_blocks: HashSet::new(),
             last_key: None,
             entries: Vec::new(),
             unverifiable_record_count: 0,
@@ -62,6 +65,7 @@ impl MstValidation {
             record_count: ctx.entries.len(),
             unverifiable_record_count: ctx.unverifiable_record_count,
             node_count: ctx.node_count,
+            unique_block_count: ctx.unique_blocks.len(),
             tree_depth: ctx.max_depth_seen + 1,
             root_layer: root_layer.unwrap_or(0),
             total_mst_block_bytes: ctx.total_mst_block_bytes,
@@ -77,6 +81,7 @@ struct ValidationContext<'s> {
     max_record_count: usize,
     verify_record_blocks: bool,
     seen_cids: HashSet<Cid>,
+    unique_blocks: HashSet<Cid>,
     last_key: Option<String>,
     entries: Vec<MstEntry>,
     unverifiable_record_count: usize,
@@ -112,6 +117,7 @@ fn validate_node<'c, 's: 'c>(
                 limit: ctx.options.max_node_count,
             });
         }
+        ctx.unique_blocks.insert(node_cid.clone());
 
         let bytes = ctx
             .source
@@ -124,7 +130,9 @@ fn validate_node<'c, 's: 'c>(
                 limit: ctx.options.max_single_block_bytes,
             });
         }
-        if node_cid.hash_code() == 0x12 && !node_cid.matches_content(&bytes) {
+        if node_cid.blessed_kind() != Some(BlessedKind::DagCbor)
+            || !node_cid.matches_content(&bytes)
+        {
             return Err(MstError::InvalidNode(format!(
                 "MST node CID hash mismatch for {node_cid}"
             )));
@@ -230,6 +238,9 @@ fn validate_node<'c, 's: 'c>(
                 if ctx.options.policy.requires_blessed_record_links_in_mst {
                     return Err(MstError::UnblessedLink(entry.value.to_string()));
                 }
+                if ctx.verify_record_blocks && ctx.source.contains_block(&entry.value).await? {
+                    ctx.unique_blocks.insert(entry.value.clone());
+                }
                 ctx.unverifiable_record_count = ctx.unverifiable_record_count.saturating_add(1);
             } else if ctx.verify_record_blocks {
                 let rec_bytes = ctx
@@ -249,6 +260,7 @@ fn validate_node<'c, 's: 'c>(
                         entry.value
                     )));
                 }
+                ctx.unique_blocks.insert(entry.value.clone());
                 ctx.total_record_block_bytes =
                     ctx.total_record_block_bytes.saturating_add(rec_bytes.len());
             }

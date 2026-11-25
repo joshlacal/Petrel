@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use petrel_core::cid::BlessedKind;
 use petrel_core::{Cid, Did, Value, dagcbor};
 
 use crate::block_store::BlockSource;
@@ -193,7 +194,7 @@ impl CommitCodec {
     ) -> Result<StructurallyValidatedSignedCommit, CommitError> {
         let computed_cid = Cid::for_dag_cbor(bytes);
         if let Some(cid) = expected_cid {
-            if cid.hash_code() != 0x12 || !cid.matches_content(bytes) {
+            if cid.blessed_kind() != Some(BlessedKind::DagCbor) || !cid.matches_content(bytes) {
                 return Err(CommitError::InvalidCbor(format!(
                     "commit CID hash mismatch: expected {cid}, got {computed_cid}"
                 )));
@@ -399,7 +400,7 @@ impl CommitCodec {
     ) -> Result<LegacyCommitV2, CommitError> {
         let computed_cid = Cid::for_dag_cbor(bytes);
         if let Some(cid) = expected_cid
-            && (cid.hash_code() != 0x12 || !cid.matches_content(bytes))
+            && (cid.blessed_kind() != Some(BlessedKind::DagCbor) || !cid.matches_content(bytes))
         {
             return Err(CommitError::InvalidCbor(format!(
                 "v2 commit CID hash mismatch: expected {cid}, got {computed_cid}"

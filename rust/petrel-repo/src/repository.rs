@@ -301,7 +301,9 @@ impl Repository<InMemoryBlockStore> {
                     .get_block(&record_cid)
                     .await?
                     .ok_or(RepositoryError::MissingBlock(record_cid.clone()))?;
-                if record_cid.hash_code() == 0x12 && !record_cid.matches_content(&bytes) {
+                if record_cid.blessed_kind() != Some(petrel_core::cid::BlessedKind::DagCbor)
+                    || !record_cid.matches_content(&bytes)
+                {
                     return Err(RepositoryError::ProofFailure(format!(
                         "proven record CID hash mismatch for {record_cid}"
                     )));
@@ -366,6 +368,9 @@ impl<B: BlockStore + 'static> Repository<B> {
     }
 
     /// Streams a CAR source into `store` and opens + verifies the resulting repository.
+    ///
+    /// If streaming or repository verification fails, any blocks newly inserted during
+    /// this import are deleted (and flushed) so `store` is left unmutated.
     pub async fn open_car_source<Src: CARByteSource + ?Sized>(
         source: &mut Src,
         store: Arc<B>,
@@ -375,9 +380,16 @@ impl<B: BlockStore + 'static> Repository<B> {
         policy: RepositoryReadPolicy,
         verifies_tree: bool,
     ) -> Result<Self, RepositoryError> {
+        let tracker = RollbackTrackingStore::new(Arc::clone(&store));
         let parsed =
-            PublicRepositoryCAR::load_from_source(source, store.as_ref(), &limits, &policy).await?;
-        Self::open_store(
+            match PublicRepositoryCAR::load_from_source(source, &tracker, &limits, &policy).await {
+                Ok(parsed) => parsed,
+                Err(err) => {
+                    tracker.rollback().await;
+                    return Err(err.into());
+                }
+            };
+        match Self::open_store(
             parsed.root_cid,
             store,
             verification,
@@ -387,6 +399,13 @@ impl<B: BlockStore + 'static> Repository<B> {
             verifies_tree,
         )
         .await
+        {
+            Ok(repo) => Ok(repo),
+            Err(err) => {
+                tracker.rollback().await;
+                Err(err)
+            }
+        }
     }
 
     /// Opens and verifies a repository already loaded into `store`.
@@ -427,6 +446,14 @@ impl<B: BlockStore + 'static> Repository<B> {
                 true,
             )
             .await?;
+            let total_reachable_blocks = 1_usize.saturating_add(stats.unique_block_count);
+            if total_reachable_blocks > limits.max_block_count {
+                return Err(RepositoryError::Limit(crate::error::LimitError::Exceeded {
+                    kind: crate::error::LimitKind::BlockCount,
+                    observed: total_reachable_blocks,
+                    limit: limits.max_block_count,
+                }));
+            }
             // Always validate every verifiable DAG-CBOR record payload under the selected read
             // policy so invalid DAG-CBOR or non-map records fail at open time even under
             // `data_model()`, while preserving unsupported/non-blessed leaf CIDs under `data_model()`.
@@ -998,4 +1025,94 @@ pub fn update_op(
         path,
         record_cbor: prepared.bytes,
     })
+}
+
+#[derive(Debug)]
+struct RollbackTrackingStore<B: ?Sized> {
+    inner: Arc<B>,
+    inserted: std::sync::Mutex<Vec<Cid>>,
+}
+
+impl<B: ?Sized> RollbackTrackingStore<B> {
+    fn new(inner: Arc<B>) -> Self {
+        Self {
+            inner,
+            inserted: std::sync::Mutex::new(Vec::new()),
+        }
+    }
+}
+
+impl<B: BlockStore + ?Sized> RollbackTrackingStore<B> {
+    async fn rollback(self) {
+        let cids = match self.inserted.lock() {
+            Ok(mut guard) => std::mem::take(&mut *guard),
+            Err(poisoned) => std::mem::take(&mut *poisoned.into_inner()),
+        };
+        if cids.is_empty() {
+            return;
+        }
+        for cid in cids.into_iter().rev() {
+            let _ = self.inner.delete_block(&cid).await;
+        }
+        let _ = self.inner.flush().await;
+    }
+}
+
+impl<B: BlockStore + ?Sized> BlockSource for RollbackTrackingStore<B> {
+    fn get_block<'a>(
+        &'a self,
+        cid: &'a Cid,
+    ) -> BoxFuture<'a, Result<Option<Vec<u8>>, crate::error::BlockStoreError>> {
+        self.inner.get_block(cid)
+    }
+
+    fn contains_block<'a>(
+        &'a self,
+        cid: &'a Cid,
+    ) -> BoxFuture<'a, Result<bool, crate::error::BlockStoreError>> {
+        self.inner.contains_block(cid)
+    }
+}
+
+impl<B: BlockStore + ?Sized> BlockStore for RollbackTrackingStore<B> {
+    fn put_block<'a>(
+        &'a self,
+        cid: &'a Cid,
+        bytes: &'a [u8],
+    ) -> BoxFuture<'a, Result<(), crate::error::BlockStoreError>> {
+        Box::pin(async move {
+            let already_present = self.inner.contains_block(cid).await?;
+            self.inner.put_block(cid, bytes).await?;
+            if !already_present {
+                match self.inserted.lock() {
+                    Ok(mut guard) => guard.push(cid.clone()),
+                    Err(poisoned) => poisoned.into_inner().push(cid.clone()),
+                }
+            }
+            Ok(())
+        })
+    }
+
+    fn delete_block<'a>(
+        &'a self,
+        cid: &'a Cid,
+    ) -> BoxFuture<'a, Result<bool, crate::error::BlockStoreError>> {
+        self.inner.delete_block(cid)
+    }
+
+    fn flush(&self) -> BoxFuture<'_, Result<(), crate::error::BlockStoreError>> {
+        self.inner.flush()
+    }
+
+    fn len(&self) -> BoxFuture<'_, Result<usize, crate::error::BlockStoreError>> {
+        self.inner.len()
+    }
+
+    fn total_bytes(&self) -> BoxFuture<'_, Result<usize, crate::error::BlockStoreError>> {
+        self.inner.total_bytes()
+    }
+
+    fn all_cids(&self) -> BoxFuture<'_, Result<Vec<Cid>, crate::error::BlockStoreError>> {
+        self.inner.all_cids()
+    }
 }
