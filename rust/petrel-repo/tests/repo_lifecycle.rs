@@ -2336,3 +2336,207 @@ async fn commit_diff_verify_rejects_deep_wrapper_merge_trees_without_stack_overf
         CommitDiffError::Mst(MstError::DepthExceeded { .. })
     ));
 }
+
+#[allow(clippy::too_many_lines)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn unverified_streamable_and_bfs_export_dedup_shared_links_and_enforce_limits() {
+    use petrel_repo::block_store::BlockStore as _;
+    use petrel_repo::error::{BlockStoreError, MstError, RepositoryError};
+    use petrel_repo::mst::codec::{MstNodeEntryView, MstNodeView, encode_mst_node};
+    use petrel_repo::repository::CARExportOrder;
+    use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+
+    #[derive(Debug)]
+    struct CountingStore {
+        inner: InMemoryBlockStore,
+        gets: AtomicUsize,
+    }
+
+    impl petrel_repo::block_store::BlockSource for CountingStore {
+        fn get_block<'a>(
+            &'a self,
+            cid: &'a Cid,
+        ) -> BoxFuture<'a, Result<Option<Vec<u8>>, BlockStoreError>> {
+            self.gets.fetch_add(1, AtomicOrdering::Relaxed);
+            self.inner.get_block(cid)
+        }
+
+        fn contains_block<'a>(
+            &'a self,
+            cid: &'a Cid,
+        ) -> BoxFuture<'a, Result<bool, BlockStoreError>> {
+            self.inner.contains_block(cid)
+        }
+    }
+
+    impl petrel_repo::block_store::BlockStore for CountingStore {
+        fn put_block<'a>(
+            &'a self,
+            cid: &'a Cid,
+            bytes: &'a [u8],
+        ) -> BoxFuture<'a, Result<(), BlockStoreError>> {
+            self.inner.put_block(cid, bytes)
+        }
+
+        fn delete_block<'a>(
+            &'a self,
+            cid: &'a Cid,
+        ) -> BoxFuture<'a, Result<bool, BlockStoreError>> {
+            self.inner.delete_block(cid)
+        }
+
+        fn len(&self) -> BoxFuture<'_, Result<usize, BlockStoreError>> {
+            self.inner.len()
+        }
+
+        fn total_bytes(&self) -> BoxFuture<'_, Result<usize, BlockStoreError>> {
+            self.inner.total_bytes()
+        }
+
+        fn all_cids(&self) -> BoxFuture<'_, Result<Vec<Cid>, BlockStoreError>> {
+            self.inner.all_cids()
+        }
+    }
+
+    let did = common::test_did();
+    let signer = P256Keypair::generate().unwrap();
+    let limits = RepositoryLimits::standard();
+    let policy = RepositoryReadPolicy::strict();
+
+    let mut rec_map = BTreeMap::new();
+    rec_map.insert(
+        "$type".to_owned(),
+        Value::String("app.bsky.feed.post".into()),
+    );
+    rec_map.insert("text".to_owned(), Value::String("dag".into()));
+    let rec_bytes = dagcbor::encode(&Value::Object(rec_map));
+    let rec_cid = Cid::for_dag_cbor(&rec_bytes);
+
+    // Build a 24-level diamond DAG (2^24 = 16M paths if un-deduplicated!) opened with `verifies_tree = false`.
+    let store = Arc::new(CountingStore {
+        inner: InMemoryBlockStore::new(),
+        gets: AtomicUsize::new(0),
+    });
+    store.put_block(&rec_cid, &rec_bytes).await.unwrap();
+    let (mut cur_cid, cur_bytes) = encode_mst_node(&MstNodeView {
+        left: None,
+        entries: vec![MstNodeEntryView {
+            key: "app.bsky.feed.post/leaf".into(),
+            value: rec_cid.clone(),
+            tree: None,
+        }],
+    })
+    .unwrap();
+    store.put_block(&cur_cid, &cur_bytes).await.unwrap();
+
+    for lvl in 0..24_usize {
+        let (next_cid, next_bytes) = encode_mst_node(&MstNodeView {
+            left: Some(cur_cid.clone()),
+            entries: vec![MstNodeEntryView {
+                key: format!("app.bsky.feed.post/k{lvl:02}"),
+                value: rec_cid.clone(),
+                tree: Some(cur_cid.clone()),
+            }],
+        })
+        .unwrap();
+        store.put_block(&next_cid, &next_bytes).await.unwrap();
+        cur_cid = next_cid;
+    }
+
+    let diamond_commit = CommitCodec::prepare(
+        &CommitDescriptor {
+            did: did.clone(),
+            rev: RepositoryTid::parse("3jzfcijpj2z2f").unwrap(),
+            data_cid: cur_cid,
+            prev_cid: None,
+        },
+        &signer,
+        &limits,
+    )
+    .await
+    .unwrap();
+    store
+        .put_block(&diamond_commit.cid, &diamond_commit.signed_commit_bytes)
+        .await
+        .unwrap();
+
+    let repo = Repository::open_store(
+        diamond_commit.cid.clone(),
+        Arc::clone(&store),
+        OpenVerification::SigningKey(signer.public_key().clone()),
+        Some(&did),
+        limits,
+        policy,
+        false,
+    )
+    .await
+    .unwrap();
+
+    for order in [CARExportOrder::Streamable, CARExportOrder::BreadthFirst] {
+        store.gets.store(0, AtomicOrdering::Relaxed);
+        let sink = petrel_repo::DataCARByteSink::new();
+        repo.export_car_to_sink(&sink, order).await.unwrap();
+        let reads = store.gets.load(AtomicOrdering::Relaxed);
+        assert!(
+            reads < 60,
+            "expected deduplicated export traversal, observed {reads} reads"
+        );
+    }
+
+    // Both Streamable and BreadthFirst enforce `max_mst_depth` and `max_mst_node_count` when `verifies_tree = false`.
+    let shallow_limits = RepositoryLimits {
+        max_mst_depth: 5,
+        ..limits
+    };
+    let shallow_repo = Repository::open_store(
+        diamond_commit.cid.clone(),
+        Arc::clone(&store),
+        OpenVerification::SigningKey(signer.public_key().clone()),
+        Some(&did),
+        shallow_limits,
+        policy,
+        false,
+    )
+    .await
+    .unwrap();
+    for order in [CARExportOrder::Streamable, CARExportOrder::BreadthFirst] {
+        let sink = petrel_repo::DataCARByteSink::new();
+        let err = shallow_repo
+            .export_car_to_sink(&sink, order)
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            RepositoryError::Mst(MstError::DepthExceeded { limit: 5, .. })
+        ));
+    }
+
+    let few_nodes_limits = RepositoryLimits {
+        max_mst_node_count: 5,
+        max_record_count: 5,
+        ..limits
+    };
+    let few_nodes_repo = Repository::open_store(
+        diamond_commit.cid,
+        store,
+        OpenVerification::SigningKey(signer.public_key().clone()),
+        Some(&did),
+        few_nodes_limits,
+        policy,
+        false,
+    )
+    .await
+    .unwrap();
+    for order in [CARExportOrder::Streamable, CARExportOrder::BreadthFirst] {
+        let sink = petrel_repo::DataCARByteSink::new();
+        let err = few_nodes_repo
+            .export_car_to_sink(&sink, order)
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            RepositoryError::Mst(MstError::NodeCountExceeded { limit: 5, .. })
+        ));
+    }
+}

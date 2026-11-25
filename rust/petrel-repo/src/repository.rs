@@ -856,56 +856,10 @@ impl<B: BlockStore + 'static> Repository<B> {
 
         match order {
             CARExportOrder::Streamable => {
-                stream_streamable_blocks(
-                    self.commit.data_cid.clone(),
-                    self.store.as_ref(),
-                    &self.policy,
-                    &mut seen,
-                    sink,
-                )
-                .await?;
+                self.export_streamable_to_sink(sink, &mut seen).await?;
             }
             CARExportOrder::BreadthFirst => {
-                let mut queue = VecDeque::new();
-                queue.push_back(self.commit.data_cid.clone());
-                let mut record_cids = Vec::new();
-
-                while let Some(node_cid) = queue.pop_front() {
-                    if !seen.insert(node_cid.clone()) {
-                        continue;
-                    }
-                    let bytes = self
-                        .store
-                        .get_block(&node_cid)
-                        .await?
-                        .ok_or_else(|| RepositoryError::MissingBlock(node_cid.clone()))?;
-                    let view = crate::mst::codec::decode_mst_node(
-                        &bytes,
-                        MstKeySyntax::StrictAtProto,
-                        &self.policy,
-                        false,
-                    )?;
-                    let frame = crate::car::writer::encode_frame(&node_cid, &bytes)?;
-                    sink.write_bytes(&frame).await?;
-                    if let Some(left) = view.left {
-                        queue.push_back(left);
-                    }
-                    for entry in view.entries {
-                        record_cids.push(entry.value);
-                        if let Some(right) = entry.tree {
-                            queue.push_back(right);
-                        }
-                    }
-                }
-                for rcid in record_cids {
-                    if !seen.contains(&rcid)
-                        && let Some(bytes) =
-                            load_export_record_block(&rcid, self.store.as_ref(), &self.policy)
-                                .await?
-                    {
-                        stream_frame_if_unseen(rcid, &bytes, &mut seen, sink).await?;
-                    }
-                }
+                self.export_breadth_first_to_sink(sink, &mut seen).await?;
             }
             CARExportOrder::Stored => {
                 let mut all_cids = self.store.all_cids().await?;
@@ -921,6 +875,189 @@ impl<B: BlockStore + 'static> Repository<B> {
         }
 
         sink.finish().await?;
+        Ok(())
+    }
+
+    async fn export_streamable_to_sink<Sink: CARByteSink + ?Sized>(
+        &self,
+        sink: &Sink,
+        seen: &mut BTreeSet<Cid>,
+    ) -> Result<(), RepositoryError> {
+        enum StreamItem {
+            Node { cid: Cid, depth: usize },
+            Record(Cid),
+        }
+
+        let mut stack = vec![StreamItem::Node {
+            cid: self.commit.data_cid.clone(),
+            depth: 0,
+        }];
+        let mut mst_node_count = 0_usize;
+        let mut record_count = 0_usize;
+
+        while let Some(item) = stack.pop() {
+            match item {
+                StreamItem::Node {
+                    cid: node_cid,
+                    depth,
+                } => {
+                    let Some((bytes, view)) = self
+                        .visit_export_mst_node(&node_cid, depth, &mut mst_node_count, seen)
+                        .await?
+                    else {
+                        continue;
+                    };
+                    let frame = crate::car::writer::encode_frame(&node_cid, &bytes)?;
+                    sink.write_bytes(&frame).await?;
+                    drop(bytes);
+
+                    for entry in view.entries.into_iter().rev() {
+                        if let Some(right) = entry.tree {
+                            stack.push(StreamItem::Node {
+                                cid: right,
+                                depth: depth + 1,
+                            });
+                        }
+                        stack.push(StreamItem::Record(entry.value));
+                    }
+                    if let Some(left) = view.left {
+                        stack.push(StreamItem::Node {
+                            cid: left,
+                            depth: depth + 1,
+                        });
+                    }
+                }
+                StreamItem::Record(rcid) => {
+                    record_count = record_count.saturating_add(1);
+                    if record_count > self.limits.max_record_count {
+                        return Err(RepositoryError::Mst(
+                            crate::error::MstError::RecordCountExceeded {
+                                count: record_count,
+                                limit: self.limits.max_record_count,
+                            },
+                        ));
+                    }
+                    self.stream_export_record_if_unseen(rcid, seen, sink)
+                        .await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn export_breadth_first_to_sink<Sink: CARByteSink + ?Sized>(
+        &self,
+        sink: &Sink,
+        seen: &mut BTreeSet<Cid>,
+    ) -> Result<(), RepositoryError> {
+        let mut queue = VecDeque::new();
+        queue.push_back((self.commit.data_cid.clone(), 0_usize));
+        let mut record_cids = Vec::new();
+        let mut mst_node_count = 0_usize;
+
+        while let Some((node_cid, depth)) = queue.pop_front() {
+            let Some((bytes, view)) = self
+                .visit_export_mst_node(&node_cid, depth, &mut mst_node_count, seen)
+                .await?
+            else {
+                continue;
+            };
+            let frame = crate::car::writer::encode_frame(&node_cid, &bytes)?;
+            sink.write_bytes(&frame).await?;
+            if let Some(left) = view.left {
+                queue.push_back((left, depth + 1));
+            }
+            for entry in view.entries {
+                if record_cids.len() >= self.limits.max_record_count {
+                    return Err(RepositoryError::Mst(
+                        crate::error::MstError::RecordCountExceeded {
+                            count: record_cids.len() + 1,
+                            limit: self.limits.max_record_count,
+                        },
+                    ));
+                }
+                record_cids.push(entry.value);
+                if let Some(right) = entry.tree {
+                    queue.push_back((right, depth + 1));
+                }
+            }
+        }
+        for rcid in record_cids {
+            self.stream_export_record_if_unseen(rcid, seen, sink)
+                .await?;
+        }
+        Ok(())
+    }
+
+    async fn visit_export_mst_node(
+        &self,
+        node_cid: &Cid,
+        depth: usize,
+        mst_node_count: &mut usize,
+        seen: &mut BTreeSet<Cid>,
+    ) -> Result<Option<(Vec<u8>, crate::mst::codec::MstNodeView)>, RepositoryError> {
+        if depth > self.limits.max_mst_depth {
+            return Err(RepositoryError::Mst(
+                crate::error::MstError::DepthExceeded {
+                    depth,
+                    limit: self.limits.max_mst_depth,
+                },
+            ));
+        }
+        if !seen.insert(node_cid.clone()) {
+            return Ok(None);
+        }
+        *mst_node_count = mst_node_count.saturating_add(1);
+        if *mst_node_count > self.limits.max_mst_node_count {
+            return Err(RepositoryError::Mst(
+                crate::error::MstError::NodeCountExceeded {
+                    count: *mst_node_count,
+                    limit: self.limits.max_mst_node_count,
+                },
+            ));
+        }
+        let bytes = self
+            .store
+            .get_block(node_cid)
+            .await?
+            .ok_or_else(|| RepositoryError::MissingBlock(node_cid.clone()))?;
+        if bytes.len() > self.limits.max_single_block_bytes {
+            return Err(RepositoryError::Mst(
+                crate::error::MstError::BlockTooLarge {
+                    len: bytes.len(),
+                    limit: self.limits.max_single_block_bytes,
+                },
+            ));
+        }
+        let view = crate::mst::codec::decode_mst_node(
+            &bytes,
+            MstKeySyntax::StrictAtProto,
+            &self.policy,
+            false,
+        )?;
+        Ok(Some((bytes, view)))
+    }
+
+    async fn stream_export_record_if_unseen<Sink: CARByteSink + ?Sized>(
+        &self,
+        rcid: Cid,
+        seen: &mut BTreeSet<Cid>,
+        sink: &Sink,
+    ) -> Result<(), RepositoryError> {
+        if !seen.contains(&rcid)
+            && let Some(rec_bytes) =
+                load_export_record_block(&rcid, self.store.as_ref(), &self.policy).await?
+        {
+            if rec_bytes.len() > self.limits.max_single_block_bytes {
+                return Err(RepositoryError::Mst(
+                    crate::error::MstError::BlockTooLarge {
+                        len: rec_bytes.len(),
+                        limit: self.limits.max_single_block_bytes,
+                    },
+                ));
+            }
+            stream_frame_if_unseen(rcid, &rec_bytes, seen, sink).await?;
+        }
         Ok(())
     }
 
@@ -947,40 +1084,6 @@ async fn stream_frame_if_unseen<Sink: CARByteSink + ?Sized>(
         sink.write_bytes(&frame).await?;
     }
     Ok(())
-}
-
-fn stream_streamable_blocks<'a, B: BlockStore, Sink: CARByteSink + ?Sized>(
-    node_cid: Cid,
-    store: &'a B,
-    policy: &'a RepositoryReadPolicy,
-    seen: &'a mut BTreeSet<Cid>,
-    sink: &'a Sink,
-) -> BoxFuture<'a, Result<(), RepositoryError>> {
-    Box::pin(async move {
-        let bytes = store
-            .get_block(&node_cid)
-            .await?
-            .ok_or_else(|| RepositoryError::MissingBlock(node_cid.clone()))?;
-        let view =
-            crate::mst::codec::decode_mst_node(&bytes, MstKeySyntax::StrictAtProto, policy, false)?;
-        stream_frame_if_unseen(node_cid, &bytes, seen, sink).await?;
-        drop(bytes);
-        if let Some(left) = view.left {
-            stream_streamable_blocks(left, store, policy, seen, sink).await?;
-        }
-        for entry in view.entries {
-            if !seen.contains(&entry.value)
-                && let Some(rec_bytes) =
-                    load_export_record_block(&entry.value, store, policy).await?
-            {
-                stream_frame_if_unseen(entry.value, &rec_bytes, seen, sink).await?;
-            }
-            if let Some(right) = entry.tree {
-                stream_streamable_blocks(right, store, policy, seen, sink).await?;
-            }
-        }
-        Ok(())
-    })
 }
 
 async fn load_export_record_block<B: BlockStore + ?Sized>(
