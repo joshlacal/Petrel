@@ -1,0 +1,46 @@
+[package]
+name = "petrel-spaces"
+description = "AT Protocol Permissioned Spaces (Nov 24 alpha at:space/ URIs, delegation/credential JWTs, RFC 9421 signatures, HPKE MACs, BLAKE3 SpaceSetHash, STAR archives, host & sync engine) for Petrel."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["native"]
+native = ["petrel/native"]
+wasm = [
+    "getrandom/js",
+    "petrel-core/wasm",
+    "petrel-crypto/wasm",
+    "petrel/wasm",
+]
+
+[dependencies]
+petrel-api = { workspace = true, features = ["com_atproto"] }
+petrel-core = { workspace = true }
+petrel-crypto = { workspace = true }
+petrel = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+base64 = { workspace = true }
+http = { workspace = true }
+bytes = { workspace = true }
+url = { workspace = true }
+async-lock = { workspace = true }
+web-time = { workspace = true }
+tracing = { workspace = true }
+zeroize = { workspace = true }
+getrandom = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+tempfile = { workspace = true }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
+[lints]
+workspace = true

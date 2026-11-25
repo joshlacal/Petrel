@@ -18,6 +18,7 @@ members = [
     "petrel-repo",
     "petrel-server",
     "petrel-plc",
+    "petrel-spaces",
     "petrel-e2e",
     "petrel-lexicon-fixture",
 ]
