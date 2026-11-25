@@ -115,13 +115,13 @@ async fn strict_production_submit_and_tampered_audit_confirmation() {
     );
     client.submit(&did, &op).await.unwrap();
 
-    // Unconfirmed read error surfaces as SubmittedButUnconfirmed
+    // Unconfirmed read error surfaces as SubmittedButUnconfirmed (even on 200 text/plain "OK")
     let unconfirmed_http = Arc::new(SequenceTransport::new(|_, _, ordinal| {
         if ordinal == 0 {
             Ok(Response::builder()
                 .status(200)
-                .header("content-type", "application/json")
-                .body(Bytes::from_static(b"{}"))
+                .header("content-type", "text/plain; charset=utf-8")
+                .body(Bytes::from_static(b"OK"))
                 .unwrap())
         } else {
             Ok(reply(500, b"{}"))

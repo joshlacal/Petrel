@@ -953,7 +953,9 @@ impl PlcOperationCodec {
 
     /// Encodes a signed operation to sorted-key JSON bytes (`POST /:did`).
     pub fn encode_signed_json(operation: &PlcOperation) -> Result<Vec<u8>, PlcError> {
-        let value = operation_to_core_value(operation);
+        // PLC wire JSON is plain JSON (not ATProto data-model JSON), so sole keys
+        // such as `$link` / `$bytes` inside `verificationMethods` serialize verbatim.
+        let value = operation_to_plain_json(operation);
         serde_json::to_vec(&value).map_err(|err| PlcError::malformed(err.to_string()))
     }
 
@@ -970,42 +972,70 @@ impl PlcOperationCodec {
     }
 }
 
-fn operation_to_core_value(operation: &PlcOperation) -> Value {
+#[derive(Serialize)]
+#[serde(untagged)]
+enum PlainJson<'a> {
+    Null,
+    Str(&'a str),
+    Slice(&'a [String]),
+    Map(BTreeMap<&'a str, Self>),
+}
+
+fn operation_to_plain_json(operation: &PlcOperation) -> PlainJson<'_> {
     let mut map = BTreeMap::new();
     match operation {
         PlcOperation::Regular(op) => {
-            regular_fields_into(
-                &mut map,
-                &op.rotation_keys,
-                &op.verification_methods,
-                &op.also_known_as,
-                &op.services,
-                op.prev.as_deref(),
-                Some(&op.signature),
+            map.insert("type", PlainJson::Str("plc_operation"));
+            map.insert("rotationKeys", PlainJson::Slice(&op.rotation_keys));
+            map.insert(
+                "verificationMethods",
+                PlainJson::Map(
+                    op.verification_methods
+                        .iter()
+                        .map(|(k, v)| (k.as_str(), PlainJson::Str(v.as_str())))
+                        .collect(),
+                ),
             );
+            map.insert("alsoKnownAs", PlainJson::Slice(&op.also_known_as));
+            map.insert(
+                "services",
+                PlainJson::Map(
+                    op.services
+                        .iter()
+                        .map(|(k, svc)| {
+                            let mut entry = BTreeMap::new();
+                            entry.insert("endpoint", PlainJson::Str(svc.endpoint.as_str()));
+                            entry.insert("type", PlainJson::Str(svc.kind.as_str()));
+                            (k.as_str(), PlainJson::Map(entry))
+                        })
+                        .collect(),
+                ),
+            );
+            map.insert(
+                "prev",
+                match op.prev.as_deref() {
+                    Some(cid) => PlainJson::Str(cid),
+                    None => PlainJson::Null,
+                },
+            );
+            map.insert("sig", PlainJson::Str(op.signature.as_str()));
         }
         PlcOperation::Tombstone(op) => {
-            map.insert("type".to_owned(), Value::String("plc_tombstone".to_owned()));
-            map.insert("prev".to_owned(), Value::String(op.prev.clone()));
-            map.insert("sig".to_owned(), Value::String(op.signature.clone()));
+            map.insert("type", PlainJson::Str("plc_tombstone"));
+            map.insert("prev", PlainJson::Str(op.prev.as_str()));
+            map.insert("sig", PlainJson::Str(op.signature.as_str()));
         }
         PlcOperation::LegacyCreate(op) => {
-            map.insert("type".to_owned(), Value::String("create".to_owned()));
-            map.insert(
-                "signingKey".to_owned(),
-                Value::String(op.signing_key.clone()),
-            );
-            map.insert(
-                "recoveryKey".to_owned(),
-                Value::String(op.recovery_key.clone()),
-            );
-            map.insert("handle".to_owned(), Value::String(op.handle.clone()));
-            map.insert("service".to_owned(), Value::String(op.service.clone()));
-            map.insert("prev".to_owned(), Value::Null);
-            map.insert("sig".to_owned(), Value::String(op.signature.clone()));
+            map.insert("type", PlainJson::Str("create"));
+            map.insert("signingKey", PlainJson::Str(op.signing_key.as_str()));
+            map.insert("recoveryKey", PlainJson::Str(op.recovery_key.as_str()));
+            map.insert("handle", PlainJson::Str(op.handle.as_str()));
+            map.insert("service", PlainJson::Str(op.service.as_str()));
+            map.insert("prev", PlainJson::Null);
+            map.insert("sig", PlainJson::Str(op.signature.as_str()));
         }
     }
-    Value::Object(map)
+    PlainJson::Map(map)
 }
 
 fn regular_cbor(

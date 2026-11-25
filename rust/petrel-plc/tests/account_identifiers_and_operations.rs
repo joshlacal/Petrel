@@ -477,3 +477,43 @@ fn lenient_heads_and_deterministic_did_document_render() {
     let _ = PlcDocumentData::clone(&verified.document_data().unwrap());
     let _ = ATProtoSignatureVerificationOptions::STRICT;
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn verification_method_keys_link_and_bytes_canonical_json_roundtrip() {
+    for key_id in ["$link", "$bytes"] {
+        let signing = K256Keypair::generate().unwrap();
+        let rotation = P256Keypair::generate().unwrap();
+        let mut methods = BTreeMap::new();
+        methods.insert(key_id.to_owned(), signing.did_key());
+        let mut services = BTreeMap::new();
+        services.insert(
+            "atproto_pds".to_owned(),
+            PlcService {
+                kind: "AtprotoPersonalDataServer".to_owned(),
+                endpoint: "https://pds.example.com".to_owned(),
+            },
+        );
+        let unsigned = UnsignedPlcRegularOperation::new(
+            vec![rotation.did_key()],
+            methods,
+            vec!["at://alice.example.com".to_owned()],
+            services,
+            None,
+        )
+        .unwrap();
+        let signed = PlcOperationCodec::sign(&UnsignedPlcOperation::Regular(unsigned), &rotation)
+            .await
+            .unwrap();
+        let json_bytes = signed.canonical_json().unwrap();
+        let json_str = std::str::from_utf8(&json_bytes).unwrap();
+        assert!(
+            json_str.contains(&format!("\"{key_id}\":\"{}\"", signing.did_key())),
+            "{json_str}"
+        );
+        let decoded = PlcOperationCodec::decode_signed_json(&json_bytes).unwrap();
+        assert_eq!(decoded, signed);
+        let did = PlcOperationCodec::genesis_did(&decoded).unwrap();
+        PlcOperationCodec::verify_genesis(&decoded, &did).unwrap();
+    }
+}

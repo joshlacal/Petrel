@@ -46,7 +46,7 @@ pub enum PlcSubmitSuccessResponsePolicy {
 pub struct PlcClientConfiguration {
     origin: Url,
     is_laboratory: bool,
-    pub submit_success_response_policy: PlcSubmitSuccessResponsePolicy,
+    submit_success_response_policy: PlcSubmitSuccessResponsePolicy,
     pub timeout: Duration,
     pub maximum_state_bytes: usize,
     pub maximum_audit_bytes: usize,
@@ -158,6 +158,10 @@ impl PlcClientConfiguration {
 
     pub fn is_laboratory(&self) -> bool {
         self.is_laboratory
+    }
+
+    pub fn submit_success_response_policy(&self) -> PlcSubmitSuccessResponsePolicy {
+        self.submit_success_response_policy
     }
 
     fn validate_origin(
@@ -791,12 +795,30 @@ impl PlcDirectoryClient {
         response: &Response<Bytes>,
         _url: &Url,
     ) -> Result<SubmitAcceptance, PlcError> {
+        Self::validate_submit_response_for_config(&self.configuration, response)
+    }
+
+    fn validate_submit_response_for_config(
+        configuration: &PlcClientConfiguration,
+        response: &Response<Bytes>,
+    ) -> Result<SubmitAcceptance, PlcError> {
         let status = response.status().as_u16();
         if !(200..=299).contains(&status) {
             return Err(Self::failure_for_response(response, None));
         }
 
-        match self.configuration.submit_success_response_policy {
+        if !configuration.is_laboratory {
+            if configuration.submit_success_response_policy
+                == PlcSubmitSuccessResponsePolicy::DidPlcServer001
+            {
+                return Err(PlcError::malformed(
+                    "PLC reference submit compatibility requires a laboratory origin",
+                ));
+            }
+            return Ok(SubmitAcceptance::RequiresDirectoryConfirmation);
+        }
+
+        match configuration.submit_success_response_policy {
             PlcSubmitSuccessResponsePolicy::DidPlcServer001 => {
                 if status != 200 {
                     return Err(PlcError::unavailable(
@@ -812,23 +834,19 @@ impl PlcDirectoryClient {
                         "PLC directory returned an incompatible submit response",
                     ));
                 }
-                return Ok(SubmitAcceptance::Verified);
+                Ok(SubmitAcceptance::Verified)
             }
-            PlcSubmitSuccessResponsePolicy::Strict => {}
+            PlcSubmitSuccessResponsePolicy::Strict => {
+                if response.body().is_empty() {
+                    return Ok(SubmitAcceptance::Verified);
+                }
+                if Self::media_type(response).as_deref() != Some("application/json") {
+                    return Err(PlcError::malformed("PLC directory response is not JSON"));
+                }
+                PlcStrictJson::validate(response.body())?;
+                Ok(SubmitAcceptance::Verified)
+            }
         }
-
-        if !self.configuration.is_laboratory {
-            return Ok(SubmitAcceptance::RequiresDirectoryConfirmation);
-        }
-
-        if response.body().is_empty() {
-            return Ok(SubmitAcceptance::Verified);
-        }
-        if Self::media_type(response).as_deref() != Some("application/json") {
-            return Err(PlcError::malformed("PLC directory response is not JSON"));
-        }
-        PlcStrictJson::validate(response.body())?;
-        Ok(SubmitAcceptance::Verified)
     }
 
     fn media_type(response: &Response<Bytes>) -> Option<String> {
@@ -927,6 +945,7 @@ impl PlcClient for PlcDirectoryClient {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SubmitAcceptance {
     Verified,
     RequiresDirectoryConfirmation,
@@ -1007,3 +1026,35 @@ const HEX_UPPER: &[char; 16] = &[
 
 #[allow(dead_code)]
 fn _unused_public_key_marker(_: &PublicKey) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn did_plc_server_001_requires_laboratory_origin() {
+        let mut prod = PlcClientConfiguration::production(None).unwrap();
+        assert!(!prod.is_laboratory());
+        assert_eq!(
+            prod.submit_success_response_policy(),
+            PlcSubmitSuccessResponsePolicy::Strict
+        );
+
+        let ok_resp = Response::builder()
+            .status(200)
+            .header(CONTENT_TYPE, "text/plain; charset=utf-8")
+            .body(Bytes::from_static(b"OK"))
+            .unwrap();
+
+        assert_eq!(
+            PlcDirectoryClient::validate_submit_response_for_config(&prod, &ok_resp).unwrap(),
+            SubmitAcceptance::RequiresDirectoryConfirmation
+        );
+
+        prod.submit_success_response_policy = PlcSubmitSuccessResponsePolicy::DidPlcServer001;
+        assert!(matches!(
+            PlcDirectoryClient::validate_submit_response_for_config(&prod, &ok_resp),
+            Err(PlcError::Malformed(_))
+        ));
+    }
+}
