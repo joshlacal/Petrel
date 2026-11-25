@@ -198,7 +198,7 @@ pub fn read_star_repo(bytes: &[u8], max_archive_bytes: usize) -> Result<StarRepo
                 }
                 let cbor_len = read_uvarint_usize(bytes, &mut cursor)?;
                 let cbor_bytes = take_slice(bytes, &mut cursor, cbor_len)?.to_vec();
-                let value = decode_with(&cbor_bytes, Limits::default())
+                let value = decode_with(&cbor_bytes, Limits::REPOSITORY_BLOCK)
                     .map_err(|e| SpaceError::InvalidCbor(e.to_string()))?;
                 let cid = Cid::for_dag_cbor(&cbor_bytes);
                 set_hash.add(&path, &cid.to_string());

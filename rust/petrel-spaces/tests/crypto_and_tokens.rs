@@ -616,3 +616,25 @@ fn replay_cache_fails_closed_when_live_capacity_exhausted() {
     ))
     .unwrap();
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[test]
+fn star_record_over_10000_nodes_roundtrips() {
+    let space = sample_space();
+    let repo = Did::parse("did:plc:ewvi7nxzyoun6zhxrhs64oiz").unwrap();
+    let rev = Tid::parse("3l2aaaaaaaaac").unwrap();
+
+    let items: Vec<Value> = (0_i64..12_000).map(Value::Integer).collect();
+    let mut map = BTreeMap::new();
+    map.insert(
+        "$type".to_owned(),
+        Value::String("blue.catbird.mlsChat.bulk".to_owned()),
+    );
+    map.insert("items".to_owned(), Value::Array(items));
+    let val = Value::Object(map);
+
+    let archive = write_star_repo(&space, &repo, &rev, &[("app.bsky.feed.post/1", &val)]).unwrap();
+    let decoded = read_star_repo(&archive, 2 * 1024 * 1024).unwrap();
+    assert_eq!(decoded.records.len(), 1);
+    assert_eq!(decoded.records[0].value, val);
+}
