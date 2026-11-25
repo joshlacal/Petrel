@@ -48,16 +48,27 @@ impl petrel_core::ToValue for Threadgate {
     }
 }
 
-impl petrel_core::FromValue for Threadgate {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Threadgate {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             post: reader.required("post")?,
-            allow: reader.optional("allow"),
+            allow: reader.optional("allow")?,
             created_at: reader.required("createdAt")?,
-            hidden_replies: reader.optional("hiddenReplies"),
+            hidden_replies: reader.optional("hiddenReplies")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Threadgate {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -115,12 +126,23 @@ impl petrel_core::ToValue for MentionRule {
     }
 }
 
-impl petrel_core::FromValue for MentionRule {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let reader = petrel_core::ObjectReader::new(value)?;
+impl MentionRule {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for MentionRule {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -178,12 +200,23 @@ impl petrel_core::ToValue for FollowerRule {
     }
 }
 
-impl petrel_core::FromValue for FollowerRule {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let reader = petrel_core::ObjectReader::new(value)?;
+impl FollowerRule {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for FollowerRule {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -241,12 +274,23 @@ impl petrel_core::ToValue for FollowingRule {
     }
 }
 
-impl petrel_core::FromValue for FollowingRule {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let reader = petrel_core::ObjectReader::new(value)?;
+impl FollowingRule {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for FollowingRule {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -301,13 +345,24 @@ impl petrel_core::ToValue for ListRule {
     }
 }
 
-impl petrel_core::FromValue for ListRule {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ListRule {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             list: reader.required("list")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ListRule {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -356,15 +411,25 @@ impl petrel_core::ToValue for ThreadgateAllow {
     }
 }
 
-impl petrel_core::FromValue for ThreadgateAllow {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl ThreadgateAllow {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.threadgate#mentionRule" => petrel_core::FromValue::from_value(value).map(Self::MentionRule),
-            "app.bsky.feed.threadgate#followerRule" => petrel_core::FromValue::from_value(value).map(Self::FollowerRule),
-            "app.bsky.feed.threadgate#followingRule" => petrel_core::FromValue::from_value(value).map(Self::FollowingRule),
-            "app.bsky.feed.threadgate#listRule" => petrel_core::FromValue::from_value(value).map(Self::ListRule),
+            "app.bsky.feed.threadgate#mentionRule" => petrel_core::decode_value(value, strict).map(Self::MentionRule),
+            "app.bsky.feed.threadgate#followerRule" => petrel_core::decode_value(value, strict).map(Self::FollowerRule),
+            "app.bsky.feed.threadgate#followingRule" => petrel_core::decode_value(value, strict).map(Self::FollowingRule),
+            "app.bsky.feed.threadgate#listRule" => petrel_core::decode_value(value, strict).map(Self::ListRule),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for ThreadgateAllow {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

@@ -32,13 +32,24 @@ impl petrel_core::ToValue for JoinLink {
     }
 }
 
-impl petrel_core::FromValue for JoinLink {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl JoinLink {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             code: reader.required("code")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for JoinLink {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -92,13 +103,24 @@ impl petrel_core::ToValue for View {
     }
 }
 
-impl petrel_core::FromValue for View {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl View {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             join_link_preview: reader.required("joinLinkPreview")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for View {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -145,14 +167,24 @@ impl petrel_core::ToValue for ViewJoinLinkPreview {
     }
 }
 
-impl petrel_core::FromValue for ViewJoinLinkPreview {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl ViewJoinLinkPreview {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.group.defs#joinLinkPreviewView" => petrel_core::FromValue::from_value(value).map(Self::JoinLinkPreviewView),
-            "chat.bsky.group.defs#disabledJoinLinkPreviewView" => petrel_core::FromValue::from_value(value).map(Self::DisabledJoinLinkPreviewView),
-            "chat.bsky.group.defs#invalidJoinLinkPreviewView" => petrel_core::FromValue::from_value(value).map(Self::InvalidJoinLinkPreviewView),
+            "chat.bsky.group.defs#joinLinkPreviewView" => petrel_core::decode_value(value, strict).map(Self::JoinLinkPreviewView),
+            "chat.bsky.group.defs#disabledJoinLinkPreviewView" => petrel_core::decode_value(value, strict).map(Self::DisabledJoinLinkPreviewView),
+            "chat.bsky.group.defs#invalidJoinLinkPreviewView" => petrel_core::decode_value(value, strict).map(Self::InvalidJoinLinkPreviewView),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for ViewJoinLinkPreview {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

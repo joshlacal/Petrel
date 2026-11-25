@@ -53,21 +53,32 @@ impl petrel_core::ToValue for ListViewBasic {
     }
 }
 
-impl petrel_core::FromValue for ListViewBasic {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ListViewBasic {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
             cid: reader.required("cid")?,
             name: reader.required("name")?,
             purpose: reader.required("purpose")?,
-            avatar: reader.optional("avatar"),
-            list_item_count: reader.optional("listItemCount"),
-            labels: reader.optional("labels"),
-            viewer: reader.optional("viewer"),
-            indexed_at: reader.optional("indexedAt"),
+            avatar: reader.optional("avatar")?,
+            list_item_count: reader.optional("listItemCount")?,
+            labels: reader.optional("labels")?,
+            viewer: reader.optional("viewer")?,
+            indexed_at: reader.optional("indexedAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ListViewBasic {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -154,24 +165,35 @@ impl petrel_core::ToValue for ListView {
     }
 }
 
-impl petrel_core::FromValue for ListView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ListView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
             cid: reader.required("cid")?,
             creator: reader.required("creator")?,
             name: reader.required("name")?,
             purpose: reader.required("purpose")?,
-            description: reader.optional("description"),
-            description_facets: reader.optional("descriptionFacets"),
-            avatar: reader.optional("avatar"),
-            list_item_count: reader.optional("listItemCount"),
-            labels: reader.optional("labels"),
-            viewer: reader.optional("viewer"),
+            description: reader.optional("description")?,
+            description_facets: reader.optional("descriptionFacets")?,
+            avatar: reader.optional("avatar")?,
+            list_item_count: reader.optional("listItemCount")?,
+            labels: reader.optional("labels")?,
+            viewer: reader.optional("viewer")?,
             indexed_at: reader.required("indexedAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ListView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -232,15 +254,26 @@ impl petrel_core::ToValue for ListItemView {
     }
 }
 
-impl petrel_core::FromValue for ListItemView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ListItemView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
             subject: reader.required("subject")?,
-            subject_opted_out: reader.optional("subjectOptedOut"),
+            subject_opted_out: reader.optional("subjectOptedOut")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ListItemView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -324,23 +357,34 @@ impl petrel_core::ToValue for StarterPackView {
     }
 }
 
-impl petrel_core::FromValue for StarterPackView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl StarterPackView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
             cid: reader.required("cid")?,
             record: reader.required("record")?,
             creator: reader.required("creator")?,
-            list: reader.optional("list"),
-            list_items_sample: reader.optional("listItemsSample"),
-            feeds: reader.optional("feeds"),
-            joined_week_count: reader.optional("joinedWeekCount"),
-            joined_all_time_count: reader.optional("joinedAllTimeCount"),
-            labels: reader.optional("labels"),
+            list: reader.optional("list")?,
+            list_items_sample: reader.optional("listItemsSample")?,
+            feeds: reader.optional("feeds")?,
+            joined_week_count: reader.optional("joinedWeekCount")?,
+            joined_all_time_count: reader.optional("joinedAllTimeCount")?,
+            labels: reader.optional("labels")?,
             indexed_at: reader.required("indexedAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for StarterPackView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -418,21 +462,32 @@ impl petrel_core::ToValue for StarterPackViewBasic {
     }
 }
 
-impl petrel_core::FromValue for StarterPackViewBasic {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl StarterPackViewBasic {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
             cid: reader.required("cid")?,
             record: reader.required("record")?,
             creator: reader.required("creator")?,
-            list_item_count: reader.optional("listItemCount"),
-            joined_week_count: reader.optional("joinedWeekCount"),
-            joined_all_time_count: reader.optional("joinedAllTimeCount"),
-            labels: reader.optional("labels"),
+            list_item_count: reader.optional("listItemCount")?,
+            joined_week_count: reader.optional("joinedWeekCount")?,
+            joined_all_time_count: reader.optional("joinedAllTimeCount")?,
+            labels: reader.optional("labels")?,
             indexed_at: reader.required("indexedAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for StarterPackViewBasic {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -508,15 +563,26 @@ impl petrel_core::ToValue for ListViewerState {
     }
 }
 
-impl petrel_core::FromValue for ListViewerState {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ListViewerState {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            muted: reader.optional("muted"),
-            blocked: reader.optional("blocked"),
-            reference_list_opt_out: reader.optional("referenceListOptOut"),
+            muted: reader.optional("muted")?,
+            blocked: reader.optional("blocked")?,
+            reference_list_opt_out: reader.optional("referenceListOptOut")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ListViewerState {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -574,14 +640,25 @@ impl petrel_core::ToValue for NotFoundActor {
     }
 }
 
-impl petrel_core::FromValue for NotFoundActor {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl NotFoundActor {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor: reader.required("actor")?,
             not_found: reader.required("notFound")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for NotFoundActor {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -660,19 +737,30 @@ impl petrel_core::ToValue for Relationship {
     }
 }
 
-impl petrel_core::FromValue for Relationship {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Relationship {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             did: reader.required("did")?,
-            following: reader.optional("following"),
-            followed_by: reader.optional("followedBy"),
-            blocking: reader.optional("blocking"),
-            blocked_by: reader.optional("blockedBy"),
-            blocking_by_list: reader.optional("blockingByList"),
-            blocked_by_list: reader.optional("blockedByList"),
+            following: reader.optional("following")?,
+            followed_by: reader.optional("followedBy")?,
+            blocking: reader.optional("blocking")?,
+            blocked_by: reader.optional("blockedBy")?,
+            blocking_by_list: reader.optional("blockingByList")?,
+            blocked_by_list: reader.optional("blockedByList")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Relationship {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 

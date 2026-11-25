@@ -76,6 +76,23 @@ class RustUnionAndEnumGenerationTests(unittest.TestCase):
         self.assertIn("Beta(Box<Beta>),", closed_enum)
         self.assertNotIn("Unknown(", closed_enum)
 
+        # A union passes the strictness it was decoded with on to the member
+        # it dispatches to. An unknown member of an open union stays raw in
+        # both modes; a closed union refuses it in both.
+        for enum_code in (open_enum, closed_enum):
+            self.assertIn("Self::decode_member(value, false)", enum_code)
+            self.assertIn(
+                "fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {\n"
+                "        Self::decode_member(value, true)",
+                enum_code,
+            )
+            self.assertIn(
+                '"com.example.unions#alpha" => petrel_core::decode_value(value, strict).map(Self::Alpha),',
+                enum_code,
+            )
+            self.assertNotIn("petrel_core::FromValue::from_value(value)", enum_code)
+        self.assertIn("_ => Ok(Self::Unknown(value)),", open_enum)
+
     def test_empty_or_duplicate_closed_union_raises(self):
         empty_lex = {
             "lexicon": 1,

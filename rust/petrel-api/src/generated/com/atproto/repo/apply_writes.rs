@@ -39,15 +39,23 @@ impl petrel_core::ToValue for Input {
     }
 }
 
-impl petrel_core::FromValue for Input {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Input {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             repo: reader.required("repo")?,
-            validate: reader.optional_strict("validate")?,
+            validate: reader.optional("validate")?,
             writes: reader.required("writes")?,
-            swap_commit: reader.optional_strict("swapCommit")?,
+            swap_commit: reader.optional("swapCommit")?,
         })
+    }
+}
+
+impl petrel_core::FromValue for Input {
+    // An XRPC input: strict however it is reached.
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -107,13 +115,24 @@ impl petrel_core::ToValue for Output {
     }
 }
 
+impl Output {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            commit: reader.optional("commit")?,
+            results: reader.optional("results")?,
+        })
+    }
+}
+
 impl petrel_core::FromValue for Output {
     fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
-        Ok(Self {
-            commit: reader.optional("commit"),
-            results: reader.optional("results"),
-        })
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -225,15 +244,26 @@ impl petrel_core::ToValue for Create {
     }
 }
 
-impl petrel_core::FromValue for Create {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Create {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             collection: reader.required("collection")?,
-            rkey: reader.optional("rkey"),
+            rkey: reader.optional("rkey")?,
             value: reader.required("value")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Create {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -294,15 +324,26 @@ impl petrel_core::ToValue for Update {
     }
 }
 
-impl petrel_core::FromValue for Update {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Update {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             collection: reader.required("collection")?,
             rkey: reader.required("rkey")?,
             value: reader.required("value")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Update {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -360,14 +401,25 @@ impl petrel_core::ToValue for Delete {
     }
 }
 
-impl petrel_core::FromValue for Delete {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Delete {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             collection: reader.required("collection")?,
             rkey: reader.required("rkey")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Delete {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -427,15 +479,26 @@ impl petrel_core::ToValue for CreateResult {
     }
 }
 
-impl petrel_core::FromValue for CreateResult {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl CreateResult {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
             cid: reader.required("cid")?,
-            validation_status: reader.optional("validationStatus"),
+            validation_status: reader.optional("validationStatus")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for CreateResult {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -495,15 +558,26 @@ impl petrel_core::ToValue for UpdateResult {
     }
 }
 
-impl petrel_core::FromValue for UpdateResult {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl UpdateResult {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
             cid: reader.required("cid")?,
-            validation_status: reader.optional("validationStatus"),
+            validation_status: reader.optional("validationStatus")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for UpdateResult {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -560,12 +634,23 @@ impl petrel_core::ToValue for DeleteResult {
     }
 }
 
-impl petrel_core::FromValue for DeleteResult {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let reader = petrel_core::ObjectReader::new(value)?;
+impl DeleteResult {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for DeleteResult {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -610,14 +695,24 @@ impl petrel_core::ToValue for InputWrites {
     }
 }
 
-impl petrel_core::FromValue for InputWrites {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl InputWrites {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.repo.applyWrites#create" => petrel_core::FromValue::from_value(value).map(Self::Create),
-            "com.atproto.repo.applyWrites#update" => petrel_core::FromValue::from_value(value).map(Self::Update),
-            "com.atproto.repo.applyWrites#delete" => petrel_core::FromValue::from_value(value).map(Self::Delete),
+            "com.atproto.repo.applyWrites#create" => petrel_core::decode_value(value, strict).map(Self::Create),
+            "com.atproto.repo.applyWrites#update" => petrel_core::decode_value(value, strict).map(Self::Update),
+            "com.atproto.repo.applyWrites#delete" => petrel_core::decode_value(value, strict).map(Self::Delete),
             other => Err(petrel_core::DecodeError::UnknownType(other.to_owned())),
         }
+    }
+}
+
+impl petrel_core::FromValue for InputWrites {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -662,14 +757,24 @@ impl petrel_core::ToValue for OutputResults {
     }
 }
 
-impl petrel_core::FromValue for OutputResults {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl OutputResults {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.repo.applyWrites#createResult" => petrel_core::FromValue::from_value(value).map(Self::CreateResult),
-            "com.atproto.repo.applyWrites#updateResult" => petrel_core::FromValue::from_value(value).map(Self::UpdateResult),
-            "com.atproto.repo.applyWrites#deleteResult" => petrel_core::FromValue::from_value(value).map(Self::DeleteResult),
+            "com.atproto.repo.applyWrites#createResult" => petrel_core::decode_value(value, strict).map(Self::CreateResult),
+            "com.atproto.repo.applyWrites#updateResult" => petrel_core::decode_value(value, strict).map(Self::UpdateResult),
+            "com.atproto.repo.applyWrites#deleteResult" => petrel_core::decode_value(value, strict).map(Self::DeleteResult),
             other => Err(petrel_core::DecodeError::UnknownType(other.to_owned())),
         }
+    }
+}
+
+impl petrel_core::FromValue for OutputResults {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

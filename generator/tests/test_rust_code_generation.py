@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 import pathlib
 import sys
 import unittest
@@ -137,7 +138,13 @@ class RustCodeGenerationTests(unittest.TestCase):
             },
         }
         proc_code = RustCodeGenerator(proc).convert()
-        self.assertIn('note: reader.optional_strict("note")?,', proc_code)
+        # The input reads its fields with a strict reader, and has no lenient
+        # entry point at all.
+        self.assertIn('note: reader.optional("note")?,', proc_code)
+        self.assertEqual(
+            self._from_value_readers(proc_code, "Input"),
+            {"from_value": "new_strict"},
+        )
 
     def test_strict_input_rejects_a_malformed_optional_nullable_field(self):
         # A compare-and-swap field such as putRecord's swapRecord is optional
@@ -161,8 +168,88 @@ class RustCodeGenerationTests(unittest.TestCase):
             },
         }
         code = RustCodeGenerator(proc).convert()
-        self.assertIn('swap: reader.optional_nullable_strict("swap")?,', code)
-        self.assertNotIn('reader.optional_nullable("swap")', code)
+        self.assertIn('swap: reader.optional_nullable("swap")?,', code)
+        self.assertEqual(
+            self._from_value_readers(code, "Input"),
+            {"from_value": "new_strict"},
+        )
+
+    @staticmethod
+    def _from_value_readers(code, type_name):
+        """Maps each `FromValue` method of a struct to the reader it opens."""
+        impl = re.search(
+            rf"impl petrel_core::FromValue for {type_name} \{{\n(.*?)\n\}}\n",
+            code,
+            re.S,
+        )
+        assert impl, f"no FromValue impl for {type_name}"
+        return dict(
+            re.findall(
+                r"fn (from_value\w*)\(.*?ObjectReader::(\w+)\(value\)",
+                impl.group(1),
+                re.S,
+            )
+        )
+
+    def test_objects_nested_in_an_input_decode_strictly(self):
+        # A def that an input refers to is also used by records and outputs,
+        # so it carries both entry points over one field-reading body. The
+        # strict one is what a strict reader calls for a nested value, which
+        # is how an input stays strict all the way down.
+        lex = {
+            "lexicon": 1,
+            "id": "com.example.nested",
+            "defs": {
+                "main": {
+                    "type": "procedure",
+                    "input": {
+                        "encoding": "application/json",
+                        "schema": {
+                            "type": "object",
+                            "required": ["status"],
+                            "properties": {
+                                "status": {"type": "ref", "ref": "#statusAttr"},
+                                "inline": {
+                                    "type": "object",
+                                    "properties": {"note": {"type": "string"}},
+                                },
+                            },
+                        },
+                    },
+                    "output": {
+                        "encoding": "application/json",
+                        "schema": {
+                            "type": "object",
+                            "properties": {"note": {"type": "string"}},
+                        },
+                    },
+                },
+                "statusAttr": {
+                    "type": "object",
+                    "required": ["applied"],
+                    "nullable": ["swap"],
+                    "properties": {
+                        "applied": {"type": "boolean"},
+                        "ref": {"type": "string"},
+                        "swap": {"type": "string"},
+                    },
+                },
+            },
+        }
+        code = RustCodeGenerator(lex).convert()
+
+        both = {"from_value": "new", "from_value_strict": "new_strict"}
+        self.assertEqual(self._from_value_readers(code, "StatusAttr"), both)
+        self.assertEqual(self._from_value_readers(code, "Output"), both)
+        inline = re.search(r"pub inline: Option<(\w+)>,", code).group(1)
+        self.assertEqual(self._from_value_readers(code, inline), both)
+
+        # One body serves both modes: the reader decides what a malformed
+        # optional field becomes.
+        self.assertEqual(code.count('r#ref: reader.optional("ref")?,'), 1)
+        self.assertEqual(code.count('swap: reader.optional_nullable("swap")?,'), 1)
+        for retired in ("optional_strict", "optional_nullable_strict"):
+            self.assertNotIn(retired, code)
 
     def test_petrel_api_cargo_features_match_computed_namespace_graph(self):
         manifest = json.loads((GENERATOR_DIR / "manifests" / "petrel-core.json").read_text(encoding="utf-8"))

@@ -115,30 +115,41 @@ impl petrel_core::ToValue for Output {
     }
 }
 
-impl petrel_core::FromValue for Output {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Output {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             job: reader.required("job")?,
             state: reader.required("state")?,
-            phase: reader.optional("phase"),
-            error: reader.optional("error"),
-            submitted_at: reader.optional("submittedAt"),
-            finished_at: reader.optional("finishedAt"),
-            bucketed: reader.optional("bucketed"),
-            segments_to_apply: reader.optional("segmentsToApply"),
-            segments_applied: reader.optional("segmentsApplied"),
-            rows_total: reader.optional("rowsTotal"),
-            rows_valid: reader.optional("rowsValid"),
-            rows_rejected: reader.optional("rowsRejected"),
-            segments_examined: reader.optional("segmentsExamined"),
-            segments_patched: reader.optional("segmentsPatched"),
-            rows_mutated: reader.optional("rowsMutated"),
-            rows_matched_all_versions: reader.optional("rowsMatchedAllVersions"),
-            rows_matched_specific: reader.optional("rowsMatchedSpecific"),
-            specific_cids_unmatched: reader.optional("specificCidsUnmatched"),
-            rows_corrupt_offset: reader.optional("rowsCorruptOffset"),
+            phase: reader.optional("phase")?,
+            error: reader.optional("error")?,
+            submitted_at: reader.optional("submittedAt")?,
+            finished_at: reader.optional("finishedAt")?,
+            bucketed: reader.optional("bucketed")?,
+            segments_to_apply: reader.optional("segmentsToApply")?,
+            segments_applied: reader.optional("segmentsApplied")?,
+            rows_total: reader.optional("rowsTotal")?,
+            rows_valid: reader.optional("rowsValid")?,
+            rows_rejected: reader.optional("rowsRejected")?,
+            segments_examined: reader.optional("segmentsExamined")?,
+            segments_patched: reader.optional("segmentsPatched")?,
+            rows_mutated: reader.optional("rowsMutated")?,
+            rows_matched_all_versions: reader.optional("rowsMatchedAllVersions")?,
+            rows_matched_specific: reader.optional("rowsMatchedSpecific")?,
+            specific_cids_unmatched: reader.optional("specificCidsUnmatched")?,
+            rows_corrupt_offset: reader.optional("rowsCorruptOffset")?,
         })
+    }
+}
+
+impl petrel_core::FromValue for Output {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 

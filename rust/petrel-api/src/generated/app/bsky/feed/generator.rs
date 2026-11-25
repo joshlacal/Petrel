@@ -62,21 +62,32 @@ impl petrel_core::ToValue for Generator {
     }
 }
 
-impl petrel_core::FromValue for Generator {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Generator {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             did: reader.required("did")?,
             display_name: reader.required("displayName")?,
-            description: reader.optional("description"),
-            description_facets: reader.optional("descriptionFacets"),
-            avatar: reader.optional("avatar"),
-            accepts_interactions: reader.optional("acceptsInteractions"),
-            labels: reader.optional("labels"),
-            content_mode: reader.optional("contentMode"),
+            description: reader.optional("description")?,
+            description_facets: reader.optional("descriptionFacets")?,
+            avatar: reader.optional("avatar")?,
+            accepts_interactions: reader.optional("acceptsInteractions")?,
+            labels: reader.optional("labels")?,
+            content_mode: reader.optional("contentMode")?,
             created_at: reader.required("createdAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Generator {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -119,12 +130,22 @@ impl petrel_core::ToValue for GeneratorLabels {
     }
 }
 
-impl petrel_core::FromValue for GeneratorLabels {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl GeneratorLabels {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.label.defs#selfLabels" => petrel_core::FromValue::from_value(value).map(Self::SelfLabels),
+            "com.atproto.label.defs#selfLabels" => petrel_core::decode_value(value, strict).map(Self::SelfLabels),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for GeneratorLabels {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

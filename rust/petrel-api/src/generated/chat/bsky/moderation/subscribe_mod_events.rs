@@ -143,18 +143,29 @@ impl petrel_core::ToValue for EventConvoFirstMessage {
     }
 }
 
-impl petrel_core::FromValue for EventConvoFirstMessage {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl EventConvoFirstMessage {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             convo_id: reader.required("convoId")?,
             created_at: reader.required("createdAt")?,
-            message_id: reader.optional("messageId"),
+            message_id: reader.optional("messageId")?,
             recipients: reader.required("recipients")?,
             rev: reader.required("rev")?,
             user: reader.required("user")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for EventConvoFirstMessage {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -239,9 +250,10 @@ impl petrel_core::ToValue for EventGroupChatCreated {
     }
 }
 
-impl petrel_core::FromValue for EventGroupChatCreated {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl EventGroupChatCreated {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor_did: reader.required("actorDid")?,
             convo_created_at: reader.required("convoCreatedAt")?,
@@ -254,6 +266,16 @@ impl petrel_core::FromValue for EventGroupChatCreated {
             rev: reader.required("rev")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for EventGroupChatCreated {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -345,9 +367,10 @@ impl petrel_core::ToValue for EventGroupChatMemberAdded {
     }
 }
 
-impl petrel_core::FromValue for EventGroupChatMemberAdded {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl EventGroupChatMemberAdded {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor_did: reader.required("actorDid")?,
             convo_created_at: reader.required("convoCreatedAt")?,
@@ -362,6 +385,16 @@ impl petrel_core::FromValue for EventGroupChatMemberAdded {
             subject_follows_owner: reader.required("subjectFollowsOwner")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for EventGroupChatMemberAdded {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -449,9 +482,10 @@ impl petrel_core::ToValue for EventGroupChatMemberJoined {
     }
 }
 
-impl petrel_core::FromValue for EventGroupChatMemberJoined {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl EventGroupChatMemberJoined {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor_did: reader.required("actorDid")?,
             convo_created_at: reader.required("convoCreatedAt")?,
@@ -465,6 +499,16 @@ impl petrel_core::FromValue for EventGroupChatMemberJoined {
             subject_follows_owner: reader.required("subjectFollowsOwner")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for EventGroupChatMemberJoined {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -552,9 +596,10 @@ impl petrel_core::ToValue for EventGroupChatJoinRequest {
     }
 }
 
-impl petrel_core::FromValue for EventGroupChatJoinRequest {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl EventGroupChatJoinRequest {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor_did: reader.required("actorDid")?,
             convo_created_at: reader.required("convoCreatedAt")?,
@@ -568,6 +613,16 @@ impl petrel_core::FromValue for EventGroupChatJoinRequest {
             subject_follows_owner: reader.required("subjectFollowsOwner")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for EventGroupChatJoinRequest {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -651,9 +706,10 @@ impl petrel_core::ToValue for EventGroupChatJoinRequestApproved {
     }
 }
 
-impl petrel_core::FromValue for EventGroupChatJoinRequestApproved {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl EventGroupChatJoinRequestApproved {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor_did: reader.required("actorDid")?,
             convo_created_at: reader.required("convoCreatedAt")?,
@@ -666,6 +722,16 @@ impl petrel_core::FromValue for EventGroupChatJoinRequestApproved {
             subject_did: reader.required("subjectDid")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for EventGroupChatJoinRequestApproved {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -749,9 +815,10 @@ impl petrel_core::ToValue for EventGroupChatJoinRequestRejected {
     }
 }
 
-impl petrel_core::FromValue for EventGroupChatJoinRequestRejected {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl EventGroupChatJoinRequestRejected {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor_did: reader.required("actorDid")?,
             convo_created_at: reader.required("convoCreatedAt")?,
@@ -764,6 +831,16 @@ impl petrel_core::FromValue for EventGroupChatJoinRequestRejected {
             subject_did: reader.required("subjectDid")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for EventGroupChatJoinRequestRejected {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -848,21 +925,32 @@ impl petrel_core::ToValue for EventChatAccepted {
     }
 }
 
-impl petrel_core::FromValue for EventChatAccepted {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl EventChatAccepted {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor_did: reader.required("actorDid")?,
             convo_created_at: reader.required("convoCreatedAt")?,
             convo_id: reader.required("convoId")?,
             created_at: reader.required("createdAt")?,
-            group_member_count: reader.optional("groupMemberCount"),
-            group_name: reader.optional("groupName"),
+            group_member_count: reader.optional("groupMemberCount")?,
+            group_name: reader.optional("groupName")?,
             method: reader.required("method")?,
-            owner_did: reader.optional("ownerDid"),
+            owner_did: reader.optional("ownerDid")?,
             rev: reader.required("rev")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for EventChatAccepted {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -950,9 +1038,10 @@ impl petrel_core::ToValue for EventGroupChatMemberLeft {
     }
 }
 
-impl petrel_core::FromValue for EventGroupChatMemberLeft {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl EventGroupChatMemberLeft {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor_did: reader.required("actorDid")?,
             convo_created_at: reader.required("convoCreatedAt")?,
@@ -966,6 +1055,16 @@ impl petrel_core::FromValue for EventGroupChatMemberLeft {
             subject_did: reader.required("subjectDid")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for EventGroupChatMemberLeft {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1074,9 +1173,10 @@ impl petrel_core::ToValue for EventGroupChatUpdated {
     }
 }
 
-impl petrel_core::FromValue for EventGroupChatUpdated {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl EventGroupChatUpdated {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor_did: reader.required("actorDid")?,
             convo_created_at: reader.required("convoCreatedAt")?,
@@ -1084,17 +1184,27 @@ impl petrel_core::FromValue for EventGroupChatUpdated {
             created_at: reader.required("createdAt")?,
             group_member_count: reader.required("groupMemberCount")?,
             group_name: reader.required("groupName")?,
-            join_link_code: reader.optional("joinLinkCode"),
-            join_link_followers_only: reader.optional("joinLinkFollowersOnly"),
-            join_link_requires_approval: reader.optional("joinLinkRequiresApproval"),
-            lock_reason: reader.optional("lockReason"),
-            new_name: reader.optional("newName"),
-            old_name: reader.optional("oldName"),
+            join_link_code: reader.optional("joinLinkCode")?,
+            join_link_followers_only: reader.optional("joinLinkFollowersOnly")?,
+            join_link_requires_approval: reader.optional("joinLinkRequiresApproval")?,
+            lock_reason: reader.optional("lockReason")?,
+            new_name: reader.optional("newName")?,
+            old_name: reader.optional("oldName")?,
             owner_did: reader.required("ownerDid")?,
             rev: reader.required("rev")?,
             update_type: reader.required("updateType")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for EventGroupChatUpdated {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1160,9 +1270,10 @@ impl petrel_core::ToValue for EventRateLimitExceeded {
     }
 }
 
-impl petrel_core::FromValue for EventRateLimitExceeded {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl EventRateLimitExceeded {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor_did: reader.required("actorDid")?,
             created_at: reader.required("createdAt")?,
@@ -1170,6 +1281,16 @@ impl petrel_core::FromValue for EventRateLimitExceeded {
             rev: reader.required("rev")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for EventRateLimitExceeded {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1232,22 +1353,32 @@ impl petrel_core::ToValue for Message {
     }
 }
 
-impl petrel_core::FromValue for Message {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl Message {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage" => petrel_core::FromValue::from_value(value).map(Self::EventConvoFirstMessage),
-            "chat.bsky.moderation.subscribeModEvents#eventGroupChatCreated" => petrel_core::FromValue::from_value(value).map(Self::EventGroupChatCreated),
-            "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberAdded" => petrel_core::FromValue::from_value(value).map(Self::EventGroupChatMemberAdded),
-            "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberJoined" => petrel_core::FromValue::from_value(value).map(Self::EventGroupChatMemberJoined),
-            "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequest" => petrel_core::FromValue::from_value(value).map(Self::EventGroupChatJoinRequest),
-            "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestApproved" => petrel_core::FromValue::from_value(value).map(Self::EventGroupChatJoinRequestApproved),
-            "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestRejected" => petrel_core::FromValue::from_value(value).map(Self::EventGroupChatJoinRequestRejected),
-            "chat.bsky.moderation.subscribeModEvents#eventChatAccepted" => petrel_core::FromValue::from_value(value).map(Self::EventChatAccepted),
-            "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberLeft" => petrel_core::FromValue::from_value(value).map(Self::EventGroupChatMemberLeft),
-            "chat.bsky.moderation.subscribeModEvents#eventGroupChatUpdated" => petrel_core::FromValue::from_value(value).map(Self::EventGroupChatUpdated),
-            "chat.bsky.moderation.subscribeModEvents#eventRateLimitExceeded" => petrel_core::FromValue::from_value(value).map(Self::EventRateLimitExceeded),
+            "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage" => petrel_core::decode_value(value, strict).map(Self::EventConvoFirstMessage),
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatCreated" => petrel_core::decode_value(value, strict).map(Self::EventGroupChatCreated),
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberAdded" => petrel_core::decode_value(value, strict).map(Self::EventGroupChatMemberAdded),
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberJoined" => petrel_core::decode_value(value, strict).map(Self::EventGroupChatMemberJoined),
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequest" => petrel_core::decode_value(value, strict).map(Self::EventGroupChatJoinRequest),
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestApproved" => petrel_core::decode_value(value, strict).map(Self::EventGroupChatJoinRequestApproved),
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestRejected" => petrel_core::decode_value(value, strict).map(Self::EventGroupChatJoinRequestRejected),
+            "chat.bsky.moderation.subscribeModEvents#eventChatAccepted" => petrel_core::decode_value(value, strict).map(Self::EventChatAccepted),
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberLeft" => petrel_core::decode_value(value, strict).map(Self::EventGroupChatMemberLeft),
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatUpdated" => petrel_core::decode_value(value, strict).map(Self::EventGroupChatUpdated),
+            "chat.bsky.moderation.subscribeModEvents#eventRateLimitExceeded" => petrel_core::decode_value(value, strict).map(Self::EventRateLimitExceeded),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for Message {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

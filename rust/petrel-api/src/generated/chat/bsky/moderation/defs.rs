@@ -37,15 +37,26 @@ impl petrel_core::ToValue for ConvoView {
     }
 }
 
-impl petrel_core::FromValue for ConvoView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ConvoView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             id: reader.required("id")?,
             rev: reader.required("rev")?,
-            kind: reader.optional("kind"),
+            kind: reader.optional("kind")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ConvoView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -103,12 +114,23 @@ impl petrel_core::ToValue for DirectConvo {
     }
 }
 
-impl petrel_core::FromValue for DirectConvo {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let reader = petrel_core::ObjectReader::new(value)?;
+impl DirectConvo {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for DirectConvo {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -186,12 +208,13 @@ impl petrel_core::ToValue for GroupConvo {
     }
 }
 
-impl petrel_core::FromValue for GroupConvo {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl GroupConvo {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             created_at: reader.required("createdAt")?,
-            join_link: reader.optional("joinLink"),
+            join_link: reader.optional("joinLink")?,
             join_request_count: reader.required("joinRequestCount")?,
             lock_status: reader.required("lockStatus")?,
             member_count: reader.required("memberCount")?,
@@ -199,6 +222,16 @@ impl petrel_core::FromValue for GroupConvo {
             name: reader.required("name")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for GroupConvo {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -243,13 +276,23 @@ impl petrel_core::ToValue for ConvoViewKind {
     }
 }
 
-impl petrel_core::FromValue for ConvoViewKind {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl ConvoViewKind {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.moderation.defs#directConvo" => petrel_core::FromValue::from_value(value).map(Self::DirectConvo),
-            "chat.bsky.moderation.defs#groupConvo" => petrel_core::FromValue::from_value(value).map(Self::GroupConvo),
+            "chat.bsky.moderation.defs#directConvo" => petrel_core::decode_value(value, strict).map(Self::DirectConvo),
+            "chat.bsky.moderation.defs#groupConvo" => petrel_core::decode_value(value, strict).map(Self::GroupConvo),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for ConvoViewKind {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

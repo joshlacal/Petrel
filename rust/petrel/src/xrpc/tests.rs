@@ -409,7 +409,7 @@ impl petrel_core::serde_bridge::FromValue for PageOutput {
     fn from_value(value: petrel_core::Value) -> Result<Self, DecodeError> {
         let mut reader = petrel_core::serde_bridge::ObjectReader::new(value)?;
         Ok(Self {
-            cursor: reader.optional("cursor"),
+            cursor: reader.optional("cursor")?,
         })
     }
 }

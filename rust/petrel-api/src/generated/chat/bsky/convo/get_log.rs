@@ -64,13 +64,24 @@ impl petrel_core::ToValue for Output {
     }
 }
 
-impl petrel_core::FromValue for Output {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Output {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            cursor: reader.optional("cursor"),
+            cursor: reader.optional("cursor")?,
             logs: reader.required("logs")?,
         })
+    }
+}
+
+impl petrel_core::FromValue for Output {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -191,41 +202,51 @@ impl petrel_core::ToValue for OutputLogs {
     }
 }
 
-impl petrel_core::FromValue for OutputLogs {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl OutputLogs {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#logBeginConvo" => petrel_core::FromValue::from_value(value).map(Self::LogBeginConvo),
-            "chat.bsky.convo.defs#logAcceptConvo" => petrel_core::FromValue::from_value(value).map(Self::LogAcceptConvo),
-            "chat.bsky.convo.defs#logLeaveConvo" => petrel_core::FromValue::from_value(value).map(Self::LogLeaveConvo),
-            "chat.bsky.convo.defs#logMuteConvo" => petrel_core::FromValue::from_value(value).map(Self::LogMuteConvo),
-            "chat.bsky.convo.defs#logUnmuteConvo" => petrel_core::FromValue::from_value(value).map(Self::LogUnmuteConvo),
-            "chat.bsky.convo.defs#logCreateMessage" => petrel_core::FromValue::from_value(value).map(Self::LogCreateMessage),
-            "chat.bsky.convo.defs#logDeleteMessage" => petrel_core::FromValue::from_value(value).map(Self::LogDeleteMessage),
-            "chat.bsky.convo.defs#logReadMessage" => petrel_core::FromValue::from_value(value).map(Self::LogReadMessage),
-            "chat.bsky.convo.defs#logAddReaction" => petrel_core::FromValue::from_value(value).map(Self::LogAddReaction),
-            "chat.bsky.convo.defs#logRemoveReaction" => petrel_core::FromValue::from_value(value).map(Self::LogRemoveReaction),
-            "chat.bsky.convo.defs#logReadConvo" => petrel_core::FromValue::from_value(value).map(Self::LogReadConvo),
-            "chat.bsky.convo.defs#logAddMember" => petrel_core::FromValue::from_value(value).map(Self::LogAddMember),
-            "chat.bsky.convo.defs#logRemoveMember" => petrel_core::FromValue::from_value(value).map(Self::LogRemoveMember),
-            "chat.bsky.convo.defs#logMemberJoin" => petrel_core::FromValue::from_value(value).map(Self::LogMemberJoin),
-            "chat.bsky.convo.defs#logMemberLeave" => petrel_core::FromValue::from_value(value).map(Self::LogMemberLeave),
-            "chat.bsky.convo.defs#logLockConvo" => petrel_core::FromValue::from_value(value).map(Self::LogLockConvo),
-            "chat.bsky.convo.defs#logUnlockConvo" => petrel_core::FromValue::from_value(value).map(Self::LogUnlockConvo),
-            "chat.bsky.convo.defs#logLockConvoPermanently" => petrel_core::FromValue::from_value(value).map(Self::LogLockConvoPermanently),
-            "chat.bsky.convo.defs#logEditGroup" => petrel_core::FromValue::from_value(value).map(Self::LogEditGroup),
-            "chat.bsky.convo.defs#logCreateJoinLink" => petrel_core::FromValue::from_value(value).map(Self::LogCreateJoinLink),
-            "chat.bsky.convo.defs#logEditJoinLink" => petrel_core::FromValue::from_value(value).map(Self::LogEditJoinLink),
-            "chat.bsky.convo.defs#logEnableJoinLink" => petrel_core::FromValue::from_value(value).map(Self::LogEnableJoinLink),
-            "chat.bsky.convo.defs#logDisableJoinLink" => petrel_core::FromValue::from_value(value).map(Self::LogDisableJoinLink),
-            "chat.bsky.convo.defs#logIncomingJoinRequest" => petrel_core::FromValue::from_value(value).map(Self::LogIncomingJoinRequest),
-            "chat.bsky.convo.defs#logApproveJoinRequest" => petrel_core::FromValue::from_value(value).map(Self::LogApproveJoinRequest),
-            "chat.bsky.convo.defs#logRejectJoinRequest" => petrel_core::FromValue::from_value(value).map(Self::LogRejectJoinRequest),
-            "chat.bsky.convo.defs#logOutgoingJoinRequest" => petrel_core::FromValue::from_value(value).map(Self::LogOutgoingJoinRequest),
-            "chat.bsky.convo.defs#logWithdrawIncomingJoinRequest" => petrel_core::FromValue::from_value(value).map(Self::LogWithdrawIncomingJoinRequest),
-            "chat.bsky.convo.defs#logWithdrawOutgoingJoinRequest" => petrel_core::FromValue::from_value(value).map(Self::LogWithdrawOutgoingJoinRequest),
-            "chat.bsky.convo.defs#logReadJoinRequests" => petrel_core::FromValue::from_value(value).map(Self::LogReadJoinRequests),
+            "chat.bsky.convo.defs#logBeginConvo" => petrel_core::decode_value(value, strict).map(Self::LogBeginConvo),
+            "chat.bsky.convo.defs#logAcceptConvo" => petrel_core::decode_value(value, strict).map(Self::LogAcceptConvo),
+            "chat.bsky.convo.defs#logLeaveConvo" => petrel_core::decode_value(value, strict).map(Self::LogLeaveConvo),
+            "chat.bsky.convo.defs#logMuteConvo" => petrel_core::decode_value(value, strict).map(Self::LogMuteConvo),
+            "chat.bsky.convo.defs#logUnmuteConvo" => petrel_core::decode_value(value, strict).map(Self::LogUnmuteConvo),
+            "chat.bsky.convo.defs#logCreateMessage" => petrel_core::decode_value(value, strict).map(Self::LogCreateMessage),
+            "chat.bsky.convo.defs#logDeleteMessage" => petrel_core::decode_value(value, strict).map(Self::LogDeleteMessage),
+            "chat.bsky.convo.defs#logReadMessage" => petrel_core::decode_value(value, strict).map(Self::LogReadMessage),
+            "chat.bsky.convo.defs#logAddReaction" => petrel_core::decode_value(value, strict).map(Self::LogAddReaction),
+            "chat.bsky.convo.defs#logRemoveReaction" => petrel_core::decode_value(value, strict).map(Self::LogRemoveReaction),
+            "chat.bsky.convo.defs#logReadConvo" => petrel_core::decode_value(value, strict).map(Self::LogReadConvo),
+            "chat.bsky.convo.defs#logAddMember" => petrel_core::decode_value(value, strict).map(Self::LogAddMember),
+            "chat.bsky.convo.defs#logRemoveMember" => petrel_core::decode_value(value, strict).map(Self::LogRemoveMember),
+            "chat.bsky.convo.defs#logMemberJoin" => petrel_core::decode_value(value, strict).map(Self::LogMemberJoin),
+            "chat.bsky.convo.defs#logMemberLeave" => petrel_core::decode_value(value, strict).map(Self::LogMemberLeave),
+            "chat.bsky.convo.defs#logLockConvo" => petrel_core::decode_value(value, strict).map(Self::LogLockConvo),
+            "chat.bsky.convo.defs#logUnlockConvo" => petrel_core::decode_value(value, strict).map(Self::LogUnlockConvo),
+            "chat.bsky.convo.defs#logLockConvoPermanently" => petrel_core::decode_value(value, strict).map(Self::LogLockConvoPermanently),
+            "chat.bsky.convo.defs#logEditGroup" => petrel_core::decode_value(value, strict).map(Self::LogEditGroup),
+            "chat.bsky.convo.defs#logCreateJoinLink" => petrel_core::decode_value(value, strict).map(Self::LogCreateJoinLink),
+            "chat.bsky.convo.defs#logEditJoinLink" => petrel_core::decode_value(value, strict).map(Self::LogEditJoinLink),
+            "chat.bsky.convo.defs#logEnableJoinLink" => petrel_core::decode_value(value, strict).map(Self::LogEnableJoinLink),
+            "chat.bsky.convo.defs#logDisableJoinLink" => petrel_core::decode_value(value, strict).map(Self::LogDisableJoinLink),
+            "chat.bsky.convo.defs#logIncomingJoinRequest" => petrel_core::decode_value(value, strict).map(Self::LogIncomingJoinRequest),
+            "chat.bsky.convo.defs#logApproveJoinRequest" => petrel_core::decode_value(value, strict).map(Self::LogApproveJoinRequest),
+            "chat.bsky.convo.defs#logRejectJoinRequest" => petrel_core::decode_value(value, strict).map(Self::LogRejectJoinRequest),
+            "chat.bsky.convo.defs#logOutgoingJoinRequest" => petrel_core::decode_value(value, strict).map(Self::LogOutgoingJoinRequest),
+            "chat.bsky.convo.defs#logWithdrawIncomingJoinRequest" => petrel_core::decode_value(value, strict).map(Self::LogWithdrawIncomingJoinRequest),
+            "chat.bsky.convo.defs#logWithdrawOutgoingJoinRequest" => petrel_core::decode_value(value, strict).map(Self::LogWithdrawOutgoingJoinRequest),
+            "chat.bsky.convo.defs#logReadJoinRequests" => petrel_core::decode_value(value, strict).map(Self::LogReadJoinRequests),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for OutputLogs {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

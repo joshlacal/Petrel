@@ -69,20 +69,21 @@ impl petrel_core::ToValue for {{ name }} {
     }
 }
 
-impl petrel_core::FromValue for {{ name }} {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let {% if properties %}mut {% elif not has_extra %}_{% endif %}reader = petrel_core::ObjectReader::new(value)?;
+impl {{ name }} {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields({% if properties %}mut {% elif not has_extra %}_{% endif %}reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
 {% for prop in properties %}
 {% if prop.strict_decode %}
 {% if prop.required_nullable %}
         let {{ prop.ident }} = reader
             .required_nullable::<petrel_core::Value>({{ prop.wire_literal }})?
-            .map(|raw| decode_strict_ref::<{{ prop.strict_target_type }}>(raw, &[{{ prop.strict_allowed_keys }}], {{ prop.strict_type_id_literal }}, {{ prop.wire_literal }}))
+            .map(|raw| decode_strict_ref::<{{ prop.strict_target_type }}>(raw, &[{{ prop.strict_allowed_keys }}], {{ prop.strict_type_id_literal }}, {{ prop.wire_literal }}, reader.is_strict()))
             .transpose()?;
 {% elif prop.wire_optional %}
         let {{ prop.ident }} = reader
-            .optional_strict::<petrel_core::Value>({{ prop.wire_literal }})?
-            .map(|raw| decode_strict_ref::<{{ prop.strict_target_type }}>(raw, &[{{ prop.strict_allowed_keys }}], {{ prop.strict_type_id_literal }}, {{ prop.wire_literal }}))
+            .optional::<petrel_core::Value>({{ prop.wire_literal }})?
+            .map(|raw| decode_strict_ref::<{{ prop.strict_target_type }}>(raw, &[{{ prop.strict_allowed_keys }}], {{ prop.strict_type_id_literal }}, {{ prop.wire_literal }}, reader.is_strict()))
             .transpose()?;
 {% else %}
         let {{ prop.ident }} = decode_strict_ref::<{{ prop.strict_target_type }}>(
@@ -90,6 +91,7 @@ impl petrel_core::FromValue for {{ name }} {
             &[{{ prop.strict_allowed_keys }}],
             {{ prop.strict_type_id_literal }},
             {{ prop.wire_literal }},
+            reader.is_strict(),
         )?;
 {% endif %}
 {% endif %}
@@ -101,17 +103,9 @@ impl petrel_core::FromValue for {{ name }} {
 {% elif prop.required_nullable %}
             {{ prop.ident }}: reader.required_nullable({{ prop.wire_literal }})?,
 {% elif prop.tri_state %}
-{% if lenient %}
-            {{ prop.ident }}: reader.optional_nullable({{ prop.wire_literal }}),
-{% else %}
-            {{ prop.ident }}: reader.optional_nullable_strict({{ prop.wire_literal }})?,
-{% endif %}
+            {{ prop.ident }}: reader.optional_nullable({{ prop.wire_literal }})?,
 {% elif prop.wire_optional %}
-{% if lenient %}
-            {{ prop.ident }}: reader.optional({{ prop.wire_literal }}),
-{% else %}
-            {{ prop.ident }}: reader.optional_strict({{ prop.wire_literal }})?,
-{% endif %}
+            {{ prop.ident }}: reader.optional({{ prop.wire_literal }})?,
 {% else %}
             {{ prop.ident }}: reader.required({{ prop.wire_literal }})?,
 {% endif %}
@@ -121,6 +115,23 @@ impl petrel_core::FromValue for {{ name }} {
 {% endif %}
         })
     }
+}
+
+impl petrel_core::FromValue for {{ name }} {
+{% if lenient %}
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
+    }
+{% else %}
+    // An XRPC input: strict however it is reached.
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
+    }
+{% endif %}
 }
 
 impl petrel_core::XrpcInput for {{ name }} {

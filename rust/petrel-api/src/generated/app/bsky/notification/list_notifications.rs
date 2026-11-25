@@ -89,15 +89,26 @@ impl petrel_core::ToValue for Output {
     }
 }
 
+impl Output {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            cursor: reader.optional("cursor")?,
+            notifications: reader.required("notifications")?,
+            priority: reader.optional("priority")?,
+            seen_at: reader.optional("seenAt")?,
+        })
+    }
+}
+
 impl petrel_core::FromValue for Output {
     fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
-        Ok(Self {
-            cursor: reader.optional("cursor"),
-            notifications: reader.required("notifications")?,
-            priority: reader.optional("priority"),
-            seen_at: reader.optional("seenAt"),
-        })
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -200,22 +211,33 @@ impl petrel_core::ToValue for Notification {
     }
 }
 
-impl petrel_core::FromValue for Notification {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Notification {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
             cid: reader.required("cid")?,
             author: reader.required("author")?,
             reason: reader.required("reason")?,
-            reason_subject: reader.optional("reasonSubject"),
+            reason_subject: reader.optional("reasonSubject")?,
             record: reader.required("record")?,
-            starter_pack: reader.optional("starterPack"),
+            starter_pack: reader.optional("starterPack")?,
             is_read: reader.required("isRead")?,
             indexed_at: reader.required("indexedAt")?,
-            labels: reader.optional("labels"),
+            labels: reader.optional("labels")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Notification {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 

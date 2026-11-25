@@ -50,13 +50,24 @@ impl petrel_core::ToValue for Output {
     }
 }
 
-impl petrel_core::FromValue for Output {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Output {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             space: reader.required("space")?,
             policy: reader.required("policy")?,
         })
+    }
+}
+
+impl petrel_core::FromValue for Output {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -155,14 +166,24 @@ impl petrel_core::ToValue for OutputPolicy {
     }
 }
 
-impl petrel_core::FromValue for OutputPolicy {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl OutputPolicy {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.personalspace.policy" => petrel_core::FromValue::from_value(value).map(Self::PersonalspacePolicy),
-            "com.atproto.memberspace.policy" => petrel_core::FromValue::from_value(value).map(Self::MemberspacePolicy),
-            "com.atproto.managedspace.policy" => petrel_core::FromValue::from_value(value).map(Self::ManagedspacePolicy),
+            "com.atproto.personalspace.policy" => petrel_core::decode_value(value, strict).map(Self::PersonalspacePolicy),
+            "com.atproto.memberspace.policy" => petrel_core::decode_value(value, strict).map(Self::MemberspacePolicy),
+            "com.atproto.managedspace.policy" => petrel_core::decode_value(value, strict).map(Self::ManagedspacePolicy),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for OutputPolicy {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

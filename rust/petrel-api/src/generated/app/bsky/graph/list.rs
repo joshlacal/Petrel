@@ -56,19 +56,30 @@ impl petrel_core::ToValue for List {
     }
 }
 
-impl petrel_core::FromValue for List {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl List {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             purpose: reader.required("purpose")?,
             name: reader.required("name")?,
-            description: reader.optional("description"),
-            description_facets: reader.optional("descriptionFacets"),
-            avatar: reader.optional("avatar"),
-            labels: reader.optional("labels"),
+            description: reader.optional("description")?,
+            description_facets: reader.optional("descriptionFacets")?,
+            avatar: reader.optional("avatar")?,
+            labels: reader.optional("labels")?,
             created_at: reader.required("createdAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for List {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -111,12 +122,22 @@ impl petrel_core::ToValue for ListLabels {
     }
 }
 
-impl petrel_core::FromValue for ListLabels {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl ListLabels {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.label.defs#selfLabels" => petrel_core::FromValue::from_value(value).map(Self::SelfLabels),
+            "com.atproto.label.defs#selfLabels" => petrel_core::decode_value(value, strict).map(Self::SelfLabels),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for ListLabels {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

@@ -46,17 +46,28 @@ impl petrel_core::ToValue for Video {
     }
 }
 
-impl petrel_core::FromValue for Video {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Video {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             video: reader.required("video")?,
-            captions: reader.optional("captions"),
-            alt: reader.optional("alt"),
-            aspect_ratio: reader.optional("aspectRatio"),
-            presentation: reader.optional("presentation"),
+            captions: reader.optional("captions")?,
+            alt: reader.optional("alt")?,
+            aspect_ratio: reader.optional("aspectRatio")?,
+            presentation: reader.optional("presentation")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Video {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -113,14 +124,25 @@ impl petrel_core::ToValue for Caption {
     }
 }
 
-impl petrel_core::FromValue for Caption {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Caption {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             lang: reader.required("lang")?,
             file: reader.required("file")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Caption {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -190,18 +212,29 @@ impl petrel_core::ToValue for View {
     }
 }
 
-impl petrel_core::FromValue for View {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl View {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             cid: reader.required("cid")?,
             playlist: reader.required("playlist")?,
-            thumbnail: reader.optional("thumbnail"),
-            alt: reader.optional("alt"),
-            aspect_ratio: reader.optional("aspectRatio"),
-            presentation: reader.optional("presentation"),
+            thumbnail: reader.optional("thumbnail")?,
+            alt: reader.optional("alt")?,
+            aspect_ratio: reader.optional("aspectRatio")?,
+            presentation: reader.optional("presentation")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for View {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 

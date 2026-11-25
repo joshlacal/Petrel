@@ -280,15 +280,18 @@ class RustEnumGenerator:
         lines.append("    }")
         lines.append("}")
         lines.append("")
-        lines.append(f"impl petrel_core::FromValue for {union_name} {{")
-        lines.append(
-            "    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {"
-        )
         if variants:
+            # One dispatch body for both modes: a member is decoded with the
+            # strictness the union itself was decoded with, so an XRPC input
+            # stays strict through a union.
+            lines.append(f"impl {union_name} {{")
+            lines.append(
+                "    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {"
+            )
             lines.append("        match petrel_core::unknown::type_of(&value)? {")
             for variant in variants:
                 lines.append(
-                    f"            {variant['wire_tag_literal']} => petrel_core::FromValue::from_value(value).map(Self::{variant['name']}),"
+                    f"            {variant['wire_tag_literal']} => petrel_core::decode_value(value, strict).map(Self::{variant['name']}),"
                 )
             if not closed:
                 lines.append("            _ => Ok(Self::Unknown(value)),")
@@ -297,6 +300,21 @@ class RustEnumGenerator:
                     "            other => Err(petrel_core::DecodeError::UnknownType(other.to_owned())),"
                 )
             lines.append("        }")
+            lines.append("    }")
+            lines.append("}")
+            lines.append("")
+        lines.append(f"impl petrel_core::FromValue for {union_name} {{")
+        lines.append(
+            "    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {"
+        )
+        if variants:
+            lines.append("        Self::decode_member(value, false)")
+            lines.append("    }")
+            lines.append("")
+            lines.append(
+                "    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {"
+            )
+            lines.append("        Self::decode_member(value, true)")
         else:
             lines.append("        let _ = petrel_core::unknown::type_of(&value)?;")
             lines.append("        Ok(Self::Unknown(value))")

@@ -34,14 +34,22 @@ impl petrel_core::ToValue for Input {
     }
 }
 
-impl petrel_core::FromValue for Input {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Input {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             space: reader.required("space")?,
             token: reader.required("token")?,
             update: reader.required("update")?,
         })
+    }
+}
+
+impl petrel_core::FromValue for Input {
+    // An XRPC input: strict however it is reached.
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -113,12 +121,23 @@ impl petrel_core::ToValue for SpaceDeleted {
     }
 }
 
-impl petrel_core::FromValue for SpaceDeleted {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let reader = petrel_core::ObjectReader::new(value)?;
+impl SpaceDeleted {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SpaceDeleted {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -173,13 +192,24 @@ impl petrel_core::ToValue for RegistrationExpired {
     }
 }
 
-impl petrel_core::FromValue for RegistrationExpired {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl RegistrationExpired {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             space_rev: reader.required("spaceRev")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for RegistrationExpired {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -228,15 +258,25 @@ impl petrel_core::ToValue for InputUpdate {
     }
 }
 
-impl petrel_core::FromValue for InputUpdate {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl InputUpdate {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.space.defs#repoWrite" => petrel_core::FromValue::from_value(value).map(Self::RepoWrite),
-            "com.atproto.space.defs#repoRemoved" => petrel_core::FromValue::from_value(value).map(Self::RepoRemoved),
-            "com.atproto.space.notifySpaceUpdate#spaceDeleted" => petrel_core::FromValue::from_value(value).map(Self::SpaceDeleted),
-            "com.atproto.space.notifySpaceUpdate#registrationExpired" => petrel_core::FromValue::from_value(value).map(Self::RegistrationExpired),
+            "com.atproto.space.defs#repoWrite" => petrel_core::decode_value(value, strict).map(Self::RepoWrite),
+            "com.atproto.space.defs#repoRemoved" => petrel_core::decode_value(value, strict).map(Self::RepoRemoved),
+            "com.atproto.space.notifySpaceUpdate#spaceDeleted" => petrel_core::decode_value(value, strict).map(Self::SpaceDeleted),
+            "com.atproto.space.notifySpaceUpdate#registrationExpired" => petrel_core::decode_value(value, strict).map(Self::RegistrationExpired),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for InputUpdate {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

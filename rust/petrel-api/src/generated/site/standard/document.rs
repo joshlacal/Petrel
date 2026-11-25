@@ -88,26 +88,37 @@ impl petrel_core::ToValue for Document {
     }
 }
 
-impl petrel_core::FromValue for Document {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Document {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            bsky_post_ref: reader.optional("bskyPostRef"),
-            content: reader.optional("content"),
-            contributors: reader.optional("contributors"),
-            cover_image: reader.optional("coverImage"),
-            description: reader.optional("description"),
-            labels: reader.optional("labels"),
-            links: reader.optional("links"),
-            path: reader.optional("path"),
+            bsky_post_ref: reader.optional("bskyPostRef")?,
+            content: reader.optional("content")?,
+            contributors: reader.optional("contributors")?,
+            cover_image: reader.optional("coverImage")?,
+            description: reader.optional("description")?,
+            labels: reader.optional("labels")?,
+            links: reader.optional("links")?,
+            path: reader.optional("path")?,
             published_at: reader.required("publishedAt")?,
             site: reader.required("site")?,
-            tags: reader.optional("tags"),
-            text_content: reader.optional("textContent"),
+            tags: reader.optional("tags")?,
+            text_content: reader.optional("textContent")?,
             title: reader.required("title")?,
-            updated_at: reader.optional("updatedAt"),
+            updated_at: reader.optional("updatedAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Document {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -167,15 +178,26 @@ impl petrel_core::ToValue for Contributor {
     }
 }
 
-impl petrel_core::FromValue for Contributor {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Contributor {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             did: reader.required("did")?,
-            display_name: reader.optional("displayName"),
-            role: reader.optional("role"),
+            display_name: reader.optional("displayName")?,
+            role: reader.optional("role")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Contributor {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -262,12 +284,22 @@ impl petrel_core::ToValue for DocumentLabels {
     }
 }
 
-impl petrel_core::FromValue for DocumentLabels {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl DocumentLabels {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.label.defs#selfLabels" => petrel_core::FromValue::from_value(value).map(Self::SelfLabels),
+            "com.atproto.label.defs#selfLabels" => petrel_core::decode_value(value, strict).map(Self::SelfLabels),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for DocumentLabels {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

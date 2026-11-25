@@ -216,13 +216,13 @@ mod spike {
             Ok(Self {
                 text: reader.required("text")?,
                 created_at: reader.required("createdAt")?,
-                edited_at: reader.optional("editedAt"),
-                embed: reader.optional("embed"),
-                thumb: reader.optional("thumb"),
-                root: reader.optional("root"),
-                sig: reader.optional("sig"),
-                langs: reader.optional("langs"),
-                like_count: reader.optional("likeCount"),
+                edited_at: reader.optional("editedAt")?,
+                embed: reader.optional("embed")?,
+                thumb: reader.optional("thumb")?,
+                root: reader.optional("root")?,
+                sig: reader.optional("sig")?,
+                langs: reader.optional("langs")?,
+                like_count: reader.optional("likeCount")?,
                 extra_data: reader.finish(),
             })
         }
@@ -279,7 +279,7 @@ mod spike {
             let mut reader = ObjectReader::new(value)?;
             Ok(Self {
                 posts: reader.required("posts")?,
-                cursor: reader.optional("cursor"),
+                cursor: reader.optional("cursor")?,
             })
         }
     }
@@ -365,8 +365,8 @@ mod spike {
             let mut reader = ObjectReader::new(value)?;
             Ok(Self {
                 pinned: reader.required_nullable("pinned")?,
-                swap_record: reader.optional_nullable("swapRecord"),
-                note: reader.optional("note"),
+                swap_record: reader.optional_nullable("swapRecord")?,
+                note: reader.optional("note")?,
                 extra_data: reader.finish(),
             })
         }

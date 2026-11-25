@@ -49,9 +49,10 @@ impl petrel_core::ToValue for Basic {
     }
 }
 
-impl petrel_core::FromValue for Basic {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Basic {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             accent: reader.required("accent")?,
             accent_foreground: reader.required("accentForeground")?,
@@ -59,6 +60,16 @@ impl petrel_core::FromValue for Basic {
             foreground: reader.required("foreground")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Basic {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -101,12 +112,22 @@ impl petrel_core::ToValue for BasicAccent {
     }
 }
 
-impl petrel_core::FromValue for BasicAccent {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl BasicAccent {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "site.standard.theme.color#rgb" => petrel_core::FromValue::from_value(value).map(Self::Rgb),
+            "site.standard.theme.color#rgb" => petrel_core::decode_value(value, strict).map(Self::Rgb),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for BasicAccent {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -149,12 +170,22 @@ impl petrel_core::ToValue for BasicAccentForeground {
     }
 }
 
-impl petrel_core::FromValue for BasicAccentForeground {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl BasicAccentForeground {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "site.standard.theme.color#rgb" => petrel_core::FromValue::from_value(value).map(Self::Rgb),
+            "site.standard.theme.color#rgb" => petrel_core::decode_value(value, strict).map(Self::Rgb),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for BasicAccentForeground {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -197,12 +228,22 @@ impl petrel_core::ToValue for BasicBackground {
     }
 }
 
-impl petrel_core::FromValue for BasicBackground {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl BasicBackground {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "site.standard.theme.color#rgb" => petrel_core::FromValue::from_value(value).map(Self::Rgb),
+            "site.standard.theme.color#rgb" => petrel_core::decode_value(value, strict).map(Self::Rgb),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for BasicBackground {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -245,12 +286,22 @@ impl petrel_core::ToValue for BasicForeground {
     }
 }
 
-impl petrel_core::FromValue for BasicForeground {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl BasicForeground {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "site.standard.theme.color#rgb" => petrel_core::FromValue::from_value(value).map(Self::Rgb),
+            "site.standard.theme.color#rgb" => petrel_core::decode_value(value, strict).map(Self::Rgb),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for BasicForeground {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

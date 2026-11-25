@@ -34,14 +34,25 @@ impl petrel_core::ToValue for RecordWithMedia {
     }
 }
 
-impl petrel_core::FromValue for RecordWithMedia {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl RecordWithMedia {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             record: reader.required("record")?,
             media: reader.required("media")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for RecordWithMedia {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -98,14 +109,25 @@ impl petrel_core::ToValue for View {
     }
 }
 
-impl petrel_core::FromValue for View {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl View {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             record: reader.required("record")?,
             media: reader.required("media")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for View {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -154,15 +176,25 @@ impl petrel_core::ToValue for RecordWithMediaMedia {
     }
 }
 
-impl petrel_core::FromValue for RecordWithMediaMedia {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl RecordWithMediaMedia {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.images" => petrel_core::FromValue::from_value(value).map(Self::Images),
-            "app.bsky.embed.video" => petrel_core::FromValue::from_value(value).map(Self::Video),
-            "app.bsky.embed.gallery" => petrel_core::FromValue::from_value(value).map(Self::Gallery),
-            "app.bsky.embed.external" => petrel_core::FromValue::from_value(value).map(Self::External),
+            "app.bsky.embed.images" => petrel_core::decode_value(value, strict).map(Self::Images),
+            "app.bsky.embed.video" => petrel_core::decode_value(value, strict).map(Self::Video),
+            "app.bsky.embed.gallery" => petrel_core::decode_value(value, strict).map(Self::Gallery),
+            "app.bsky.embed.external" => petrel_core::decode_value(value, strict).map(Self::External),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for RecordWithMediaMedia {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -211,15 +243,25 @@ impl petrel_core::ToValue for ViewMedia {
     }
 }
 
-impl petrel_core::FromValue for ViewMedia {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl ViewMedia {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.images#view" => petrel_core::FromValue::from_value(value).map(Self::ImagesView),
-            "app.bsky.embed.video#view" => petrel_core::FromValue::from_value(value).map(Self::VideoView),
-            "app.bsky.embed.gallery#view" => petrel_core::FromValue::from_value(value).map(Self::GalleryView),
-            "app.bsky.embed.external#view" => petrel_core::FromValue::from_value(value).map(Self::ExternalView),
+            "app.bsky.embed.images#view" => petrel_core::decode_value(value, strict).map(Self::ImagesView),
+            "app.bsky.embed.video#view" => petrel_core::decode_value(value, strict).map(Self::VideoView),
+            "app.bsky.embed.gallery#view" => petrel_core::decode_value(value, strict).map(Self::GalleryView),
+            "app.bsky.embed.external#view" => petrel_core::decode_value(value, strict).map(Self::ExternalView),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for ViewMedia {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

@@ -37,8 +37,20 @@
 //! field that the lexicon does not mark nullable reads as absent and is not
 //! written back, so a record's CID is that of its original bytes, never of
 //! the re-encoded value. A required field that does not decode fails the
-//! whole object. XRPC inputs use [`ObjectReader::optional_strict`] and
-//! [`ObjectReader::optional_nullable_strict`] instead.
+//! whole object.
+//!
+//! # Strict decoding (XRPC inputs)
+//!
+//! A server must not read a malformed optional field of a request as
+//! "absent": it would then act on a request the caller did not make (skip a
+//! compare-and-swap, apply a default). So an XRPC input decodes strictly: a
+//! reader made with [`ObjectReader::new_strict`] fails on an optional field
+//! that does not decode, and decodes every nested value with
+//! [`FromValue::from_value_strict`], so the rule holds all the way down,
+//! through arrays, maps, boxes and unions. Unknown fields and unknown members
+//! of an open union are still accepted, as the lexicon rules require. The
+//! same generated type decodes leniently when it is reached from a record or
+//! an output and strictly when it is reached from an input.
 //!
 //! # Preservation of optional fields
 //!
@@ -67,6 +79,27 @@ pub trait ToValue {
 pub trait FromValue: Sized {
     /// Reads the typed value, consuming the wire value.
     fn from_value(value: Value) -> Result<Self, DecodeError>;
+
+    /// Reads the typed value as part of an XRPC input: a malformed optional
+    /// field anywhere inside it is an error. See the [module docs](self).
+    ///
+    /// The default is [`from_value`](Self::from_value), which is right for a
+    /// type with no optional fields and nothing nested. An object overrides
+    /// it to read with [`ObjectReader::new_strict`]; a container overrides it
+    /// to pass the strictness on to what it holds.
+    fn from_value_strict(value: Value) -> Result<Self, DecodeError> {
+        Self::from_value(value)
+    }
+}
+
+/// Reads a typed value strictly or leniently. Generated unions use this to
+/// decode the member they dispatched to in the mode they were asked for.
+pub fn decode_value<T: FromValue>(value: Value, strict: bool) -> Result<T, DecodeError> {
+    if strict {
+        T::from_value_strict(value)
+    } else {
+        T::from_value(value)
+    }
 }
 
 /// Encodes a typed value as JSON. Object keys are written in sorted order.
@@ -210,6 +243,13 @@ impl<T: FromValue> FromValue for Vec<T> {
             other => Err(mismatch("array", &other)),
         }
     }
+
+    fn from_value_strict(value: Value) -> Result<Self, DecodeError> {
+        match value {
+            Value::Array(items) => items.into_iter().map(T::from_value_strict).collect(),
+            other => Err(mismatch("array", &other)),
+        }
+    }
 }
 
 impl<T: ToValue + ?Sized> ToValue for Box<T> {
@@ -221,6 +261,10 @@ impl<T: ToValue + ?Sized> ToValue for Box<T> {
 impl<T: FromValue> FromValue for Box<T> {
     fn from_value(value: Value) -> Result<Self, DecodeError> {
         T::from_value(value).map(Box::new)
+    }
+
+    fn from_value_strict(value: Value) -> Result<Self, DecodeError> {
+        T::from_value_strict(value).map(Box::new)
     }
 }
 
@@ -243,30 +287,70 @@ impl<T: FromValue> FromValue for BTreeMap<String, T> {
             other => Err(mismatch("object", &other)),
         }
     }
+
+    fn from_value_strict(value: Value) -> Result<Self, DecodeError> {
+        match value {
+            Value::Object(map) => map
+                .into_iter()
+                .map(|(key, item)| {
+                    let item = T::from_value_strict(item).map_err(|error| error.in_field(&key))?;
+                    Ok((key, item))
+                })
+                .collect(),
+            other => Err(mismatch("object", &other)),
+        }
+    }
 }
 
 /// Reads the fields of one object. See the [module docs](self) for the rules.
+///
+/// A reader is lenient ([`new`](Self::new)) or strict
+/// ([`new_strict`](Self::new_strict)). The mode decides what an optional
+/// field that does not decode becomes, and how nested values are decoded, so
+/// the code that reads the fields is the same for both.
 #[derive(Debug)]
 pub struct ObjectReader {
     fields: BTreeMap<String, Value>,
     degraded: BTreeMap<String, Value>,
+    strict: bool,
 }
 
 impl ObjectReader {
-    /// Starts reading an object. Fails if the value is not an object.
+    /// Starts reading an object leniently. Fails if the value is not an
+    /// object.
     pub fn new(value: Value) -> Result<Self, DecodeError> {
+        Self::with_mode(value, false)
+    }
+
+    /// Starts reading an object strictly, as part of an XRPC input. Fails if
+    /// the value is not an object.
+    pub fn new_strict(value: Value) -> Result<Self, DecodeError> {
+        Self::with_mode(value, true)
+    }
+
+    fn with_mode(value: Value, strict: bool) -> Result<Self, DecodeError> {
         match value {
             Value::Object(fields) => Ok(Self {
                 fields,
                 degraded: BTreeMap::new(),
+                strict,
             }),
             other => Err(mismatch("object", &other)),
         }
     }
 
+    /// Whether this reader is strict.
+    pub fn is_strict(&self) -> bool {
+        self.strict
+    }
+
     /// The object's `$type`, if it has a string one.
     pub fn type_id(&self) -> Option<&str> {
         self.fields.get("$type").and_then(Value::as_str)
+    }
+
+    fn decode<T: FromValue>(&self, name: &str, value: Value) -> Result<T, DecodeError> {
+        decode_value(value, self.strict).map_err(|error| error.in_field(name))
     }
 
     /// A required field: the key must be present and decode.
@@ -275,34 +359,18 @@ impl ObjectReader {
             .fields
             .remove(name)
             .ok_or_else(|| DecodeError::MissingField(name.to_owned()))?;
-        T::from_value(value).map_err(|error| error.in_field(name))
+        self.decode(name, value)
     }
 
-    /// An optional field, read leniently: absent or `null` is `None`; a value
-    /// that does not decode is also `None`, and its raw form is kept for
-    /// [`finish`](Self::finish) to return.
-    pub fn optional<T: FromValue>(&mut self, name: &str) -> Option<T> {
-        match self.fields.remove(name)? {
-            Value::Null => None,
-            value => {
-                if let Ok(typed) = T::from_value(value.clone()) {
-                    Some(typed)
-                } else {
-                    self.degraded.insert(name.to_owned(), value);
-                    None
-                }
-            }
-        }
-    }
-
-    /// An optional field, read strictly (XRPC inputs): absent or `null` is
-    /// `None`, a value that does not decode is an error.
-    pub fn optional_strict<T: FromValue>(&mut self, name: &str) -> Result<Option<T>, DecodeError> {
+    /// An optional field: absent or `null` is `None`. A value that does not
+    /// decode is an error in a strict reader. In a lenient one it is `None`,
+    /// and its raw form is kept for [`finish`](Self::finish) to return, so a
+    /// lenient reader never returns an error here.
+    pub fn optional<T: FromValue>(&mut self, name: &str) -> Result<Option<T>, DecodeError> {
         match self.fields.remove(name) {
             None | Some(Value::Null) => Ok(None),
-            Some(value) => T::from_value(value)
-                .map(Some)
-                .map_err(|error| error.in_field(name)),
+            Some(value) if self.strict => self.decode(name, value).map(Some),
+            Some(value) => Ok(self.lenient(name, value)),
         }
     }
 
@@ -314,47 +382,41 @@ impl ObjectReader {
         match self.fields.remove(name) {
             None => Err(DecodeError::MissingField(name.to_owned())),
             Some(Value::Null) => Ok(None),
-            Some(value) => T::from_value(value)
-                .map(Some)
-                .map_err(|error| error.in_field(name)),
+            Some(value) => self.decode(name, value).map(Some),
         }
     }
 
     /// An optional, nullable field (tri-state): absent is `None`, `null` is
-    /// `Some(Nullable::Null)`. A value that does not decode degrades like
-    /// [`optional`](Self::optional).
-    pub fn optional_nullable<T: FromValue>(&mut self, name: &str) -> Option<Nullable<T>> {
-        match self.fields.remove(name)? {
-            Value::Null => Some(Nullable::Null),
-            value => {
-                if let Ok(typed) = T::from_value(value.clone()) {
-                    Some(Nullable::Value(typed))
-                } else {
-                    self.degraded.insert(name.to_owned(), value);
-                    None
-                }
-            }
-        }
-    }
-
-    /// The tri-state field of a strict object (an XRPC input): absent is
-    /// `None`, `null` is `Some(Nullable::Null)`, and a value that does not
-    /// decode is an error, never silently "absent".
-    pub fn optional_nullable_strict<T: FromValue>(
+    /// `Some(Nullable::Null)`. A value that does not decode is an error in a
+    /// strict reader, never silently "absent", and degrades like
+    /// [`optional`](Self::optional) in a lenient one.
+    pub fn optional_nullable<T: FromValue>(
         &mut self,
         name: &str,
     ) -> Result<Option<Nullable<T>>, DecodeError> {
         match self.fields.remove(name) {
             None => Ok(None),
             Some(Value::Null) => Ok(Some(Nullable::Null)),
-            Some(value) => T::from_value(value)
-                .map(|typed| Some(Nullable::Value(typed)))
-                .map_err(|error| error.in_field(name)),
+            Some(value) if self.strict => self
+                .decode(name, value)
+                .map(|typed| Some(Nullable::Value(typed))),
+            Some(value) => Ok(self.lenient(name, value).map(Nullable::Value)),
         }
     }
 
-    /// Wire names of the optional fields that failed to decode so far. The
-    /// strict decode API is "decode, then require this to be empty".
+    /// Decodes leniently, keeping the raw value when it does not decode.
+    fn lenient<T: FromValue>(&mut self, name: &str, value: Value) -> Option<T> {
+        if let Ok(typed) = T::from_value(value.clone()) {
+            Some(typed)
+        } else {
+            self.degraded.insert(name.to_owned(), value);
+            None
+        }
+    }
+
+    /// Wire names of the optional fields that failed to decode so far. Only
+    /// a lenient reader collects any; [`finish_strict`](Self::finish_strict)
+    /// turns them into an error after the fact.
     pub fn degraded(&self) -> impl Iterator<Item = &str> {
         self.degraded.keys().map(String::as_str)
     }

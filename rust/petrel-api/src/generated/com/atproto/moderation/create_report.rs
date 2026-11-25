@@ -38,15 +38,23 @@ impl petrel_core::ToValue for Input {
     }
 }
 
-impl petrel_core::FromValue for Input {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Input {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             reason_type: reader.required("reasonType")?,
-            reason: reader.optional_strict("reason")?,
+            reason: reader.optional("reason")?,
             subject: reader.required("subject")?,
-            mod_tool: reader.optional_strict("modTool")?,
+            mod_tool: reader.optional("modTool")?,
         })
+    }
+}
+
+impl petrel_core::FromValue for Input {
+    // An XRPC input: strict however it is reached.
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -112,17 +120,28 @@ impl petrel_core::ToValue for Output {
     }
 }
 
-impl petrel_core::FromValue for Output {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Output {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             id: reader.required("id")?,
             reason_type: reader.required("reasonType")?,
-            reason: reader.optional("reason"),
+            reason: reader.optional("reason")?,
             subject: reader.required("subject")?,
             reported_by: reader.required("reportedBy")?,
             created_at: reader.required("createdAt")?,
         })
+    }
+}
+
+impl petrel_core::FromValue for Output {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -196,14 +215,25 @@ impl petrel_core::ToValue for ModTool {
     }
 }
 
-impl petrel_core::FromValue for ModTool {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ModTool {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             name: reader.required("name")?,
-            meta: reader.optional("meta"),
+            meta: reader.optional("meta")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ModTool {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -248,13 +278,23 @@ impl petrel_core::ToValue for InputSubject {
     }
 }
 
-impl petrel_core::FromValue for InputSubject {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl InputSubject {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.admin.defs#repoRef" => petrel_core::FromValue::from_value(value).map(Self::RepoRef),
-            "com.atproto.repo.strongRef" => petrel_core::FromValue::from_value(value).map(Self::StrongRef),
+            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(value, strict).map(Self::RepoRef),
+            "com.atproto.repo.strongRef" => petrel_core::decode_value(value, strict).map(Self::StrongRef),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for InputSubject {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -299,13 +339,23 @@ impl petrel_core::ToValue for OutputSubject {
     }
 }
 
-impl petrel_core::FromValue for OutputSubject {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl OutputSubject {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.admin.defs#repoRef" => petrel_core::FromValue::from_value(value).map(Self::RepoRef),
-            "com.atproto.repo.strongRef" => petrel_core::FromValue::from_value(value).map(Self::StrongRef),
+            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(value, strict).map(Self::RepoRef),
+            "com.atproto.repo.strongRef" => petrel_core::decode_value(value, strict).map(Self::StrongRef),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for OutputSubject {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

@@ -42,9 +42,10 @@ impl petrel_core::ToValue for JoinLinkView {
     }
 }
 
-impl petrel_core::FromValue for JoinLinkView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl JoinLinkView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             code: reader.required("code")?,
             enabled_status: reader.required("enabledStatus")?,
@@ -53,6 +54,16 @@ impl petrel_core::FromValue for JoinLinkView {
             created_at: reader.required("createdAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for JoinLinkView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -135,9 +146,10 @@ impl petrel_core::ToValue for JoinLinkPreviewView {
     }
 }
 
-impl petrel_core::FromValue for JoinLinkPreviewView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl JoinLinkPreviewView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             convo_id: reader.required("convoId")?,
             code: reader.required("code")?,
@@ -147,10 +159,20 @@ impl petrel_core::FromValue for JoinLinkPreviewView {
             member_limit: reader.required("memberLimit")?,
             require_approval: reader.required("requireApproval")?,
             join_rule: reader.required("joinRule")?,
-            convo: reader.optional("convo"),
-            viewer: reader.optional("viewer"),
+            convo: reader.optional("convo")?,
+            viewer: reader.optional("viewer")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for JoinLinkPreviewView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -205,13 +227,24 @@ impl petrel_core::ToValue for DisabledJoinLinkPreviewView {
     }
 }
 
-impl petrel_core::FromValue for DisabledJoinLinkPreviewView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl DisabledJoinLinkPreviewView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             code: reader.required("code")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for DisabledJoinLinkPreviewView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -266,13 +299,24 @@ impl petrel_core::ToValue for InvalidJoinLinkPreviewView {
     }
 }
 
-impl petrel_core::FromValue for InvalidJoinLinkPreviewView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl InvalidJoinLinkPreviewView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             code: reader.required("code")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for InvalidJoinLinkPreviewView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -332,13 +376,24 @@ impl petrel_core::ToValue for JoinLinkViewerState {
     }
 }
 
-impl petrel_core::FromValue for JoinLinkViewerState {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl JoinLinkViewerState {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            requested_at: reader.optional("requestedAt"),
+            requested_at: reader.optional("requestedAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for JoinLinkViewerState {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -399,15 +454,26 @@ impl petrel_core::ToValue for JoinRequestView {
     }
 }
 
-impl petrel_core::FromValue for JoinRequestView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl JoinRequestView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             convo_id: reader.required("convoId")?,
             requested_by: reader.required("requestedBy")?,
             requested_at: reader.required("requestedAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for JoinRequestView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -477,9 +543,10 @@ impl petrel_core::ToValue for JoinRequestConvoView {
     }
 }
 
-impl petrel_core::FromValue for JoinRequestConvoView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl JoinRequestConvoView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             convo_id: reader.required("convoId")?,
             name: reader.required("name")?,
@@ -489,6 +556,16 @@ impl petrel_core::FromValue for JoinRequestConvoView {
             viewer: reader.required("viewer")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for JoinRequestConvoView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 

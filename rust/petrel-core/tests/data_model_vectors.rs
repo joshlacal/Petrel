@@ -541,7 +541,7 @@ fn dynamic_decoding_preserves_unknown_values_and_guards_projection() {
     assert!(from_json::<Value>(br#"{"$link":"invalid"}"#).is_err());
 
     let mut reader = ObjectReader::new(parse(r#"{"bad":"none","future":7}"#)).unwrap();
-    assert_eq!(reader.optional::<i64>("bad"), None);
+    assert_eq!(reader.optional::<i64>("bad"), Ok(None));
     assert_eq!(reader.degraded().collect::<Vec<_>>(), ["bad"]);
     assert_eq!(
         reader.finish_strict(),

@@ -32,14 +32,25 @@ impl petrel_core::ToValue for ConvoRef {
     }
 }
 
-impl petrel_core::FromValue for ConvoRef {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ConvoRef {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             did: reader.required("did")?,
             convo_id: reader.required("convoId")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ConvoRef {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -99,15 +110,26 @@ impl petrel_core::ToValue for MessageRef {
     }
 }
 
-impl petrel_core::FromValue for MessageRef {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl MessageRef {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             did: reader.required("did")?,
             convo_id: reader.required("convoId")?,
             message_id: reader.required("messageId")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for MessageRef {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -172,16 +194,27 @@ impl petrel_core::ToValue for MessageInput {
     }
 }
 
-impl petrel_core::FromValue for MessageInput {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl MessageInput {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             text: reader.required("text")?,
-            facets: reader.optional("facets"),
-            embed: reader.optional("embed"),
-            reply_to: reader.optional("replyTo"),
+            facets: reader.optional("facets")?,
+            embed: reader.optional("embed")?,
+            reply_to: reader.optional("replyTo")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for MessageInput {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -236,13 +269,24 @@ impl petrel_core::ToValue for ReplyRef {
     }
 }
 
-impl petrel_core::FromValue for ReplyRef {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ReplyRef {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             message_id: reader.required("messageId")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ReplyRef {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -323,21 +367,32 @@ impl petrel_core::ToValue for MessageView {
     }
 }
 
-impl petrel_core::FromValue for MessageView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl MessageView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             id: reader.required("id")?,
             rev: reader.required("rev")?,
             text: reader.required("text")?,
-            facets: reader.optional("facets"),
-            embed: reader.optional("embed"),
-            reactions: reader.optional("reactions"),
-            reply_to: reader.optional("replyTo"),
+            facets: reader.optional("facets")?,
+            embed: reader.optional("embed")?,
+            reactions: reader.optional("reactions")?,
+            reply_to: reader.optional("replyTo")?,
             sender: reader.required("sender")?,
             sent_at: reader.required("sentAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for MessageView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -391,13 +446,24 @@ impl petrel_core::ToValue for SystemMessageReferredUser {
     }
 }
 
-impl petrel_core::FromValue for SystemMessageReferredUser {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl SystemMessageReferredUser {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             did: reader.required("did")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SystemMessageReferredUser {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -460,9 +526,10 @@ impl petrel_core::ToValue for SystemMessageView {
     }
 }
 
-impl petrel_core::FromValue for SystemMessageView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl SystemMessageView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             id: reader.required("id")?,
             rev: reader.required("rev")?,
@@ -470,6 +537,16 @@ impl petrel_core::FromValue for SystemMessageView {
             data: reader.required("data")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SystemMessageView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -532,15 +609,26 @@ impl petrel_core::ToValue for SystemMessageDataAddMember {
     }
 }
 
-impl petrel_core::FromValue for SystemMessageDataAddMember {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl SystemMessageDataAddMember {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             member: reader.required("member")?,
             role: reader.required("role")?,
             added_by: reader.required("addedBy")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SystemMessageDataAddMember {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -599,14 +687,25 @@ impl petrel_core::ToValue for SystemMessageDataRemoveMember {
     }
 }
 
-impl petrel_core::FromValue for SystemMessageDataRemoveMember {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl SystemMessageDataRemoveMember {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             member: reader.required("member")?,
             removed_by: reader.required("removedBy")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SystemMessageDataRemoveMember {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -670,15 +769,26 @@ impl petrel_core::ToValue for SystemMessageDataMemberJoin {
     }
 }
 
-impl petrel_core::FromValue for SystemMessageDataMemberJoin {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl SystemMessageDataMemberJoin {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             member: reader.required("member")?,
             role: reader.required("role")?,
-            approved_by: reader.optional("approvedBy"),
+            approved_by: reader.optional("approvedBy")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SystemMessageDataMemberJoin {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -734,13 +844,24 @@ impl petrel_core::ToValue for SystemMessageDataMemberLeave {
     }
 }
 
-impl petrel_core::FromValue for SystemMessageDataMemberLeave {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl SystemMessageDataMemberLeave {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             member: reader.required("member")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SystemMessageDataMemberLeave {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -796,13 +917,24 @@ impl petrel_core::ToValue for SystemMessageDataLockConvo {
     }
 }
 
-impl petrel_core::FromValue for SystemMessageDataLockConvo {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl SystemMessageDataLockConvo {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             locked_by: reader.required("lockedBy")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SystemMessageDataLockConvo {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -858,13 +990,24 @@ impl petrel_core::ToValue for SystemMessageDataUnlockConvo {
     }
 }
 
-impl petrel_core::FromValue for SystemMessageDataUnlockConvo {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl SystemMessageDataUnlockConvo {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             unlocked_by: reader.required("unlockedBy")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SystemMessageDataUnlockConvo {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -920,13 +1063,24 @@ impl petrel_core::ToValue for SystemMessageDataLockConvoPermanently {
     }
 }
 
-impl petrel_core::FromValue for SystemMessageDataLockConvoPermanently {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl SystemMessageDataLockConvoPermanently {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             locked_by: reader.required("lockedBy")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SystemMessageDataLockConvoPermanently {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -992,14 +1146,25 @@ impl petrel_core::ToValue for SystemMessageDataEditGroup {
     }
 }
 
-impl petrel_core::FromValue for SystemMessageDataEditGroup {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl SystemMessageDataEditGroup {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            old_name: reader.optional("oldName"),
-            new_name: reader.optional("newName"),
+            old_name: reader.optional("oldName")?,
+            new_name: reader.optional("newName")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SystemMessageDataEditGroup {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1057,12 +1222,23 @@ impl petrel_core::ToValue for SystemMessageDataCreateJoinLink {
     }
 }
 
-impl petrel_core::FromValue for SystemMessageDataCreateJoinLink {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let reader = petrel_core::ObjectReader::new(value)?;
+impl SystemMessageDataCreateJoinLink {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SystemMessageDataCreateJoinLink {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1120,12 +1296,23 @@ impl petrel_core::ToValue for SystemMessageDataEditJoinLink {
     }
 }
 
-impl petrel_core::FromValue for SystemMessageDataEditJoinLink {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let reader = petrel_core::ObjectReader::new(value)?;
+impl SystemMessageDataEditJoinLink {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SystemMessageDataEditJoinLink {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1183,12 +1370,23 @@ impl petrel_core::ToValue for SystemMessageDataEnableJoinLink {
     }
 }
 
-impl petrel_core::FromValue for SystemMessageDataEnableJoinLink {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let reader = petrel_core::ObjectReader::new(value)?;
+impl SystemMessageDataEnableJoinLink {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SystemMessageDataEnableJoinLink {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1246,12 +1444,23 @@ impl petrel_core::ToValue for SystemMessageDataDisableJoinLink {
     }
 }
 
-impl petrel_core::FromValue for SystemMessageDataDisableJoinLink {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let reader = petrel_core::ObjectReader::new(value)?;
+impl SystemMessageDataDisableJoinLink {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SystemMessageDataDisableJoinLink {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1314,9 +1523,10 @@ impl petrel_core::ToValue for DeletedMessageView {
     }
 }
 
-impl petrel_core::FromValue for DeletedMessageView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl DeletedMessageView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             id: reader.required("id")?,
             rev: reader.required("rev")?,
@@ -1324,6 +1534,16 @@ impl petrel_core::FromValue for DeletedMessageView {
             sent_at: reader.required("sentAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for DeletedMessageView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1381,12 +1601,23 @@ impl petrel_core::ToValue for MessageBeforeUserJoinedGroupView {
     }
 }
 
-impl petrel_core::FromValue for MessageBeforeUserJoinedGroupView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let reader = petrel_core::ObjectReader::new(value)?;
+impl MessageBeforeUserJoinedGroupView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for MessageBeforeUserJoinedGroupView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1440,13 +1671,24 @@ impl petrel_core::ToValue for MessageViewSender {
     }
 }
 
-impl petrel_core::FromValue for MessageViewSender {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl MessageViewSender {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             did: reader.required("did")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for MessageViewSender {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1506,15 +1748,26 @@ impl petrel_core::ToValue for ReactionView {
     }
 }
 
-impl petrel_core::FromValue for ReactionView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ReactionView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             value: reader.required("value")?,
             sender: reader.required("sender")?,
             created_at: reader.required("createdAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ReactionView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1568,13 +1821,24 @@ impl petrel_core::ToValue for ReactionViewSender {
     }
 }
 
-impl petrel_core::FromValue for ReactionViewSender {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ReactionViewSender {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             did: reader.required("did")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ReactionViewSender {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1631,14 +1895,25 @@ impl petrel_core::ToValue for MessageAndReactionView {
     }
 }
 
-impl petrel_core::FromValue for MessageAndReactionView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl MessageAndReactionView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             message: reader.required("message")?,
             reaction: reader.required("reaction")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for MessageAndReactionView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1719,21 +1994,32 @@ impl petrel_core::ToValue for ConvoView {
     }
 }
 
-impl petrel_core::FromValue for ConvoView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ConvoView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             id: reader.required("id")?,
             rev: reader.required("rev")?,
             members: reader.required("members")?,
-            last_message: reader.optional("lastMessage"),
-            last_reaction: reader.optional("lastReaction"),
+            last_message: reader.optional("lastMessage")?,
+            last_reaction: reader.optional("lastReaction")?,
             muted: reader.required("muted")?,
-            status: reader.optional("status"),
+            status: reader.optional("status")?,
             unread_count: reader.required("unreadCount")?,
-            kind: reader.optional("kind"),
+            kind: reader.optional("kind")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ConvoView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1790,12 +2076,23 @@ impl petrel_core::ToValue for DirectConvo {
     }
 }
 
-impl petrel_core::FromValue for DirectConvo {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let reader = petrel_core::ObjectReader::new(value)?;
+impl DirectConvo {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for DirectConvo {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1880,21 +2177,32 @@ impl petrel_core::ToValue for GroupConvo {
     }
 }
 
-impl petrel_core::FromValue for GroupConvo {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl GroupConvo {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             created_at: reader.required("createdAt")?,
-            join_link: reader.optional("joinLink"),
-            join_request_count: reader.optional("joinRequestCount"),
+            join_link: reader.optional("joinLink")?,
+            join_request_count: reader.optional("joinRequestCount")?,
             lock_status: reader.required("lockStatus")?,
             lock_status_moderation_override: reader.required("lockStatusModerationOverride")?,
             member_count: reader.required("memberCount")?,
             member_limit: reader.required("memberLimit")?,
             name: reader.required("name")?,
-            unread_join_request_count: reader.optional("unreadJoinRequestCount"),
+            unread_join_request_count: reader.optional("unreadJoinRequestCount")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for GroupConvo {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1952,14 +2260,25 @@ impl petrel_core::ToValue for LogBeginConvo {
     }
 }
 
-impl petrel_core::FromValue for LogBeginConvo {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogBeginConvo {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogBeginConvo {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -2017,14 +2336,25 @@ impl petrel_core::ToValue for LogAcceptConvo {
     }
 }
 
-impl petrel_core::FromValue for LogAcceptConvo {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogAcceptConvo {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogAcceptConvo {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -2082,14 +2412,25 @@ impl petrel_core::ToValue for LogLeaveConvo {
     }
 }
 
-impl petrel_core::FromValue for LogLeaveConvo {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogLeaveConvo {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogLeaveConvo {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -2147,14 +2488,25 @@ impl petrel_core::ToValue for LogMuteConvo {
     }
 }
 
-impl petrel_core::FromValue for LogMuteConvo {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogMuteConvo {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogMuteConvo {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -2212,14 +2564,25 @@ impl petrel_core::ToValue for LogUnmuteConvo {
     }
 }
 
-impl petrel_core::FromValue for LogUnmuteConvo {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogUnmuteConvo {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogUnmuteConvo {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -2284,16 +2647,27 @@ impl petrel_core::ToValue for LogCreateMessage {
     }
 }
 
-impl petrel_core::FromValue for LogCreateMessage {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogCreateMessage {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
-            related_profiles: reader.optional("relatedProfiles"),
+            related_profiles: reader.optional("relatedProfiles")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogCreateMessage {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -2354,15 +2728,26 @@ impl petrel_core::ToValue for LogDeleteMessage {
     }
 }
 
-impl petrel_core::FromValue for LogDeleteMessage {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogDeleteMessage {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogDeleteMessage {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -2423,15 +2808,26 @@ impl petrel_core::ToValue for LogReadMessage {
     }
 }
 
-impl petrel_core::FromValue for LogReadMessage {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogReadMessage {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogReadMessage {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -2499,17 +2895,28 @@ impl petrel_core::ToValue for LogAddReaction {
     }
 }
 
-impl petrel_core::FromValue for LogAddReaction {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogAddReaction {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             reaction: reader.required("reaction")?,
-            related_profiles: reader.optional("relatedProfiles"),
+            related_profiles: reader.optional("relatedProfiles")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogAddReaction {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -2577,17 +2984,28 @@ impl petrel_core::ToValue for LogRemoveReaction {
     }
 }
 
-impl petrel_core::FromValue for LogRemoveReaction {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogRemoveReaction {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             reaction: reader.required("reaction")?,
-            related_profiles: reader.optional("relatedProfiles"),
+            related_profiles: reader.optional("relatedProfiles")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogRemoveReaction {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -2648,15 +3066,26 @@ impl petrel_core::ToValue for LogReadConvo {
     }
 }
 
-impl petrel_core::FromValue for LogReadConvo {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogReadConvo {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogReadConvo {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -2722,9 +3151,10 @@ impl petrel_core::ToValue for LogAddMember {
     }
 }
 
-impl petrel_core::FromValue for LogAddMember {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogAddMember {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
@@ -2732,6 +3162,16 @@ impl petrel_core::FromValue for LogAddMember {
             related_profiles: reader.required("relatedProfiles")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogAddMember {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -2797,9 +3237,10 @@ impl petrel_core::ToValue for LogRemoveMember {
     }
 }
 
-impl petrel_core::FromValue for LogRemoveMember {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogRemoveMember {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
@@ -2807,6 +3248,16 @@ impl petrel_core::FromValue for LogRemoveMember {
             related_profiles: reader.required("relatedProfiles")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogRemoveMember {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -2872,9 +3323,10 @@ impl petrel_core::ToValue for LogMemberJoin {
     }
 }
 
-impl petrel_core::FromValue for LogMemberJoin {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogMemberJoin {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
@@ -2882,6 +3334,16 @@ impl petrel_core::FromValue for LogMemberJoin {
             related_profiles: reader.required("relatedProfiles")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogMemberJoin {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -2947,9 +3409,10 @@ impl petrel_core::ToValue for LogMemberLeave {
     }
 }
 
-impl petrel_core::FromValue for LogMemberLeave {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogMemberLeave {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
@@ -2957,6 +3420,16 @@ impl petrel_core::FromValue for LogMemberLeave {
             related_profiles: reader.required("relatedProfiles")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogMemberLeave {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -3022,9 +3495,10 @@ impl petrel_core::ToValue for LogLockConvo {
     }
 }
 
-impl petrel_core::FromValue for LogLockConvo {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogLockConvo {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
@@ -3032,6 +3506,16 @@ impl petrel_core::FromValue for LogLockConvo {
             related_profiles: reader.required("relatedProfiles")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogLockConvo {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -3097,9 +3581,10 @@ impl petrel_core::ToValue for LogUnlockConvo {
     }
 }
 
-impl petrel_core::FromValue for LogUnlockConvo {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogUnlockConvo {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
@@ -3107,6 +3592,16 @@ impl petrel_core::FromValue for LogUnlockConvo {
             related_profiles: reader.required("relatedProfiles")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogUnlockConvo {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -3172,9 +3667,10 @@ impl petrel_core::ToValue for LogLockConvoPermanently {
     }
 }
 
-impl petrel_core::FromValue for LogLockConvoPermanently {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogLockConvoPermanently {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
@@ -3182,6 +3678,16 @@ impl petrel_core::FromValue for LogLockConvoPermanently {
             related_profiles: reader.required("relatedProfiles")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogLockConvoPermanently {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -3243,15 +3749,26 @@ impl petrel_core::ToValue for LogEditGroup {
     }
 }
 
-impl petrel_core::FromValue for LogEditGroup {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogEditGroup {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogEditGroup {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -3313,15 +3830,26 @@ impl petrel_core::ToValue for LogCreateJoinLink {
     }
 }
 
-impl petrel_core::FromValue for LogCreateJoinLink {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogCreateJoinLink {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogCreateJoinLink {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -3383,15 +3911,26 @@ impl petrel_core::ToValue for LogEditJoinLink {
     }
 }
 
-impl petrel_core::FromValue for LogEditJoinLink {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogEditJoinLink {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogEditJoinLink {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -3453,15 +3992,26 @@ impl petrel_core::ToValue for LogEnableJoinLink {
     }
 }
 
-impl petrel_core::FromValue for LogEnableJoinLink {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogEnableJoinLink {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogEnableJoinLink {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -3523,15 +4073,26 @@ impl petrel_core::ToValue for LogDisableJoinLink {
     }
 }
 
-impl petrel_core::FromValue for LogDisableJoinLink {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogDisableJoinLink {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogDisableJoinLink {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -3593,15 +4154,26 @@ impl petrel_core::ToValue for LogIncomingJoinRequest {
     }
 }
 
-impl petrel_core::FromValue for LogIncomingJoinRequest {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogIncomingJoinRequest {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             member: reader.required("member")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogIncomingJoinRequest {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -3663,15 +4235,26 @@ impl petrel_core::ToValue for LogApproveJoinRequest {
     }
 }
 
-impl petrel_core::FromValue for LogApproveJoinRequest {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogApproveJoinRequest {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             member: reader.required("member")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogApproveJoinRequest {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -3733,15 +4316,26 @@ impl petrel_core::ToValue for LogRejectJoinRequest {
     }
 }
 
-impl petrel_core::FromValue for LogRejectJoinRequest {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogRejectJoinRequest {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             member: reader.required("member")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogRejectJoinRequest {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -3799,14 +4393,25 @@ impl petrel_core::ToValue for LogOutgoingJoinRequest {
     }
 }
 
-impl petrel_core::FromValue for LogOutgoingJoinRequest {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogOutgoingJoinRequest {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogOutgoingJoinRequest {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -3868,15 +4473,26 @@ impl petrel_core::ToValue for LogWithdrawIncomingJoinRequest {
     }
 }
 
-impl petrel_core::FromValue for LogWithdrawIncomingJoinRequest {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogWithdrawIncomingJoinRequest {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             member: reader.required("member")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogWithdrawIncomingJoinRequest {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -3934,14 +4550,25 @@ impl petrel_core::ToValue for LogWithdrawOutgoingJoinRequest {
     }
 }
 
-impl petrel_core::FromValue for LogWithdrawOutgoingJoinRequest {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogWithdrawOutgoingJoinRequest {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogWithdrawOutgoingJoinRequest {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -3999,14 +4626,25 @@ impl petrel_core::ToValue for LogReadJoinRequests {
     }
 }
 
-impl petrel_core::FromValue for LogReadJoinRequests {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LogReadJoinRequests {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LogReadJoinRequests {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -4344,13 +4982,23 @@ impl petrel_core::ToValue for MessageInputEmbed {
     }
 }
 
-impl petrel_core::FromValue for MessageInputEmbed {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl MessageInputEmbed {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.record" => petrel_core::FromValue::from_value(value).map(Self::Record),
-            "chat.bsky.embed.joinLink" => petrel_core::FromValue::from_value(value).map(Self::JoinLink),
+            "app.bsky.embed.record" => petrel_core::decode_value(value, strict).map(Self::Record),
+            "chat.bsky.embed.joinLink" => petrel_core::decode_value(value, strict).map(Self::JoinLink),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for MessageInputEmbed {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -4395,13 +5043,23 @@ impl petrel_core::ToValue for MessageViewEmbed {
     }
 }
 
-impl petrel_core::FromValue for MessageViewEmbed {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl MessageViewEmbed {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.record#view" => petrel_core::FromValue::from_value(value).map(Self::RecordView),
-            "chat.bsky.embed.joinLink#view" => petrel_core::FromValue::from_value(value).map(Self::JoinLinkView),
+            "app.bsky.embed.record#view" => petrel_core::decode_value(value, strict).map(Self::RecordView),
+            "chat.bsky.embed.joinLink#view" => petrel_core::decode_value(value, strict).map(Self::JoinLinkView),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for MessageViewEmbed {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -4448,14 +5106,24 @@ impl petrel_core::ToValue for MessageViewReplyTo {
     }
 }
 
-impl petrel_core::FromValue for MessageViewReplyTo {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl MessageViewReplyTo {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::FromValue::from_value(value).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::FromValue::from_value(value).map(Self::DeletedMessageView),
-            "chat.bsky.convo.defs#messageBeforeUserJoinedGroupView" => petrel_core::FromValue::from_value(value).map(Self::MessageBeforeUserJoinedGroupView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#messageBeforeUserJoinedGroupView" => petrel_core::decode_value(value, strict).map(Self::MessageBeforeUserJoinedGroupView),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for MessageViewReplyTo {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -4520,23 +5188,33 @@ impl petrel_core::ToValue for SystemMessageViewData {
     }
 }
 
-impl petrel_core::FromValue for SystemMessageViewData {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl SystemMessageViewData {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#systemMessageDataAddMember" => petrel_core::FromValue::from_value(value).map(Self::SystemMessageDataAddMember),
-            "chat.bsky.convo.defs#systemMessageDataRemoveMember" => petrel_core::FromValue::from_value(value).map(Self::SystemMessageDataRemoveMember),
-            "chat.bsky.convo.defs#systemMessageDataMemberJoin" => petrel_core::FromValue::from_value(value).map(Self::SystemMessageDataMemberJoin),
-            "chat.bsky.convo.defs#systemMessageDataMemberLeave" => petrel_core::FromValue::from_value(value).map(Self::SystemMessageDataMemberLeave),
-            "chat.bsky.convo.defs#systemMessageDataLockConvo" => petrel_core::FromValue::from_value(value).map(Self::SystemMessageDataLockConvo),
-            "chat.bsky.convo.defs#systemMessageDataUnlockConvo" => petrel_core::FromValue::from_value(value).map(Self::SystemMessageDataUnlockConvo),
-            "chat.bsky.convo.defs#systemMessageDataLockConvoPermanently" => petrel_core::FromValue::from_value(value).map(Self::SystemMessageDataLockConvoPermanently),
-            "chat.bsky.convo.defs#systemMessageDataEditGroup" => petrel_core::FromValue::from_value(value).map(Self::SystemMessageDataEditGroup),
-            "chat.bsky.convo.defs#systemMessageDataCreateJoinLink" => petrel_core::FromValue::from_value(value).map(Self::SystemMessageDataCreateJoinLink),
-            "chat.bsky.convo.defs#systemMessageDataEditJoinLink" => petrel_core::FromValue::from_value(value).map(Self::SystemMessageDataEditJoinLink),
-            "chat.bsky.convo.defs#systemMessageDataEnableJoinLink" => petrel_core::FromValue::from_value(value).map(Self::SystemMessageDataEnableJoinLink),
-            "chat.bsky.convo.defs#systemMessageDataDisableJoinLink" => petrel_core::FromValue::from_value(value).map(Self::SystemMessageDataDisableJoinLink),
+            "chat.bsky.convo.defs#systemMessageDataAddMember" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataAddMember),
+            "chat.bsky.convo.defs#systemMessageDataRemoveMember" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataRemoveMember),
+            "chat.bsky.convo.defs#systemMessageDataMemberJoin" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataMemberJoin),
+            "chat.bsky.convo.defs#systemMessageDataMemberLeave" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataMemberLeave),
+            "chat.bsky.convo.defs#systemMessageDataLockConvo" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataLockConvo),
+            "chat.bsky.convo.defs#systemMessageDataUnlockConvo" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataUnlockConvo),
+            "chat.bsky.convo.defs#systemMessageDataLockConvoPermanently" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataLockConvoPermanently),
+            "chat.bsky.convo.defs#systemMessageDataEditGroup" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataEditGroup),
+            "chat.bsky.convo.defs#systemMessageDataCreateJoinLink" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataCreateJoinLink),
+            "chat.bsky.convo.defs#systemMessageDataEditJoinLink" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataEditJoinLink),
+            "chat.bsky.convo.defs#systemMessageDataEnableJoinLink" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataEnableJoinLink),
+            "chat.bsky.convo.defs#systemMessageDataDisableJoinLink" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataDisableJoinLink),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for SystemMessageViewData {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -4583,14 +5261,24 @@ impl petrel_core::ToValue for ConvoViewLastMessage {
     }
 }
 
-impl petrel_core::FromValue for ConvoViewLastMessage {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl ConvoViewLastMessage {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::FromValue::from_value(value).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::FromValue::from_value(value).map(Self::DeletedMessageView),
-            "chat.bsky.convo.defs#systemMessageView" => petrel_core::FromValue::from_value(value).map(Self::SystemMessageView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#systemMessageView" => petrel_core::decode_value(value, strict).map(Self::SystemMessageView),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for ConvoViewLastMessage {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -4633,12 +5321,22 @@ impl petrel_core::ToValue for ConvoViewLastReaction {
     }
 }
 
-impl petrel_core::FromValue for ConvoViewLastReaction {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl ConvoViewLastReaction {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageAndReactionView" => petrel_core::FromValue::from_value(value).map(Self::MessageAndReactionView),
+            "chat.bsky.convo.defs#messageAndReactionView" => petrel_core::decode_value(value, strict).map(Self::MessageAndReactionView),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for ConvoViewLastReaction {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -4683,13 +5381,23 @@ impl petrel_core::ToValue for ConvoViewKind {
     }
 }
 
-impl petrel_core::FromValue for ConvoViewKind {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl ConvoViewKind {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#directConvo" => petrel_core::FromValue::from_value(value).map(Self::DirectConvo),
-            "chat.bsky.convo.defs#groupConvo" => petrel_core::FromValue::from_value(value).map(Self::GroupConvo),
+            "chat.bsky.convo.defs#directConvo" => petrel_core::decode_value(value, strict).map(Self::DirectConvo),
+            "chat.bsky.convo.defs#groupConvo" => petrel_core::decode_value(value, strict).map(Self::GroupConvo),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for ConvoViewKind {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -4734,13 +5442,23 @@ impl petrel_core::ToValue for LogCreateMessageMessage {
     }
 }
 
-impl petrel_core::FromValue for LogCreateMessageMessage {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl LogCreateMessageMessage {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::FromValue::from_value(value).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::FromValue::from_value(value).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for LogCreateMessageMessage {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -4785,13 +5503,23 @@ impl petrel_core::ToValue for LogDeleteMessageMessage {
     }
 }
 
-impl petrel_core::FromValue for LogDeleteMessageMessage {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl LogDeleteMessageMessage {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::FromValue::from_value(value).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::FromValue::from_value(value).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for LogDeleteMessageMessage {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -4838,14 +5566,24 @@ impl petrel_core::ToValue for LogReadMessageMessage {
     }
 }
 
-impl petrel_core::FromValue for LogReadMessageMessage {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl LogReadMessageMessage {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::FromValue::from_value(value).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::FromValue::from_value(value).map(Self::DeletedMessageView),
-            "chat.bsky.convo.defs#systemMessageView" => petrel_core::FromValue::from_value(value).map(Self::SystemMessageView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#systemMessageView" => petrel_core::decode_value(value, strict).map(Self::SystemMessageView),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for LogReadMessageMessage {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -4890,13 +5628,23 @@ impl petrel_core::ToValue for LogAddReactionMessage {
     }
 }
 
-impl petrel_core::FromValue for LogAddReactionMessage {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl LogAddReactionMessage {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::FromValue::from_value(value).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::FromValue::from_value(value).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for LogAddReactionMessage {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -4941,13 +5689,23 @@ impl petrel_core::ToValue for LogRemoveReactionMessage {
     }
 }
 
-impl petrel_core::FromValue for LogRemoveReactionMessage {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl LogRemoveReactionMessage {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::FromValue::from_value(value).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::FromValue::from_value(value).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for LogRemoveReactionMessage {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -4994,14 +5752,24 @@ impl petrel_core::ToValue for LogReadConvoMessage {
     }
 }
 
-impl petrel_core::FromValue for LogReadConvoMessage {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl LogReadConvoMessage {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::FromValue::from_value(value).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::FromValue::from_value(value).map(Self::DeletedMessageView),
-            "chat.bsky.convo.defs#systemMessageView" => petrel_core::FromValue::from_value(value).map(Self::SystemMessageView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#systemMessageView" => petrel_core::decode_value(value, strict).map(Self::SystemMessageView),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for LogReadConvoMessage {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

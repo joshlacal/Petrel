@@ -67,21 +67,32 @@ impl petrel_core::ToValue for Post {
     }
 }
 
-impl petrel_core::FromValue for Post {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Post {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             text: reader.required("text")?,
-            entities: reader.optional("entities"),
-            facets: reader.optional("facets"),
-            reply: reader.optional("reply"),
-            embed: reader.optional("embed"),
-            langs: reader.optional("langs"),
-            labels: reader.optional("labels"),
-            tags: reader.optional("tags"),
+            entities: reader.optional("entities")?,
+            facets: reader.optional("facets")?,
+            reply: reader.optional("reply")?,
+            embed: reader.optional("embed")?,
+            langs: reader.optional("langs")?,
+            labels: reader.optional("labels")?,
+            tags: reader.optional("tags")?,
             created_at: reader.required("createdAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Post {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -138,14 +149,25 @@ impl petrel_core::ToValue for ReplyRef {
     }
 }
 
-impl petrel_core::FromValue for ReplyRef {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ReplyRef {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             root: reader.required("root")?,
             parent: reader.required("parent")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ReplyRef {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -207,15 +229,26 @@ impl petrel_core::ToValue for Entity {
     }
 }
 
-impl petrel_core::FromValue for Entity {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Entity {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             index: reader.required("index")?,
             r#type: reader.required("type")?,
             value: reader.required("value")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Entity {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -273,14 +306,25 @@ impl petrel_core::ToValue for TextSlice {
     }
 }
 
-impl petrel_core::FromValue for TextSlice {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl TextSlice {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             start: reader.required("start")?,
             end: reader.required("end")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for TextSlice {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -333,17 +377,27 @@ impl petrel_core::ToValue for PostEmbed {
     }
 }
 
-impl petrel_core::FromValue for PostEmbed {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl PostEmbed {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.images" => petrel_core::FromValue::from_value(value).map(Self::Images),
-            "app.bsky.embed.video" => petrel_core::FromValue::from_value(value).map(Self::Video),
-            "app.bsky.embed.gallery" => petrel_core::FromValue::from_value(value).map(Self::Gallery),
-            "app.bsky.embed.external" => petrel_core::FromValue::from_value(value).map(Self::External),
-            "app.bsky.embed.record" => petrel_core::FromValue::from_value(value).map(Self::Record),
-            "app.bsky.embed.recordWithMedia" => petrel_core::FromValue::from_value(value).map(Self::RecordWithMedia),
+            "app.bsky.embed.images" => petrel_core::decode_value(value, strict).map(Self::Images),
+            "app.bsky.embed.video" => petrel_core::decode_value(value, strict).map(Self::Video),
+            "app.bsky.embed.gallery" => petrel_core::decode_value(value, strict).map(Self::Gallery),
+            "app.bsky.embed.external" => petrel_core::decode_value(value, strict).map(Self::External),
+            "app.bsky.embed.record" => petrel_core::decode_value(value, strict).map(Self::Record),
+            "app.bsky.embed.recordWithMedia" => petrel_core::decode_value(value, strict).map(Self::RecordWithMedia),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for PostEmbed {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -386,12 +440,22 @@ impl petrel_core::ToValue for PostLabels {
     }
 }
 
-impl petrel_core::FromValue for PostLabels {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl PostLabels {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.label.defs#selfLabels" => petrel_core::FromValue::from_value(value).map(Self::SelfLabels),
+            "com.atproto.label.defs#selfLabels" => petrel_core::decode_value(value, strict).map(Self::SelfLabels),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for PostLabels {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

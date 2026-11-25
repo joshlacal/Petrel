@@ -858,6 +858,13 @@ impl<T: FromValue> FromValue for Nullable<T> {
             other => T::from_value(other).map(Self::Value),
         }
     }
+
+    fn from_value_strict(value: Value) -> Result<Self, DecodeError> {
+        match value {
+            Value::Null => Ok(Self::Null),
+            other => T::from_value_strict(other).map(Self::Value),
+        }
+    }
 }
 
 impl<T: ToValue> Serialize for Nullable<T> {

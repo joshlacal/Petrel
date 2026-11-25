@@ -3,6 +3,7 @@ fn decode_strict_ref<T: petrel_core::FromValue>(
     allowed_keys: &[&str],
     expected_type_id: &str,
     field_name: &str,
+    strict: bool,
 ) -> Result<T, petrel_core::DecodeError> {
     let map = raw.as_object().ok_or_else(|| {
         petrel_core::DecodeError::TypeMismatch {
@@ -40,5 +41,5 @@ fn decode_strict_ref<T: petrel_core::FromValue>(
         }
     }
 
-    T::from_value(raw).map_err(|err| err.in_field(field_name))
+    petrel_core::decode_value(raw, strict).map_err(|err| err.in_field(field_name))
 }

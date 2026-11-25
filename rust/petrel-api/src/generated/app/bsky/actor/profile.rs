@@ -79,23 +79,34 @@ impl petrel_core::ToValue for Profile {
     }
 }
 
-impl petrel_core::FromValue for Profile {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Profile {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            display_name: reader.optional("displayName"),
-            description: reader.optional("description"),
-            pronouns: reader.optional("pronouns"),
-            website: reader.optional("website"),
-            avatar: reader.optional("avatar"),
-            banner: reader.optional("banner"),
-            labels: reader.optional("labels"),
-            joined_via_starter_pack: reader.optional("joinedViaStarterPack"),
-            pinned_post: reader.optional("pinnedPost"),
-            links: reader.optional("links"),
-            created_at: reader.optional("createdAt"),
+            display_name: reader.optional("displayName")?,
+            description: reader.optional("description")?,
+            pronouns: reader.optional("pronouns")?,
+            website: reader.optional("website")?,
+            avatar: reader.optional("avatar")?,
+            banner: reader.optional("banner")?,
+            labels: reader.optional("labels")?,
+            joined_via_starter_pack: reader.optional("joinedViaStarterPack")?,
+            pinned_post: reader.optional("pinnedPost")?,
+            links: reader.optional("links")?,
+            created_at: reader.optional("createdAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Profile {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -138,12 +149,22 @@ impl petrel_core::ToValue for ProfileLabels {
     }
 }
 
-impl petrel_core::FromValue for ProfileLabels {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl ProfileLabels {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.label.defs#selfLabels" => petrel_core::FromValue::from_value(value).map(Self::SelfLabels),
+            "com.atproto.label.defs#selfLabels" => petrel_core::decode_value(value, strict).map(Self::SelfLabels),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for ProfileLabels {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

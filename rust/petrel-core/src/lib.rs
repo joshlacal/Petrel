@@ -39,7 +39,8 @@ pub use datetime::Datetime;
 pub use error::{CidError, DagCborError, DecodeError, EncodeError, SyntaxError, SyntaxKind};
 pub use language::{Language, LanguageTag};
 pub use serde_bridge::{
-    FromValue, ObjectReader, ObjectWriter, ToValue, from_dag_cbor, from_json, to_dag_cbor, to_json,
+    FromValue, ObjectReader, ObjectWriter, ToValue, decode_value, from_dag_cbor, from_json,
+    to_dag_cbor, to_json,
 };
 pub use service_ref::{ServiceRef, ServiceRefError};
 pub use syntax::{

@@ -70,24 +70,32 @@ impl petrel_core::ToValue for Input {
     }
 }
 
-impl petrel_core::FromValue for Input {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Input {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            chat: reader.optional_strict("chat")?,
-            follow: reader.optional_strict("follow")?,
-            like: reader.optional_strict("like")?,
-            like_via_repost: reader.optional_strict("likeViaRepost")?,
-            mention: reader.optional_strict("mention")?,
-            quote: reader.optional_strict("quote")?,
-            reply: reader.optional_strict("reply")?,
-            repost: reader.optional_strict("repost")?,
-            repost_via_repost: reader.optional_strict("repostViaRepost")?,
-            starterpack_joined: reader.optional_strict("starterpackJoined")?,
-            subscribed_post: reader.optional_strict("subscribedPost")?,
-            unverified: reader.optional_strict("unverified")?,
-            verified: reader.optional_strict("verified")?,
+            chat: reader.optional("chat")?,
+            follow: reader.optional("follow")?,
+            like: reader.optional("like")?,
+            like_via_repost: reader.optional("likeViaRepost")?,
+            mention: reader.optional("mention")?,
+            quote: reader.optional("quote")?,
+            reply: reader.optional("reply")?,
+            repost: reader.optional("repost")?,
+            repost_via_repost: reader.optional("repostViaRepost")?,
+            starterpack_joined: reader.optional("starterpackJoined")?,
+            subscribed_post: reader.optional("subscribedPost")?,
+            unverified: reader.optional("unverified")?,
+            verified: reader.optional("verified")?,
         })
+    }
+}
+
+impl petrel_core::FromValue for Input {
+    // An XRPC input: strict however it is reached.
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -138,12 +146,23 @@ impl petrel_core::ToValue for Output {
     }
 }
 
-impl petrel_core::FromValue for Output {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Output {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             preferences: reader.required("preferences")?,
         })
+    }
+}
+
+impl petrel_core::FromValue for Output {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 

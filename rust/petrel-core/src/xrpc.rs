@@ -192,7 +192,7 @@ impl FromValue for XrpcErrorBody {
         let mut reader = ObjectReader::new(value)?;
         Ok(Self {
             error: reader.required("error")?,
-            message: reader.optional("message"),
+            message: reader.optional("message")?,
         })
     }
 }

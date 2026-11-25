@@ -72,27 +72,38 @@ impl petrel_core::ToValue for PostView {
     }
 }
 
-impl petrel_core::FromValue for PostView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl PostView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
             cid: reader.required("cid")?,
             author: reader.required("author")?,
             record: reader.required("record")?,
-            embed: reader.optional("embed"),
-            bookmark_count: reader.optional("bookmarkCount"),
-            reply_count: reader.optional("replyCount"),
-            repost_count: reader.optional("repostCount"),
-            like_count: reader.optional("likeCount"),
-            quote_count: reader.optional("quoteCount"),
+            embed: reader.optional("embed")?,
+            bookmark_count: reader.optional("bookmarkCount")?,
+            reply_count: reader.optional("replyCount")?,
+            repost_count: reader.optional("repostCount")?,
+            like_count: reader.optional("likeCount")?,
+            quote_count: reader.optional("quoteCount")?,
             indexed_at: reader.required("indexedAt")?,
-            viewer: reader.optional("viewer"),
-            labels: reader.optional("labels"),
-            threadgate: reader.optional("threadgate"),
-            debug: reader.optional("debug"),
+            viewer: reader.optional("viewer")?,
+            labels: reader.optional("labels")?,
+            threadgate: reader.optional("threadgate")?,
+            debug: reader.optional("debug")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for PostView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -175,20 +186,31 @@ impl petrel_core::ToValue for ViewerState {
     }
 }
 
-impl petrel_core::FromValue for ViewerState {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ViewerState {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            repost: reader.optional("repost"),
-            like: reader.optional("like"),
-            bookmarked: reader.optional("bookmarked"),
-            thread_muted: reader.optional("threadMuted"),
-            reply_disabled: reader.optional("replyDisabled"),
-            embedding_disabled: reader.optional("embeddingDisabled"),
-            pinned: reader.optional("pinned"),
-            known_likers: reader.optional("knownLikers"),
+            repost: reader.optional("repost")?,
+            like: reader.optional("like")?,
+            bookmarked: reader.optional("bookmarked")?,
+            thread_muted: reader.optional("threadMuted")?,
+            reply_disabled: reader.optional("replyDisabled")?,
+            embedding_disabled: reader.optional("embeddingDisabled")?,
+            pinned: reader.optional("pinned")?,
+            known_likers: reader.optional("knownLikers")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ViewerState {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -246,14 +268,25 @@ impl petrel_core::ToValue for KnownLikers {
     }
 }
 
-impl petrel_core::FromValue for KnownLikers {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl KnownLikers {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             count: reader.required("count")?,
             actors: reader.required("actors")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for KnownLikers {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -314,13 +347,24 @@ impl petrel_core::ToValue for ThreadContext {
     }
 }
 
-impl petrel_core::FromValue for ThreadContext {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ThreadContext {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            root_author_like: reader.optional("rootAuthorLike"),
+            root_author_like: reader.optional("rootAuthorLike")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ThreadContext {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -396,19 +440,30 @@ impl petrel_core::ToValue for FeedViewPost {
     }
 }
 
-impl petrel_core::FromValue for FeedViewPost {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl FeedViewPost {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             post: reader.required("post")?,
-            reply: reader.optional("reply"),
-            op_thread_post_index: reader.optional("opThreadPostIndex"),
-            op_thread_post_count: reader.optional("opThreadPostCount"),
-            reason: reader.optional("reason"),
-            feed_context: reader.optional("feedContext"),
-            req_id: reader.optional("reqId"),
+            reply: reader.optional("reply")?,
+            op_thread_post_index: reader.optional("opThreadPostIndex")?,
+            op_thread_post_count: reader.optional("opThreadPostCount")?,
+            reason: reader.optional("reason")?,
+            feed_context: reader.optional("feedContext")?,
+            req_id: reader.optional("reqId")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for FeedViewPost {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -469,15 +524,26 @@ impl petrel_core::ToValue for ReplyRef {
     }
 }
 
-impl petrel_core::FromValue for ReplyRef {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ReplyRef {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             root: reader.required("root")?,
             parent: reader.required("parent")?,
-            grandparent_author: reader.optional("grandparentAuthor"),
+            grandparent_author: reader.optional("grandparentAuthor")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ReplyRef {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -540,16 +606,27 @@ impl petrel_core::ToValue for ReasonRepost {
     }
 }
 
-impl petrel_core::FromValue for ReasonRepost {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ReasonRepost {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             by: reader.required("by")?,
-            uri: reader.optional("uri"),
-            cid: reader.optional("cid"),
+            uri: reader.optional("uri")?,
+            cid: reader.optional("cid")?,
             indexed_at: reader.required("indexedAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ReasonRepost {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -606,12 +683,23 @@ impl petrel_core::ToValue for ReasonPin {
     }
 }
 
-impl petrel_core::FromValue for ReasonPin {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let reader = petrel_core::ObjectReader::new(value)?;
+impl ReasonPin {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ReasonPin {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -674,16 +762,27 @@ impl petrel_core::ToValue for ThreadViewPost {
     }
 }
 
-impl petrel_core::FromValue for ThreadViewPost {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ThreadViewPost {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             post: reader.required("post")?,
-            parent: reader.optional("parent"),
-            replies: reader.optional("replies"),
-            thread_context: reader.optional("threadContext"),
+            parent: reader.optional("parent")?,
+            replies: reader.optional("replies")?,
+            thread_context: reader.optional("threadContext")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ThreadViewPost {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -740,14 +839,25 @@ impl petrel_core::ToValue for NotFoundPost {
     }
 }
 
-impl petrel_core::FromValue for NotFoundPost {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl NotFoundPost {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
             not_found: reader.required("notFound")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for NotFoundPost {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -807,15 +917,26 @@ impl petrel_core::ToValue for BlockedPost {
     }
 }
 
-impl petrel_core::FromValue for BlockedPost {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl BlockedPost {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
             blocked: reader.required("blocked")?,
             author: reader.required("author")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for BlockedPost {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -872,14 +993,25 @@ impl petrel_core::ToValue for BlockedAuthor {
     }
 }
 
-impl petrel_core::FromValue for BlockedAuthor {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl BlockedAuthor {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             did: reader.required("did")?,
-            viewer: reader.optional("viewer"),
+            viewer: reader.optional("viewer")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for BlockedAuthor {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -972,26 +1104,37 @@ impl petrel_core::ToValue for GeneratorView {
     }
 }
 
-impl petrel_core::FromValue for GeneratorView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl GeneratorView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
             cid: reader.required("cid")?,
             did: reader.required("did")?,
             creator: reader.required("creator")?,
             display_name: reader.required("displayName")?,
-            description: reader.optional("description"),
-            description_facets: reader.optional("descriptionFacets"),
-            avatar: reader.optional("avatar"),
-            like_count: reader.optional("likeCount"),
-            accepts_interactions: reader.optional("acceptsInteractions"),
-            labels: reader.optional("labels"),
-            viewer: reader.optional("viewer"),
-            content_mode: reader.optional("contentMode"),
+            description: reader.optional("description")?,
+            description_facets: reader.optional("descriptionFacets")?,
+            avatar: reader.optional("avatar")?,
+            like_count: reader.optional("likeCount")?,
+            accepts_interactions: reader.optional("acceptsInteractions")?,
+            labels: reader.optional("labels")?,
+            viewer: reader.optional("viewer")?,
+            content_mode: reader.optional("contentMode")?,
             indexed_at: reader.required("indexedAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for GeneratorView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1051,13 +1194,24 @@ impl petrel_core::ToValue for GeneratorViewerState {
     }
 }
 
-impl petrel_core::FromValue for GeneratorViewerState {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl GeneratorViewerState {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            like: reader.optional("like"),
+            like: reader.optional("like")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for GeneratorViewerState {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1118,15 +1272,26 @@ impl petrel_core::ToValue for SkeletonFeedPost {
     }
 }
 
-impl petrel_core::FromValue for SkeletonFeedPost {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl SkeletonFeedPost {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             post: reader.required("post")?,
-            reason: reader.optional("reason"),
-            feed_context: reader.optional("feedContext"),
+            reason: reader.optional("reason")?,
+            feed_context: reader.optional("feedContext")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SkeletonFeedPost {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1180,13 +1345,24 @@ impl petrel_core::ToValue for SkeletonReasonRepost {
     }
 }
 
-impl petrel_core::FromValue for SkeletonReasonRepost {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl SkeletonReasonRepost {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             repost: reader.required("repost")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SkeletonReasonRepost {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1243,12 +1419,23 @@ impl petrel_core::ToValue for SkeletonReasonPin {
     }
 }
 
-impl petrel_core::FromValue for SkeletonReasonPin {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let reader = petrel_core::ObjectReader::new(value)?;
+impl SkeletonReasonPin {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for SkeletonReasonPin {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1317,16 +1504,27 @@ impl petrel_core::ToValue for ThreadgateView {
     }
 }
 
-impl petrel_core::FromValue for ThreadgateView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ThreadgateView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            uri: reader.optional("uri"),
-            cid: reader.optional("cid"),
-            record: reader.optional("record"),
-            lists: reader.optional("lists"),
+            uri: reader.optional("uri")?,
+            cid: reader.optional("cid")?,
+            record: reader.optional("record")?,
+            lists: reader.optional("lists")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ThreadgateView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1397,16 +1595,27 @@ impl petrel_core::ToValue for Interaction {
     }
 }
 
-impl petrel_core::FromValue for Interaction {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Interaction {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            item: reader.optional("item"),
-            event: reader.optional("event"),
-            feed_context: reader.optional("feedContext"),
-            req_id: reader.optional("reqId"),
+            item: reader.optional("item")?,
+            event: reader.optional("event")?,
+            feed_context: reader.optional("feedContext")?,
+            req_id: reader.optional("reqId")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Interaction {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1501,17 +1710,27 @@ impl petrel_core::ToValue for PostViewEmbed {
     }
 }
 
-impl petrel_core::FromValue for PostViewEmbed {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl PostViewEmbed {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.images#view" => petrel_core::FromValue::from_value(value).map(Self::ImagesView),
-            "app.bsky.embed.video#view" => petrel_core::FromValue::from_value(value).map(Self::VideoView),
-            "app.bsky.embed.gallery#view" => petrel_core::FromValue::from_value(value).map(Self::GalleryView),
-            "app.bsky.embed.external#view" => petrel_core::FromValue::from_value(value).map(Self::ExternalView),
-            "app.bsky.embed.record#view" => petrel_core::FromValue::from_value(value).map(Self::RecordView),
-            "app.bsky.embed.recordWithMedia#view" => petrel_core::FromValue::from_value(value).map(Self::RecordWithMediaView),
+            "app.bsky.embed.images#view" => petrel_core::decode_value(value, strict).map(Self::ImagesView),
+            "app.bsky.embed.video#view" => petrel_core::decode_value(value, strict).map(Self::VideoView),
+            "app.bsky.embed.gallery#view" => petrel_core::decode_value(value, strict).map(Self::GalleryView),
+            "app.bsky.embed.external#view" => petrel_core::decode_value(value, strict).map(Self::ExternalView),
+            "app.bsky.embed.record#view" => petrel_core::decode_value(value, strict).map(Self::RecordView),
+            "app.bsky.embed.recordWithMedia#view" => petrel_core::decode_value(value, strict).map(Self::RecordWithMediaView),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for PostViewEmbed {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -1556,13 +1775,23 @@ impl petrel_core::ToValue for FeedViewPostReason {
     }
 }
 
-impl petrel_core::FromValue for FeedViewPostReason {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl FeedViewPostReason {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.defs#reasonRepost" => petrel_core::FromValue::from_value(value).map(Self::ReasonRepost),
-            "app.bsky.feed.defs#reasonPin" => petrel_core::FromValue::from_value(value).map(Self::ReasonPin),
+            "app.bsky.feed.defs#reasonRepost" => petrel_core::decode_value(value, strict).map(Self::ReasonRepost),
+            "app.bsky.feed.defs#reasonPin" => petrel_core::decode_value(value, strict).map(Self::ReasonPin),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for FeedViewPostReason {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -1609,14 +1838,24 @@ impl petrel_core::ToValue for ReplyRefRoot {
     }
 }
 
-impl petrel_core::FromValue for ReplyRefRoot {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl ReplyRefRoot {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.defs#postView" => petrel_core::FromValue::from_value(value).map(Self::PostView),
-            "app.bsky.feed.defs#notFoundPost" => petrel_core::FromValue::from_value(value).map(Self::NotFoundPost),
-            "app.bsky.feed.defs#blockedPost" => petrel_core::FromValue::from_value(value).map(Self::BlockedPost),
+            "app.bsky.feed.defs#postView" => petrel_core::decode_value(value, strict).map(Self::PostView),
+            "app.bsky.feed.defs#notFoundPost" => petrel_core::decode_value(value, strict).map(Self::NotFoundPost),
+            "app.bsky.feed.defs#blockedPost" => petrel_core::decode_value(value, strict).map(Self::BlockedPost),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for ReplyRefRoot {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -1663,14 +1902,24 @@ impl petrel_core::ToValue for ReplyRefParent {
     }
 }
 
-impl petrel_core::FromValue for ReplyRefParent {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl ReplyRefParent {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.defs#postView" => petrel_core::FromValue::from_value(value).map(Self::PostView),
-            "app.bsky.feed.defs#notFoundPost" => petrel_core::FromValue::from_value(value).map(Self::NotFoundPost),
-            "app.bsky.feed.defs#blockedPost" => petrel_core::FromValue::from_value(value).map(Self::BlockedPost),
+            "app.bsky.feed.defs#postView" => petrel_core::decode_value(value, strict).map(Self::PostView),
+            "app.bsky.feed.defs#notFoundPost" => petrel_core::decode_value(value, strict).map(Self::NotFoundPost),
+            "app.bsky.feed.defs#blockedPost" => petrel_core::decode_value(value, strict).map(Self::BlockedPost),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for ReplyRefParent {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -1717,14 +1966,24 @@ impl petrel_core::ToValue for ThreadViewPostParent {
     }
 }
 
-impl petrel_core::FromValue for ThreadViewPostParent {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl ThreadViewPostParent {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.defs#threadViewPost" => petrel_core::FromValue::from_value(value).map(Self::ThreadViewPost),
-            "app.bsky.feed.defs#notFoundPost" => petrel_core::FromValue::from_value(value).map(Self::NotFoundPost),
-            "app.bsky.feed.defs#blockedPost" => petrel_core::FromValue::from_value(value).map(Self::BlockedPost),
+            "app.bsky.feed.defs#threadViewPost" => petrel_core::decode_value(value, strict).map(Self::ThreadViewPost),
+            "app.bsky.feed.defs#notFoundPost" => petrel_core::decode_value(value, strict).map(Self::NotFoundPost),
+            "app.bsky.feed.defs#blockedPost" => petrel_core::decode_value(value, strict).map(Self::BlockedPost),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for ThreadViewPostParent {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -1771,14 +2030,24 @@ impl petrel_core::ToValue for ThreadViewPostReplies {
     }
 }
 
-impl petrel_core::FromValue for ThreadViewPostReplies {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl ThreadViewPostReplies {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.defs#threadViewPost" => petrel_core::FromValue::from_value(value).map(Self::ThreadViewPost),
-            "app.bsky.feed.defs#notFoundPost" => petrel_core::FromValue::from_value(value).map(Self::NotFoundPost),
-            "app.bsky.feed.defs#blockedPost" => petrel_core::FromValue::from_value(value).map(Self::BlockedPost),
+            "app.bsky.feed.defs#threadViewPost" => petrel_core::decode_value(value, strict).map(Self::ThreadViewPost),
+            "app.bsky.feed.defs#notFoundPost" => petrel_core::decode_value(value, strict).map(Self::NotFoundPost),
+            "app.bsky.feed.defs#blockedPost" => petrel_core::decode_value(value, strict).map(Self::BlockedPost),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for ThreadViewPostReplies {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
@@ -1823,13 +2092,23 @@ impl petrel_core::ToValue for SkeletonFeedPostReason {
     }
 }
 
-impl petrel_core::FromValue for SkeletonFeedPostReason {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl SkeletonFeedPostReason {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.defs#skeletonReasonRepost" => petrel_core::FromValue::from_value(value).map(Self::SkeletonReasonRepost),
-            "app.bsky.feed.defs#skeletonReasonPin" => petrel_core::FromValue::from_value(value).map(Self::SkeletonReasonPin),
+            "app.bsky.feed.defs#skeletonReasonRepost" => petrel_core::decode_value(value, strict).map(Self::SkeletonReasonRepost),
+            "app.bsky.feed.defs#skeletonReasonPin" => petrel_core::decode_value(value, strict).map(Self::SkeletonReasonPin),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for SkeletonFeedPostReason {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 

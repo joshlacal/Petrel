@@ -19,9 +19,6 @@ the tag `petrel-rust`.
 Known gaps, all outside phases 0 to 3:
 
 - Subscriptions are declared but there is no event-stream frame decoder.
-- Objects nested inside an XRPC input decode leniently: a malformed optional
-  field is kept in `extra_data` instead of being rejected. A server built on
-  these types must check for that until the generator emits a strict path.
 - The file store runs blocking file I/O inside its async methods and does not
   bind a ciphertext to its file name. Both follow the Swift store it shares a
   format with.

@@ -47,19 +47,30 @@ impl petrel_core::ToValue for LabelerView {
     }
 }
 
-impl petrel_core::FromValue for LabelerView {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LabelerView {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
             cid: reader.required("cid")?,
             creator: reader.required("creator")?,
-            like_count: reader.optional("likeCount"),
-            viewer: reader.optional("viewer"),
+            like_count: reader.optional("likeCount")?,
+            viewer: reader.optional("viewer")?,
             indexed_at: reader.required("indexedAt")?,
-            labels: reader.optional("labels"),
+            labels: reader.optional("labels")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LabelerView {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -146,23 +157,34 @@ impl petrel_core::ToValue for LabelerViewDetailed {
     }
 }
 
-impl petrel_core::FromValue for LabelerViewDetailed {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LabelerViewDetailed {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
             cid: reader.required("cid")?,
             creator: reader.required("creator")?,
             policies: reader.required("policies")?,
-            like_count: reader.optional("likeCount"),
-            viewer: reader.optional("viewer"),
+            like_count: reader.optional("likeCount")?,
+            viewer: reader.optional("viewer")?,
             indexed_at: reader.required("indexedAt")?,
-            labels: reader.optional("labels"),
-            reason_types: reader.optional("reasonTypes"),
-            subject_types: reader.optional("subjectTypes"),
-            subject_collections: reader.optional("subjectCollections"),
+            labels: reader.optional("labels")?,
+            reason_types: reader.optional("reasonTypes")?,
+            subject_types: reader.optional("subjectTypes")?,
+            subject_collections: reader.optional("subjectCollections")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LabelerViewDetailed {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -222,13 +244,24 @@ impl petrel_core::ToValue for LabelerViewerState {
     }
 }
 
-impl petrel_core::FromValue for LabelerViewerState {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LabelerViewerState {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            like: reader.optional("like"),
+            like: reader.optional("like")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LabelerViewerState {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -287,14 +320,25 @@ impl petrel_core::ToValue for LabelerPolicies {
     }
 }
 
-impl petrel_core::FromValue for LabelerPolicies {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl LabelerPolicies {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             label_values: reader.required("labelValues")?,
-            label_value_definitions: reader.optional("labelValueDefinitions"),
+            label_value_definitions: reader.optional("labelValueDefinitions")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for LabelerPolicies {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 

@@ -37,15 +37,26 @@ impl petrel_core::ToValue for State {
     }
 }
 
-impl petrel_core::FromValue for State {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl State {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            last_initiated_at: reader.optional("lastInitiatedAt"),
+            last_initiated_at: reader.optional("lastInitiatedAt")?,
             status: reader.required("status")?,
             access: reader.required("access")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for State {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -107,13 +118,24 @@ impl petrel_core::ToValue for StateMetadata {
     }
 }
 
-impl petrel_core::FromValue for StateMetadata {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl StateMetadata {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            account_created_at: reader.optional("accountCreatedAt"),
+            account_created_at: reader.optional("accountCreatedAt")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for StateMetadata {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -168,13 +190,24 @@ impl petrel_core::ToValue for Config {
     }
 }
 
-impl petrel_core::FromValue for Config {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Config {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             regions: reader.required("regions")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Config {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -250,18 +283,29 @@ impl petrel_core::ToValue for ConfigRegion {
     }
 }
 
-impl petrel_core::FromValue for ConfigRegion {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ConfigRegion {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            platforms: reader.optional("platforms"),
+            platforms: reader.optional("platforms")?,
             country_code: reader.required("countryCode")?,
-            region_code: reader.optional("regionCode"),
+            region_code: reader.optional("regionCode")?,
             min_access_age: reader.required("minAccessAge")?,
-            additional_verification_methods: reader.optional("additionalVerificationMethods"),
+            additional_verification_methods: reader.optional("additionalVerificationMethods")?,
             rules: reader.required("rules")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ConfigRegion {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -316,13 +360,24 @@ impl petrel_core::ToValue for ConfigRegionRuleDefault {
     }
 }
 
-impl petrel_core::FromValue for ConfigRegionRuleDefault {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ConfigRegionRuleDefault {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             access: reader.required("access")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ConfigRegionRuleDefault {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -381,14 +436,25 @@ impl petrel_core::ToValue for ConfigRegionRuleIfDeclaredOverAge {
     }
 }
 
-impl petrel_core::FromValue for ConfigRegionRuleIfDeclaredOverAge {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ConfigRegionRuleIfDeclaredOverAge {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             age: reader.required("age")?,
             access: reader.required("access")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ConfigRegionRuleIfDeclaredOverAge {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -447,14 +513,25 @@ impl petrel_core::ToValue for ConfigRegionRuleIfDeclaredUnderAge {
     }
 }
 
-impl petrel_core::FromValue for ConfigRegionRuleIfDeclaredUnderAge {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ConfigRegionRuleIfDeclaredUnderAge {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             age: reader.required("age")?,
             access: reader.required("access")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ConfigRegionRuleIfDeclaredUnderAge {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -513,14 +590,25 @@ impl petrel_core::ToValue for ConfigRegionRuleIfAssuredOverAge {
     }
 }
 
-impl petrel_core::FromValue for ConfigRegionRuleIfAssuredOverAge {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ConfigRegionRuleIfAssuredOverAge {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             age: reader.required("age")?,
             access: reader.required("access")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ConfigRegionRuleIfAssuredOverAge {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -579,14 +667,25 @@ impl petrel_core::ToValue for ConfigRegionRuleIfAssuredUnderAge {
     }
 }
 
-impl petrel_core::FromValue for ConfigRegionRuleIfAssuredUnderAge {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ConfigRegionRuleIfAssuredUnderAge {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             age: reader.required("age")?,
             access: reader.required("access")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ConfigRegionRuleIfAssuredUnderAge {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -645,14 +744,25 @@ impl petrel_core::ToValue for ConfigRegionRuleIfAccountNewerThan {
     }
 }
 
-impl petrel_core::FromValue for ConfigRegionRuleIfAccountNewerThan {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ConfigRegionRuleIfAccountNewerThan {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             date: reader.required("date")?,
             access: reader.required("access")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ConfigRegionRuleIfAccountNewerThan {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -711,14 +821,25 @@ impl petrel_core::ToValue for ConfigRegionRuleIfAccountOlderThan {
     }
 }
 
-impl petrel_core::FromValue for ConfigRegionRuleIfAccountOlderThan {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl ConfigRegionRuleIfAccountOlderThan {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             date: reader.required("date")?,
             access: reader.required("access")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for ConfigRegionRuleIfAccountOlderThan {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -814,23 +935,34 @@ impl petrel_core::ToValue for Event {
     }
 }
 
-impl petrel_core::FromValue for Event {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
-        let mut reader = petrel_core::ObjectReader::new(value)?;
+impl Event {
+    /// Reads the fields. The reader decides whether a malformed optional
+    /// field is an error (an XRPC input) or is kept as raw data.
+    fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             created_at: reader.required("createdAt")?,
             attempt_id: reader.required("attemptId")?,
             status: reader.required("status")?,
             access: reader.required("access")?,
             country_code: reader.required("countryCode")?,
-            region_code: reader.optional("regionCode"),
-            email: reader.optional("email"),
-            init_ip: reader.optional("initIp"),
-            init_ua: reader.optional("initUa"),
-            complete_ip: reader.optional("completeIp"),
-            complete_ua: reader.optional("completeUa"),
+            region_code: reader.optional("regionCode")?,
+            email: reader.optional("email")?,
+            init_ip: reader.optional("initIp")?,
+            init_ua: reader.optional("initUa")?,
+            complete_ip: reader.optional("completeIp")?,
+            complete_ua: reader.optional("completeUa")?,
             extra_data: reader.finish(),
         })
+    }
+}
+
+impl petrel_core::FromValue for Event {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new(value)?)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_fields(petrel_core::ObjectReader::new_strict(value)?)
     }
 }
 
@@ -1097,18 +1229,28 @@ impl petrel_core::ToValue for ConfigRegionRules {
     }
 }
 
-impl petrel_core::FromValue for ConfigRegionRules {
-    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+impl ConfigRegionRules {
+    fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.ageassurance.defs#configRegionRuleDefault" => petrel_core::FromValue::from_value(value).map(Self::ConfigRegionRuleDefault),
-            "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge" => petrel_core::FromValue::from_value(value).map(Self::ConfigRegionRuleIfDeclaredOverAge),
-            "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge" => petrel_core::FromValue::from_value(value).map(Self::ConfigRegionRuleIfDeclaredUnderAge),
-            "app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge" => petrel_core::FromValue::from_value(value).map(Self::ConfigRegionRuleIfAssuredOverAge),
-            "app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge" => petrel_core::FromValue::from_value(value).map(Self::ConfigRegionRuleIfAssuredUnderAge),
-            "app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan" => petrel_core::FromValue::from_value(value).map(Self::ConfigRegionRuleIfAccountNewerThan),
-            "app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan" => petrel_core::FromValue::from_value(value).map(Self::ConfigRegionRuleIfAccountOlderThan),
+            "app.bsky.ageassurance.defs#configRegionRuleDefault" => petrel_core::decode_value(value, strict).map(Self::ConfigRegionRuleDefault),
+            "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge" => petrel_core::decode_value(value, strict).map(Self::ConfigRegionRuleIfDeclaredOverAge),
+            "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge" => petrel_core::decode_value(value, strict).map(Self::ConfigRegionRuleIfDeclaredUnderAge),
+            "app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge" => petrel_core::decode_value(value, strict).map(Self::ConfigRegionRuleIfAssuredOverAge),
+            "app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge" => petrel_core::decode_value(value, strict).map(Self::ConfigRegionRuleIfAssuredUnderAge),
+            "app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan" => petrel_core::decode_value(value, strict).map(Self::ConfigRegionRuleIfAccountNewerThan),
+            "app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan" => petrel_core::decode_value(value, strict).map(Self::ConfigRegionRuleIfAccountOlderThan),
             _ => Ok(Self::Unknown(value)),
         }
+    }
+}
+
+impl petrel_core::FromValue for ConfigRegionRules {
+    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, false)
+    }
+
+    fn from_value_strict(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        Self::decode_member(value, true)
     }
 }
 
