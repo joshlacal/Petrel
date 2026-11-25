@@ -719,3 +719,64 @@ fn car_reader_and_car_repository_enforce_limits() {
         Err(CARReaderError::MstDepthLimitExceeded)
     ));
 }
+
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+fn car_repository_parses_mst_node_exceeding_10k_cbor_values() {
+    let did = common::test_did();
+    let signer = common::deterministic_p256_signer();
+    let mut rec_map = BTreeMap::new();
+    rec_map.insert(
+        "$type".to_owned(),
+        Value::String("app.bsky.feed.post".into()),
+    );
+    rec_map.insert("text".to_owned(), Value::String("wide".into()));
+    let (rec_cid, rec_bytes) = cbor_block(&Value::Object(rec_map));
+
+    let mut entries = Vec::with_capacity(2_050);
+    let mut idx = 0_usize;
+    while entries.len() < 2_050 {
+        let key = format!("app.bsky.feed.post/w{idx:05}");
+        idx += 1;
+        if petrel_repo::mst::key_depth(key.as_bytes()) == 0 {
+            entries.push(MstNodeEntryView {
+                key,
+                value: rec_cid.clone(),
+                tree: None,
+            });
+        }
+    }
+    let (mst_cid, mst_bytes) = encode_mst_node(&MstNodeView {
+        left: None,
+        entries,
+    })
+    .unwrap();
+    // Sanity check: confirm standard 10k CBOR value limit would reject this node.
+    assert!(dagcbor::decode(&mst_bytes).is_err());
+    assert!(dagcbor::decode_with(&mst_bytes, dagcbor::Limits::REPOSITORY_BLOCK).is_ok());
+
+    let mut commit = BTreeMap::new();
+    commit.insert("did".to_owned(), Value::String(did.as_str().to_owned()));
+    commit.insert("rev".to_owned(), Value::String("3jzfcijpj2z2g".into()));
+    commit.insert("data".to_owned(), Value::Link(mst_cid.clone()));
+    commit.insert("prev".to_owned(), Value::Null);
+    commit.insert("version".to_owned(), Value::Integer(3));
+    let unsigned = dagcbor::encode(&Value::Object(commit.clone()));
+    commit.insert(
+        "sig".to_owned(),
+        Value::Bytes(signer.sign_sync(&unsigned).unwrap()),
+    );
+    let (commit_cid, commit_bytes) = cbor_block(&Value::Object(commit));
+
+    let car = common::encode_raw_car(
+        std::slice::from_ref(&commit_cid),
+        &[
+            (commit_cid.as_bytes().to_vec(), commit_bytes),
+            (mst_cid.as_bytes().to_vec(), mst_bytes),
+            (rec_cid.as_bytes().to_vec(), rec_bytes),
+        ],
+    );
+    let parsed = CARRepository::parse_with_limits(&car, &RepositoryLimits::standard()).unwrap();
+    assert_eq!(parsed.collections["app.bsky.feed.post"].len(), 2_050);
+    assert_eq!(parsed.records.len(), 2_050);
+}

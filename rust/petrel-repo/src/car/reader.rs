@@ -911,7 +911,7 @@ impl CARRepository {
             .blocks
             .get(&root)
             .ok_or_else(|| CARReaderError::MissingBlock(root.to_string()))?;
-        let commit_val = dagcbor::decode(commit_bytes)
+        let commit_val = dagcbor::decode_with(commit_bytes, dagcbor::Limits::REPOSITORY_BLOCK)
             .map_err(|err| CARReaderError::InvalidHeader(err.to_string()))?;
         let Value::Object(commit_map) = commit_val else {
             return Err(CARReaderError::InvalidHeader(
@@ -1046,7 +1046,7 @@ fn traverse_mst_node(
     let node_bytes = blocks
         .get(node_cid)
         .ok_or_else(|| CARReaderError::MissingBlock(node_cid.to_string()))?;
-    let node_val = dagcbor::decode(node_bytes)
+    let node_val = dagcbor::decode_with(node_bytes, dagcbor::Limits::REPOSITORY_BLOCK)
         .map_err(|err| CARReaderError::InvalidMstNode(err.to_string()))?;
     let Value::Object(map) = node_val else {
         return Err(CARReaderError::InvalidMstNode(
