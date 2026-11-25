@@ -161,6 +161,12 @@ impl RepositoryMst {
         &self.root_cid
     }
 
+    /// Returns the MST layer height of the current root (`0` when empty).
+    pub async fn root_layer(&mut self) -> Result<usize, MstError> {
+        let root = self.root_cid.clone();
+        Ok(self.node_layer(&root).await?.unwrap_or(0))
+    }
+
     pub fn options(&self) -> &MstOptions {
         &self.options
     }

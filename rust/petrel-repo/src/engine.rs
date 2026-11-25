@@ -263,15 +263,18 @@ impl RepositoryEngine {
             });
         }
 
-        // Enforce `max_block_count`, `max_mst_node_count`, and `max_record_count` over the
-        // resulting reachable tree/CAR state before signing or persisting anything. Uses O(1)
-        // `store.len()` fast-path unless total candidate blocks approach the tightest ceiling.
+        // Enforce `max_mst_depth`, `max_block_count`, `max_mst_node_count`, and
+        // `max_record_count` over the resulting reachable tree/CAR state before signing or
+        // persisting anything. Uses O(1) fast-paths (`root_layer <= max_mst_depth` and
+        // `store.len()`) unless depth or total candidate counts approach a limit.
+        let root_layer = mst.root_layer().await?;
         let store_len = store.len().await?;
         let tightest_tree_limit = limits.max_mst_node_count.min(limits.max_record_count);
-        if store_len
-            .saturating_add(1)
-            .saturating_add(new_blocks_map.len())
-            > limits.max_block_count
+        if root_layer > limits.max_mst_depth
+            || store_len
+                .saturating_add(1)
+                .saturating_add(new_blocks_map.len())
+                > limits.max_block_count
             || store_len.saturating_add(new_blocks_map.len()) > tightest_tree_limit
         {
             let max_tree_blocks = limits.max_block_count.saturating_sub(1);

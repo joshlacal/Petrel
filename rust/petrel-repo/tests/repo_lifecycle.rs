@@ -1626,4 +1626,116 @@ async fn data_model_open_store_validates_record_cbor_and_streaming_export_avoids
         })
     ));
     assert_eq!(genesis_store.len().await.unwrap(), 0);
+
+    // 6. Engine enforces `limits.max_mst_depth` across reused unchanged subtrees before signing
+    // or persisting: e.g. with `max_mst_depth = 1`, layer-0 + layer-1 succeeds (depth 1), then
+    // inserting a layer >= 2 key pushes the unchanged layer-0 subtree to depth >= 2 and fails.
+    let mut layer0_rkey = None;
+    let mut layer1_rkey = None;
+    let mut layer2plus_rkey = None;
+    for i in 0..2000_u32 {
+        let rkey = format!("d{i:04}");
+        let d = petrel_repo::mst::key_depth(format!("app.bsky.feed.post/{rkey}").as_bytes());
+        if d == 0 && layer0_rkey.is_none() {
+            layer0_rkey = Some(rkey);
+        } else if d == 1 && layer1_rkey.is_none() {
+            layer1_rkey = Some(rkey);
+        } else if d >= 2 && layer2plus_rkey.is_none() {
+            layer2plus_rkey = Some(rkey);
+        }
+        if layer0_rkey.is_some() && layer1_rkey.is_some() && layer2plus_rkey.is_some() {
+            break;
+        }
+    }
+    let l0 = layer0_rkey.unwrap();
+    let l1 = layer1_rkey.unwrap();
+    let l2 = layer2plus_rkey.unwrap();
+
+    let depth_limits = RepositoryLimits {
+        max_mst_depth: 1,
+        ..RepositoryLimits::standard()
+    };
+    let depth_store = Arc::new(InMemoryBlockStore::new());
+    let base_repo = Repository::create_in_store(
+        did.clone(),
+        &signer,
+        Arc::clone(&depth_store),
+        depth_limits,
+        strict,
+    )
+    .await
+    .unwrap();
+    let rev1 = RepositoryTid::next_after(Some(base_repo.revision()), 0, 0).unwrap();
+    let depth_c1 = base_repo
+        .commit_writes_with_rev(
+            WriteBatch::new(vec![
+                create_op("app.bsky.feed.post", &l0, &post_record_value("layer 0")).unwrap(),
+                create_op("app.bsky.feed.post", &l1, &post_record_value("layer 1")).unwrap(),
+            ])
+            .unwrap(),
+            rev1,
+            &signer,
+        )
+        .await
+        .unwrap();
+    let persisted_before_fail = depth_store.len().await.unwrap();
+    let prev_commit_cid = depth_c1.commit.cid.clone();
+    let rev2 = RepositoryTid::next_after(Some(depth_c1.repository.revision()), 0, 0).unwrap();
+
+    let depth_err = RepositoryEngine::apply(
+        &depth_c1.repository.state(),
+        &WriteBatch::new(vec![
+            create_op("app.bsky.feed.post", &l2, &post_record_value("layer >= 2")).unwrap(),
+        ])
+        .unwrap(),
+        Some(&prev_commit_cid),
+        rev2,
+        &signer,
+        Arc::clone(&depth_store),
+        &depth_limits,
+        &strict,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        depth_err,
+        EngineError::Mst(petrel_repo::error::MstError::DepthExceeded { limit: 1, .. })
+    ));
+    assert_eq!(
+        depth_store.len().await.unwrap(),
+        persisted_before_fail,
+        "depth-exceeded commit must fail before signing or persisting any blocks"
+    );
+
+    // Conversely, when root_layer == 2 > max_mst_depth(1) but only layer-1 and layer-2 keys
+    // exist (no layer-0 subtree), actual tree depth is 1 <= 1 and must succeed.
+    let no_l0_store = Arc::new(InMemoryBlockStore::new());
+    let no_l0_res = RepositoryEngine::apply(
+        &s0,
+        &WriteBatch::new(vec![
+            create_op("app.bsky.feed.post", &l1, &post_record_value("layer 1")).unwrap(),
+            create_op("app.bsky.feed.post", &l2, &post_record_value("layer >= 2")).unwrap(),
+        ])
+        .unwrap(),
+        None,
+        RepositoryTid::parse("3jzfcijpj2z2a").unwrap(),
+        &signer,
+        Arc::clone(&no_l0_store),
+        &depth_limits,
+        &strict,
+    )
+    .await
+    .unwrap();
+    let reopened_no_l0 = Repository::open_store(
+        no_l0_res.commit.cid,
+        no_l0_store,
+        OpenVerification::SigningKey(signer.public_key().clone()),
+        Some(&did),
+        depth_limits,
+        strict,
+        true,
+    )
+    .await
+    .unwrap();
+    assert_eq!(reopened_no_l0.statistics().unwrap().record_count, 2);
 }
