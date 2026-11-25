@@ -91,6 +91,8 @@ struct Server {
     scenario: Scenario,
     exchanges: Mutex<Exchanges>,
     refresh_response_gate: async_lock::Mutex<()>,
+    cab_gate: async_lock::Mutex<()>,
+    cab_waiting: std::sync::atomic::AtomicUsize,
 }
 
 impl Server {
@@ -99,6 +101,8 @@ impl Server {
             scenario,
             exchanges: Mutex::new(Exchanges::default()),
             refresh_response_gate: async_lock::Mutex::new(()),
+            cab_gate: async_lock::Mutex::new(()),
+            cab_waiting: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
@@ -165,6 +169,9 @@ impl Server {
                 json_response(200, None, &serde_json::to_value(metadata).unwrap())
             }
             (Some("cab.example"), "/backend/oauth/client-assertion") => {
+                self.cab_waiting
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                drop(self.cab_gate.lock().await);
                 self.cab_exchange(&request, &form)
             }
             (Some("issuer.example"), "/par") => self.par_exchange(&request, form),
@@ -1559,6 +1566,52 @@ async fn cancelled_refresh_does_not_lose_the_received_token_replacement() {
             .access_token(),
         "access-second"
     );
+    assert_eq!(server.exchanges.lock().unwrap().refreshes, 1);
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn refresh_cancelled_while_the_cab_answers_does_not_burn_the_token() {
+    use std::{
+        future::{Future, poll_fn},
+        sync::atomic::Ordering,
+        task::Poll,
+    };
+
+    let server = Arc::new(Server::new(Scenario::CabNonce));
+    let client = client(
+        &server,
+        ClientAuth::Cab {
+            backend_url: Url::parse(CAB).unwrap(),
+            client_id: CLIENT.into(),
+        },
+    );
+    start(&client).await;
+    let session = client
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+
+    // Hold the client assertion backend, start a refresh, and drop it while
+    // it waits there: the token request never reaches the server.
+    let hold_cab = server.cab_gate.lock().await;
+    let before = server.cab_waiting.load(Ordering::Relaxed);
+    let mut refresh = Box::pin(client.refresh(&session.did, true));
+    poll_fn(|cx| {
+        assert!(refresh.as_mut().poll(cx).is_pending());
+        if server.cab_waiting.load(Ordering::Relaxed) > before {
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
+    })
+    .await;
+    drop(refresh);
+    drop(hold_cab);
+    assert_eq!(server.exchanges.lock().unwrap().refreshes, 0);
+
+    let refreshed = client.refresh(&session.did, true).await.unwrap();
+    assert_eq!(refreshed.access_token(), "access-second");
     assert_eq!(server.exchanges.lock().unwrap().refreshes, 1);
 }
 

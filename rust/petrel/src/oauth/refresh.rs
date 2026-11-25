@@ -58,6 +58,32 @@ impl RefreshState {
     }
 }
 
+/// A burned refresh token whose exchange has not returned yet. Dropping it
+/// unsettled, as happens when the caller drops the refresh future, releases
+/// the token so a later refresh can use it.
+struct Burned<'a> {
+    state: &'a mut RefreshState,
+    digest: [u8; 32],
+    settled: bool,
+}
+
+impl Burned<'_> {
+    /// Marks the exchange as returned. The caller then decides whether the
+    /// token stays burned.
+    fn settle(mut self) {
+        self.settled = true;
+    }
+}
+
+impl Drop for Burned<'_> {
+    fn drop(&mut self) {
+        if !self.settled {
+            let digest = self.digest;
+            self.state.used.retain(|used| *used != digest);
+        }
+    }
+}
+
 impl OAuthClient {
     pub(super) fn missing_session(&self, did: &Did) -> OAuthError {
         self.storage
@@ -209,6 +235,18 @@ impl OAuthClient {
             .bound_key(&current.dpop_key_id, &current.dpop_jkt)
             .await?;
         let digest = state.burn(token)?;
+        // If the caller drops this future while the exchange is in flight,
+        // for example while the client assertion backend is still answering,
+        // release the token again. Otherwise it would stay burned with no
+        // replacement and every later refresh would fail with
+        // `UsedRefreshToken`. A drop after the authorization server rotated
+        // the token loses that rotation either way; the next attempt then
+        // gets `invalid_grant` instead of a local error.
+        let burned = Burned {
+            state: &mut state,
+            digest,
+            settled: false,
+        };
         let response = self
             .protocol
             .send_as(
@@ -218,6 +256,7 @@ impl OAuthClient {
                 &*key,
             )
             .await;
+        burned.settle();
         let result = match response {
             Ok(response) => match require_success(&response) {
                 Ok(()) => {
