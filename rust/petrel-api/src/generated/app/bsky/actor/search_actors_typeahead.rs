@@ -37,6 +37,16 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            term: petrel_core::xrpc::pull_optional_param(params, "term")?,
+            q: petrel_core::xrpc::pull_optional_param(params, "q")?,
+            limit: petrel_core::xrpc::pull_default_param(params, "limit", || 10)?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     pub actors: Vec<crate::generated::app::bsky::actor::defs::ProfileViewBasic>,

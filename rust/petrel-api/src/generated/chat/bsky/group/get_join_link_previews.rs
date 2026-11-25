@@ -23,6 +23,14 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            codes: petrel_core::xrpc::pull_array_param(params, "codes")?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     pub join_link_previews: Vec<OutputJoinLinkPreviews>,

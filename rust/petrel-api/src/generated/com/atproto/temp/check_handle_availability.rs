@@ -32,6 +32,16 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            handle: petrel_core::xrpc::pull_param(params, "handle")?,
+            email: petrel_core::xrpc::pull_optional_param(params, "email")?,
+            birth_date: petrel_core::xrpc::pull_optional_param(params, "birthDate")?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     /// Echo of the input handle.

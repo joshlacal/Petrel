@@ -51,6 +51,28 @@ impl petrel_core::ToQueryParams for Parameters {
 {% endfor %}
     }
 }
+
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params({% if not properties %}_{% endif %}params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+{% for prop in properties %}
+{% if prop.is_array %}
+{% if prop.is_option %}
+            {{ prop.ident }}: petrel_core::xrpc::pull_optional_array_param(params, {{ prop.wire_literal }})?,
+{% else %}
+            {{ prop.ident }}: petrel_core::xrpc::pull_array_param(params, {{ prop.wire_literal }})?,
+{% endif %}
+{% elif prop.default_expr %}
+            {{ prop.ident }}: petrel_core::xrpc::pull_default_param(params, {{ prop.wire_literal }}, || {{ prop.default_expr }})?,
+{% elif prop.is_option %}
+            {{ prop.ident }}: petrel_core::xrpc::pull_optional_param(params, {{ prop.wire_literal }})?,
+{% else %}
+            {{ prop.ident }}: petrel_core::xrpc::pull_param(params, {{ prop.wire_literal }})?,
+{% endif %}
+{% endfor %}
+        })
+    }
+}
 {% if cursor_ident %}
 
 impl petrel_core::xrpc::CursorParams for Parameters {

@@ -74,6 +74,12 @@ macro_rules! wire_string {
             }
         }
 
+        impl $crate::xrpc::FromQueryValue for $name {
+            fn from_query_value(value: &str) -> Result<Self, DecodeError> {
+                Ok(Self::parse_owned(value.to_owned())?)
+            }
+        }
+
         serde_via_value!($name);
     };
 }
@@ -191,6 +197,12 @@ macro_rules! string_newtype {
         impl $crate::xrpc::QueryValue for $name {
             fn to_query_value(&self) -> String {
                 self.0.clone()
+            }
+        }
+
+        impl $crate::xrpc::FromQueryValue for $name {
+            fn from_query_value(value: &str) -> Result<Self, $crate::error::DecodeError> {
+                Ok(Self::parse(value)?)
             }
         }
 

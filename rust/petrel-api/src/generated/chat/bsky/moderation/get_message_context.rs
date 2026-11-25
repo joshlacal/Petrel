@@ -38,6 +38,18 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            convo_id: petrel_core::xrpc::pull_optional_param(params, "convoId")?,
+            message_id: petrel_core::xrpc::pull_param(params, "messageId")?,
+            before: petrel_core::xrpc::pull_default_param(params, "before", || 5)?,
+            after: petrel_core::xrpc::pull_default_param(params, "after", || 5)?,
+            max_interleaved_system_messages: petrel_core::xrpc::pull_default_param(params, "maxInterleavedSystemMessages", || 10)?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     pub messages: Vec<OutputMessages>,

@@ -40,6 +40,18 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            anchor: petrel_core::xrpc::pull_param(params, "anchor")?,
+            above: petrel_core::xrpc::pull_default_param(params, "above", || true)?,
+            below: petrel_core::xrpc::pull_default_param(params, "below", || 6)?,
+            branching_factor: petrel_core::xrpc::pull_default_param(params, "branchingFactor", || 10)?,
+            sort: petrel_core::xrpc::pull_default_param(params, "sort", || "oldest".to_owned())?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     /// A flat list of thread items. The depth of each item is indicated by the depth property inside the item.

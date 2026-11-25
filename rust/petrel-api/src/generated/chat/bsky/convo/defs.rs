@@ -4976,6 +4976,12 @@ impl petrel_core::xrpc::QueryValue for ConvoKind {
     }
 }
 
+impl petrel_core::xrpc::FromQueryValue for ConvoKind {
+    fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self::from(value.to_owned()))
+    }
+}
+
 impl petrel_core::XrpcInput for ConvoKind {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
@@ -5081,6 +5087,12 @@ impl petrel_core::xrpc::QueryValue for ConvoLockStatus {
     }
 }
 
+impl petrel_core::xrpc::FromQueryValue for ConvoLockStatus {
+    fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self::from(value.to_owned()))
+    }
+}
+
 impl petrel_core::XrpcInput for ConvoLockStatus {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
@@ -5178,6 +5190,12 @@ impl petrel_core::FromValue for ConvoStatus {
 impl petrel_core::xrpc::QueryValue for ConvoStatus {
     fn to_query_value(&self) -> String {
         self.as_str().to_owned()
+    }
+}
+
+impl petrel_core::xrpc::FromQueryValue for ConvoStatus {
+    fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self::from(value.to_owned()))
     }
 }
 

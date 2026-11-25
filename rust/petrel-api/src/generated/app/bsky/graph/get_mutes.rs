@@ -32,6 +32,15 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            limit: petrel_core::xrpc::pull_default_param(params, "limit", || 50)?,
+            cursor: petrel_core::xrpc::pull_optional_param(params, "cursor")?,
+        })
+    }
+}
+
 impl petrel_core::xrpc::CursorParams for Parameters {
     fn cursor(&self) -> Option<&str> {
         self.cursor.as_deref()

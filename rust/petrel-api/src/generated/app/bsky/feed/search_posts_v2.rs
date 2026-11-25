@@ -170,6 +170,42 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            cursor: petrel_core::xrpc::pull_optional_param(params, "cursor")?,
+            limit: petrel_core::xrpc::pull_default_param(params, "limit", || 25)?,
+            query: petrel_core::xrpc::pull_optional_param(params, "query")?,
+            sort: petrel_core::xrpc::pull_optional_param(params, "sort")?,
+            authors: petrel_core::xrpc::pull_optional_array_param(params, "authors")?,
+            mentions: petrel_core::xrpc::pull_optional_array_param(params, "mentions")?,
+            domains: petrel_core::xrpc::pull_optional_array_param(params, "domains")?,
+            urls: petrel_core::xrpc::pull_optional_array_param(params, "urls")?,
+            embedded_at_uris: petrel_core::xrpc::pull_optional_array_param(params, "embeddedAtUris")?,
+            hashtags: petrel_core::xrpc::pull_optional_array_param(params, "hashtags")?,
+            exclude_authors: petrel_core::xrpc::pull_optional_array_param(params, "excludeAuthors")?,
+            exclude_mentions: petrel_core::xrpc::pull_optional_array_param(params, "excludeMentions")?,
+            exclude_domains: petrel_core::xrpc::pull_optional_array_param(params, "excludeDomains")?,
+            exclude_urls: petrel_core::xrpc::pull_optional_array_param(params, "excludeUrls")?,
+            exclude_embedded_at_uris: petrel_core::xrpc::pull_optional_array_param(params, "excludeEmbeddedAtUris")?,
+            exclude_hashtags: petrel_core::xrpc::pull_optional_array_param(params, "excludeHashtags")?,
+            since: petrel_core::xrpc::pull_optional_param(params, "since")?,
+            until: petrel_core::xrpc::pull_optional_param(params, "until")?,
+            all_time: petrel_core::xrpc::pull_optional_param(params, "allTime")?,
+            languages: petrel_core::xrpc::pull_optional_array_param(params, "languages")?,
+            exclude_languages: petrel_core::xrpc::pull_optional_array_param(params, "excludeLanguages")?,
+            has_media: petrel_core::xrpc::pull_optional_param(params, "hasMedia")?,
+            has_video: petrel_core::xrpc::pull_optional_param(params, "hasVideo")?,
+            reply_parent_uri: petrel_core::xrpc::pull_optional_param(params, "replyParentUri")?,
+            thread_root_uri: petrel_core::xrpc::pull_optional_param(params, "threadRootUri")?,
+            exclude_replies: petrel_core::xrpc::pull_optional_param(params, "excludeReplies")?,
+            replies_only: petrel_core::xrpc::pull_optional_param(params, "repliesOnly")?,
+            following: petrel_core::xrpc::pull_optional_param(params, "following")?,
+            query_language: petrel_core::xrpc::pull_optional_param(params, "queryLanguage")?,
+        })
+    }
+}
+
 impl petrel_core::xrpc::CursorParams for Parameters {
     fn cursor(&self) -> Option<&str> {
         self.cursor.as_deref()

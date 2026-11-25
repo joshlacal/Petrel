@@ -73,6 +73,26 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            q: petrel_core::xrpc::pull_param(params, "q")?,
+            sort: petrel_core::xrpc::pull_default_param(params, "sort", || "latest".to_owned())?,
+            since: petrel_core::xrpc::pull_optional_param(params, "since")?,
+            until: petrel_core::xrpc::pull_optional_param(params, "until")?,
+            mentions: petrel_core::xrpc::pull_optional_param(params, "mentions")?,
+            author: petrel_core::xrpc::pull_optional_param(params, "author")?,
+            lang: petrel_core::xrpc::pull_optional_param(params, "lang")?,
+            domain: petrel_core::xrpc::pull_optional_param(params, "domain")?,
+            url: petrel_core::xrpc::pull_optional_param(params, "url")?,
+            tag: petrel_core::xrpc::pull_optional_array_param(params, "tag")?,
+            viewer: petrel_core::xrpc::pull_optional_param(params, "viewer")?,
+            limit: petrel_core::xrpc::pull_default_param(params, "limit", || 25)?,
+            cursor: petrel_core::xrpc::pull_optional_param(params, "cursor")?,
+        })
+    }
+}
+
 impl petrel_core::xrpc::CursorParams for Parameters {
     fn cursor(&self) -> Option<&str> {
         self.cursor.as_deref()

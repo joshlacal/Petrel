@@ -23,6 +23,14 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            did: petrel_core::xrpc::pull_param(params, "did")?,
+        })
+    }
+}
+
 pub type Output = crate::generated::com::atproto::admin::defs::AccountView;
 
 #[derive(Debug)]

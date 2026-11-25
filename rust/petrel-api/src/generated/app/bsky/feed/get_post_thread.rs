@@ -32,6 +32,16 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            uri: petrel_core::xrpc::pull_param(params, "uri")?,
+            depth: petrel_core::xrpc::pull_default_param(params, "depth", || 6)?,
+            parent_height: petrel_core::xrpc::pull_default_param(params, "parentHeight", || 80)?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     pub thread: OutputThread,

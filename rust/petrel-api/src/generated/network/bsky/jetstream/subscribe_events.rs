@@ -56,6 +56,19 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            cursor: petrel_core::xrpc::pull_optional_param(params, "cursor")?,
+            kinds: petrel_core::xrpc::pull_optional_array_param(params, "kinds")?,
+            dids: petrel_core::xrpc::pull_optional_array_param(params, "dids")?,
+            collections: petrel_core::xrpc::pull_optional_array_param(params, "collections")?,
+            max_message_size_bytes: petrel_core::xrpc::pull_default_param(params, "maxMessageSizeBytes", || 0)?,
+            zstd_dictionary: petrel_core::xrpc::pull_optional_param(params, "zstdDictionary")?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
     /// The client is far behind the live tip AND reading below the server's floor rate for a sustained window; the server drops adversarially-slow readers. A merely-slow-but-progressing reader is never dropped.
@@ -649,6 +662,12 @@ impl petrel_core::FromValue for ParametersKinds {
 impl petrel_core::xrpc::QueryValue for ParametersKinds {
     fn to_query_value(&self) -> String {
         self.as_str().to_owned()
+    }
+}
+
+impl petrel_core::xrpc::FromQueryValue for ParametersKinds {
+    fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
+        value.parse::<Self>().map_err(|err| petrel_core::DecodeError::Custom(err.to_owned()))
     }
 }
 

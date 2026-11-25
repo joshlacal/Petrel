@@ -33,6 +33,15 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            priority: petrel_core::xrpc::pull_optional_param(params, "priority")?,
+            seen_at: petrel_core::xrpc::pull_optional_param(params, "seenAt")?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     pub count: i64,

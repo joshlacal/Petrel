@@ -26,6 +26,15 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            dids: petrel_core::xrpc::pull_array_param(params, "dids")?,
+            detailed: petrel_core::xrpc::pull_default_param(params, "detailed", || false)?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     pub views: Vec<OutputViews>,

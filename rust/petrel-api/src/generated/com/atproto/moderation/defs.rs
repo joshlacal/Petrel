@@ -321,6 +321,12 @@ impl petrel_core::xrpc::QueryValue for ReasonType {
     }
 }
 
+impl petrel_core::xrpc::FromQueryValue for ReasonType {
+    fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self::from(value.to_owned()))
+    }
+}
+
 impl petrel_core::XrpcInput for ReasonType {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
@@ -423,6 +429,12 @@ impl petrel_core::FromValue for SubjectType {
 impl petrel_core::xrpc::QueryValue for SubjectType {
     fn to_query_value(&self) -> String {
         self.as_str().to_owned()
+    }
+}
+
+impl petrel_core::xrpc::FromQueryValue for SubjectType {
+    fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self::from(value.to_owned()))
     }
 }
 

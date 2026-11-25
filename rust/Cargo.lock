@@ -1694,8 +1694,11 @@ dependencies = [
  "http",
  "p256",
  "petrel",
+ "petrel-api",
  "petrel-core",
+ "petrel-server",
  "reqwest",
+ "serde",
  "serde_json",
  "tempfile",
  "tokio",
@@ -1745,6 +1748,43 @@ dependencies = [
  "tokio",
  "wasm-bindgen-test",
  "web-time",
+]
+
+[[package]]
+name = "petrel-server"
+version = "0.0.0"
+dependencies = [
+ "async-lock",
+ "axum",
+ "base64 0.22.1",
+ "bs58",
+ "bytes",
+ "form_urlencoded",
+ "futures-util",
+ "getrandom 0.2.17",
+ "hmac",
+ "http",
+ "k256",
+ "p256",
+ "petrel",
+ "petrel-api",
+ "petrel-core",
+ "petrel-crypto",
+ "petrel-oauth-scopes",
+ "serde",
+ "serde_json",
+ "sha2",
+ "subtle",
+ "thiserror",
+ "tokio",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+ "url",
+ "uuid",
+ "wasm-bindgen-test",
+ "web-time",
+ "zeroize",
 ]
 
 [[package]]
@@ -2292,6 +2332,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
+name = "signal-hook-registry"
+version = "1.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4db69cba1110affc0e9f7bcd48bbf87b3f4fc7c61fc9155afd4c469eb3d6c1b"
+dependencies = [
+ "errno",
+ "libc",
+]
+
+[[package]]
 name = "signature"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2514,6 +2564,7 @@ dependencies = [
  "libc",
  "mio",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "windows-sys 0.61.2",

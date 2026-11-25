@@ -1120,6 +1120,12 @@ impl petrel_core::xrpc::QueryValue for Access {
     }
 }
 
+impl petrel_core::xrpc::FromQueryValue for Access {
+    fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self::from(value.to_owned()))
+    }
+}
+
 impl petrel_core::XrpcInput for Access {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
@@ -1227,6 +1233,12 @@ impl petrel_core::FromValue for Status {
 impl petrel_core::xrpc::QueryValue for Status {
     fn to_query_value(&self) -> String {
         self.as_str().to_owned()
+    }
+}
+
+impl petrel_core::xrpc::FromQueryValue for Status {
+    fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self::from(value.to_owned()))
     }
 }
 

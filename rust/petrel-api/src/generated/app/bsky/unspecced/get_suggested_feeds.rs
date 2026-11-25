@@ -29,6 +29,14 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            limit: petrel_core::xrpc::pull_default_param(params, "limit", || 10)?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     pub feeds: Vec<crate::generated::app::bsky::feed::defs::GeneratorView>,
