@@ -377,3 +377,31 @@ async fn run_cli_unauth_allows_loopback_targets_for_both_supported_endpoints() {
     assert!(recorded[0].starts_with("GET /xrpc/app.bsky.actor.getProfile?"));
     assert!(recorded[1].starts_with("GET /xrpc/app.bsky.feed.getTimeline?"));
 }
+
+#[cfg(unix)]
+#[test]
+fn auth_event_jsonl_writer_restricts_file_permissions_to_0600() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = TempDir::new().unwrap();
+    let fresh_path = dir.path().join("nested").join("events.jsonl");
+    let writer = AuthEventJsonlWriter::open(&fresh_path).unwrap();
+    drop(writer);
+
+    let fresh_mode = std::fs::metadata(&fresh_path).unwrap().permissions().mode() & 0o777;
+    assert_eq!(fresh_mode, 0o600);
+
+    // Pre-existing overly permissive regular file is also tightened on open.
+    let existing_path = dir.path().join("existing.jsonl");
+    std::fs::write(&existing_path, b"").unwrap();
+    std::fs::set_permissions(&existing_path, std::fs::Permissions::from_mode(0o644)).unwrap();
+    let writer = AuthEventJsonlWriter::open(&existing_path).unwrap();
+    drop(writer);
+
+    let existing_mode = std::fs::metadata(&existing_path)
+        .unwrap()
+        .permissions()
+        .mode()
+        & 0o777;
+    assert_eq!(existing_mode, 0o600);
+}

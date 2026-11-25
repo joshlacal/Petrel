@@ -1,6 +1,6 @@
 //! Ported BskyAppURL, LabelSet lifecycle, recorded AppView fixture, and BskyAgent tests.
 
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, sync::Arc, time::Duration};
 
 use petrel_api::generated::app::bsky::actor::defs::ProfileViewDetailed;
 use petrel_api::generated::app::bsky::labeler::get_services::{
@@ -8,11 +8,12 @@ use petrel_api::generated::app::bsky::labeler::get_services::{
 };
 use petrel_api::generated::com::atproto::label::defs::Label;
 use petrel_bsky::{
-    BSKY_LABELER_DID, BskyAppURL, LabelExt, LabelPreference, LabelSet, LabelStreamEvent,
-    Moderation, ModerationContext, ModerationOptions, ModerationPrefs, ModerationPrefsLabeler,
-    RichText, interpret_label_value_definitions, known_labels,
+    BSKY_LABELER_DID, BskyAppURL, LabelExt, LabelPreference, LabelRejectionReason, LabelSet,
+    LabelSignatureVerifier, LabelStreamEvent, Moderation, ModerationContext, ModerationOptions,
+    ModerationPrefs, ModerationPrefsLabeler, RichText, interpret_label_value_definitions,
+    known_labels,
 };
-use petrel_core::{AtUri, Datetime, Uri};
+use petrel_core::{AtUri, Datetime, Did, Uri};
 use serde_json::json;
 use url::Url;
 
@@ -221,6 +222,94 @@ fn label_set_lifecycle_negation_expiry_cursor_and_prune() {
             .collect::<Vec<_>>(),
         vec!["kept", "old"]
     );
+}
+
+struct StubLabelVerifier {
+    expected_sig: Vec<u8>,
+}
+
+impl LabelSignatureVerifier for StubLabelVerifier {
+    fn verify_label(&self, label: &Label) -> Result<(), String> {
+        match &label.sig {
+            Some(sig) if sig.0.as_slice() == self.expected_sig.as_slice() => Ok(()),
+            Some(_) => Err("signature mismatch".to_owned()),
+            None => Err("missing signature".to_owned()),
+        }
+    }
+}
+
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+fn label_set_stream_src_binding_signature_verifier_and_future_cts_guard() {
+    let expected_did: Did = "did:plc:labeler".parse().unwrap();
+    let other_did: Did = "did:plc:attacker".parse().unwrap();
+    let post = "at://did:plc:bob/app.bsky.feed.post/3kpost";
+    let now = Datetime::from_unix(1_000, 0).unwrap();
+
+    let mut bound = LabelSet::for_labeler(expected_did.clone())
+        .with_signature_verifier(Arc::new(StubLabelVerifier {
+            expected_sig: vec![1, 2, 3, 4],
+        }))
+        .with_max_future_skew(Some(Duration::from_secs(60)));
+
+    // 1. Foreign `src` on stream ingestion is rejected and never stored.
+    let mut foreign = mk_label("spam", post, other_did.as_str(), 1_000, None, None);
+    foreign.sig = Some(petrel_core::Bytes(vec![1, 2, 3, 4]));
+    // 2. Missing signature and invalid signature are rejected.
+    let unsigned = mk_label("spam", post, expected_did.as_str(), 1_000, None, None);
+    let mut bad_sig = mk_label("spam", post, expected_did.as_str(), 1_000, None, None);
+    bad_sig.sig = Some(petrel_core::Bytes(vec![9, 9]));
+    // 3. Far-future `cts` (> now + 60s) is rejected so it cannot pin replacement order.
+    let mut far_future = mk_label("spam", post, expected_did.as_str(), 2_000, None, None);
+    far_future.sig = Some(petrel_core::Bytes(vec![1, 2, 3, 4]));
+    // 4. Valid signed label within skew is accepted.
+    let mut valid = mk_label("spam", post, expected_did.as_str(), 1_010, None, None);
+    valid.sig = Some(petrel_core::Bytes(vec![1, 2, 3, 4]));
+
+    let outcome = bound.try_apply_event_at(
+        Some(&expected_did),
+        LabelStreamEvent::Labels {
+            seq: 55,
+            labels: vec![foreign, unsigned, bad_sig, far_future, valid],
+        },
+        &now,
+    );
+    assert_eq!(bound.cursor(), Some(55));
+    assert_eq!(outcome.accepted, 1);
+    assert_eq!(outcome.stale, 0);
+    assert_eq!(outcome.rejected.len(), 4);
+    assert!(matches!(
+        &outcome.rejected[0].reason,
+        LabelRejectionReason::UnexpectedSource { expected, actual }
+            if expected == &expected_did && actual == &other_did
+    ));
+    assert_eq!(
+        outcome.rejected[1].reason,
+        LabelRejectionReason::MissingSignature
+    );
+    assert!(matches!(
+        &outcome.rejected[2].reason,
+        LabelRejectionReason::InvalidSignature(msg) if msg == "signature mismatch"
+    ));
+    assert!(matches!(
+        &outcome.rejected[3].reason,
+        LabelRejectionReason::FutureTimestamp { .. }
+    ));
+    assert_eq!(bound.active_labels(Some(post), &now).len(), 1);
+
+    // Subsequent negation at real time (`1_020`) still succeeds because `far_future` was never stored.
+    let mut negate = mk_label("spam", post, expected_did.as_str(), 1_020, Some(true), None);
+    negate.sig = Some(petrel_core::Bytes(vec![1, 2, 3, 4]));
+    assert_eq!(bound.try_apply_at(negate, &now), Ok(true));
+    assert_eq!(bound.active_labels(Some(post), &now), [] as [&Label; 0]);
+
+    // Even an unbound `LabelSet::new()` rejects far-future `cts` by default.
+    let mut unbound = LabelSet::new();
+    let future_poison = mk_label("rude", post, expected_did.as_str(), 9_999_999, None, None);
+    assert!(matches!(
+        unbound.try_apply_at(future_poison, &now),
+        Err(LabelRejectionReason::FutureTimestamp { .. })
+    ));
 }
 
 // MARK: 3. BskyRecordedFixtureTests

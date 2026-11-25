@@ -19,6 +19,8 @@ use petrel_api::generated::app::bsky::notification::list_notifications::Notifica
 use petrel_api::generated::com::atproto::label::defs::Label;
 use petrel_core::{Datetime, Did, FromValue, Value};
 
+use crate::label_set::current_datetime;
+
 pub use behavior::{
     LabelTarget, LabelValueDefinitionFlag, ModerationAction, ModerationBehavior, ModerationContext,
 };
@@ -39,15 +41,34 @@ pub use types::{
 pub struct Moderation;
 
 impl Moderation {
-    /// Evaluates an account and its profile record.
+    /// Evaluates an account and its profile record against the system clock.
     #[must_use]
     pub fn moderate_profile<S: ModerationSubjectProfile + ?Sized>(
         subject: &S,
         options: &ModerationOptions,
     ) -> ModerationDecision {
+        let now = current_datetime();
+        Self::moderate_profile_with_time(subject, options, now.as_ref())
+    }
+
+    /// Evaluates an account and its profile record against explicit `now`.
+    #[must_use]
+    pub fn moderate_profile_at<S: ModerationSubjectProfile + ?Sized>(
+        subject: &S,
+        options: &ModerationOptions,
+        now: &Datetime,
+    ) -> ModerationDecision {
+        Self::moderate_profile_with_time(subject, options, Some(now))
+    }
+
+    fn moderate_profile_with_time<S: ModerationSubjectProfile + ?Sized>(
+        subject: &S,
+        options: &ModerationOptions,
+        now: Option<&Datetime>,
+    ) -> ModerationDecision {
         ModerationDecision::merge([
-            Some(decide_account(subject, options)),
-            Some(decide_profile(subject, options)),
+            Some(decide_account(subject, options, now)),
+            Some(decide_profile(subject, options, now)),
         ])
     }
 
@@ -60,49 +81,93 @@ impl Moderation {
     ) -> ModerationDecision {
         ModerationDecision::merge([
             Some(decide_post_subject(subject, options, now)),
-            decide_embed(subject.embed.as_ref(), options).map(|d| d.downgraded()),
-            Some(decide_account(&subject.author, options)),
-            Some(decide_profile(&subject.author, options)),
+            decide_embed(subject.embed.as_ref(), options, Some(now)).map(|d| d.downgraded()),
+            Some(decide_account(&subject.author, options, Some(now))),
+            Some(decide_profile(&subject.author, options, Some(now))),
         ])
     }
 
-    /// Evaluates a notification and its author.
+    /// Evaluates a notification and its author against the system clock.
     #[must_use]
     pub fn moderate_notification(
         subject: &Notification,
         options: &ModerationOptions,
     ) -> ModerationDecision {
+        let now = current_datetime();
+        Self::moderate_notification_with_time(subject, options, now.as_ref())
+    }
+
+    /// Evaluates a notification and its author against explicit `now`.
+    #[must_use]
+    pub fn moderate_notification_at(
+        subject: &Notification,
+        options: &ModerationOptions,
+        now: &Datetime,
+    ) -> ModerationDecision {
+        Self::moderate_notification_with_time(subject, options, Some(now))
+    }
+
+    fn moderate_notification_with_time(
+        subject: &Notification,
+        options: &ModerationOptions,
+        now: Option<&Datetime>,
+    ) -> ModerationDecision {
         let mut decision = ModerationDecision::new(
             Some(subject.author.did.clone()),
             is_viewer(&subject.author.did, options),
         );
-        for label in subject.labels.as_deref().unwrap_or(&[]) {
-            decision.add_label(LabelTarget::Content, label, options);
-        }
+        decision.add_labels_at(
+            LabelTarget::Content,
+            subject.labels.as_deref().unwrap_or(&[]),
+            options,
+            now,
+        );
         ModerationDecision::merge([
             Some(decision),
-            Some(decide_account(&subject.author, options)),
-            Some(decide_profile(&subject.author, options)),
+            Some(decide_account(&subject.author, options, now)),
+            Some(decide_profile(&subject.author, options, now)),
         ])
     }
 
-    /// Evaluates a feed generator and its creator.
+    /// Evaluates a feed generator and its creator against the system clock.
     #[must_use]
     pub fn moderate_feed_generator(
         subject: &GeneratorView,
         options: &ModerationOptions,
     ) -> ModerationDecision {
+        let now = current_datetime();
+        Self::moderate_feed_generator_with_time(subject, options, now.as_ref())
+    }
+
+    /// Evaluates a feed generator and its creator against explicit `now`.
+    #[must_use]
+    pub fn moderate_feed_generator_at(
+        subject: &GeneratorView,
+        options: &ModerationOptions,
+        now: &Datetime,
+    ) -> ModerationDecision {
+        Self::moderate_feed_generator_with_time(subject, options, Some(now))
+    }
+
+    fn moderate_feed_generator_with_time(
+        subject: &GeneratorView,
+        options: &ModerationOptions,
+        now: Option<&Datetime>,
+    ) -> ModerationDecision {
         let mut decision = ModerationDecision::new(
             Some(subject.creator.did.clone()),
             is_viewer(&subject.creator.did, options),
         );
-        for label in subject.labels.as_deref().unwrap_or(&[]) {
-            decision.add_label(LabelTarget::Content, label, options);
-        }
+        decision.add_labels_at(
+            LabelTarget::Content,
+            subject.labels.as_deref().unwrap_or(&[]),
+            options,
+            now,
+        );
         ModerationDecision::merge([
             Some(decision),
-            Some(decide_account(&subject.creator, options)),
-            Some(decide_profile(&subject.creator, options)),
+            Some(decide_account(&subject.creator, options, now)),
+            Some(decide_profile(&subject.creator, options, now)),
         ])
     }
 
@@ -112,18 +177,40 @@ impl Moderation {
         subject: &S,
         options: &ModerationOptions,
     ) -> ModerationDecision {
+        let now = current_datetime();
+        Self::moderate_user_list_with_time(subject, options, now.as_ref())
+    }
+
+    /// Evaluates a user list against explicit `now`.
+    #[must_use]
+    pub fn moderate_user_list_at<S: ModerationSubjectUserList + ?Sized>(
+        subject: &S,
+        options: &ModerationOptions,
+        now: &Datetime,
+    ) -> ModerationDecision {
+        Self::moderate_user_list_with_time(subject, options, Some(now))
+    }
+
+    fn moderate_user_list_with_time<S: ModerationSubjectUserList + ?Sized>(
+        subject: &S,
+        options: &ModerationOptions,
+        now: Option<&Datetime>,
+    ) -> ModerationDecision {
         if let Some(creator) = subject.moderation_creator() {
             let mut decision = ModerationDecision::new(
                 Some(creator.did.clone()),
                 is_viewer(&creator.did, options),
             );
-            for label in subject.labels().unwrap_or(&[]) {
-                decision.add_label(LabelTarget::Content, label, options);
-            }
+            decision.add_labels_at(
+                LabelTarget::Content,
+                subject.labels().unwrap_or(&[]),
+                options,
+                now,
+            );
             return ModerationDecision::merge([
                 Some(decision),
-                Some(decide_account(creator, options)),
-                Some(decide_profile(creator, options)),
+                Some(decide_account(creator, options, now)),
+                Some(decide_profile(creator, options, now)),
             ]);
         }
 
@@ -132,9 +219,12 @@ impl Moderation {
             .as_ref()
             .is_some_and(|did| is_viewer(did, options));
         let mut decision = ModerationDecision::new(creator_did, is_me);
-        for label in subject.labels().unwrap_or(&[]) {
-            decision.add_label(LabelTarget::Content, label, options);
-        }
+        decision.add_labels_at(
+            LabelTarget::Content,
+            subject.labels().unwrap_or(&[]),
+            options,
+            now,
+        );
         decision
     }
 
@@ -144,19 +234,41 @@ impl Moderation {
         subject: &S,
         options: &ModerationOptions,
     ) -> ModerationDecision {
+        let now = current_datetime();
+        Self::moderate_status_with_time(subject, options, now.as_ref())
+    }
+
+    /// Evaluates an account's status record together with the account itself against explicit `now`.
+    #[must_use]
+    pub fn moderate_status_at<S: ModerationSubjectProfile + ?Sized>(
+        subject: &S,
+        options: &ModerationOptions,
+        now: &Datetime,
+    ) -> ModerationDecision {
+        Self::moderate_status_with_time(subject, options, Some(now))
+    }
+
+    fn moderate_status_with_time<S: ModerationSubjectProfile + ?Sized>(
+        subject: &S,
+        options: &ModerationOptions,
+        now: Option<&Datetime>,
+    ) -> ModerationDecision {
         let mut decision = ModerationDecision::new(
             Some(subject.did().clone()),
             is_viewer(subject.did(), options),
         );
         if let Some(status) = subject.moderation_status() {
-            for label in status.labels.as_deref().unwrap_or(&[]) {
-                decision.add_label(LabelTarget::Content, label, options);
-            }
+            decision.add_labels_at(
+                LabelTarget::Content,
+                status.labels.as_deref().unwrap_or(&[]),
+                options,
+                now,
+            );
         }
         ModerationDecision::merge([
             Some(decision),
-            Some(decide_account(subject, options)),
-            Some(decide_profile(subject, options)),
+            Some(decide_account(subject, options, now)),
+            Some(decide_profile(subject, options, now)),
         ])
     }
 }
@@ -172,6 +284,7 @@ fn is_profile_record_label(label: &Label) -> bool {
 fn decide_account<S: ModerationSubjectProfile + ?Sized>(
     subject: &S,
     options: &ModerationOptions,
+    now: Option<&Datetime>,
 ) -> ModerationDecision {
     let mut decision = ModerationDecision::new(
         Some(subject.did().clone()),
@@ -179,27 +292,34 @@ fn decide_account<S: ModerationSubjectProfile + ?Sized>(
     );
     add_viewer_state(subject.viewer(), &mut decision);
 
-    for label in subject.labels().unwrap_or(&[]) {
-        if !is_profile_record_label(label) || label.val == "!no-unauthenticated" {
-            decision.add_label(LabelTarget::Account, label, options);
-        }
-    }
+    let account_labels: Vec<Label> = subject
+        .labels()
+        .unwrap_or(&[])
+        .iter()
+        .filter(|label| !is_profile_record_label(label) || label.val == "!no-unauthenticated")
+        .cloned()
+        .collect();
+    decision.add_labels_at(LabelTarget::Account, &account_labels, options, now);
     decision
 }
 
 fn decide_profile<S: ModerationSubjectProfile + ?Sized>(
     subject: &S,
     options: &ModerationOptions,
+    now: Option<&Datetime>,
 ) -> ModerationDecision {
     let mut decision = ModerationDecision::new(
         Some(subject.did().clone()),
         is_viewer(subject.did(), options),
     );
-    for label in subject.labels().unwrap_or(&[]) {
-        if is_profile_record_label(label) {
-            decision.add_label(LabelTarget::Profile, label, options);
-        }
-    }
+    let profile_labels: Vec<Label> = subject
+        .labels()
+        .unwrap_or(&[])
+        .iter()
+        .filter(|label| is_profile_record_label(label))
+        .cloned()
+        .collect();
+    decision.add_labels_at(LabelTarget::Profile, &profile_labels, options, now);
     decision
 }
 
@@ -231,9 +351,12 @@ fn decide_post_subject(
         Some(subject.author.did.clone()),
         is_viewer(&subject.author.did, options),
     );
-    for label in subject.labels.as_deref().unwrap_or(&[]) {
-        decision.add_label(LabelTarget::Content, label, options);
-    }
+    decision.add_labels_at(
+        LabelTarget::Content,
+        subject.labels.as_deref().unwrap_or(&[]),
+        options,
+        Some(now),
+    );
     decision.add_hidden(is_hidden(subject, &options.prefs.hidden_posts));
     if !decision.is_me {
         decision.add_muted_word(match_all_mute_words(
@@ -256,9 +379,10 @@ fn quoted_record(embed: Option<&PostViewEmbed>) -> Option<&ViewRecordUnion> {
 fn decide_embed(
     embed: Option<&PostViewEmbed>,
     options: &ModerationOptions,
+    now: Option<&Datetime>,
 ) -> Option<ModerationDecision> {
     match quoted_record(embed) {
-        Some(ViewRecordUnion::ViewRecord(record)) => Some(decide_quoted_post(record, options)),
+        Some(ViewRecordUnion::ViewRecord(record)) => Some(decide_quoted_post(record, options, now)),
         Some(ViewRecordUnion::ViewBlocked(blocked)) => {
             Some(decide_blocked_quoted_post(blocked, options))
         }
@@ -266,18 +390,25 @@ fn decide_embed(
     }
 }
 
-fn decide_quoted_post(subject: &ViewRecord, options: &ModerationOptions) -> ModerationDecision {
+fn decide_quoted_post(
+    subject: &ViewRecord,
+    options: &ModerationOptions,
+    now: Option<&Datetime>,
+) -> ModerationDecision {
     let mut decision = ModerationDecision::new(
         Some(subject.author.did.clone()),
         is_viewer(&subject.author.did, options),
     );
-    for label in subject.labels.as_deref().unwrap_or(&[]) {
-        decision.add_label(LabelTarget::Content, label, options);
-    }
+    decision.add_labels_at(
+        LabelTarget::Content,
+        subject.labels.as_deref().unwrap_or(&[]),
+        options,
+        now,
+    );
     ModerationDecision::merge([
         Some(decision),
-        Some(decide_account(&subject.author, options)),
-        Some(decide_profile(&subject.author, options)),
+        Some(decide_account(&subject.author, options, now)),
+        Some(decide_profile(&subject.author, options, now)),
     ])
 }
 

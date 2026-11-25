@@ -199,7 +199,7 @@ fn parse_month(name: &str) -> Option<u32> {
 }
 
 fn is_leap_year(year: i64) -> bool {
-    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+    (year.rem_euclid(4) == 0 && year.rem_euclid(100) != 0) || year.rem_euclid(400) == 0
 }
 
 fn days_in_month(year: i64, month: u32) -> u32 {
@@ -219,14 +219,25 @@ fn days_in_month(year: i64, month: u32) -> u32 {
 
 fn days_since_epoch(year: i64, month: u32, day: u32) -> Option<u64> {
     // Howard Hinnant's civil-from-days inverse for UTC calendar dates.
-    let adj_year = if month <= 2 { year - 1 } else { year };
+    let adj_year = if month <= 2 {
+        year.checked_sub(1)?
+    } else {
+        year
+    };
     let era = adj_year.div_euclid(400);
-    let yoe = u64::try_from(adj_year - era * 400).ok()?;
+    let era_start = era.checked_mul(400)?;
+    let yoe = u64::try_from(adj_year.checked_sub(era_start)?).ok()?;
     let m = u64::from(month);
     let d = u64::from(day);
     let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    let total = era * 146_097 + i64::try_from(doe).ok()? - 719_468;
+    let doe = yoe
+        .checked_mul(365)?
+        .checked_add(yoe / 4)?
+        .checked_sub(yoe / 100)?
+        .checked_add(doy)?;
+    let era_days = era.checked_mul(146_097)?;
+    let doe_i64 = i64::try_from(doe).ok()?;
+    let total = era_days.checked_add(doe_i64)?.checked_sub(719_468)?;
     u64::try_from(total).ok()
 }
 
@@ -251,6 +262,19 @@ mod tests {
         // Past HTTP-date clamps to zero.
         let past = parse_retry_after("Wed, 21 Oct 2015 07:28:00 GMT", now).unwrap();
         assert_eq!(past, Duration::ZERO);
+
+        // Extreme years must never overflow or panic in debug builds.
+        for extreme in [
+            "Wed, 15 Nov 99999999999999999 22:13:30 GMT",
+            "Wed, 15 Nov 9223372036854775807 22:13:30 GMT",
+            "Wed, 15 Nov 999999999999 22:13:30 GMT",
+            "Wed, 15 Nov -9223372036854775808 22:13:30 GMT",
+            "Wed, 15 Nov 1969 22:13:30 GMT",
+            "Sun Nov  6 08:49:37 9223372036854775807",
+        ] {
+            assert_eq!(parse_http_date(extreme), None, "{extreme}");
+            assert_eq!(parse_retry_after(extreme, now), None, "{extreme}");
+        }
     }
 
     #[test]

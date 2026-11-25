@@ -1,8 +1,12 @@
 //! Per-subject moderation decisions and UI context resolution.
 
+use std::collections::HashMap;
+
 use petrel_api::generated::app::bsky::graph::defs::ListViewBasic;
 use petrel_api::generated::com::atproto::label::defs::Label;
-use petrel_core::Did;
+use petrel_core::{Datetime, Did};
+
+use crate::label_set::{LabelExt, LabelKey, current_datetime};
 
 use super::behavior::{
     LabelTarget, LabelValueDefinitionFlag, ModerationAction, ModerationBehavior, ModerationContext,
@@ -285,8 +289,78 @@ impl ModerationDecision {
         }
     }
 
-    /// Evaluates one label and appends a cause if it applies to the viewer.
+    /// Evaluates one label against the system clock and appends a cause if it applies.
+    ///
+    /// Negation labels (`neg == Some(true)`) and expired labels (`exp <= now`) never add causes.
     pub fn add_label(&mut self, target: LabelTarget, label: &Label, options: &ModerationOptions) {
+        let now = current_datetime();
+        self.add_label_with_time(target, label, options, now.as_ref());
+    }
+
+    /// Evaluates one label against explicit `now` and appends a cause if active and applicable.
+    pub fn add_label_at(
+        &mut self,
+        target: LabelTarget,
+        label: &Label,
+        options: &ModerationOptions,
+        now: &Datetime,
+    ) {
+        self.add_label_with_time(target, label, options, Some(now));
+    }
+
+    /// Resolves `(src, uri, val)` replacement/negation across `labels` and applies active,
+    /// unexpired labels in their winning order.
+    pub fn add_labels_at(
+        &mut self,
+        target: LabelTarget,
+        labels: &[Label],
+        options: &ModerationOptions,
+        now: Option<&Datetime>,
+    ) {
+        if labels.is_empty() {
+            return;
+        }
+        if labels.len() == 1 {
+            self.add_label_with_time(target, &labels[0], options, now);
+            return;
+        }
+        let mut latest: HashMap<LabelKey, (usize, &Label)> = HashMap::with_capacity(labels.len());
+        for (idx, label) in labels.iter().enumerate() {
+            let key = LabelKey::from_label(label);
+            let replace = match latest.get(&key) {
+                None => true,
+                Some((_, prev)) => {
+                    (prev.cts.unix_seconds(), prev.cts.subsec_nanos())
+                        <= (label.cts.unix_seconds(), label.cts.subsec_nanos())
+                }
+            };
+            if replace {
+                latest.insert(key, (idx, label));
+            }
+        }
+        let mut ordered: Vec<(usize, &Label)> = latest.into_values().collect();
+        ordered.sort_by_key(|(idx, _)| *idx);
+        for (_, label) in ordered {
+            self.add_label_with_time(target, label, options, now);
+        }
+    }
+
+    /// Evaluates one label with an optional reference timestamp and appends a cause if active.
+    pub(crate) fn add_label_with_time(
+        &mut self,
+        target: LabelTarget,
+        label: &Label,
+        options: &ModerationOptions,
+        now: Option<&Datetime>,
+    ) {
+        if label.is_negation() {
+            return;
+        }
+        if let Some(now) = now
+            && label.is_expired(now)
+        {
+            return;
+        }
         let builtins = builtin_label_definitions();
         let built_in = builtins.get(&label.val).cloned();
         let definition = if is_custom_label_value(&label.val) {

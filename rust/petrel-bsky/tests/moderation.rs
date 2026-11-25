@@ -878,3 +878,87 @@ fn moderation_subjects_and_mute_words() {
         1
     );
 }
+
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+fn moderation_enforces_label_negation_and_expiration() {
+    let labeler: Did = "did:web:labeler.test".parse().unwrap();
+    let opts = ModerationOptions::new(
+        None,
+        ModerationPrefs {
+            adult_content_enabled: false,
+            labels: HashMap::new(),
+            labelers: vec![ModerationPrefsLabeler::new(labeler.clone())],
+            muted_words: Vec::new(),
+            hidden_posts: Vec::new(),
+        },
+    );
+    let now = Datetime::from_unix(1_000, 0).unwrap();
+    let post_uri = "at://did:web:bob.test/app.bsky.feed.post/fake";
+
+    let make_label = |val: &str,
+                      cts: i64,
+                      neg: Option<bool>,
+                      exp: Option<i64>|
+     -> petrel_api::generated::com::atproto::label::defs::Label {
+        serde_json::from_value(json!({
+            "src": labeler.as_str(),
+            "uri": post_uri,
+            "val": val,
+            "neg": neg,
+            "cts": Datetime::from_unix(cts, 0).unwrap().as_str(),
+            "exp": exp.map(|secs| Datetime::from_unix(secs, 0).unwrap().into_string()),
+        }))
+        .unwrap()
+    };
+
+    // Direct `add_label_at` ignores negation labels and expired labels (`exp <= now`).
+    let mut direct = ModerationDecision::new(None, false);
+    direct.add_label_at(
+        petrel_bsky::LabelTarget::Content,
+        &make_label("!hide", 100, Some(true), None),
+        &opts,
+        &now,
+    );
+    direct.add_label_at(
+        petrel_bsky::LabelTarget::Content,
+        &make_label("!hide", 100, None, Some(1_000)),
+        &opts,
+        &now,
+    );
+    direct.add_label_at(
+        petrel_bsky::LabelTarget::Content,
+        &make_label("!hide", 100, None, Some(999)),
+        &opts,
+        &now,
+    );
+    assert_eq!(direct.causes, [] as [petrel_bsky::ModerationCause; 0]);
+
+    // An unexpired label (`exp > now`) still applies.
+    direct.add_label_at(
+        petrel_bsky::LabelTarget::Content,
+        &make_label("!warn", 100, None, Some(1_001)),
+        &opts,
+        &now,
+    );
+    assert_eq!(direct.causes.len(), 1);
+    assert!(direct.ui(ModerationContext::ContentList).blur());
+
+    // `moderate_post` retracts an active label when a newer `neg: true` tombstone is present,
+    // ignores expired labels, and does not let an older replay resurrect a negated label.
+    let post = mock_post_view(
+        mock_post("Hello", Some(vec!["en"])),
+        mock_profile("bob.test", None, None, None),
+        None,
+        Some(vec![
+            serde_json::to_value(make_label("!hide", 100, None, None)).unwrap(),
+            serde_json::to_value(make_label("!hide", 200, Some(true), None)).unwrap(),
+            serde_json::to_value(make_label("!hide", 50, None, None)).unwrap(),
+            serde_json::to_value(make_label("!warn", 100, None, Some(900))).unwrap(),
+        ]),
+    );
+    let decision = Moderation::moderate_post(&post, &opts, &now);
+    assert_eq!(decision.causes, [] as [petrel_bsky::ModerationCause; 0]);
+    assert!(!decision.ui(ModerationContext::ContentList).filter());
+    assert!(!decision.ui(ModerationContext::ContentList).blur());
+}

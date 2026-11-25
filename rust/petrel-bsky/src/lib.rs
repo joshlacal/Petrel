@@ -15,7 +15,10 @@ pub use agent::{
     PostImage, ProfileUpdate, RecordSwap, ServiceProxy, VIDEO_SERVICE_URL,
 };
 pub use app_url::BskyAppURL;
-pub use label_set::{LabelExt, LabelKey, LabelSet, LabelStreamEvent};
+pub use label_set::{
+    DEFAULT_MAX_FUTURE_CTS_SKEW, LabelEventOutcome, LabelExt, LabelKey, LabelRejection,
+    LabelRejectionReason, LabelSet, LabelSignatureVerifier, LabelStreamEvent,
+};
 pub use moderation::{
     InterpretedLabelValueDefinition, LabelCause, LabelPreference, LabelTarget,
     LabelTargetBehaviors, LabelValueDefinitionFlag, Moderation, ModerationAction,

@@ -272,14 +272,36 @@ pub struct AuthEventJsonlWriter {
 }
 
 impl AuthEventJsonlWriter {
-    /// Opens an existing (or creates a new) JSONL file in append mode and records initial offset.
+    /// Opens an existing (or creates a new) JSONL file in append mode with `0o600` permissions on
+    /// Unix and records the initial byte offset.
     pub fn open(path: impl AsRef<Path>) -> std::io::Result<Self> {
-        if let Some(parent) = path.as_ref().parent()
+        let path = path.as_ref();
+        if let Some(parent) = path.parent()
             && !parent.as_os_str().is_empty()
         {
             std::fs::create_dir_all(parent)?;
         }
-        let mut file = OpenOptions::new().create(true).append(true).open(path)?;
+        let mut options = OpenOptions::new();
+        options.create(true).append(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file = options.open(path)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let meta = file.metadata()?;
+            if meta.file_type().is_file() {
+                let perms = meta.permissions();
+                if (perms.mode() & 0o077) != 0 {
+                    let mut restricted = perms;
+                    restricted.set_mode(0o600);
+                    file.set_permissions(restricted)?;
+                }
+            }
+        }
         let append_offset = file.seek(SeekFrom::End(0))?;
         Ok(Self {
             append_offset,

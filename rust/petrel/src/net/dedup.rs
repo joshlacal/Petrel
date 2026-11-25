@@ -2,7 +2,7 @@
 
 use std::{
     collections::{BTreeSet, HashMap},
-    fmt,
+    fmt::{self, Write as _},
     future::Future,
     sync::{
         Arc,
@@ -18,26 +18,78 @@ use http::{HeaderMap, Method, Request, Response};
 use web_time::Instant;
 
 use super::TransportError;
-use crate::rt::{BoxFuture, MaybeSend};
+use crate::{
+    crypto::sha256,
+    rt::{BoxFuture, MaybeSend},
+};
 
 const DEFAULT_MAX_REQUEST_AGE: Duration = Duration::from_secs(30);
 
 /// Canonical key identifying an idempotent `GET` or `HEAD` request for deduplication.
 ///
 /// Requests that differ in response-affecting headers (`atproto-proxy`,
-/// `atproto-accept-labelers`, or any caller header) map to distinct keys, while
-/// per-request credentials (`Authorization`, `DPoP`) and configured ignored headers
-/// do not split keys.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// `atproto-accept-labelers`, or any caller header), calling `auth_identity`, or
+/// whether an `Authorization` header is present map to distinct keys, while per-request
+/// `DPoP` proofs and configured ignored headers do not split keys.
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct RequestKey {
-    /// Calling identity, used to isolate responses per user/session.
+    /// Calling identity (or opaque hash of `Authorization` when explicit identity is absent),
+    /// used to isolate responses per user/session.
     pub auth_identity: Option<String>,
+    /// Distinguishes authenticated requests carrying an `Authorization` header from
+    /// pre-auth / unauthenticated requests even if `auth_identity` matches.
+    has_authorization: bool,
     /// HTTP method (`GET` or `HEAD`).
     pub method: String,
     /// Full request URL string.
     pub url: String,
     /// Sorted lowercase `name:value` pairs for non-ignored headers.
     pub headers: Vec<String>,
+}
+
+impl fmt::Debug for RequestKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let header_names: Vec<&str> = self
+            .headers
+            .iter()
+            .map(|entry| {
+                entry
+                    .split_once(':')
+                    .map_or(entry.as_str(), |(name, _)| name)
+            })
+            .collect();
+        f.debug_struct("RequestKey")
+            .field(
+                "auth_identity",
+                &self.auth_identity.as_ref().map(|_| "[REDACTED]"),
+            )
+            .field("has_authorization", &self.has_authorization)
+            .field("method", &self.method)
+            .field("url", &self.url)
+            .field("header_names", &header_names)
+            .finish()
+    }
+}
+
+fn authorization_digest(headers: &HeaderMap) -> Option<String> {
+    let mut values = headers
+        .get_all(http::header::AUTHORIZATION)
+        .iter()
+        .peekable();
+    values.peek()?;
+    let mut material = Vec::new();
+    for value in values {
+        let bytes = value.as_bytes();
+        material.extend_from_slice(&(bytes.len() as u64).to_be_bytes());
+        material.extend_from_slice(bytes);
+    }
+    let digest = sha256(&material);
+    let mut out = String::with_capacity("auth-sha256:".len() + digest.len() * 2);
+    out.push_str("auth-sha256:");
+    for byte in digest {
+        let _ = write!(&mut out, "{byte:02x}");
+    }
+    Some(out)
 }
 
 impl RequestKey {
@@ -52,14 +104,10 @@ impl RequestKey {
         auth_identity: Option<&str>,
         ignoring_headers: &[&str],
     ) -> Option<Self> {
-        let fallback_auth = request
-            .headers()
-            .get(http::header::AUTHORIZATION)
-            .and_then(|value| value.to_str().ok());
         Self::new(
             request.method(),
             &request.uri().to_string(),
-            auth_identity.or(fallback_auth),
+            auth_identity,
             request.headers(),
             ignoring_headers,
         )
@@ -81,6 +129,10 @@ impl RequestKey {
         if url.is_empty() {
             return None;
         }
+        let has_authorization = headers.contains_key(http::header::AUTHORIZATION);
+        let bound_identity = auth_identity
+            .map(str::to_owned)
+            .or_else(|| authorization_digest(headers));
         let mut ignored: BTreeSet<String> = Self::DEFAULT_IGNORED_HEADERS
             .iter()
             .map(|name| (*name).to_owned())
@@ -103,7 +155,8 @@ impl RequestKey {
         normalized_headers.sort();
 
         Some(Self {
-            auth_identity: auth_identity.map(str::to_owned),
+            auth_identity: bound_identity,
+            has_authorization,
             method: method.as_str().to_owned(),
             url: url.to_owned(),
             headers: normalized_headers,

@@ -130,6 +130,51 @@ fn request_key_partitioning_matches_swift_parity() {
 
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+fn request_key_redacts_debug_and_isolates_auth_states() {
+    let secret_token = "Bearer super-secret-oauth-token-123";
+    let secret_cookie = "sid=top-secret-cookie";
+    let authed_req = get_request(&[
+        ("Authorization", secret_token),
+        ("Cookie", secret_cookie),
+        ("atproto-proxy", "did:web:api.bsky.app#bsky_appview"),
+    ]);
+    let authed_key = RequestKey::from_request(&authed_req, None, &[]).unwrap();
+
+    // Debug output must redact `auth_identity` and header values, and never retain raw token.
+    let debug_str = format!("{authed_key:?}");
+    assert!(!debug_str.contains(secret_token));
+    assert!(!debug_str.contains("super-secret-oauth-token-123"));
+    assert!(!debug_str.contains(secret_cookie));
+    assert_ne!(authed_key.auth_identity.as_deref(), Some(secret_token));
+
+    // Different `Authorization` tokens (when `auth_identity` is None) must not collide.
+    let other_token_req = get_request(&[
+        ("Authorization", "Bearer different-token-456"),
+        ("Cookie", secret_cookie),
+        ("atproto-proxy", "did:web:api.bsky.app#bsky_appview"),
+    ]);
+    let other_token_key = RequestKey::from_request(&other_token_req, None, &[]).unwrap();
+    assert_ne!(authed_key, other_token_key);
+
+    // Pre-auth (no Authorization) vs authenticated (with Authorization) never coalesce even if
+    // the same DID is supplied, and different accounts never coalesce.
+    let pre_auth_req = get_request(&[("atproto-proxy", "did:web:api.bsky.app#bsky_appview")]);
+    let with_auth_req = get_request(&[
+        ("Authorization", secret_token),
+        ("atproto-proxy", "did:web:api.bsky.app#bsky_appview"),
+    ]);
+    let alice_pre = RequestKey::from_request(&pre_auth_req, Some("did:plc:alice"), &[]).unwrap();
+    let alice_authed =
+        RequestKey::from_request(&with_auth_req, Some("did:plc:alice"), &[]).unwrap();
+    let bob_authed = RequestKey::from_request(&with_auth_req, Some("did:plc:bob"), &[]).unwrap();
+    let anon = RequestKey::from_request(&pre_auth_req, None, &[]).unwrap();
+    assert_ne!(alice_pre, alice_authed);
+    assert_ne!(alice_authed, bob_authed);
+    assert_ne!(alice_pre, anon);
+}
+
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn sse_parser_whatwg_parity() {
     let parse_chunks = |chunks: &[&[u8]]| -> Result<Vec<ServerSentEvent>, SseError> {
         let mut parser = ServerSentEventParser::default();
