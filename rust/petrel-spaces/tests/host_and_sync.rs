@@ -68,8 +68,9 @@ impl HttpTransport for ScriptedTransport {
     fn send(
         &self,
         request: Request<Bytes>,
-        _options: &SendOptions,
+        options: &SendOptions,
     ) -> impl Future<Output = Result<Response<Bytes>, TransportError>> + petrel::rt::MaybeSend {
+        let limit = options.max_response_bytes.unwrap_or(10 * 1024 * 1024);
         let result = {
             let guard = self.routes.lock().unwrap();
             let mut matched = None;
@@ -79,13 +80,20 @@ impl HttpTransport for ScriptedTransport {
                     break;
                 }
             }
-            matched.ok_or_else(|| {
-                TransportError::Other(format!(
+            match matched {
+                Some(resp) if resp.body().len() as u64 > limit => {
+                    Err(TransportError::Other(format!(
+                        "response {} bytes exceeds max_response_bytes {limit}",
+                        resp.body().len()
+                    )))
+                }
+                Some(resp) => Ok(resp),
+                None => Err(TransportError::Other(format!(
                     "unhandled mock request: {} {}",
                     request.method(),
                     request.uri()
-                ))
-            })
+                ))),
+            }
         };
         std::future::ready(result)
     }
@@ -838,14 +846,16 @@ fn host_tracks_space_wide_prev_space_rev_across_writers_and_removals() {
     let r3 = backend.next_space_rev(1_800_000_000_000_003).unwrap();
     let r4 = backend.next_space_rev(1_800_000_000_000_004).unwrap();
     let r5 = backend.next_space_rev(1_800_000_000_000_005).unwrap();
-    let writer_rev = Tid::parse("3l2aaaaaaaaac").unwrap();
+    let writer_rev_1 = Tid::parse("3l2aaaaaaaaac").unwrap();
+    let writer_rev_2 = Tid::parse("3l2aaaaaaaaad").unwrap();
+    let writer_rev_3 = Tid::parse("3l2aaaaaaaaae").unwrap();
     let empty_hash = vec![0_u8; 32];
 
     let u1 = block_on(host.handle_notify_repo_update(
         &NotifyRepoUpdateInput::new(
             space.clone(),
             writer_a.clone(),
-            writer_rev.clone(),
+            writer_rev_1.clone(),
             AtBytes(empty_hash.clone()),
         ),
         r1.clone(),
@@ -860,7 +870,7 @@ fn host_tracks_space_wide_prev_space_rev_across_writers_and_removals() {
         &NotifyRepoUpdateInput::new(
             space.clone(),
             writer_b.clone(),
-            writer_rev.clone(),
+            writer_rev_1,
             AtBytes(empty_hash.clone()),
         ),
         r2.clone(),
@@ -875,7 +885,7 @@ fn host_tracks_space_wide_prev_space_rev_across_writers_and_removals() {
         &NotifyRepoUpdateInput::new(
             space.clone(),
             writer_a.clone(),
-            writer_rev.clone(),
+            writer_rev_2,
             AtBytes(empty_hash.clone()),
         ),
         r3.clone(),
@@ -898,7 +908,7 @@ fn host_tracks_space_wide_prev_space_rev_across_writers_and_removals() {
     }
 
     let u5 = block_on(host.handle_notify_repo_update(
-        &NotifyRepoUpdateInput::new(space, writer_a, writer_rev, AtBytes(empty_hash)),
+        &NotifyRepoUpdateInput::new(space, writer_a, writer_rev_3, AtBytes(empty_hash)),
         r5,
     ))
     .unwrap();
@@ -1274,4 +1284,296 @@ fn list_active_writers_errors_when_pagination_hits_page_limit() {
         .unwrap_err();
     assert!(matches!(err, SpaceError::MalformedPayload(_)));
     assert_eq!(page_counter.load(Ordering::SeqCst), 1000);
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+#[test]
+fn host_rejects_stale_and_duplicate_notify_repo_update() {
+    use petrel_api::generated::com::atproto::space::{
+        list_writers::OutputRepos, notify_space_update::InputUpdate,
+    };
+
+    let space =
+        parse_space_ref("at:space/did:web:host.example.com/blue.catbird.mlsChat/3l2aaaaaaaaae")
+            .unwrap();
+    let host_did = Did::parse("did:web:host.example.com").unwrap();
+    let writer = Did::parse("did:plc:writer444444444444444444").unwrap();
+    let host_kp = SigningKeyPair::generate_p256().unwrap();
+
+    let mut resolver = StaticDidResolver::new();
+    resolver.insert_keypair(&host_did, &host_kp, Some("https://host.example.com"));
+
+    let backend = Arc::new(InMemorySpaceHostBackend::new());
+    let mut writers = HashSet::new();
+    writers.insert(writer.clone());
+    backend
+        .put_space(petrel_spaces::HostedSpace {
+            space: space.clone(),
+            policy: OutputPolicy::MemberspacePolicy(Box::new(MemberspacePolicy::new())),
+            allowed_readers: HashSet::new(),
+            allowed_writers: writers,
+            deleted: false,
+        })
+        .unwrap();
+
+    let host =
+        SpaceHost::with_in_memory_replay(host_did, host_kp, backend.clone(), Arc::new(resolver));
+
+    let rev_old = Tid::parse("3l2aaaaaaaaaa").unwrap();
+    let rev_cur = Tid::parse("3l2aaaaaaaaab").unwrap();
+    let rev_new = Tid::parse("3l2aaaaaaaaac").unwrap();
+
+    let s1 = backend.next_space_rev(1_800_000_000_000_010).unwrap();
+    let s2 = backend.next_space_rev(1_800_000_000_000_020).unwrap();
+    let s3 = backend.next_space_rev(1_800_000_000_000_030).unwrap();
+    let s4 = backend.next_space_rev(1_800_000_000_000_040).unwrap();
+
+    let data_cur = vec![0x22_u8; 32];
+    let data_stale = vec![0x11_u8; 32];
+    let data_dup = vec![0x99_u8; 32];
+    let data_new = vec![0x33_u8; 32];
+
+    let ok1 = block_on(host.handle_notify_repo_update(
+        &NotifyRepoUpdateInput::new(
+            space.clone(),
+            writer.clone(),
+            rev_cur.clone(),
+            AtBytes(data_cur.clone()),
+        ),
+        s1.clone(),
+    ))
+    .unwrap();
+    match ok1 {
+        InputUpdate::RepoWrite(w) => assert_eq!(w.prev_space_rev, None),
+        other => panic!("unexpected update: {other:?}"),
+    }
+
+    // Stale (older) repo_rev must fail without mutating state or advancing latest_space_rev.
+    let stale_err = block_on(host.handle_notify_repo_update(
+        &NotifyRepoUpdateInput::new(space.clone(), writer.clone(), rev_old, AtBytes(data_stale)),
+        s2,
+    ))
+    .unwrap_err();
+    assert!(matches!(
+        stale_err,
+        SpaceError::Xrpc {
+            status: 409,
+            ref error,
+            ..
+        } if error == "StaleRepoRev"
+    ));
+
+    // Duplicate repo_rev must also be rejected without publishing a new space_rev.
+    let dup_err = block_on(host.handle_notify_repo_update(
+        &NotifyRepoUpdateInput::new(
+            space.clone(),
+            writer.clone(),
+            rev_cur.clone(),
+            AtBytes(data_dup),
+        ),
+        s3,
+    ))
+    .unwrap_err();
+    assert!(matches!(
+        dup_err,
+        SpaceError::Xrpc {
+            status: 409,
+            ref error,
+            ..
+        } if error == "StaleRepoRev"
+    ));
+
+    let listed = block_on(host.handle_list_writers(&space, None, 10)).unwrap();
+    assert_eq!(listed.repos.len(), 1);
+    match &listed.repos[0] {
+        OutputRepos::RepoWrite(w) => {
+            assert_eq!(w.repo_rev, rev_cur);
+            assert_eq!(w.data.0, data_cur);
+            assert_eq!(w.space_rev, s1);
+        }
+        other => panic!("unexpected listed writer state: {other:?}"),
+    }
+
+    // Subsequent newer repo_rev still links prev_space_rev directly to s1.
+    let ok2 = block_on(host.handle_notify_repo_update(
+        &NotifyRepoUpdateInput::new(space, writer, rev_new, AtBytes(data_new)),
+        s4,
+    ))
+    .unwrap();
+    match ok2 {
+        InputUpdate::RepoWrite(w) => assert_eq!(w.prev_space_rev.as_ref(), Some(&s1)),
+        other => panic!("unexpected update: {other:?}"),
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+#[allow(clippy::too_many_lines)]
+#[test]
+fn recover_writer_repo_via_star_propagates_max_archive_bytes_above_10mib() {
+    let now = 1_800_000_000_i64;
+    let space =
+        parse_space_ref("at:space/did:web:host.example.com/blue.catbird.mlsChat/3l2aaaaaaaaaf")
+            .unwrap();
+    let host_did = Did::parse("did:web:host.example.com").unwrap();
+    let writer_did = Did::parse("did:plc:writer555555555555555555").unwrap();
+    let reader_did = Did::parse("did:plc:reader555555555555555555").unwrap();
+    let pds_did = Did::parse("did:web:pds.example.com").unwrap();
+
+    let host_kp = SigningKeyPair::generate_p256().unwrap();
+    let reader_kp = SigningKeyPair::generate_p256().unwrap();
+    let (pds_kem_sk, pds_kem_did_key) = generate_p256_keypair().unwrap();
+
+    // Build a valid STAR archive > 10 MiB (12 records x ~920 KiB ~= 11 MiB).
+    let col = Nsid::parse("blue.catbird.mlsChat.message").unwrap();
+    let payload = "x".repeat(920 * 1024);
+    let mut records_owned: Vec<(String, Value)> = Vec::with_capacity(12);
+    let mut set_hash = SpaceSetHash::new();
+    for idx in 0_u8..12 {
+        let suffix = char::from(b'a' + idx);
+        let rkey = RecordKey::parse(format!("3l2aaaaaaaaa{suffix}")).unwrap();
+        let mut map = BTreeMap::new();
+        map.insert(
+            "$type".to_owned(),
+            Value::String("blue.catbird.mlsChat.message".to_owned()),
+        );
+        map.insert("body".to_owned(), Value::String(payload.clone()));
+        let val = Value::Object(map);
+        let cid = Cid::for_dag_cbor(&encode(&val));
+        let path = format!("{col}/{rkey}");
+        set_hash.add(&path, &cid.to_string());
+        records_owned.push((path, val));
+    }
+    let record_refs: Vec<(&str, &Value)> =
+        records_owned.iter().map(|(p, v)| (p.as_str(), v)).collect();
+    let writer_rev = Tid::parse("3l2aaaaaaaaag").unwrap();
+    let star_bytes = write_star_repo(&space, &writer_did, &writer_rev, &record_refs).unwrap();
+    assert!(
+        star_bytes.len() > 10 * 1024 * 1024,
+        "test STAR archive must exceed default 10 MiB transport cap"
+    );
+    let data = set_hash.digest();
+
+    let host_doc_json = serde_json::json!({
+        "id": host_did.as_str(),
+        "service": [{
+            "id": "#atproto_space",
+            "type": "AtprotoSpaceHost",
+            "serviceEndpoint": "https://host.example.com"
+        }],
+        "verificationMethod": [{
+            "id": format!("{host_did}#atproto"),
+            "type": "Multikey",
+            "controller": host_did.as_str(),
+            "publicKeyMultibase": host_kp.did_key().unwrap().strip_prefix("did:key:").unwrap()
+        }]
+    });
+    let pds_doc_json = serde_json::json!({
+        "id": pds_did.as_str(),
+        "service": [{
+            "id": "#atproto_pds",
+            "type": "AtprotoPersonalDataServer",
+            "serviceEndpoint": "https://pds.example.com"
+        }],
+        "verificationMethod": [{
+            "id": format!("{pds_did}#atproto_kem"),
+            "type": "P256KeyAgreement",
+            "controller": pds_did.as_str(),
+            "publicKeyMultibase": pds_kem_did_key.strip_prefix("did:key:").unwrap()
+        }]
+    });
+
+    let space_c = space.clone();
+    let host_did_c = host_did.clone();
+    let host_kp_c = host_kp.clone();
+    let writer_did_c = writer_did.clone();
+    let star_c = Arc::new(Bytes::from(star_bytes));
+
+    let transport_impl = Arc::new(ScriptedTransport::default());
+    transport_impl.push(move |req| {
+        let uri_str = req.uri().to_string();
+        if uri_str == "https://host.example.com/.well-known/did.json" {
+            return Some(json_resp(200, &host_doc_json));
+        }
+        if uri_str == "https://pds.example.com/.well-known/did.json" {
+            return Some(json_resp(200, &pds_doc_json));
+        }
+        if uri_str.contains("/xrpc/com.atproto.space.authorizeSpaceSync") {
+            let input: AuthorizeSpaceSyncInput = serde_json::from_slice(req.body()).unwrap();
+            let jwt = mint_credential_token(
+                &host_kp_c,
+                &host_did_c,
+                &space_c,
+                &input.credential_key,
+                now,
+                now + 600,
+                Some("jti-large-star"),
+                None,
+            )
+            .unwrap();
+            return Some(json_resp(
+                200,
+                &petrel_api::generated::com::atproto::space::authorize_space_sync::Output::new(jwt),
+            ));
+        }
+        if uri_str.contains("/xrpc/com.atproto.space.getRepo") {
+            let accept = parse_accept_signature(
+                req.headers()
+                    .get("accept-signature")
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
+            )
+            .unwrap();
+            let secret = decapsulate_p256(&pds_kem_sk, &accept.keyid).unwrap();
+            let mac = sign_commit_mac(
+                &secret,
+                &space_c,
+                &writer_did_c,
+                &writer_rev,
+                &data,
+                &accept.keyid,
+            )
+            .unwrap();
+            return Some(
+                Response::builder()
+                    .status(200)
+                    .header("atproto-space-commit", mac.covered_signature)
+                    .header("signature-input", mac.signature_input)
+                    .header("signature", mac.signature)
+                    .body((*star_c).clone())
+                    .unwrap(),
+            );
+        }
+        None
+    });
+
+    let transport: SharedTransport = transport_impl;
+    let host_resolver = Arc::new(SpaceHostResolver::new(transport.clone()));
+    let minter = Arc::new(LocalMinter {
+        reader_did,
+        reader_kp,
+        host_did,
+        now,
+    });
+    let exchanger = Arc::new(HttpCredentialExchanger::new(
+        transport.clone(),
+        host_resolver.clone(),
+        minter,
+    ));
+    let cred_mgr =
+        Arc::new(SpaceCredentialManager::new(exchanger).with_max_archive_bytes(16 * 1024 * 1024));
+    let engine = SpaceSyncEngine::new(transport, cred_mgr, host_resolver);
+    let pds_url = Url::parse("https://pds.example.com").unwrap();
+
+    let recovered = block_on(engine.recover_writer_repo_via_star(
+        &space,
+        &writer_did,
+        &pds_url,
+        Some(&pds_did),
+        now,
+    ))
+    .unwrap();
+    assert_eq!(recovered.records.len(), 12);
 }

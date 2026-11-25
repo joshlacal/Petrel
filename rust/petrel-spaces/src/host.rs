@@ -119,7 +119,8 @@ pub trait SpaceHostBackend: MaybeSend + MaybeSync {
         user: &'a Did,
     ) -> BoxFuture<'a, Result<Vec<String>>>;
 
-    /// Record or update an active writer state and return the previous space-wide `space_rev`.
+    /// Atomically verify `repo_rev` is strictly newer than any currently stored active `repo_rev`
+    /// for `(space, repo)`, record/update the writer state, and return the previous space-wide `space_rev`.
     fn upsert_writer<'a>(
         &'a self,
         space: &'a SpaceRef,
@@ -322,6 +323,25 @@ impl SpaceHostBackend for InMemorySpaceHostBackend {
                 .state
                 .lock()
                 .map_err(|_| SpaceError::Storage("host backend mutex poisoned".into()))?;
+            let existing_rev = guard
+                .writers
+                .get(space)
+                .and_then(|map| map.get(repo))
+                .and_then(|state| match state {
+                    WriterState::Active { repo_rev: cur, .. } => Some(cur),
+                    WriterState::Removed { .. } => None,
+                });
+            if let Some(cur_rev) = existing_rev
+                && repo_rev.as_str() <= cur_rev.as_str()
+            {
+                return Err(SpaceError::Xrpc {
+                    status: 409,
+                    error: "StaleRepoRev".to_owned(),
+                    message: Some(format!(
+                        "repo_rev '{repo_rev}' is not newer than current '{cur_rev}' for writer '{repo}'"
+                    )),
+                });
+            }
             let prev = guard
                 .latest_space_rev
                 .insert(space.clone(), space_rev.clone());

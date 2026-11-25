@@ -232,6 +232,7 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
                 &url,
                 pds_did,
                 MacProfile::Commit,
+                None,
                 now_secs,
             )
             .await?;
@@ -266,6 +267,8 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
             q.append_pair("repo", writer_did.as_str());
         }
 
+        let max_archive_bytes = self.credentials.max_archive_bytes();
+        let max_response_bytes = Some(u64::try_from(max_archive_bytes).unwrap_or(u64::MAX));
         let (resp, shared_secret) = self
             .send_mac_protected_get(
                 space,
@@ -273,6 +276,7 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
                 &url,
                 pds_did,
                 MacProfile::Commit,
+                max_response_bytes,
                 now_secs,
             )
             .await?;
@@ -289,7 +293,7 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
             Some(writer_did),
             Some(&mac.rev),
             Some(&mac.data),
-            self.credentials.max_archive_bytes(),
+            max_archive_bytes,
         )
     }
 
@@ -324,6 +328,7 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
                 &url,
                 pds_did,
                 MacProfile::Record,
+                None,
                 now_secs,
             )
             .await?;
@@ -417,6 +422,7 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
                     &url,
                     pds_did,
                     MacProfile::Commit,
+                    None,
                     now_secs,
                 )
                 .await?;
@@ -488,6 +494,7 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
     /// Execute a GET request carrying both RFC 9421 credential headers and an HPKE
     /// `Accept-Signature` header, retrying once on KEM key rotation (`InvalidSpaceMac`)
     /// or `401 CredentialRevoked`.
+    #[allow(clippy::too_many_arguments)]
     async fn send_mac_protected_get(
         &self,
         space: &SpaceRef,
@@ -495,6 +502,7 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
         url: &Url,
         pds_did: Option<&Did>,
         profile: MacProfile,
+        max_response_bytes: Option<u64>,
         now_secs: i64,
     ) -> Result<(http::Response<Bytes>, zeroize::Zeroizing<[u8; 32]>)> {
         let mut force_kem_refresh = false;
@@ -537,10 +545,12 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
                 .body(Bytes::new())
                 .map_err(|e| SpaceError::Transport(e.to_string()))?;
 
+            let mut send_options = SendOptions::new();
+            send_options.max_response_bytes = max_response_bytes;
             let resp = send_with_redirects(
                 self.transport.as_ref(),
                 req,
-                &SendOptions::new(),
+                &send_options,
                 RedirectPolicy::Never,
             )
             .await
