@@ -84,6 +84,7 @@ type SplitPair = (Option<Cid>, Option<Cid>);
 #[derive(Debug, Clone)]
 pub struct RepositoryMst {
     root_cid: Cid,
+    base_root_cid: Option<Cid>,
     source: NodeSource,
     dirty_blocks: BlockMap,
     decoded_cache: BTreeMap<Cid, MstNodeView>,
@@ -106,6 +107,7 @@ impl RepositoryMst {
         );
         Self {
             root_cid,
+            base_root_cid: None,
             source: NodeSource::Empty,
             dirty_blocks,
             decoded_cache,
@@ -121,13 +123,7 @@ impl RepositoryMst {
 
     /// Opens an MST rooted at `root_cid` backed by `source`.
     pub fn open(root_cid: Cid, source: Arc<dyn BlockSource>) -> Self {
-        Self {
-            root_cid,
-            source: NodeSource::External(source),
-            dirty_blocks: BTreeMap::new(),
-            decoded_cache: BTreeMap::new(),
-            options: MstOptions::default(),
-        }
+        Self::open_with_options(root_cid, source, MstOptions::default())
     }
 
     pub fn open_with_options(
@@ -136,6 +132,7 @@ impl RepositoryMst {
         options: MstOptions,
     ) -> Self {
         Self {
+            base_root_cid: Some(root_cid.clone()),
             root_cid,
             source: NodeSource::External(source),
             dirty_blocks: BTreeMap::new(),
@@ -515,31 +512,167 @@ impl RepositoryMst {
     }
 
     /// Computes minimal new blocks between `self` (new MST) and `previous_root_cid`.
+    ///
+    /// When comparing against the root this tree was branched from, traverses
+    /// strictly through the dirty-node overlay so unchanged subtrees in the
+    /// backing store incur zero block reads. Otherwise performs a CID-pruned
+    /// subtree comparison skipping identical CIDs.
     pub async fn new_blocks_since(
         &mut self,
         previous_root_cid: Option<&Cid>,
     ) -> Result<Vec<RepositoryBlock>, MstError> {
-        let reachable = self.reachable_node_blocks().await?;
-        let prev_reachable = match previous_root_cid {
-            Some(prev) => {
-                let mut prev_mst = match &self.source {
-                    NodeSource::External(src) => {
-                        Self::open_with_options(prev.clone(), Arc::clone(src), self.options)
-                    }
-                    NodeSource::Empty => Self::empty_with_options(self.options),
-                };
-                prev_mst.reachable_node_blocks().await.unwrap_or_default()
-            }
-            None => BTreeMap::new(),
-        };
+        if previous_root_cid == Some(&self.root_cid) {
+            return Ok(Vec::new());
+        }
 
-        let mut delta = Vec::new();
-        for (cid, bytes) in reachable {
-            if !prev_reachable.contains_key(&cid) {
-                delta.push(RepositoryBlock::new(cid, bytes));
+        // Fast path: tree was opened at `base_root_cid` and mutated via `self.dirty_blocks`.
+        // Any child not in `self.dirty_blocks` is an unmodified subtree from `base_root_cid`.
+        if previous_root_cid == self.base_root_cid.as_ref() {
+            let root = self.root_cid.clone();
+            let mut collected: BlockMap = BTreeMap::new();
+            let mut visited: std::collections::HashSet<Cid> = std::collections::HashSet::new();
+            self.collect_reachable_dirty(&root, &mut visited, &mut collected, 0)
+                .await?;
+
+            let mut delta = Vec::with_capacity(collected.len());
+            for (cid, bytes) in collected {
+                let already_stored = match &self.source {
+                    NodeSource::External(src) => src.contains_block(&cid).await?,
+                    NodeSource::Empty => false,
+                };
+                if !already_stored {
+                    delta.push(RepositoryBlock::new(cid, bytes));
+                }
+            }
+            return Ok(delta);
+        }
+
+        // General path against an arbitrary `previous_root_cid`: CID-pruned traversal.
+        let mut prev_cids: std::collections::HashSet<Cid> = std::collections::HashSet::new();
+        if let Some(prev) = previous_root_cid {
+            let mut prev_mst = match &self.source {
+                NodeSource::External(src) => {
+                    Self::open_with_options(prev.clone(), Arc::clone(src), self.options)
+                }
+                NodeSource::Empty => Self::empty_with_options(self.options),
+            };
+            if prev_mst.get_raw_block(prev).await.is_ok() {
+                let mut new_cids_on_shared = std::collections::HashSet::new();
+                // Collect CIDs only down to subtrees whose CIDs already appear in `self`,
+                // or simply collect prev CIDs when comparing distinct arbitrary roots.
+                let _ = prev_mst
+                    .collect_cids(&prev.clone(), &mut prev_cids, &mut new_cids_on_shared, 0)
+                    .await;
             }
         }
-        Ok(delta)
+
+        let root = self.root_cid.clone();
+        let mut collected = BTreeMap::new();
+        self.collect_blocks_pruned(&root, &prev_cids, &mut collected, 0)
+            .await?;
+        Ok(collected
+            .into_iter()
+            .map(|(cid, bytes)| RepositoryBlock::new(cid, bytes))
+            .collect())
+    }
+
+    fn collect_reachable_dirty<'a>(
+        &'a mut self,
+        node_cid: &'a Cid,
+        visited: &'a mut std::collections::HashSet<Cid>,
+        out: &'a mut BlockMap,
+        depth: usize,
+    ) -> BoxFuture<'a, Result<(), MstError>> {
+        Box::pin(async move {
+            if depth > self.options.max_depth {
+                return Err(MstError::DepthExceeded {
+                    depth,
+                    limit: self.options.max_depth,
+                });
+            }
+            if !visited.insert(node_cid.clone()) {
+                return Ok(());
+            }
+            let Some(bytes) = self.dirty_blocks.get(node_cid).cloned() else {
+                // Node was not created/modified in this mutation sequence; its entire
+                // subtree already belongs to `base_root_cid`.
+                return Ok(());
+            };
+            let view = self.load_node(node_cid).await?;
+            out.insert(node_cid.clone(), bytes);
+            if let Some(left) = view.left {
+                self.collect_reachable_dirty(&left, visited, out, depth + 1)
+                    .await?;
+            }
+            for entry in view.entries {
+                if let Some(right) = entry.tree {
+                    self.collect_reachable_dirty(&right, visited, out, depth + 1)
+                        .await?;
+                }
+            }
+            Ok(())
+        })
+    }
+
+    fn collect_cids<'a>(
+        &'a mut self,
+        node_cid: &'a Cid,
+        cids: &'a mut std::collections::HashSet<Cid>,
+        visited: &'a mut std::collections::HashSet<Cid>,
+        depth: usize,
+    ) -> BoxFuture<'a, Result<(), MstError>> {
+        Box::pin(async move {
+            if depth > self.options.max_depth || !visited.insert(node_cid.clone()) {
+                return Ok(());
+            }
+            cids.insert(node_cid.clone());
+            let Ok(view) = self.load_node(node_cid).await else {
+                return Ok(());
+            };
+            if let Some(left) = view.left {
+                self.collect_cids(&left, cids, visited, depth + 1).await?;
+            }
+            for entry in view.entries {
+                if let Some(right) = entry.tree {
+                    self.collect_cids(&right, cids, visited, depth + 1).await?;
+                }
+            }
+            Ok(())
+        })
+    }
+
+    fn collect_blocks_pruned<'a>(
+        &'a mut self,
+        node_cid: &'a Cid,
+        skip_cids: &'a std::collections::HashSet<Cid>,
+        out: &'a mut BlockMap,
+        depth: usize,
+    ) -> BoxFuture<'a, Result<(), MstError>> {
+        Box::pin(async move {
+            if depth > self.options.max_depth {
+                return Err(MstError::DepthExceeded {
+                    depth,
+                    limit: self.options.max_depth,
+                });
+            }
+            if skip_cids.contains(node_cid) || out.contains_key(node_cid) {
+                return Ok(());
+            }
+            let bytes = self.get_raw_block(node_cid).await?;
+            let view = self.load_node(node_cid).await?;
+            out.insert(node_cid.clone(), bytes);
+            if let Some(left) = view.left {
+                self.collect_blocks_pruned(&left, skip_cids, out, depth + 1)
+                    .await?;
+            }
+            for entry in view.entries {
+                if let Some(right) = entry.tree {
+                    self.collect_blocks_pruned(&right, skip_cids, out, depth + 1)
+                        .await?;
+                }
+            }
+            Ok(())
+        })
     }
 
     fn validate_insert_args(&self, key: &str, value: &Cid) -> Result<(), MstError> {

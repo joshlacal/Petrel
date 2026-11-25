@@ -265,3 +265,72 @@ async fn mst_validation_and_walker_reject_corrupt_structures() {
     assert!(matches!(err_proof, MstError::MissingBlock(_)));
     let _ = expected_layer;
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn new_blocks_since_reads_zero_unchanged_subtrees() {
+    use petrel::rt::BoxFuture;
+    use petrel_repo::block_store::BlockSource;
+    use petrel_repo::error::BlockStoreError;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[derive(Debug)]
+    struct CountingSource {
+        inner: InMemoryBlockStore,
+        get_calls: AtomicUsize,
+    }
+
+    impl BlockSource for CountingSource {
+        fn get_block<'a>(
+            &'a self,
+            cid: &'a Cid,
+        ) -> BoxFuture<'a, Result<Option<Vec<u8>>, BlockStoreError>> {
+            self.get_calls.fetch_add(1, Ordering::Relaxed);
+            self.inner.get_block(cid)
+        }
+
+        fn contains_block<'a>(
+            &'a self,
+            cid: &'a Cid,
+        ) -> BoxFuture<'a, Result<bool, BlockStoreError>> {
+            self.inner.contains_block(cid)
+        }
+    }
+
+    let options = MstOptions::default();
+    let entries: Vec<(String, Cid)> = (0..250_usize)
+        .map(|i| (format!("com.example.item/r{i:04}"), synthetic_val(i)))
+        .collect();
+    let (mut base_tree, base_blocks) = build_mst_from_entries(entries, options).unwrap();
+    let base_root = base_tree.root_cid().clone();
+    let base_reachable = base_tree.reachable_node_blocks().await.unwrap();
+    let base_node_count = base_reachable.len();
+
+    let source = Arc::new(CountingSource {
+        inner: InMemoryBlockStore::from_blocks(base_blocks.into_iter().map(|b| (b.cid, b.bytes)))
+            .unwrap(),
+        get_calls: AtomicUsize::new(0),
+    });
+
+    let mut mutated = RepositoryMst::open_with_options(base_root.clone(), source.clone(), options);
+    mutated
+        .insert("com.example.item/r0125x", synthetic_val(999_999))
+        .await
+        .unwrap();
+
+    let reads_before_diff = source.get_calls.load(Ordering::Relaxed);
+    let delta = mutated.new_blocks_since(Some(&base_root)).await.unwrap();
+    let reads_during_diff = source.get_calls.load(Ordering::Relaxed) - reads_before_diff;
+
+    assert_eq!(reads_during_diff, 0);
+    assert!(reads_before_diff < base_node_count / 2);
+
+    let after_reachable = mutated.reachable_node_blocks().await.unwrap();
+    let expected_cids: std::collections::BTreeSet<Cid> = after_reachable
+        .keys()
+        .filter(|cid| !base_reachable.contains_key(*cid))
+        .cloned()
+        .collect();
+    let delta_cids: std::collections::BTreeSet<Cid> = delta.into_iter().map(|b| b.cid).collect();
+    assert_eq!(delta_cids, expected_cids);
+}

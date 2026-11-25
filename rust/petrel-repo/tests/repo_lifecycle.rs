@@ -667,3 +667,77 @@ async fn scale_synthetic_disk_repository_streams_and_enforces_standard_ceilings(
         count + 1
     );
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+#[tokio::test]
+async fn file_block_store_persists_deletions_across_sync_and_reopen() {
+    use petrel_repo::block_store::BlockStore as _;
+
+    let dir = tempfile::tempdir().unwrap();
+    let store_path = dir.path().join("blocks.car");
+
+    let blk_a = dagcbor::encode(&Value::String("block-a".into()));
+    let cid_a = Cid::for_dag_cbor(&blk_a);
+    let blk_b = dagcbor::encode(&Value::String("block-b".into()));
+    let cid_b = Cid::for_dag_cbor(&blk_b);
+    let blk_c = dagcbor::encode(&Value::String("block-c-unflushed".into()));
+    let cid_c = Cid::for_dag_cbor(&blk_c);
+
+    // 1. Delete an unflushed pending block before synchronize: it must never land on disk.
+    let store = petrel_repo::FileBlockStore::open(&store_path).unwrap();
+    store.put_block(&cid_a, &blk_a).await.unwrap();
+    store.put_block(&cid_c, &blk_c).await.unwrap();
+    assert!(store.delete_block(&cid_c).await.unwrap());
+    assert!(!store.delete_block(&cid_c).await.unwrap());
+    store.synchronize().await.unwrap();
+    drop(store);
+
+    let reopened = petrel_repo::FileBlockStore::open(&store_path).unwrap();
+    assert_eq!(reopened.len().await.unwrap(), 1);
+    assert_eq!(reopened.total_bytes().await.unwrap(), blk_a.len());
+    assert_eq!(
+        reopened.get_block(&cid_a).await.unwrap(),
+        Some(blk_a.clone())
+    );
+    assert_eq!(reopened.get_block(&cid_c).await.unwrap(), None);
+
+    // 2. Delete a persisted block, add another block, synchronize, and reopen: deletion survives.
+    reopened.put_block(&cid_b, &blk_b).await.unwrap();
+    reopened.synchronize().await.unwrap();
+    assert!(reopened.delete_block(&cid_a).await.unwrap());
+    assert_eq!(reopened.get_block(&cid_a).await.unwrap(), None);
+    assert!(!reopened.contains_block(&cid_a).await.unwrap());
+    assert_eq!(reopened.len().await.unwrap(), 1);
+    assert_eq!(reopened.total_bytes().await.unwrap(), blk_b.len());
+    reopened.synchronize().await.unwrap();
+    drop(reopened);
+
+    let reopened2 = petrel_repo::FileBlockStore::open(&store_path).unwrap();
+    assert_eq!(reopened2.get_block(&cid_a).await.unwrap(), None);
+    assert_eq!(
+        reopened2.get_block(&cid_b).await.unwrap(),
+        Some(blk_b.clone())
+    );
+    assert_eq!(reopened2.len().await.unwrap(), 1);
+    assert_eq!(reopened2.total_bytes().await.unwrap(), blk_b.len());
+
+    // 3. Re-putting the previously deleted CID succeeds and survives another reopen.
+    reopened2.put_block(&cid_a, &blk_a).await.unwrap();
+    reopened2.synchronize().await.unwrap();
+    drop(reopened2);
+
+    let reopened3 = petrel_repo::FileBlockStore::open(&store_path).unwrap();
+    assert_eq!(
+        reopened3.get_block(&cid_a).await.unwrap(),
+        Some(blk_a.clone())
+    );
+    assert_eq!(
+        reopened3.get_block(&cid_b).await.unwrap(),
+        Some(blk_b.clone())
+    );
+    assert_eq!(reopened3.len().await.unwrap(), 2);
+    assert_eq!(
+        reopened3.total_bytes().await.unwrap(),
+        blk_a.len() + blk_b.len()
+    );
+}

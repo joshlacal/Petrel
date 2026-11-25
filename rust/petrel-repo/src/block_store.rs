@@ -251,7 +251,7 @@ pub(crate) fn verify_cid_if_sha256(cid: &Cid, bytes: &[u8]) -> Result<(), BlockS
 
 #[cfg(not(target_arch = "wasm32"))]
 mod file_store {
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use std::fs::{File, OpenOptions};
     use std::io::{BufReader, Read, Seek, SeekFrom, Write};
     use std::path::{Path, PathBuf};
@@ -280,17 +280,82 @@ mod file_store {
         reader: File,
         writer: File,
         index: HashMap<Cid, DiskEntry>,
-        pending_blocks: HashMap<Cid, Vec<u8>>,
+        disk_bytes: usize,
+        pending_puts: HashMap<Cid, Vec<u8>>,
+        pending_put_order: Vec<Cid>,
+        pending_bytes: usize,
+        pending_deletes: HashSet<Cid>,
         write_buffer: Vec<u8>,
         file_len: u64,
-        total_bytes: usize,
     }
 
     impl FileState {
+        fn stage_frame_bytes(&self) -> usize {
+            let delete_bytes: usize = self
+                .pending_deletes
+                .iter()
+                .map(|c| 1 + 9 + c.as_bytes().len())
+                .sum();
+            self.pending_bytes
+                .saturating_add(self.pending_puts.len() * 45)
+                .saturating_add(delete_bytes)
+        }
+
         fn flush(&mut self) -> Result<(), BlockStoreError> {
+            if self.pending_deletes.is_empty() && self.pending_put_order.is_empty() {
+                return Ok(());
+            }
+            self.write_buffer.clear();
+
+            // Persist tombstones (`varint(0) || varint(cid_len) || cid_bytes`) first so any
+            // subsequent put for the same CID supersedes the tombstone on replay.
+            let mut deleted_cids: Vec<Cid> = self.pending_deletes.drain().collect();
+            deleted_cids.sort();
+            for cid in deleted_cids {
+                let cid_bytes = cid.as_bytes();
+                let mut header = [0_u8; 9];
+                let hlen = varint::encode_into(cid_bytes.len() as u64, &mut header)
+                    .map_err(|err| BlockStoreError::CorruptStore(err.to_string()))?;
+                self.write_buffer.push(0x00);
+                self.write_buffer.extend_from_slice(&header[..hlen]);
+                self.write_buffer.extend_from_slice(cid_bytes);
+            }
+
+            let put_order = std::mem::take(&mut self.pending_put_order);
+            let mut written_entries: Vec<(Cid, DiskEntry)> = Vec::with_capacity(put_order.len());
+            for cid in put_order {
+                let Some(bytes) = self.pending_puts.remove(&cid) else {
+                    continue;
+                };
+                self.pending_bytes = self.pending_bytes.saturating_sub(bytes.len());
+                let cid_bytes = cid.as_bytes();
+                let frame_len = cid_bytes.len() + bytes.len();
+                let mut header = [0_u8; 9];
+                let header_len = varint::encode_into(frame_len as u64, &mut header)
+                    .map_err(|err| BlockStoreError::CorruptStore(err.to_string()))?;
+
+                let payload_offset = self
+                    .file_len
+                    .saturating_add(self.write_buffer.len() as u64)
+                    .saturating_add(header_len as u64)
+                    .saturating_add(cid_bytes.len() as u64);
+
+                self.write_buffer.extend_from_slice(&header[..header_len]);
+                self.write_buffer.extend_from_slice(cid_bytes);
+                self.write_buffer.extend_from_slice(&bytes);
+                written_entries.push((
+                    cid,
+                    DiskEntry {
+                        payload_offset,
+                        payload_len: bytes.len(),
+                    },
+                ));
+            }
+
             if self.write_buffer.is_empty() {
                 return Ok(());
             }
+
             self.writer
                 .write_all(&self.write_buffer)
                 .map_err(|err| BlockStoreError::Io(err.to_string()))?;
@@ -299,7 +364,12 @@ mod file_store {
                 .map_err(|err| BlockStoreError::Io(err.to_string()))?;
             self.file_len = self.file_len.saturating_add(self.write_buffer.len() as u64);
             self.write_buffer.clear();
-            self.pending_blocks.clear();
+
+            for (cid, entry) in written_entries {
+                if self.index.insert(cid, entry).is_none() {
+                    self.disk_bytes = self.disk_bytes.saturating_add(entry.payload_len);
+                }
+            }
             Ok(())
         }
     }
@@ -307,7 +377,8 @@ mod file_store {
     /// Disk-backed append-only CAR-frame block store matching
     /// `FileRepositoryBlockStore` in Swift.
     ///
-    /// Frames are stored as `varint(cid_len + block_len) || cid_bytes || block_bytes`.
+    /// Live frames are stored as `varint(cid_len + block_len) || cid_bytes || block_bytes`;
+    /// persisted deletions are appended as `0x00 || varint(cid_len) || cid_bytes` tombstones.
     #[derive(Debug, Clone)]
     pub struct FileBlockStore {
         state: Arc<RwLock<FileState>>,
@@ -347,7 +418,7 @@ mod file_store {
                 .map_err(|err| BlockStoreError::Io(err.to_string()))?
                 .len();
 
-            let (index, total_bytes) = scan_existing_frames(
+            let (index, disk_bytes) = scan_existing_frames(
                 &mut reader,
                 file_len,
                 max_block_count,
@@ -360,17 +431,20 @@ mod file_store {
                     reader,
                     writer,
                     index,
-                    pending_blocks: HashMap::new(),
+                    disk_bytes,
+                    pending_puts: HashMap::new(),
+                    pending_put_order: Vec::new(),
+                    pending_bytes: 0,
+                    pending_deletes: HashSet::new(),
                     write_buffer: Vec::new(),
                     file_len,
-                    total_bytes,
                 })),
                 max_block_count,
                 max_single_block_bytes,
             })
         }
 
-        /// Flushes any buffered appends to disk and syncs the file descriptor.
+        /// Flushes any buffered appends and tombstones to disk and syncs the file descriptor.
         pub async fn synchronize(&self) -> Result<(), BlockStoreError> {
             let mut guard = self.state.write().await;
             guard.flush()?;
@@ -402,13 +476,37 @@ mod file_store {
         while offset < file_len {
             let (frame_len_u64, varint_bytes) = read_varint_from_reader(&mut reader)?;
             offset = offset.saturating_add(varint_bytes as u64);
+
+            if frame_len_u64 == 0 {
+                // Deletion tombstone: `0x00 || varint(cid_len) || cid_bytes`
+                let (tombstone_bytes_u64, cid_varint_bytes) = read_varint_from_reader(&mut reader)?;
+                offset = offset.saturating_add(cid_varint_bytes as u64);
+                let tombstone_cid_len = usize::try_from(tombstone_bytes_u64).map_err(|_| {
+                    BlockStoreError::CorruptStore("tombstone CID length overflow".into())
+                })?;
+                if tombstone_cid_len == 0
+                    || offset.saturating_add(tombstone_cid_len as u64) > file_len
+                {
+                    return Err(BlockStoreError::CorruptStore(
+                        "truncated deletion tombstone in block store".into(),
+                    ));
+                }
+                let mut cid_buf = vec![0_u8; tombstone_cid_len];
+                reader
+                    .read_exact(&mut cid_buf)
+                    .map_err(|err| BlockStoreError::CorruptStore(err.to_string()))?;
+                let cid = Cid::from_bytes(&cid_buf).map_err(|err| {
+                    BlockStoreError::CorruptStore(format!("invalid tombstone CID: {err}"))
+                })?;
+                if let Some(removed) = index.remove(&cid) {
+                    total_bytes = total_bytes.saturating_sub(removed.payload_len);
+                }
+                offset = offset.saturating_add(tombstone_cid_len as u64);
+                continue;
+            }
+
             let frame_len = usize::try_from(frame_len_u64)
                 .map_err(|_| BlockStoreError::CorruptStore("frame length overflow".into()))?;
-            if frame_len == 0 {
-                return Err(BlockStoreError::CorruptStore(
-                    "zero-length block frame".into(),
-                ));
-            }
             if offset.saturating_add(frame_len as u64) > file_len {
                 return Err(BlockStoreError::CorruptStore(
                     "truncated frame in block store".into(),
@@ -504,7 +602,7 @@ mod file_store {
         ) -> BoxFuture<'a, Result<Option<Vec<u8>>, BlockStoreError>> {
             Box::pin(async move {
                 let mut guard = self.state.write().await;
-                if let Some(pending) = guard.pending_blocks.get(cid) {
+                if let Some(pending) = guard.pending_puts.get(cid) {
                     return Ok(Some(pending.clone()));
                 }
                 let Some(entry) = guard.index.get(cid).copied() else {
@@ -529,7 +627,7 @@ mod file_store {
         ) -> BoxFuture<'a, Result<bool, BlockStoreError>> {
             Box::pin(async move {
                 let guard = self.state.read().await;
-                Ok(guard.index.contains_key(cid))
+                Ok(guard.pending_puts.contains_key(cid) || guard.index.contains_key(cid))
             })
         }
     }
@@ -551,7 +649,7 @@ mod file_store {
                 }
                 verify_cid_if_sha256(cid, bytes)?;
                 let mut guard = self.state.write().await;
-                if let Some(pending) = guard.pending_blocks.get(cid) {
+                if let Some(pending) = guard.pending_puts.get(cid) {
                     if pending.as_slice() != bytes {
                         return Err(BlockStoreError::ConflictingBlock(cid.clone()));
                     }
@@ -573,41 +671,21 @@ mod file_store {
                     return Ok(());
                 }
 
+                let live_count = guard.index.len() + guard.pending_puts.len();
                 if let Some(max_count) = self.max_block_count
-                    && guard.index.len() >= max_count
+                    && live_count >= max_count
                 {
                     return Err(BlockStoreError::TooManyBlocks {
-                        count: guard.index.len() + 1,
+                        count: live_count + 1,
                         limit: max_count,
                     });
                 }
 
-                let cid_bytes = cid.as_bytes();
-                let frame_len = cid_bytes.len() + bytes.len();
-                let mut header = [0_u8; 9];
-                let header_len = varint::encode_into(frame_len as u64, &mut header)
-                    .map_err(|err| BlockStoreError::CorruptStore(err.to_string()))?;
+                guard.pending_bytes = guard.pending_bytes.saturating_add(bytes.len());
+                guard.pending_puts.insert(cid.clone(), bytes.to_vec());
+                guard.pending_put_order.push(cid.clone());
 
-                let payload_offset = guard
-                    .file_len
-                    .saturating_add(guard.write_buffer.len() as u64)
-                    .saturating_add(header_len as u64)
-                    .saturating_add(cid_bytes.len() as u64);
-
-                guard.write_buffer.extend_from_slice(&header[..header_len]);
-                guard.write_buffer.extend_from_slice(cid_bytes);
-                guard.write_buffer.extend_from_slice(bytes);
-                guard.index.insert(
-                    cid.clone(),
-                    DiskEntry {
-                        payload_offset,
-                        payload_len: bytes.len(),
-                    },
-                );
-                guard.pending_blocks.insert(cid.clone(), bytes.to_vec());
-                guard.total_bytes = guard.total_bytes.saturating_add(bytes.len());
-
-                if guard.write_buffer.len() >= WRITE_BUFFER_THRESHOLD {
+                if guard.stage_frame_bytes() >= WRITE_BUFFER_THRESHOLD {
                     guard.flush()?;
                 }
                 Ok(())
@@ -620,9 +698,13 @@ mod file_store {
         ) -> BoxFuture<'a, Result<bool, BlockStoreError>> {
             Box::pin(async move {
                 let mut guard = self.state.write().await;
-                guard.pending_blocks.remove(cid);
+                if let Some(pending) = guard.pending_puts.remove(cid) {
+                    guard.pending_bytes = guard.pending_bytes.saturating_sub(pending.len());
+                    return Ok(true);
+                }
                 if let Some(removed) = guard.index.remove(cid) {
-                    guard.total_bytes = guard.total_bytes.saturating_sub(removed.payload_len);
+                    guard.disk_bytes = guard.disk_bytes.saturating_sub(removed.payload_len);
+                    guard.pending_deletes.insert(cid.clone());
                     Ok(true)
                 } else {
                     Ok(false)
@@ -633,22 +715,28 @@ mod file_store {
         fn len(&self) -> BoxFuture<'_, Result<usize, BlockStoreError>> {
             Box::pin(async move {
                 let guard = self.state.read().await;
-                Ok(guard.index.len())
+                Ok(guard.index.len() + guard.pending_puts.len())
             })
         }
 
         fn total_bytes(&self) -> BoxFuture<'_, Result<usize, BlockStoreError>> {
             Box::pin(async move {
                 let guard = self.state.read().await;
-                Ok(guard.total_bytes)
+                Ok(guard.disk_bytes.saturating_add(guard.pending_bytes))
             })
         }
 
         fn all_cids(&self) -> BoxFuture<'_, Result<Vec<Cid>, BlockStoreError>> {
             Box::pin(async move {
                 let guard = self.state.read().await;
-                let mut cids: Vec<Cid> = guard.index.keys().cloned().collect();
+                let mut cids: Vec<Cid> = guard
+                    .index
+                    .keys()
+                    .chain(guard.pending_puts.keys())
+                    .cloned()
+                    .collect();
                 cids.sort();
+                cids.dedup();
                 Ok(cids)
             })
         }
