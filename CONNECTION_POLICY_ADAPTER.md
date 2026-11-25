@@ -16,16 +16,9 @@ This default routing model is insufficient in several operational scenarios:
 
 ## Implement the adapter protocol
 
-The `ConnectionPolicyAdapter` protocol requires one method:
+The `ConnectionPolicyAdapter` protocol is `Sendable` and requires one method, `resolveConnectionURL(_:endpoint:)`. It receives the URL Petrel is about to connect to and the lexicon method name, and returns the URL to connect to instead:
 
-```swift
-public protocol ConnectionPolicyAdapter: Sendable {
-    func resolveConnectionURL(_ url: URL, endpoint: String?) async -> URL
-}
-```
-
-Implement the protocol to inspect the incoming URL and endpoint string, returning the resolved destination `URL`:
-
+<!-- compile-example: connection-policy-websocket-bypass -->
 ```swift
 import Foundation
 import Petrel
@@ -52,58 +45,73 @@ public final class WebSocketProxyBypassAdapter: ConnectionPolicyAdapter, Sendabl
 
 ## Configure the client
 
-Set the adapter on `ATProtoClient` using `setConnectionPolicyAdapter(_:)`:
+Create an adapter, such as `WebSocketProxyBypassAdapter(directStreamingHost: "bsky.network")` from the previous section, and set it on `ATProtoClient` with `setConnectionPolicyAdapter(_:)`:
 
+<!-- compile-example: connection-policy-configure -->
 ```swift
 import Foundation
 import Petrel
 
-let client = await ATProtoClient(
-    baseURL: URL(string: "https://bsky.social")!
-)
-
-let adapter = WebSocketProxyBypassAdapter(directStreamingHost: "bsky.network")
-await client.setConnectionPolicyAdapter(adapter)
+func makeStreamingClient(adapter: any ConnectionPolicyAdapter) async -> ATProtoClient {
+    let client = await ATProtoClient(
+        baseURL: URL(string: "https://bsky.social")!
+    )
+    await client.setConnectionPolicyAdapter(adapter)
+    return client
+}
 ```
 
 For authenticated clients initialized with OAuth, set the adapter after client initialization:
 
+<!-- compile-example: connection-policy-configure-oauth -->
 ```swift
 import Foundation
 import Petrel
 
-let oauthConfig = OAuthConfig(
-    clientId: "https://example.com/oauth/client-metadata.json",
-    redirectUri: "https://example.com/oauth/callback",
-    scope: "atproto transition:generic"
-)
-
-let client = try await ATProtoClient(
-    baseURL: URL(string: "https://bsky.social")!,
-    oauthConfig: oauthConfig,
-    namespace: "com.example.app"
-)
-
-let adapter = WebSocketProxyBypassAdapter(directStreamingHost: "bsky.network")
-await client.setConnectionPolicyAdapter(adapter)
+func makeAuthenticatedClient(adapter: any ConnectionPolicyAdapter) async throws -> ATProtoClient {
+    let oauthConfig = OAuthConfig(
+        clientId: "https://example.com/oauth/client-metadata.json",
+        redirectUri: "https://example.com/oauth/callback",
+        scope: "atproto transition:generic"
+    )
+    let client = try await ATProtoClient(
+        baseURL: URL(string: "https://bsky.social")!,
+        oauthConfig: oauthConfig,
+        namespace: "com.example.app"
+    )
+    await client.setConnectionPolicyAdapter(adapter)
+    return client
+}
 ```
 
-Once configured, the adapter automatically resolves URLs for both streaming subscriptions and standard queries:
+Once configured, the adapter is consulted for both standard queries and streaming subscriptions. With `WebSocketProxyBypassAdapter`, only the subscription changes host:
 
+<!-- compile-example: connection-policy-usage -->
 ```swift
-// WebSocket subscription resolves via the adapter to directStreamingHost
-let messages = try await client.com.atproto.sync.subscribeRepos(cursor: nil)
+import Foundation
+import Petrel
 
-// Standard HTTP requests resolve through the default base URL
-let (responseCode, timeline) = try await client.app.bsky.feed.getTimeline(
-    input: AppBskyFeedGetTimeline.Parameters(limit: 25)
-)
+func loadTimelineThenFollowFirehose(client: ATProtoClient) async throws {
+    // An HTTP request: the adapter returns the URL unchanged, so it goes to the base URL.
+    let (_, timeline) = try await client.app.bsky.feed.getTimeline(
+        input: .init(limit: 25)
+    )
+    _ = timeline?.feed
+
+    // A WebSocket subscription: the adapter rewrites the host to directStreamingHost.
+    for try await message in try await client.com.atproto.sync.subscribeRepos(cursor: nil) {
+        if case let .commit(commit) = message {
+            _ = commit.ops
+        }
+    }
+}
 ```
 
 ## Route specific namespaces
 
 To divert specific lexicon namespaces to dedicated backend hosts, inspect the `endpoint` parameter in `resolveConnectionURL(_:endpoint:)`:
 
+<!-- compile-example: connection-policy-namespace-routing -->
 ```swift
 import Foundation
 import Petrel
@@ -130,16 +138,24 @@ public final class NamespaceRoutingAdapter: ConnectionPolicyAdapter, Sendable {
 
 If your application uses private overlay lexicons (namespaces such as `com.example.private.*` that are served by your own infrastructure rather than the account's PDS), you can use this same pattern to direct those calls to your private infrastructure:
 
+<!-- compile-example: connection-policy-private-overlay -->
 ```swift
-public func resolveConnectionURL(_ url: URL, endpoint: String?) async -> URL {
-    // Route private overlay lexicon endpoints to custom infrastructure
-    if let endpoint, endpoint.hasPrefix("com.example.private.") {
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
-        components?.host = "private-api.example.com"
-        return components?.url ?? url
-    }
+import Foundation
+import Petrel
 
-    return url
+public struct PrivateOverlayRoutingAdapter: ConnectionPolicyAdapter {
+    public init() {}
+
+    public func resolveConnectionURL(_ url: URL, endpoint: String?) async -> URL {
+        // Route private overlay lexicon endpoints to custom infrastructure
+        if let endpoint, endpoint.hasPrefix("com.example.private.") {
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+            components?.host = "private-api.example.com"
+            return components?.url ?? url
+        }
+
+        return url
+    }
 }
 ```
 
@@ -147,8 +163,13 @@ public func resolveConnectionURL(_ url: URL, endpoint: String?) async -> URL {
 
 To restore default connection resolution, pass `nil` to `setConnectionPolicyAdapter(_:)`:
 
+<!-- compile-example: connection-policy-remove -->
 ```swift
-await client.setConnectionPolicyAdapter(nil)
+import Petrel
+
+func restoreDefaultRouting(client: ATProtoClient) async {
+    await client.setConnectionPolicyAdapter(nil)
+}
 ```
 
 ## Runtime behavior

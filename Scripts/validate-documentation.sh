@@ -54,9 +54,12 @@ validate_documentation() {
 
 # Public guides whose Swift fences must all compile: the root guides, the
 # Spaces guide, and every article in every DocC catalog. The extractor rejects any Swift fence
-# that is not preceded by a compile-example marker, so nothing is skipped.
+# that is not preceded by a compile-example marker, so nothing is skipped. Swift fences in
+# `///` comments are checked separately, at the end of typecheck_documentation_examples.
 documentation_sources() {
-    printf '%s\n' "$ROOT/README.md" "$ROOT/GETTING_STARTED.md" "$ROOT/docs/Spaces.md"
+    printf '%s\n' "$ROOT/README.md" "$ROOT/GETTING_STARTED.md" "$ROOT/docs/Spaces.md" \
+        "$ROOT/CONNECTION_POLICY_ADAPTER.md" "$ROOT/SERVICE_DID_CONFIGURATION.md" \
+        "$ROOT/LINUX_SUPPORT.md"
     find "$ROOT/Sources" -path '*/*.docc/*' -type f -name '*.md' | LC_ALL=C sort
 }
 
@@ -181,6 +184,45 @@ typecheck_documentation_examples() {
     done
     [[ $failures -eq 0 ]] || {
         echo "$failures documentation example(s) failed to compile" >&2
+        return 1
+    }
+
+    # Swift fences in `///` comments are fragments that use values the prose around them
+    # introduces. The extractor wraps each one in a function whose parameters supply those
+    # values (Scripts/doc-comment-examples/contexts.json), and they are compiled together with
+    # the stand-in types in Support.swift. They must compile; they are not held to being
+    # warning-free, because a fragment often ends on a value it does not use.
+    local doc_comment_dir doc_comment_fences doc_comment_files
+    doc_comment_dir="$example_dir/doc-comments"
+    /usr/bin/python3 "$ROOT/Scripts/extract-doc-comment-examples.py" "$doc_comment_dir"
+    # Inventory: every Swift fence in a documentation comment is compiled or explicitly skipped.
+    doc_comment_fences=$(
+        find "$ROOT/Sources" -type f -name '*.swift' -not -path '*/Generated/*' -not -path '*.docc/*' \
+            -exec /usr/bin/grep -hE '^[[:space:]]*///[[:space:]]?```swift[[:space:]]*$' {} + |
+            /usr/bin/wc -l | /usr/bin/tr -d ' '
+    )
+    doc_comment_files=$(
+        find "$doc_comment_dir" -type f \( -name '*.swift' -o -name '*.skipped' \) |
+            /usr/bin/wc -l | /usr/bin/tr -d ' '
+    )
+    [[ $doc_comment_files == "$doc_comment_fences" ]] || {
+        printf 'doc-comment example inventory mismatch: %s Swift fences, %s extracted examples\n' \
+            "$doc_comment_fences" "$doc_comment_files" >&2
+        return 1
+    }
+    "$release_swiftc" \
+        -typecheck \
+        -parse-as-library \
+        -swift-version 6 \
+        -suppress-warnings \
+        -module-name PetrelDocCommentExamples \
+        -sdk "$macos_sdk" \
+        -target "$target" \
+        -I "$example_bin_path/Modules" \
+        "${cc_args[@]}" \
+        "$ROOT/Scripts/doc-comment-examples/Support.swift" \
+        "$doc_comment_dir"/*.swift || {
+        echo "documentation-comment examples failed to compile" >&2
         return 1
     }
 }

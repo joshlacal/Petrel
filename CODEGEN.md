@@ -50,14 +50,16 @@ import PetrelStatusphere
 PetrelStatusphereLexicons.register()
 
 func readStatus(client: ATProtoClient, userDID: DID, rkey: RecordKey) async throws {
-    let (code, output) = try await client.com.atproto.repo.getRecord(
+    let (_, output) = try await client.com.atproto.repo.getRecord(
         input: .init(
             repo: .did(userDID),
             collection: try NSID(nsidString: XyzStatusphereStatus.typeIdentifier),
             rkey: rkey
         )
     )
-    if code == 200, case .knownType(let value) = output?.value,
+    // A registered overlay record arrives as `.knownType`; cast it to the generated type.
+    // `output?.value.decoded(XyzStatusphereStatus.self)` is shorthand for these two lines.
+    if case .knownType(let value) = output?.value,
        let status = value as? XyzStatusphereStatus {
         print(status.status)
     }

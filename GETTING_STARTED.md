@@ -50,21 +50,20 @@ func printProfileAndPosts(handle: String) async throws {
     let client = await ATProtoClient(baseURL: URL(string: "https://public.api.bsky.app")!)
     let actor = try ATIdentifier(string: handle)
 
-    let (profileCode, profile) = try await client.app.bsky.actor.getProfile(
+    // A failed request throws, so there is no status code to check.
+    let (_, profile) = try await client.app.bsky.actor.getProfile(
         input: .init(actor: actor)
     )
-    if profileCode == 200, let profile {
+    if let profile {
         print(profile.displayName ?? profile.handle.description, profile.did)
     }
 
-    let (feedCode, feed) = try await client.app.bsky.feed.getAuthorFeed(
+    let (_, feed) = try await client.app.bsky.feed.getAuthorFeed(
         input: .init(actor: actor, limit: 10)
     )
-    if feedCode == 200, let feed {
-        for item in feed.feed {
-            if let post = item.post.record.decoded(AppBskyFeedPost.self) {
-                print("-", post.text)
-            }
+    for item in feed?.feed ?? [] {
+        if let post = item.post.record.decoded(AppBskyFeedPost.self) {
+            print("-", post.text)
         }
     }
 }

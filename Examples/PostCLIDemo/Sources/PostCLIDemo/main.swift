@@ -100,6 +100,10 @@ struct PostCLIDemo {
                 print("💡 Suggestion: \(suggestion)")
             }
             exit(1)
+        } catch let error as ATProtoXRPCError {
+            // What the server answered: an error name and, usually, a message.
+            print("\n❌ \(error.error): \(error.message ?? "no message")")
+            exit(1)
         } catch {
             print("\n❌ Error: \(error)")
             exit(1)
@@ -183,70 +187,33 @@ struct PostCLIDemo {
             return
         }
 
-        if text.count > 300 {
-            print("⚠️  Warning: Post is \(text.count) characters (max 300)")
-            print("Post anyway? (y/n): ", terminator: "")
-            guard let confirm = readLine()?.lowercased(), confirm == "y" else {
-                print("❌ Post cancelled")
-                return
-            }
+        // Check the length the way the network does: graphemes and bytes.
+        if RichText(text: text).exceedsPostLimits {
+            print("❌ Post is too long (300 characters at most)")
+            return
         }
 
         print("\n⏳ Posting...")
 
-        // Create the post record
-        let post = AppBskyFeedPost(
-            text: text,
-            entities: nil,
-            facets: nil,
-            reply: nil,
-            embed: nil,
-            langs: [LanguageCodeContainer(languageCode: "en")],
-            labels: nil,
-            tags: nil,
-            createdAt: ATProtocolDate(date: Date())
-        )
+        // Links, @mentions and #hashtags in the text become facets. A failed
+        // request throws, so a returned reference means the post exists.
+        let post = try await client.bsky.post(text, langs: ["en"])
 
-        // Wrap in ATProtocolValueContainer
-        let recordContainer = ATProtocolValueContainer.knownType(post)
-
-        // Create the record
-        let input = ComAtprotoRepoCreateRecord.Input(
-            repo: try ATIdentifier(string: handle),
-            collection: try NSID(nsidString: "app.bsky.feed.post"),
-            rkey: nil,
-            validate: true,
-            record: recordContainer,
-            swapCommit: nil
-        )
-
-        let (responseCode, response) = try await client.com.atproto.repo.createRecord(input: input)
-
-        if responseCode == 200, let uri = response?.uri {
-            print("✅ Post created successfully!")
-            print("   URI: \(uri)")
-
-            // Extract the post ID for a web link
-            if let uriString = uri.description.split(separator: "/").last {
-                let webLink = "https://bsky.app/profile/\(handle)/post/\(uriString)"
-                print("   View: \(webLink)")
-            }
-        } else {
-            print("⚠️  Post may have failed (Status: \(responseCode))")
+        print("✅ Post created successfully!")
+        print("   URI: \(post.uri.uriString())")
+        if let webLink = BskyAppURL.url(for: post.uri, handle: handle) {
+            print("   View: \(webLink.absoluteString)")
         }
     }
 
     static func viewProfile(client: ATProtoClient, handle: String) async throws {
         print("\n👤 Fetching profile...")
 
-        let actor = try ATIdentifier(string: handle)
-        let params = AppBskyActorGetProfile.Parameters(actor: actor)
-        let (responseCode, profile) = try await client.app.bsky.actor.getProfile(input: params)
-
-        guard responseCode == 200, let profile = profile else {
-            print("❌ Failed to fetch profile (Status: \(responseCode))")
-            return
-        }
+        // A failed request throws; main() reports it.
+        let (_, profile) = try await client.app.bsky.actor.getProfile(
+            input: .init(actor: try ATIdentifier(string: handle))
+        )
+        guard let profile else { return }
 
         print("\n" + String(repeating: "═", count: 50))
         print("Profile: @\(profile.handle)")
@@ -266,7 +233,7 @@ struct PostCLIDemo {
         print("   Posts: \(profile.postsCount ?? 0)")
 
         if let createdAt = profile.createdAt {
-            print("   Joined: \(createdAt)")
+            print("   Joined: \(createdAt.iso8601String)")
         }
 
         print(String(repeating: "═", count: 50))

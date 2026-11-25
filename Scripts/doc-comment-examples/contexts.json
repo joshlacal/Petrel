@@ -1,0 +1,248 @@
+{
+  "imports": [
+    "Foundation",
+    "Petrel",
+    "PetrelCore",
+    "PetrelCrypto",
+    "PetrelRepo",
+    "PetrelFirehose",
+    "PetrelJetstream",
+    "PetrelPLC",
+    "PetrelPLCPDS",
+    "PetrelOAuthScopes",
+    "PetrelOAuthServer",
+    "PetrelOAuthServerLexicon",
+    "PetrelOzone",
+    "PetrelLexicon"
+  ],
+  "examples": {
+    "Sources/PetrelCrypto/ATProtoCrypto.swift#1": {
+      "starts": "let keypair = ATProtoCrypto.generateKeypair()            // K-256 by default",
+      "parameters": "bytes: Data"
+    },
+    "Sources/PetrelCrypto/ATProtoPublicKey.swift#1": {
+      "starts": "let key = try ATProtoPublicKey(didKey: \"did:key:zQ3shqwJEJyMBsBXCWyCBpUBMqxcon9oHB7mCvx4sSpMdLJwc\")",
+      "parameters": "signature: Data, commitBytes: Data"
+    },
+    "Sources/PetrelCrypto/ATProtoSigner.swift#1": {
+      "starts": "let signer = ATProtoExternalSigner(publicKey: rotationKey) { request in",
+      "parameters": "rotationKey: ATProtoPublicKey, kms: StubKMS, operationBytes: Data"
+    },
+    "Sources/PetrelCrypto/SecureEnclaveP256Signer.swift#1": {
+      "starts": "guard SecureEnclaveP256Signer.isAvailable else { return }",
+      "parameters": "keychain: StubKeychain, commitBytes: Data"
+    },
+    "Sources/PetrelCrypto/ServiceJWT.swift#1": {
+      "starts": "// Minting: a service or PDS signs with the issuer's key.",
+      "parameters": "keypair: K256Keypair"
+    },
+    "Sources/PetrelCrypto/ServiceJWT.swift#2": {
+      "starts": "let token = try await ServiceJWT.mint(",
+      "parameters": "accountDID: String, accountSigningKey: K256Keypair",
+      "setup": [
+        "var request = URLRequest(url: URL(string: \"https://example.com\")!)"
+      ]
+    },
+    "Sources/PetrelCrypto/ServiceAuth/ATProtoServiceReference.swift#1": {
+      "starts": "let appView = try ATProtoServiceReference(\"did:web:api.bsky.app#bsky_appview\")",
+      "setup": [
+        "var request = URLRequest(url: URL(string: \"https://example.com\")!)"
+      ]
+    },
+    "Sources/PetrelCrypto/ServiceAuth/ServiceAuthError.swift#1": {
+      "starts": "do {",
+      "parameters": "verifier: ServiceAuthVerifier, header: String?, nsid: String"
+    },
+    "Sources/PetrelCrypto/ServiceAuth/ServiceAuthKeyResolver.swift#1": {
+      "starts": "let resolver = StaticServiceAuthKeyResolver(keys: [",
+      "parameters": "accountKey: ATProtoPublicKey"
+    },
+    "Sources/PetrelCrypto/ServiceAuth/ServiceAuthKeyResolver.swift#2": {
+      "starts": "let resolver = ClosureServiceAuthKeyResolver { did, keyID, forceRefresh in",
+      "parameters": "myDirectory: StubKeyDirectory"
+    },
+    "Sources/PetrelCrypto/ServiceAuth/ServiceAuthVerifier.swift#1": {
+      "starts": "let verifier = ServiceAuthVerifier(",
+      "parameters": "resolver: any ServiceAuthKeyResolver, request: StubHTTPRequest"
+    },
+    "Sources/PetrelPLC/PLCDirectoryClient.swift#1": {
+      "starts": "for try await entry in client.exportSequence(after: .sequence(0)) {",
+      "parameters": "client: PLCDirectoryClient"
+    },
+    "Sources/PetrelRepo/Repository.swift#1": {
+      "starts": "let key = try ATProtoPublicKey(didKey: \"did:key:zQ3sh…\")",
+      "parameters": "exportBytes: Data"
+    },
+    "Sources/PetrelRepo/RepositoryBlockStore.swift#1": {
+      "starts": "let store = InMemoryRepositoryBlockStore()",
+      "parameters": "did: String, keypair: K256Keypair"
+    },
+    "Sources/PetrelRepo/RepositoryBlockStore.swift#2": {
+      "starts": "let store = try FileRepositoryBlockStore(url: scratchDirectory.appending(path: \"blocks\"))",
+      "parameters": "scratchDirectory: URL, exportURL: URL, key: ATProtoPublicKey"
+    },
+    "Sources/PetrelRepo/RepositoryIdentityKeyResolver.swift#1": {
+      "starts": "let keys = CachingServiceAuthKeyResolver(upstream: IdentityResolver())",
+      "parameters": "event: StubCommitEvent, operations: [RepositoryCommitOperation], previousDataCID: CID"
+    },
+    "Sources/PetrelOAuthServerLexicon/AuthenticatedOAuthLexiconResolver.swift#1": {
+      "starts": "let fetcher = OAuthRemoteDocumentFetcher(",
+      "parameters": "pinnedTransport: any OAuthRemoteTransport, store: any OAuthLexiconCacheStore"
+    },
+    "Sources/PetrelPLCPDS/PLCPDSOperationFlow.swift#1": {
+      "starts": "let flow = PLCPDSOperationFlow(api: await client.com.atproto.identity)",
+      "parameters": "client: ATProtoClient"
+    },
+    "Sources/Petrel/Core/Types/ATProtoNullable.swift#1": {
+      "starts": "swapRecord: nil            // key absent",
+      "skip": "Three alternative argument values, not statements."
+    },
+    "Sources/Petrel/Core/Types/ATProtocolValueContainerHelpers.swift#1": {
+      "starts": "let post = try ATProtoDecoding.strictJSONDecoder().decode(AppBskyFeedPost.self, from: data)",
+      "parameters": "data: Data"
+    },
+    "Sources/Petrel/Core/Types/CIDString.swift#1": {
+      "starts": "let ref = ComAtprotoRepoStrongRef(uri: uri, cid: try CIDString(cidString: \"bafyrei…\"))",
+      "parameters": "uri: ATProtocolURI"
+    },
+    "Sources/Petrel/Core/Utils/TIDGenerator.swift#1": {
+      "starts": "let rkey = await TIDGenerator.next()               // \"3lxy…\", shared generator",
+      "parameters": "previousRevision: TID"
+    },
+    "Sources/Petrel/Identity/DIDDocument+ATProto.swift#1": {
+      "starts": "let labeler = try document.serviceEndpoint(.labeler)",
+      "parameters": "document: DIDDocument"
+    },
+    "Sources/Petrel/Identity/IdentityResolver.swift#2": {
+      "starts": "let pds = try await resolver.resolveServiceEndpoint(for: did, service: .pds)",
+      "parameters": "resolver: IdentityResolver, did: String"
+    },
+    "Sources/Petrel/Identity/ServiceAuthIdentityKeyResolver.swift#1": {
+      "starts": "let verifier = ServiceAuthVerifier(",
+      "parameters": "request: StubHTTPRequest"
+    },
+    "Sources/Petrel/Auth/GatewayConfiguration.swift#1": {
+      "starts": "let gateway = try GatewayConfiguration(",
+      "parameters": "oauthConfig: OAuthConfig"
+    },
+    "Sources/Petrel/Network/ATProtoWebSocketFrameDecoder.swift#1": {
+      "starts": "do {",
+      "parameters": "subscription: EventStreamSubscription<ComAtprotoSyncSubscribeRepos.Message>"
+    },
+    "Sources/Petrel/Network/NetworkService.swift#1": {
+      "starts": "let car = try await NetworkService.withResponseLimits(",
+      "parameters": "client: ATProtoClient, did: DID"
+    },
+    "Sources/Petrel/Network/NetworkService.swift#2": {
+      "starts": "let bytes = SpaceSTAR.defaultMaximumArchiveBytes",
+      "parameters": "client: ATProtoClient, input: ComAtprotoSpaceGetBlob.Parameters"
+    },
+    "Sources/Petrel/Network/XRPC.swift#1": {
+      "starts": "let options = XRPCCallOptions(",
+      "parameters": "client: ATProtoClient"
+    },
+    "Sources/Petrel/Network/XRPC.swift#2": {
+      "starts": "let (result, metadata) = try await NetworkService.withResponseMetadata {",
+      "parameters": "client: ATProtoClient"
+    },
+    "Sources/Petrel/Network/XRPC.swift#3": {
+      "starts": "let response = try await client.networkService.xrpcQuery(",
+      "parameters": "client: ATProtoClient"
+    },
+    "Sources/Petrel/Network/XRPC.swift#4": {
+      "starts": "let response = try await client.networkService.xrpcProcedure(",
+      "parameters": "client: ATProtoClient"
+    },
+    "Sources/Petrel/Network/XRPCPagination.swift#1": {
+      "starts": "let pages = XRPCPages(startingAt: AppBskyFeedGetTimeline.Parameters(limit: 50)) {",
+      "parameters": "client: ATProtoClient"
+    },
+    "Sources/Petrel/ServiceAuth/ATProtoClient+ServiceAuth.swift#1": {
+      "starts": "let token = try await client.getServiceAuthToken(",
+      "parameters": "client: ATProtoClient",
+      "setup": [
+        "var request = URLRequest(url: URL(string: \"https://example.com\")!)"
+      ]
+    },
+    "Sources/Petrel/ServiceAuth/ATProtoClient+ServiceAuth.swift#2": {
+      "starts": "// Everything under app.bsky goes to a self-hosted AppView…",
+      "parameters": "client: ATProtoClient"
+    },
+    "Sources/Petrel/ServiceAuth/DIDDocumentServiceAuthKeyResolver.swift#1": {
+      "starts": "let resolver = DIDDocumentServiceAuthKeyResolver { did, forceRefresh in",
+      "parameters": "directory: StubDocumentDirectory"
+    },
+    "Sources/Petrel/Helpers/BskyAgent+Graph.swift#1": {
+      "starts": "try await client.bsky.upsertProfile { existing in",
+      "parameters": "client: ATProtoClient"
+    },
+    "Sources/Petrel/Helpers/BskyAgent+Labelers.swift#1": {
+      "starts": "let options = try await client.bsky.moderationOptions()",
+      "parameters": "client: ATProtoClient, post: AppBskyFeedDefs.PostView"
+    },
+    "Sources/Petrel/Helpers/BskyAgent+Posts.swift#1": {
+      "starts": "let blob = try await client.bsky.uploadImage(jpegData, mimeType: \"image/jpeg\")",
+      "parameters": "client: ATProtoClient, jpegData: Data, otherPost: ComAtprotoRepoStrongRef"
+    },
+    "Sources/Petrel/Helpers/BskyAgent+Posts.swift#2": {
+      "starts": "try await client.bsky.post(\"Seen today\", images: [",
+      "parameters": "client: ATProtoClient, jpegData: Data"
+    },
+    "Sources/Petrel/Helpers/BskyAgent+Records.swift#1": {
+      "starts": "let convos = try await client.bsky.query(",
+      "parameters": "client: ATProtoClient"
+    },
+    "Sources/Petrel/Helpers/BskyAgent+Video.swift#1": {
+      "starts": "let video = try await client.bsky.uploadVideo(data, name: \"landing.mp4\")",
+      "parameters": "client: ATProtoClient, data: Data"
+    },
+    "Sources/Petrel/Helpers/BskyAgent.swift#1": {
+      "starts": "let post = try await client.bsky.post(\"Hello from Petrel\")",
+      "parameters": "client: ATProtoClient"
+    },
+    "Sources/Petrel/Helpers/Preferences/BskyAgent+Preferences.swift#1": {
+      "starts": "let prefs = try await client.bsky.getPreferences()",
+      "parameters": "client: ATProtoClient"
+    },
+    "Sources/Petrel/Helpers/Preferences/BskyAgent+Preferences.swift#2": {
+      "starts": "try await client.bsky.addSavedFeeds([.feed(feedURI, pinned: true)])",
+      "parameters": "client: ATProtoClient, feedURI: ATProtocolURI"
+    },
+    "Sources/Petrel/Helpers/Preferences/BskyAgent+Preferences.swift#3": {
+      "starts": "try await client.bsky.setContentLabelPref(\"graphic-media\", .hide)",
+      "parameters": "client: ATProtoClient"
+    },
+    "Sources/Petrel/Helpers/Preferences/BskyAgent+Preferences.swift#4": {
+      "starts": "try await client.bsky.addMutedWord(\"spoilers\", targets: [.content, .tag])",
+      "parameters": "client: ATProtoClient"
+    },
+    "Sources/Petrel/Helpers/Preferences/BskyAgent+Preferences.swift#5": {
+      "starts": "try await client.bsky.setFeedViewPrefs(feed: \"home\", .init(hideReposts: true))",
+      "parameters": "client: ATProtoClient"
+    },
+    "Sources/Petrel/Helpers/Labels/LabelSet.swift#1": {
+      "starts": "var labels = LabelSet()",
+      "parameters": "labeler: ATProtoClient"
+    },
+    "Sources/Petrel/Helpers/RichText/RichTextValue.swift#1": {
+      "starts": "var richText = RichText(text: \"Hello @alice.bsky.social, see https://atproto.com #atproto\")",
+      "parameters": "client: ATProtoClient"
+    },
+    "Sources/Petrel/Helpers/Moderation/Moderation.swift#1": {
+      "starts": "let options = ModerationOptions(userDid: myDid, prefs: preferences.moderationPrefs)",
+      "parameters": "myDid: DID, preferences: BskyPreferences, postView: AppBskyFeedDefs.PostView"
+    },
+    "Sources/Petrel/Helpers/Moderation/ModerationDecision.swift#1": {
+      "starts": "let decision = Moderation.moderatePost(postView, options: options)",
+      "parameters": "postView: AppBskyFeedDefs.PostView, options: ModerationOptions"
+    },
+    "Sources/PetrelLexicon/BundledCatalog.swift#1": {
+      "starts": "let catalog = try LexiconCatalog.bundled()",
+      "parameters": "post: AppBskyFeedPost"
+    },
+    "Sources/PetrelLexicon/LexiconCatalog.swift#1": {
+      "starts": "var catalog = LexiconCatalog()",
+      "parameters": "schemaJSON: Data, record: LexValue"
+    }
+  }
+}

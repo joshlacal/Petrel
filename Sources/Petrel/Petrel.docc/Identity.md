@@ -87,8 +87,13 @@ func inspectDIDDocument(resolver: IdentityResolver) async throws {
     _ = document.pdsEndpoint                      // #atproto_pds, type AtprotoPersonalDataServer
     _ = try document.atprotoSigningKey()          // #atproto: Multikey or a legacy 2019 key type
     _ = try document.atprotoSigningDIDKey()       // the same key as a did:key string
-    _ = try document.serviceEndpoint(.labeler)        // #atproto_labeler
-    _ = try document.serviceEndpoint(.feedGenerator)  // #bsky_fg
+
+    // Other services are looked up by identifier. A document that does not declare the
+    // service throws IdentityError.missingService, so ask the DID that runs it.
+    let labeler = try await resolver.resolveDIDDocument("did:plc:ar7c4by46qjdydhdevvrndac")
+    _ = try labeler.serviceEndpoint(.labeler)             // #atproto_labeler
+    let feedHost = try await resolver.resolveDIDDocument("did:web:discover.bsky.app")
+    _ = try feedHost.serviceEndpoint(.feedGenerator)      // #bsky_fg
 }
 ```
 
