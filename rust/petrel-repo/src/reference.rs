@@ -55,6 +55,7 @@ impl ReferenceSurface {
             require_canonical_prefix: true,
             max_depth: limits.max_mst_depth,
             max_node_count: limits.max_mst_node_count,
+            max_single_block_bytes: limits.max_single_block_bytes,
         };
         let (stats, entries) = MstValidation::validate_full(
             &commit.data_cid,

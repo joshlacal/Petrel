@@ -741,3 +741,290 @@ async fn file_block_store_persists_deletions_across_sync_and_reopen() {
         blk_a.len() + blk_b.len()
     );
 }
+
+#[allow(clippy::too_many_lines)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn recreated_mst_split_emits_new_blocks_and_verifies_commit_diff() {
+    use petrel_repo::mst::key_depth;
+
+    let did = common::test_did();
+    let signer = P256Keypair::generate().unwrap();
+    let resolver = FixedSigningKey::from_public_key(signer.public_key().clone());
+    let limits = RepositoryLimits::standard();
+    let policy = RepositoryReadPolicy::strict();
+    let store = Arc::new(InMemoryBlockStore::new());
+
+    // Find deterministic layer-0 / layer->=1 / layer-0 keys in sorted order: low < mid < high.
+    let mut layer0_keys = Vec::new();
+    let mut selected_mid = None;
+    for i in 0..200_u32 {
+        let rkey = format!("k{i:04}");
+        let mst_key = format!("app.bsky.feed.post/{rkey}");
+        let depth = key_depth(mst_key.as_bytes());
+        if depth == 0 && layer0_keys.is_empty() {
+            layer0_keys.push(rkey);
+        } else if depth >= 1 && !layer0_keys.is_empty() && selected_mid.is_none() {
+            selected_mid = Some(rkey);
+        } else if depth == 0 && selected_mid.is_some() {
+            layer0_keys.push(rkey);
+            break;
+        }
+    }
+    assert_eq!(layer0_keys.len(), 2);
+    let mid_rkey = selected_mid.expect("expected intervening layer >= 1 key");
+    let low_path = RepositoryPath::new("app.bsky.feed.post", &layer0_keys[0]).unwrap();
+    let mid_path = RepositoryPath::new("app.bsky.feed.post", &mid_rkey).unwrap();
+    let high_path = RepositoryPath::new("app.bsky.feed.post", &layer0_keys[1]).unwrap();
+    let rec_bytes = dagcbor::encode(&post_record_value("mst split regression"));
+
+    let s0 = RepositoryState::new(did.clone(), 1).unwrap();
+
+    // 1. Create low + high in a single layer-0 MST node.
+    let b1 = WriteBatch::new(vec![
+        WriteOp::Create {
+            path: low_path,
+            record_cbor: rec_bytes.clone(),
+        },
+        WriteOp::Create {
+            path: high_path,
+            record_cbor: rec_bytes.clone(),
+        },
+    ])
+    .unwrap();
+    let r1 = RepositoryEngine::apply(
+        &s0,
+        &b1,
+        None,
+        RepositoryTid::parse("3jzfcijpj2z2a").unwrap(),
+        &signer,
+        Arc::clone(&store),
+        &limits,
+        &policy,
+    )
+    .await
+    .unwrap();
+
+    // 2. Insert intervening layer >= 1 key `mid`, persisting split children in `store`.
+    let b2 = WriteBatch::new(vec![WriteOp::Create {
+        path: mid_path.clone(),
+        record_cbor: rec_bytes.clone(),
+    }])
+    .unwrap();
+    let r2 = RepositoryEngine::apply(
+        &r1.state,
+        &b2,
+        r1.state.head_commit_cid.as_ref(),
+        RepositoryTid::parse("3jzfcijpj2z2b").unwrap(),
+        &signer,
+        Arc::clone(&store),
+        &limits,
+        &policy,
+    )
+    .await
+    .unwrap();
+    CommitDiff::verify_commit_event(
+        &r2.diff_car().unwrap(),
+        &r2.commit.cid,
+        &did,
+        &r2.operations,
+        r2.previous_data_cid.as_ref(),
+        &resolver,
+        &limits,
+        &policy,
+    )
+    .await
+    .unwrap();
+
+    // 3. Delete `mid`, merging back to the single layer-0 root while split children remain in `store`.
+    let b3 = WriteBatch::new(vec![WriteOp::Delete {
+        path: mid_path.clone(),
+    }])
+    .unwrap();
+    let r3 = RepositoryEngine::apply(
+        &r2.state,
+        &b3,
+        r2.state.head_commit_cid.as_ref(),
+        RepositoryTid::parse("3jzfcijpj2z2c").unwrap(),
+        &signer,
+        Arc::clone(&store),
+        &limits,
+        &policy,
+    )
+    .await
+    .unwrap();
+    assert_eq!(r3.state.head_data_cid, r1.state.head_data_cid);
+    CommitDiff::verify_commit_event(
+        &r3.diff_car().unwrap(),
+        &r3.commit.cid,
+        &did,
+        &r3.operations,
+        r3.previous_data_cid.as_ref(),
+        &resolver,
+        &limits,
+        &policy,
+    )
+    .await
+    .unwrap();
+
+    // 4. Recreate `mid`: diff CAR must still emit the recreated split child nodes even though
+    // `store` retained them from commit 2, and `verify_commit_event` must succeed.
+    let b4 = WriteBatch::new(vec![WriteOp::Create {
+        path: mid_path,
+        record_cbor: rec_bytes,
+    }])
+    .unwrap();
+    let r4 = RepositoryEngine::apply(
+        &r3.state,
+        &b4,
+        r3.state.head_commit_cid.as_ref(),
+        RepositoryTid::parse("3jzfcijpj2z2d").unwrap(),
+        &signer,
+        Arc::clone(&store),
+        &limits,
+        &policy,
+    )
+    .await
+    .unwrap();
+    let emitted_cids: std::collections::BTreeSet<Cid> =
+        r4.new_blocks.iter().map(|b| b.cid.clone()).collect();
+    for expected in &r2.new_blocks {
+        if expected.cid != r2.commit.cid {
+            assert!(
+                emitted_cids.contains(&expected.cid),
+                "re-split MST diff omitted node block {}",
+                expected.cid
+            );
+        }
+    }
+    CommitDiff::verify_commit_event(
+        &r4.diff_car().unwrap(),
+        &r4.commit.cid,
+        &did,
+        &r4.operations,
+        r4.previous_data_cid.as_ref(),
+        &resolver,
+        &limits,
+        &policy,
+    )
+    .await
+    .unwrap();
+}
+
+#[allow(clippy::too_many_lines)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn engine_and_validation_reject_mst_blocks_exceeding_single_block_limit() {
+    use petrel_repo::block_store::BlockStore as _;
+    use petrel_repo::error::{LimitKind, MstError, RepositoryError};
+    use petrel_repo::mst::MstValidation;
+
+    let did = common::test_did();
+    let signer = P256Keypair::generate().unwrap();
+    let policy = RepositoryReadPolicy::strict();
+
+    // Valid ~509-byte MST path (`app.bsky.feed.post/` + 490 chars) produces an MST node > 512 bytes,
+    // while the small record and signed commit stay well below 512 bytes.
+    let long_rkey = "a".repeat(490);
+    let long_path = RepositoryPath::new("app.bsky.feed.post", &long_rkey).unwrap();
+    let small_record_cbor = dagcbor::encode(&post_record_value("hi"));
+    assert!(small_record_cbor.len() < 128);
+
+    let batch = WriteBatch::new(vec![WriteOp::Create {
+        path: long_path,
+        record_cbor: small_record_cbor,
+    }])
+    .unwrap();
+
+    let strict_limits = RepositoryLimits {
+        max_single_block_bytes: 512,
+        ..RepositoryLimits::standard()
+    };
+    strict_limits.validate().unwrap();
+
+    let unbounded_store = Arc::new(InMemoryBlockStore::new());
+    let s0 = RepositoryState::new(did.clone(), 1).unwrap();
+    let err = RepositoryEngine::apply(
+        &s0,
+        &batch,
+        None,
+        RepositoryTid::parse("3jzfcijpj2z2a").unwrap(),
+        &signer,
+        Arc::clone(&unbounded_store),
+        &strict_limits,
+        &policy,
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        matches!(
+            err,
+            EngineError::Mst(MstError::BlockTooLarge { limit: 512, .. })
+                | EngineError::Limit(LimitError::Exceeded {
+                    kind: LimitKind::SingleBlockBytes,
+                    limit: 512,
+                    ..
+                })
+        ),
+        "unexpected error for oversized MST block: {err:?}"
+    );
+    assert_eq!(
+        unbounded_store.len().await.unwrap(),
+        0,
+        "oversized MST commit must fail before persisting any blocks"
+    );
+
+    // Apply under standard limits so an MST block > 512B exists in the unbounded store, then
+    // verify full-tree validation & Repository::open_store enforce `max_single_block_bytes: 512`.
+    let standard_limits = RepositoryLimits::standard();
+    let res = RepositoryEngine::apply(
+        &s0,
+        &batch,
+        None,
+        RepositoryTid::parse("3jzfcijpj2z2a").unwrap(),
+        &signer,
+        Arc::clone(&unbounded_store),
+        &standard_limits,
+        &policy,
+    )
+    .await
+    .unwrap();
+    let data_cid = res.state.head_data_cid.unwrap();
+
+    let strict_mst_opts = MstOptions {
+        max_single_block_bytes: 512,
+        ..MstOptions::default()
+    };
+    let val_err = MstValidation::validate_full(
+        &data_cid,
+        unbounded_store.as_ref(),
+        &strict_mst_opts,
+        strict_limits.max_record_count,
+        true,
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        matches!(val_err, MstError::BlockTooLarge { limit: 512, .. }),
+        "unexpected full-tree validation error: {val_err:?}"
+    );
+
+    let open_err = Repository::open_store(
+        res.commit.cid,
+        unbounded_store,
+        OpenVerification::SigningKey(signer.public_key().clone()),
+        Some(&did),
+        strict_limits,
+        policy,
+        true,
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        matches!(
+            open_err,
+            RepositoryError::Mst(MstError::BlockTooLarge { limit: 512, .. })
+        ),
+        "unexpected Repository::open_store error: {open_err:?}"
+    );
+}

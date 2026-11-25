@@ -288,6 +288,7 @@ impl Repository<InMemoryBlockStore> {
             require_canonical_prefix: true,
             max_depth: limits.max_mst_depth,
             max_node_count: limits.max_mst_node_count,
+            max_single_block_bytes: limits.max_single_block_bytes,
         };
         let proven =
             MstProof::verify_membership(&commit.data_cid, path.mst_key(), &store, &mst_options)
@@ -408,6 +409,7 @@ impl<B: BlockStore + 'static> Repository<B> {
                 require_canonical_prefix: true,
                 max_depth: limits.max_mst_depth,
                 max_node_count: limits.max_mst_node_count,
+                max_single_block_bytes: limits.max_single_block_bytes,
             };
             let (stats, entries) = MstValidation::validate_full(
                 &commit.data_cid,
@@ -864,6 +866,7 @@ impl<B: BlockStore + 'static> Repository<B> {
             require_canonical_prefix: true,
             max_depth: self.limits.max_mst_depth,
             max_node_count: self.limits.max_mst_node_count,
+            max_single_block_bytes: self.limits.max_single_block_bytes,
         }
     }
 }

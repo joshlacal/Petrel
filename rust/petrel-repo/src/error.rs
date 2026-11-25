@@ -230,6 +230,8 @@ pub enum MstError {
     NodeCountExceeded { count: usize, limit: usize },
     #[error("MST record count {count} exceeds limit {limit}")]
     RecordCountExceeded { count: usize, limit: usize },
+    #[error("MST block size {len} exceeds maximum block limit {limit}")]
+    BlockTooLarge { len: usize, limit: usize },
     #[error("key {key:?} height {actual} does not match expected tree height {expected}")]
     KeyHeightMismatch {
         key: String,

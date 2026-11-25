@@ -99,6 +99,7 @@ impl CommitDiff {
         };
         options.max_depth = limits.max_mst_depth;
         options.max_node_count = limits.max_mst_node_count;
+        options.max_single_block_bytes = limits.max_single_block_bytes;
 
         let mut tree = RepositoryMst::open_with_options(data_cid.clone(), blocks, options);
 

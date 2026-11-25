@@ -176,6 +176,7 @@ impl RepositoryEngine {
             require_canonical_prefix: true,
             max_depth: limits.max_mst_depth,
             max_node_count: limits.max_mst_node_count,
+            max_single_block_bytes: limits.max_single_block_bytes,
         };
 
         let mut mst = match &previous_data_cid {
@@ -241,6 +242,15 @@ impl RepositoryEngine {
         }
         for (cid, bytes) in &proof_blocks_map {
             relevant_union.insert(cid, bytes.len());
+        }
+        for &block_len in relevant_union.values() {
+            if block_len > limits.max_single_block_bytes {
+                return Err(EngineError::Limit(LimitError::Exceeded {
+                    kind: LimitKind::SingleBlockBytes,
+                    observed: block_len,
+                    limit: limits.max_single_block_bytes,
+                }));
+            }
         }
         let relevant_bytes: usize = relevant_union.values().sum();
         let total_commit_bytes = relevant_bytes.saturating_add(estimated_commit_bytes);

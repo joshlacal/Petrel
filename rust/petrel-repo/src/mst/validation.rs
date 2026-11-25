@@ -114,6 +114,12 @@ fn validate_node<'c, 's: 'c>(
             .get_block(&node_cid)
             .await?
             .ok_or_else(|| MstError::MissingBlock(node_cid.clone()))?;
+        if bytes.len() > ctx.options.max_single_block_bytes {
+            return Err(MstError::BlockTooLarge {
+                len: bytes.len(),
+                limit: ctx.options.max_single_block_bytes,
+            });
+        }
         if node_cid.hash_code() == 0x12 && !node_cid.matches_content(&bytes) {
             return Err(MstError::InvalidNode(format!(
                 "MST node CID hash mismatch for {node_cid}"
@@ -220,6 +226,12 @@ fn validate_node<'c, 's: 'c>(
                     .get_block(&entry.value)
                     .await?
                     .ok_or_else(|| MstError::MissingBlock(entry.value.clone()))?;
+                if rec_bytes.len() > ctx.options.max_single_block_bytes {
+                    return Err(MstError::BlockTooLarge {
+                        len: rec_bytes.len(),
+                        limit: ctx.options.max_single_block_bytes,
+                    });
+                }
                 if entry.value.hash_code() == 0x12 && !entry.value.matches_content(&rec_bytes) {
                     return Err(MstError::InvalidNode(format!(
                         "record block CID hash mismatch for {}",

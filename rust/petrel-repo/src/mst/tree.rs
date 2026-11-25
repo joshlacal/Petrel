@@ -32,6 +32,7 @@ pub struct MstOptions {
     pub require_canonical_prefix: bool,
     pub max_depth: usize,
     pub max_node_count: usize,
+    pub max_single_block_bytes: usize,
 }
 
 impl Default for MstOptions {
@@ -42,6 +43,7 @@ impl Default for MstOptions {
             require_canonical_prefix: true,
             max_depth: 128,
             max_node_count: 250_000,
+            max_single_block_bytes: 1_048_576,
         }
     }
 }
@@ -85,6 +87,7 @@ type SplitPair = (Option<Cid>, Option<Cid>);
 pub struct RepositoryMst {
     root_cid: Cid,
     base_root_cid: Option<Cid>,
+    base_nodes: std::collections::HashSet<Cid>,
     source: NodeSource,
     dirty_blocks: BlockMap,
     decoded_cache: BTreeMap<Cid, MstNodeView>,
@@ -108,6 +111,7 @@ impl RepositoryMst {
         Self {
             root_cid,
             base_root_cid: None,
+            base_nodes: std::collections::HashSet::new(),
             source: NodeSource::Empty,
             dirty_blocks,
             decoded_cache,
@@ -131,8 +135,11 @@ impl RepositoryMst {
         source: Arc<dyn BlockSource>,
         options: MstOptions,
     ) -> Self {
+        let mut base_nodes = std::collections::HashSet::new();
+        base_nodes.insert(root_cid.clone());
         Self {
             base_root_cid: Some(root_cid.clone()),
+            base_nodes,
             root_cid,
             source: NodeSource::External(source),
             dirty_blocks: BTreeMap::new(),
@@ -166,6 +173,9 @@ impl RepositoryMst {
     /// Clears local dirty tracking while keeping cached decoded nodes and source.
     pub fn clear_dirty_tracking(&mut self) {
         self.dirty_blocks.clear();
+        self.base_root_cid = Some(self.root_cid.clone());
+        self.base_nodes.clear();
+        self.base_nodes.insert(self.root_cid.clone());
     }
 
     /// Fetches and decodes `node_cid` either from the local overlay or `source`.
@@ -173,6 +183,8 @@ impl RepositoryMst {
         if let Some(view) = self.decoded_cache.get(node_cid) {
             return Ok(view.clone());
         }
+        let from_base_source = !self.dirty_blocks.contains_key(node_cid)
+            && matches!(self.source, NodeSource::External(_));
         let bytes = self.get_raw_block(node_cid).await?;
         let view = decode_mst_node(
             &bytes,
@@ -180,6 +192,9 @@ impl RepositoryMst {
             &self.options.policy,
             self.options.require_canonical_prefix,
         )?;
+        if from_base_source {
+            self.base_nodes.insert(node_cid.clone());
+        }
         self.decoded_cache.insert(node_cid.clone(), view.clone());
         Ok(view)
     }
@@ -205,6 +220,12 @@ impl RepositoryMst {
 
     fn store_node(&mut self, view: MstNodeView) -> Result<Cid, MstError> {
         let (cid, bytes) = encode_mst_node(&view)?;
+        if bytes.len() > self.options.max_single_block_bytes {
+            return Err(MstError::BlockTooLarge {
+                len: bytes.len(),
+                limit: self.options.max_single_block_bytes,
+            });
+        }
         self.dirty_blocks.insert(cid.clone(), bytes);
         self.decoded_cache.insert(cid.clone(), view);
         Ok(cid)
@@ -527,6 +548,9 @@ impl RepositoryMst {
 
         // Fast path: tree was opened at `base_root_cid` and mutated via `self.dirty_blocks`.
         // Any child not in `self.dirty_blocks` is an unmodified subtree from `base_root_cid`.
+        // Any dirty block whose CID matches a node loaded from `base_root_cid` (`base_nodes`)
+        // is also already part of `previous_root_cid`, whereas historical store blocks from older
+        // epochs that are absent from `base_root_cid` are never skipped.
         if previous_root_cid == self.base_root_cid.as_ref() {
             let root = self.root_cid.clone();
             let mut collected: BlockMap = BTreeMap::new();
@@ -534,17 +558,10 @@ impl RepositoryMst {
             self.collect_reachable_dirty(&root, &mut visited, &mut collected, 0)
                 .await?;
 
-            let mut delta = Vec::with_capacity(collected.len());
-            for (cid, bytes) in collected {
-                let already_stored = match &self.source {
-                    NodeSource::External(src) => src.contains_block(&cid).await?,
-                    NodeSource::Empty => false,
-                };
-                if !already_stored {
-                    delta.push(RepositoryBlock::new(cid, bytes));
-                }
-            }
-            return Ok(delta);
+            return Ok(collected
+                .into_iter()
+                .map(|(cid, bytes)| RepositoryBlock::new(cid, bytes))
+                .collect());
         }
 
         // General path against an arbitrary `previous_root_cid`: CID-pruned traversal.
@@ -590,7 +607,7 @@ impl RepositoryMst {
                     limit: self.options.max_depth,
                 });
             }
-            if !visited.insert(node_cid.clone()) {
+            if !visited.insert(node_cid.clone()) || self.base_nodes.contains(node_cid) {
                 return Ok(());
             }
             let Some(bytes) = self.dirty_blocks.get(node_cid).cloned() else {
