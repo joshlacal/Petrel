@@ -6,6 +6,8 @@ name: Rust
     paths:
       - 'rust/**'
       - 'Server/**'
+      - 'Sources/PetrelCrypto/**'
+      - 'Sources/CPetrelBLAKE3/**'
       - 'Sources/PetrelOAuthServer*/**'
       - 'Sources/PetrelOAuthScopes/**'
       - 'Package.swift'
@@ -16,6 +18,8 @@ name: Rust
     paths:
       - 'rust/**'
       - 'Server/**'
+      - 'Sources/PetrelCrypto/**'
+      - 'Sources/CPetrelBLAKE3/**'
       - 'Sources/PetrelOAuthServer*/**'
       - 'Sources/PetrelOAuthScopes/**'
       - 'Package.swift'
@@ -75,17 +79,17 @@ jobs:
       - name: Build the SDK crates for wasm32
         run: |
           cargo build --locked --target wasm32-unknown-unknown --no-default-features --features wasm \
-            -p petrel-core -p petrel-oauth-scopes -p petrel-api -p petrel
+            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel-api -p petrel
       - name: Check wasm32 with the minimum supported Rust version
         run: |
           rustup toolchain install 1.88.0 --profile minimal --target wasm32-unknown-unknown
           cargo +1.88.0 check --locked --target wasm32-unknown-unknown --no-default-features --features wasm \
-            -p petrel-core -p petrel-oauth-scopes -p petrel-api -p petrel
+            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel-api -p petrel
       - name: Keep native-only dependencies out of the wasm SDK
         run: |
           set -euo pipefail
           tree=$(cargo tree --locked --target wasm32-unknown-unknown --no-default-features --features wasm \
-            -p petrel-core -p petrel-oauth-scopes -p petrel-api -p petrel --edges normal --prefix none)
+            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel-api -p petrel --edges normal --prefix none)
           if grep -E '^(tokio|mio|socket2|hickory-[^ ]+|aws-lc[^ ]*) v' <<< "$tree"; then
             echo 'Native-only dependencies found in the wasm SDK' >&2
             exit 1
@@ -112,7 +116,7 @@ jobs:
         run: |
           test "$(node --version)" = "$NODE_VERSION"
           cargo test --locked --target wasm32-unknown-unknown --no-default-features --features wasm \
-            -p petrel-core -p petrel-oauth-scopes -p petrel
+            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel
 
   e2e:
     name: Rust client against the Swift OAuth and CAB servers

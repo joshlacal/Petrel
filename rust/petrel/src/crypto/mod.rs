@@ -20,6 +20,23 @@ mod jose;
 #[cfg(all(target_arch = "wasm32", target_os = "unknown", feature = "wasm"))]
 mod web_crypto;
 
+pub use petrel_crypto;
+pub use petrel_crypto::{
+    ATProtoCrypto, ATProtoExportableKeypair, ATProtoExternalSigner, ATProtoJWTVerificationKey,
+    ATProtoKeyCurve, ATProtoKeypair, ATProtoPublicKey, ATProtoServiceReference, ATProtoSignature,
+    ATProtoSignatureVerificationOptions, ATProtoSigner, ATProtoVerifier, Base58BTC,
+    CachingServiceAuthKeyResolver, ClockFn, ClosureServiceAuthKeyResolver, ExternalSignRequest,
+    Hex, InMemoryServiceAuthReplayStore, JWTBase64URL, K256Keypair, LegacyVerificationKeyCurve,
+    P256DIDKey, P256Keypair, P256WireSignature, PLCDIDKeyCodec, PLCDIDVerificationKey,
+    PetrelCryptoError, PrivateKey, ProxyServiceJWT, PublicKey, ReplayStoreError,
+    ServiceAuthAudience, ServiceAuthError, ServiceAuthKeyResolver, ServiceAuthMethodPolicy,
+    ServiceAuthPolicy, ServiceAuthReplayStore, ServiceAuthRequiredClaims, ServiceAuthVerifier,
+    ServiceAuthVerifierConfig, ServiceAuthVerifierConfiguration, ServiceJWT, ServiceJWTClaims,
+    ServiceJWTInspection, ServiceJWTMintOptions, ServiceJWTSigningKey, ServiceJWTVerifyOptions,
+    SpaceMAC, SpaceMACEncapsulation, SpaceMACError, SpaceServiceJWT, SpaceSetHash, StrictJSON,
+    VerifiedServiceAuth, blake3,
+};
+
 #[cfg(all(target_arch = "wasm32", target_os = "unknown", feature = "wasm"))]
 pub use web_crypto::WebCryptoDpopSigner;
 

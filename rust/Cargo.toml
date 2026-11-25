@@ -9,6 +9,7 @@
 resolver = "3"
 members = [
     "petrel-core",
+    "petrel-crypto",
     "petrel-api",
     "petrel-oauth-scopes",
     "petrel",
@@ -26,6 +27,7 @@ repository = "https://github.com/joshlacal/Petrel"
 [workspace.dependencies]
 # Workspace members
 petrel-core = { path = "petrel-core", version = "0.0.0" }
+petrel-crypto = { path = "petrel-crypto", version = "0.0.0", default-features = false }
 petrel-api = { path = "petrel-api", version = "0.0.0" }
 petrel-oauth-scopes = { path = "petrel-oauth-scopes", version = "0.0.0" }
 petrel = { path = "petrel", version = "0.0.0", default-features = false }
@@ -41,6 +43,8 @@ thiserror = "2"
 # Crypto (RustCrypto 0.13 line: matches every sibling lockfile; keep these
 # types out of public APIs so the later 0.14 bump stays internal)
 sha2 = { version = "0.10", default-features = false, features = ["std"] }
+hmac = { version = "0.12", default-features = false }
+blake3 = { version = "1.8", default-features = false, features = ["pure"] }
 p256 = { version = "0.13", default-features = false, features = ["ecdsa", "std", "jwk"] }
 k256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"] }
 getrandom = "0.2"
