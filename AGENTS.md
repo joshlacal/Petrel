@@ -138,7 +138,7 @@ Generated XRPC endpoints are organized as hierarchical properties on `ATProtoCli
 1. **Labeled `input:` argument**: Endpoints with parameters or request bodies require an `input:` argument label. Endpoints without parameters or bodies take no arguments.
 2. **Strongly typed values**: Parameter structs do not accept raw `String` literals for semantic types. Construct instances of `ATIdentifier`, `Handle`, `DID`, `NSID`, `URI`, or `ATProtocolURI`.
 3. **Return values**:
-   - Endpoints with an output schema return `(responseCode: Int, data: Output?)`.
+   - Endpoints with an output schema return `(responseCode: Int, data: Output?)`. A non-2xx response throws (`ATProtoError<E>` or `ATProtoXRPCError`), so the code is always 2xx.
    - Endpoints with no output schema (e.g. `com.atproto.server.deleteSession`) return `Int` (the HTTP status code).
 
 ### Usage Example
@@ -147,16 +147,18 @@ Generated XRPC endpoints are organized as hierarchical properties on `ATProtoCli
 import Foundation
 import Petrel
 
-// Initialize an unauthenticated client for public XRPC queries
-let client = await ATProtoClient(baseURL: ATProtoClient.defaultBaseURL)
+// Initialize an unauthenticated client for public XRPC queries. Point it at the
+// public AppView: a PDS such as bsky.social answers app.bsky.* only for signed-in users.
+let client = await ATProtoClient(baseURL: URL(string: "https://public.api.bsky.app")!)
 
 // Construct typed parameters
 let actor = try ATIdentifier(string: "atproto.com")
-let (responseCode, profile) = try await client.app.bsky.actor.getProfile(
+// A non-2xx response throws, so a returned code is always 2xx and is usually ignored.
+let (_, profile) = try await client.app.bsky.actor.getProfile(
     input: AppBskyActorGetProfile.Parameters(actor: actor)
 )
 
-if responseCode == 200, let profile {
+if let profile {
     // Handle is a typed struct; access its string value via .description
     print("Profile handle: \(profile.handle.description)")
 }

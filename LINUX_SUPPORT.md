@@ -72,22 +72,25 @@ error that names the underlying cause; the process is never terminated.
 To choose the directory and key in code, and to give two clients separate stores in one process,
 pass an explicit configuration:
 
+<!-- compile-example: linux-encrypted-file-storage -->
 ```swift
 import Foundation
 import Petrel
 
-let directory = URL(fileURLWithPath: "/var/lib/example-app/credentials", isDirectory: true)
-let masterKey: Data = try loadKeyFromYourSecretManager()  // 32 bytes
-
-let client = try await ATProtoClient(
-    oauthConfig: OAuthConfig(
-        clientId: "https://example.com/oauth/client-metadata.json",
-        redirectUri: "https://example.com/oauth/callback",
-        scope: "atproto transition:generic"
-    ),
-    namespace: "com.example.app",
-    credentialStorage: .encryptedFiles(directory: directory, masterKey: masterKey)
-)
+/// `masterKey` is 32 bytes from your secret manager.
+func makeServerClient(masterKey: Data) async throws -> ATProtoClient {
+    let directory = URL(fileURLWithPath: "/var/lib/example-app/credentials", isDirectory: true)
+    return try await ATProtoClient(
+        oauthConfig: OAuthConfig(
+            clientId: "https://example.com/oauth/client-metadata.json",
+            redirectUri: "https://example.com/oauth/callback",
+            scope: "atproto transition:generic"
+        ),
+        namespace: "com.example.app",
+        // Throws if the directory or key is unusable; see the rules below.
+        credentialStorage: try .encryptedFiles(directory: directory, masterKey: masterKey)
+    )
+}
 ```
 
 Omit `masterKey` to read it from `PETREL_MASTER_KEY`. Existing files in the directory must

@@ -55,11 +55,10 @@ Generated calls behave like every other Petrel endpoint: they return `(responseC
 import Petrel
 
 func listMySpaces(client: ATProtoClient) async throws -> [SpaceRef] {
-    let (code, output) = try await client.com.atproto.space.listSpaces(
+    let (_, output) = try await client.com.atproto.space.listSpaces(
         input: .init()
     )
-    guard code == 200, let output else { return [] }
-    return output.spaces.map(\.space)
+    return output?.spaces.map(\.space) ?? []
 }
 ```
 
@@ -176,12 +175,12 @@ func readOwnRepository(
 ) async throws -> VerifiedSpaceRepository? {
     let bytes = SpaceSTAR.defaultMaximumArchiveBytes
     let limits = NetworkResponseLimits(maximumWireBytes: bytes, maximumDecodedBytes: bytes)
-    let (code, output) = try await NetworkService.withResponseLimits(limits) {
+    let (_, output) = try await NetworkService.withResponseLimits(limits) {
         try await client.com.atproto.space.getRepo(
             input: .init(space: space, repo: owner)
         )
     }
-    guard code == 200, let output else { return nil }
+    guard let output else { return nil }
     return try SpaceSTAR.verify(
         archive: output.data,
         space: space,

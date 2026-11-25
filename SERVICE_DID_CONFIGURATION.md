@@ -20,23 +20,25 @@ By default, Petrel routes downstream namespaces to the standard Bluesky infrastr
 
 To direct `app.bsky.*` or `chat.bsky.*` requests to custom service deployments, supply the service DIDs during `ATProtoClient` initialization:
 
+<!-- compile-example: service-did-custom-init -->
 ```swift
 import Foundation
 import Petrel
 
-let oauthConfig = OAuthConfig(
-    clientId: "https://example.com/oauth/client-metadata.json",
-    redirectUri: "https://example.com/oauth/callback",
-    scope: "atproto transition:generic"
-)
-
-let client = try await ATProtoClient(
-    baseURL: URL(string: "https://bsky.social")!,
-    oauthConfig: oauthConfig,
-    namespace: "com.example.myapp",
-    bskyAppViewDID: "did:web:custom.appview.example#custom_appview",
-    bskyChatDID: "did:web:custom.chat.example#custom_chat"
-)
+func makeClientWithCustomServices() async throws -> ATProtoClient {
+    let oauthConfig = OAuthConfig(
+        clientId: "https://example.com/oauth/client-metadata.json",
+        redirectUri: "https://example.com/oauth/callback",
+        scope: "atproto transition:generic"
+    )
+    return try await ATProtoClient(
+        baseURL: URL(string: "https://bsky.social")!,
+        oauthConfig: oauthConfig,
+        namespace: "com.example.myapp",
+        bskyAppViewDID: "did:web:custom.appview.example#custom_appview",
+        bskyChatDID: "did:web:custom.chat.example#custom_chat"
+    )
+}
 ```
 
 ## Special cases and routing behavior
@@ -62,31 +64,44 @@ When Petrel evaluates an endpoint to determine whether to attach an `atproto-pro
 
 To update service DIDs after client initialization, use the client's configuration methods:
 
+<!-- compile-example: service-did-runtime-update -->
 ```swift
-// Update a single namespace mapping
-await client.setServiceDID("did:web:custom.appview.example#custom_appview", for: "app.bsky")
+import Petrel
 
-// Update both AppView and Chat service DIDs in memory
-await client.updateServiceDIDs(
-    bskyAppViewDID: "did:web:custom.appview.example#custom_appview",
-    bskyChatDID: "did:web:custom.chat.example#custom_chat"
-)
+func switchServices(client: ATProtoClient) async {
+    // Update a single namespace mapping
+    await client.setServiceDID("did:web:custom.appview.example#custom_appview", for: "app.bsky")
+
+    // Update both AppView and Chat service DIDs in memory
+    await client.updateServiceDIDs(
+        bskyAppViewDID: "did:web:custom.appview.example#custom_appview",
+        bskyChatDID: "did:web:custom.chat.example#custom_chat"
+    )
+}
 ```
+
+Both calls last for the life of the client. To also store the choice on the signed-in account, so the next launch restores it, call `updateAndPersistServiceDIDs(bskyAppViewDID:bskyChatDID:)`.
 
 ## Typed service references and per-endpoint routing
 
 `setServiceDID(_:for:)` takes the header value as a string. `setServiceProxy(_:for:)` takes an `ATProtoServiceReference`, which validates the DID and requires the service identifier a PDS needs to find the endpoint. The prefix may be a namespace or a full NSID, so one endpoint can be routed apart from the rest of its namespace:
 
+<!-- compile-example: service-did-typed-proxy -->
 ```swift
-// Route one endpoint to a labeler, leaving the rest of com.atproto on the PDS
-try await client.setServiceProxy(
-    ATProtoServiceReference(did: "did:web:labeler.example.com", serviceID: "atproto_labeler"),
-    for: "com.atproto.label.queryLabels"
-)
+import Petrel
 
-// Ask where an endpoint is routed
-let target = await client.serviceProxy(for: "app.bsky.feed.getTimeline")
-// target?.did == "did:web:api.bsky.app", target?.serviceID == "bsky_appview"
+func routeLabelQueries(client: ATProtoClient) async throws {
+    // Route one endpoint to a labeler, leaving the rest of com.atproto on the PDS
+    try await client.setServiceProxy(
+        ATProtoServiceReference(did: "did:web:labeler.example.com", serviceID: "atproto_labeler"),
+        for: "com.atproto.label.queryLabels"
+    )
+
+    // Ask where an endpoint is routed
+    let target = await client.serviceProxy(for: "app.bsky.feed.getTimeline")
+    // With the defaults: target?.did == "did:web:api.bsky.app", target?.serviceID == "bsky_appview"
+    _ = target
+}
 ```
 
 `setReportLabeler(did:)` is different: it sets `atproto-proxy` for every request the client makes until `clearReportLabeler()` is called. Prefer a prefix route when only some endpoints should reach the labeler.
@@ -97,13 +112,19 @@ When a request carries `atproto-proxy`, the PDS resolves the service DID, finds 
 
 To call a service directly instead of through the proxy, request a token yourself:
 
+<!-- compile-example: service-did-direct-token -->
 ```swift
-let token = try await client.getServiceAuthToken(
-    audience: ATProtoServiceReference("did:web:video.example.com#video_service"),
-    lexiconMethod: "com.atproto.repo.uploadBlob",
-    lifetime: 30 * 60
-)
-request.setValue(token.authorizationHeaderValue, forHTTPHeaderField: "Authorization")
+import Foundation
+import Petrel
+
+func authorizeDirectUpload(client: ATProtoClient, request: inout URLRequest) async throws {
+    let token = try await client.getServiceAuthToken(
+        audience: ATProtoServiceReference("did:web:video.example.com#video_service"),
+        lexiconMethod: "com.atproto.repo.uploadBlob",
+        lifetime: 30 * 60
+    )
+    request.setValue(token.authorizationHeaderValue, forHTTPHeaderField: "Authorization")
+}
 ```
 
 Minting and verifying these tokens in Swift — for a feed generator, a labeler or any other service — is covered by the *Service Authentication* articles in the `PetrelCrypto` and `Petrel` DocC catalogs (`Sources/PetrelCrypto/PetrelCrypto.docc/ServiceAuth.md`, `Sources/Petrel/Petrel.docc/ServiceAuthentication.md`).

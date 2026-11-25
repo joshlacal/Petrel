@@ -56,7 +56,9 @@ validate_documentation() {
 # Spaces guide, and every article in every DocC catalog. The extractor rejects any Swift fence
 # that is not preceded by a compile-example marker, so nothing is skipped.
 documentation_sources() {
-    printf '%s\n' "$ROOT/README.md" "$ROOT/GETTING_STARTED.md" "$ROOT/docs/Spaces.md"
+    printf '%s\n' "$ROOT/README.md" "$ROOT/GETTING_STARTED.md" "$ROOT/docs/Spaces.md" \
+        "$ROOT/CONNECTION_POLICY_ADAPTER.md" "$ROOT/SERVICE_DID_CONFIGURATION.md" \
+        "$ROOT/LINUX_SUPPORT.md"
     find "$ROOT/Sources" -path '*/*.docc/*' -type f -name '*.md' | LC_ALL=C sort
 }
 

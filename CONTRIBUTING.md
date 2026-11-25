@@ -177,7 +177,8 @@ import Testing
 struct ProfileRetrievalTests {
     @Test("Unauthenticated client fetches public profile")
     func fetchPublicProfile() async throws {
-        let client = await ATProtoClient(baseURL: URL(string: "https://bsky.social")!)
+        // The public AppView; a PDS such as bsky.social answers app.bsky.* only for signed-in users.
+        let client = await ATProtoClient(baseURL: URL(string: "https://public.api.bsky.app")!)
         let actor = try ATIdentifier(string: "atproto.com")
         let (responseCode, profile) = try await client.app.bsky.actor.getProfile(
             input: AppBskyActorGetProfile.Parameters(actor: actor)

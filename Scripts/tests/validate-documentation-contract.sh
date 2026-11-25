@@ -48,6 +48,9 @@ done
 /usr/bin/grep -F 'Scripts/extract-documentation-examples.sh' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F 'README.md' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F 'GETTING_STARTED.md' "$VALIDATOR" >/dev/null
+/usr/bin/grep -F 'CONNECTION_POLICY_ADAPTER.md' "$VALIDATOR" >/dev/null
+/usr/bin/grep -F 'SERVICE_DID_CONFIGURATION.md' "$VALIDATOR" >/dev/null
+/usr/bin/grep -F 'LINUX_SUPPORT.md' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F 'readme-package-manifest.swift' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F 'readme-oauth.swift' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F 'readme-public-profile.swift' "$VALIDATOR" >/dev/null
@@ -102,7 +105,10 @@ while IFS= read -r md_file; do
     catalog_files+=("$md_file")
 done < <(find "$ROOT/Sources/Petrel/Petrel.docc" -maxdepth 1 -type f -name '*.md' | LC_ALL=C sort)
 
-documentation_sources=("$README" "$GUIDE" "$ROOT/docs/Spaces.md")
+documentation_sources=(
+    "$README" "$GUIDE" "$ROOT/docs/Spaces.md"
+    "$ROOT/CONNECTION_POLICY_ADAPTER.md" "$ROOT/SERVICE_DID_CONFIGURATION.md" "$ROOT/LINUX_SUPPORT.md"
+)
 while IFS= read -r catalog_article; do
     documentation_sources+=("$catalog_article")
 done < <(find "$ROOT/Sources" -path '*/*.docc/*' -type f -name '*.md' | LC_ALL=C sort)

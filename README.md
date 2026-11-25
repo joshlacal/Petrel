@@ -57,10 +57,11 @@ import Petrel
 func fetchPublicProfile() async throws {
     let client = await ATProtoClient(baseURL: URL(string: "https://public.api.bsky.app")!)
     let actor = try ATIdentifier(string: "bsky.app")
-    let (responseCode, profile) = try await client.app.bsky.actor.getProfile(
+    // A failed request throws, so there is no status code to check.
+    let (_, profile) = try await client.app.bsky.actor.getProfile(
         input: .init(actor: actor)
     )
-    if responseCode == 200, let profile {
+    if let profile {
         print(profile.displayName ?? profile.handle.description)
     }
 }
