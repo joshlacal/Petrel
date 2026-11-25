@@ -93,6 +93,16 @@ impl CommitDiff {
             )));
         }
 
+        let mut seen_paths = std::collections::HashSet::with_capacity(operations.len());
+        for op in operations {
+            if !seen_paths.insert(op.path().mst_key()) {
+                return Err(CommitDiffError::InvalidOperation(format!(
+                    "duplicate operation path: {}",
+                    op.path().mst_key()
+                )));
+            }
+        }
+
         let mut options = MstOptions {
             policy: *policy,
             ..MstOptions::default()
@@ -185,11 +195,54 @@ impl CommitDiff {
             &commit.data_cid,
             operations,
             previous_data_cid,
-            blocks,
+            Arc::clone(&blocks),
             limits,
             policy,
         )
         .await?;
+
+        for op in operations {
+            let Some(cid) = op.cid() else {
+                continue;
+            };
+            if cid.blessed_kind() != Some(petrel_core::cid::BlessedKind::DagCbor) {
+                if policy.requires_blessed_record_links_in_mst {
+                    return Err(CommitDiffError::Mst(crate::error::MstError::UnblessedLink(
+                        cid.to_string(),
+                    )));
+                }
+                continue;
+            }
+            let bytes = blocks
+                .get_block(cid)
+                .await?
+                .ok_or_else(|| CommitDiffError::MissingBlock(cid.clone()))?;
+            if !cid.matches_content(&bytes) {
+                return Err(CommitDiffError::InvalidOperation(format!(
+                    "record block CID hash mismatch for {} ({cid})",
+                    op.path().mst_key()
+                )));
+            }
+            if bytes.len() > limits.max_single_block_bytes {
+                return Err(CommitDiffError::Mst(
+                    crate::error::MstError::BlockTooLarge {
+                        len: bytes.len(),
+                        limit: limits.max_single_block_bytes,
+                    },
+                ));
+            }
+            crate::record::RecordCodec::validate_record_bytes(
+                &bytes,
+                Some(op.path().collection()),
+                policy,
+            )
+            .map_err(|err| {
+                CommitDiffError::InvalidOperation(format!(
+                    "invalid record block for {}: {err}",
+                    op.path().mst_key()
+                ))
+            })?;
+        }
 
         Ok(VerifiedCommitDiff {
             commit,

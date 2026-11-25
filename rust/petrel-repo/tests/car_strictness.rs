@@ -349,3 +349,123 @@ async fn public_car_enforces_foreign_blocks_and_root_policies() {
     .unwrap();
     assert_eq!(parsed_multi.roots.len(), 2);
 }
+
+#[allow(clippy::too_many_lines)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+async fn public_car_counts_foreign_blocks_toward_max_block_count() {
+    use petrel_repo::error::{LimitError, LimitKind};
+
+    let (cbor_cid, cbor_bytes) = cbor_block(&Value::Integer(42));
+    let raw_payload = b"raw-bytes-payload".to_vec();
+    let raw_cid = Cid::for_raw(&raw_payload);
+    let mut sha512_cid = vec![0x01, 0x71, 0x13, 0x20];
+    sha512_cid.extend_from_slice(&[0xab; 32]);
+    let mut v0_cid = vec![0x12, 0x20];
+    let v0_payload = b"dag-pb-v0-payload".to_vec();
+    v0_cid.extend_from_slice(&<sha2::Sha256 as sha2::Digest>::digest(&v0_payload));
+
+    let tight_limits = RepositoryLimits {
+        max_block_count: 1,
+        max_record_count: 1,
+        max_mst_node_count: 1,
+        ..RepositoryLimits::standard()
+    };
+    let policy = RepositoryReadPolicy::data_model();
+
+    // 1 blessed block + 1 foreign CIDv1(raw) block exceeds max_block_count=1.
+    let car_raw = common::encode_raw_car(
+        std::slice::from_ref(&cbor_cid),
+        &[
+            (cbor_cid.as_bytes().to_vec(), cbor_bytes.clone()),
+            (raw_cid.as_bytes().to_vec(), raw_payload.clone()),
+        ],
+    );
+    let err_raw = PublicRepositoryCAR::import_bytes(&car_raw, &tight_limits, &policy)
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err_raw,
+        CARError::Limit(LimitError::Exceeded {
+            kind: LimitKind::BlockCount,
+            limit: 1,
+            ..
+        })
+    ));
+
+    // 1 blessed block + 1 foreign non-blessed (sha2-512) CIDv1 block exceeds max_block_count=1.
+    let car_foreign_v1 = common::encode_raw_car(
+        std::slice::from_ref(&cbor_cid),
+        &[
+            (cbor_cid.as_bytes().to_vec(), cbor_bytes.clone()),
+            (sha512_cid.clone(), b"foreign-sha512".to_vec()),
+        ],
+    );
+    let err_foreign_v1 = PublicRepositoryCAR::import_bytes(&car_foreign_v1, &tight_limits, &policy)
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err_foreign_v1,
+        CARError::Limit(LimitError::Exceeded {
+            kind: LimitKind::BlockCount,
+            limit: 1,
+            ..
+        })
+    ));
+
+    // 1 blessed block + 1 CIDv0 block exceeds max_block_count=1.
+    let car_v0 = common::encode_raw_car(
+        std::slice::from_ref(&cbor_cid),
+        &[
+            (cbor_cid.as_bytes().to_vec(), cbor_bytes.clone()),
+            (v0_cid, v0_payload),
+        ],
+    );
+    let err_v0 = PublicRepositoryCAR::import_bytes(&car_v0, &tight_limits, &policy)
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err_v0,
+        CARError::Limit(LimitError::Exceeded {
+            kind: LimitKind::BlockCount,
+            limit: 1,
+            ..
+        })
+    ));
+
+    // Conflicting duplicate foreign non-blessed block is rejected.
+    let conflict_car = common::encode_raw_car(
+        std::slice::from_ref(&cbor_cid),
+        &[
+            (sha512_cid.clone(), b"first".to_vec()),
+            (sha512_cid, b"second".to_vec()),
+        ],
+    );
+    let err_conflict = PublicRepositoryCAR::import_bytes(&conflict_car, &tight_limits, &policy)
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err_conflict,
+        CARError::ConflictingDuplicateBlock(_)
+    ));
+
+    // Identical duplicate foreign raw blocks only consume one block-count slot.
+    let two_limits = RepositoryLimits {
+        max_block_count: 2,
+        max_record_count: 2,
+        max_mst_node_count: 2,
+        ..RepositoryLimits::standard()
+    };
+    let dup_ok_car = common::encode_raw_car(
+        std::slice::from_ref(&cbor_cid),
+        &[
+            (cbor_cid.as_bytes().to_vec(), cbor_bytes),
+            (raw_cid.as_bytes().to_vec(), raw_payload.clone()),
+            (raw_cid.as_bytes().to_vec(), raw_payload),
+        ],
+    );
+    let (parsed_ok, _) = PublicRepositoryCAR::import_bytes(&dup_ok_car, &two_limits, &policy)
+        .await
+        .unwrap();
+    assert_eq!(parsed_ok.block_count, 1);
+}

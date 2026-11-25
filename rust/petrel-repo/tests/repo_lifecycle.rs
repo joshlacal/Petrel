@@ -1028,3 +1028,200 @@ async fn engine_and_validation_reject_mst_blocks_exceeding_single_block_limit() 
         "unexpected Repository::open_store error: {open_err:?}"
     );
 }
+
+#[allow(clippy::too_many_lines)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn commit_diff_validates_record_blocks_and_rejects_duplicate_paths() {
+    use petrel_repo::car::PublicRepositoryCAR;
+    use petrel_repo::error::CommitDiffError;
+
+    let did = common::test_did();
+    let signer = P256Keypair::generate().unwrap();
+    let resolver = FixedSigningKey::from_public_key(signer.public_key().clone());
+    let limits = RepositoryLimits::standard();
+    let policy = RepositoryReadPolicy::strict();
+    let store = Arc::new(InMemoryBlockStore::new());
+    let s0 = RepositoryState::new(did.clone(), 1).unwrap();
+
+    let post_path = RepositoryPath::new("app.bsky.feed.post", "3jzfcijpj2z2a").unwrap();
+    let valid_cbor = dagcbor::encode(&post_record_value("hello world"));
+    let batch = WriteBatch::new(vec![WriteOp::Create {
+        path: post_path.clone(),
+        record_cbor: valid_cbor.clone(),
+    }])
+    .unwrap();
+    let res = RepositoryEngine::apply(
+        &s0,
+        &batch,
+        None,
+        RepositoryTid::parse("3jzfcijpj2z2a").unwrap(),
+        &signer,
+        Arc::clone(&store),
+        &limits,
+        &policy,
+    )
+    .await
+    .unwrap();
+    let record_cid = res.operations[0].cid().unwrap().clone();
+
+    // 1. Missing record block in commit diff CAR fails `verify_commit_event`.
+    let blocks_without_record: Vec<RepositoryBlock> = std::iter::once(RepositoryBlock::new(
+        res.commit.cid.clone(),
+        res.commit.signed_commit_bytes.clone(),
+    ))
+    .chain(res.proof_blocks.iter().cloned())
+    .chain(
+        res.new_blocks
+            .iter()
+            .filter(|b| b.cid != record_cid)
+            .cloned(),
+    )
+    .collect();
+    let car_missing_record = PublicRepositoryCAR::write(
+        std::slice::from_ref(&res.commit.cid),
+        &blocks_without_record,
+    )
+    .unwrap();
+    let missing_err = CommitDiff::verify_commit_event(
+        &car_missing_record,
+        &res.commit.cid,
+        &did,
+        &res.operations,
+        res.previous_data_cid.as_ref(),
+        &resolver,
+        &limits,
+        &policy,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(missing_err, CommitDiffError::MissingBlock(c) if c == record_cid));
+
+    // 2. Record block whose `$type` mismatches operation collection fails `verify_commit_event`.
+    let mut wrong_type_map = BTreeMap::new();
+    wrong_type_map.insert(
+        "$type".to_owned(),
+        Value::String("app.bsky.feed.like".into()),
+    );
+    wrong_type_map.insert("subject".to_owned(), Value::String("at://example".into()));
+    let wrong_cbor = dagcbor::encode(&Value::Object(wrong_type_map));
+    let wrong_cid = Cid::for_dag_cbor(&wrong_cbor);
+    let mut mst = petrel_repo::mst::RepositoryMst::empty();
+    let wrong_root = mst
+        .insert(post_path.mst_key(), wrong_cid.clone())
+        .await
+        .unwrap();
+    let wrong_commit = CommitCodec::prepare(
+        &CommitDescriptor {
+            did: did.clone(),
+            rev: RepositoryTid::parse("3jzfcijpj2z2b").unwrap(),
+            data_cid: wrong_root,
+            prev_cid: None,
+        },
+        &signer,
+        &limits,
+    )
+    .await
+    .unwrap();
+    let mut wrong_blocks = vec![
+        RepositoryBlock::new(
+            wrong_commit.cid.clone(),
+            wrong_commit.signed_commit_bytes.clone(),
+        ),
+        RepositoryBlock::new(wrong_cid.clone(), wrong_cbor),
+    ];
+    wrong_blocks.extend(mst.new_blocks());
+    let wrong_car =
+        PublicRepositoryCAR::write(std::slice::from_ref(&wrong_commit.cid), &wrong_blocks).unwrap();
+    let wrong_ops = vec![CommitOperation::Create {
+        path: post_path.clone(),
+        cid: wrong_cid.clone(),
+    }];
+    let type_err = CommitDiff::verify_commit_event(
+        &wrong_car,
+        &wrong_commit.cid,
+        &did,
+        &wrong_ops,
+        Some(&Cid::parse(petrel_repo::CANONICAL_EMPTY_MST_CID).unwrap()),
+        &resolver,
+        &limits,
+        &policy,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(type_err, CommitDiffError::InvalidOperation(_)));
+
+    // 3. Record block exceeding `max_single_block_bytes` fails `CommitDiff::verify`.
+    let diff_store = Arc::new(InMemoryBlockStore::new());
+    PublicRepositoryCAR::load(
+        &res.diff_car().unwrap(),
+        diff_store.as_ref(),
+        &limits,
+        &policy,
+    )
+    .await
+    .unwrap();
+    let tight_limits = RepositoryLimits {
+        max_single_block_bytes: valid_cbor.len().saturating_sub(1).max(1),
+        ..limits
+    };
+    let size_err = CommitDiff::verify(
+        &res.commit.cid,
+        &res.operations,
+        res.previous_data_cid.as_ref(),
+        diff_store,
+        &resolver,
+        Some(&did),
+        &tight_limits,
+        &policy,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        size_err,
+        CommitDiffError::Mst(petrel_repo::error::MstError::BlockTooLarge { .. })
+    ));
+
+    // 4. Duplicate cancelling path `[Create(absent, bogus), Delete(absent, bogus)]` fails on
+    // an unchanged-tree commit before inversion executes.
+    let absent_path = RepositoryPath::new("app.bsky.feed.post", "3jzfcijpj2zzz").unwrap();
+    let bogus_cid = Cid::for_dag_cbor(&[0xa0]);
+    let mut proof_blocks = vec![RepositoryBlock::new(
+        res.commit.cid.clone(),
+        res.commit.signed_commit_bytes.clone(),
+    )];
+    let mut open_mst =
+        petrel_repo::mst::RepositoryMst::open(res.commit.data_cid.clone(), Arc::clone(&store) as _);
+    for (cid, bytes) in open_mst
+        .covering_proof_blocks(&[absent_path.mst_key().to_owned()])
+        .await
+        .unwrap()
+    {
+        proof_blocks.push(RepositoryBlock::new(cid, bytes));
+    }
+    let unchanged_car =
+        PublicRepositoryCAR::write(std::slice::from_ref(&res.commit.cid), &proof_blocks).unwrap();
+    let dup_ops = vec![
+        CommitOperation::Create {
+            path: absent_path.clone(),
+            cid: bogus_cid.clone(),
+        },
+        CommitOperation::Delete {
+            path: absent_path,
+            prev: bogus_cid,
+        },
+    ];
+    let dup_err = CommitDiff::verify_commit_event(
+        &unchanged_car,
+        &res.commit.cid,
+        &did,
+        &dup_ops,
+        Some(&res.commit.data_cid),
+        &resolver,
+        &limits,
+        &policy,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(dup_err, CommitDiffError::InvalidOperation(_)));
+}

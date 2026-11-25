@@ -222,6 +222,17 @@ impl PublicRepositoryCAR {
                         if policy.rejects_foreign_car_blocks {
                             return Err(CARError::ForeignBlockRejected(cid.to_string()));
                         }
+                        if cid.hash_code() == 0x12 {
+                            verify_v1_cid_hash(&cid, payload)?;
+                        }
+                        record_foreign_block(
+                            &mut seen_foreign,
+                            &frame[..cid_len],
+                            payload,
+                            block_count,
+                            limits.max_block_count,
+                            &cid.to_string(),
+                        )?;
                         continue;
                     }
                     verify_v1_cid_hash(&cid, payload)?;
@@ -230,10 +241,11 @@ impl PublicRepositoryCAR {
                             return Err(CARError::ConflictingDuplicateBlock(cid.to_string()));
                         }
                     } else {
-                        if block_count >= limits.max_block_count {
+                        let total_seen = block_count.saturating_add(seen_foreign.len());
+                        if total_seen >= limits.max_block_count {
                             return Err(CARError::Limit(crate::error::LimitError::Exceeded {
                                 kind: crate::error::LimitKind::BlockCount,
-                                observed: block_count + 1,
+                                observed: total_seen + 1,
                                 limit: limits.max_block_count,
                             }));
                         }
@@ -259,20 +271,14 @@ impl PublicRepositoryCAR {
                     if digest.as_slice() != &raw_cid[2..34] {
                         return Err(CARError::HashMismatch("CIDv0".into()));
                     }
-                    if let Some(prev) = seen_foreign.get(&raw_cid) {
-                        if prev != &digest {
-                            return Err(CARError::ConflictingDuplicateBlock("CIDv0".into()));
-                        }
-                    } else {
-                        if block_count >= limits.max_block_count {
-                            return Err(CARError::Limit(crate::error::LimitError::Exceeded {
-                                kind: crate::error::LimitKind::BlockCount,
-                                observed: block_count + 1,
-                                limit: limits.max_block_count,
-                            }));
-                        }
-                        seen_foreign.insert(raw_cid, digest);
-                    }
+                    record_foreign_block(
+                        &mut seen_foreign,
+                        &raw_cid,
+                        payload,
+                        block_count,
+                        limits.max_block_count,
+                        "CIDv0",
+                    )?;
                 }
                 FrameCid::ForeignNonBlessed { cid_len } => {
                     let payload = &frame[cid_len..];
@@ -285,6 +291,14 @@ impl PublicRepositoryCAR {
                     if policy.rejects_foreign_car_blocks {
                         return Err(CARError::ForeignBlockRejected("foreign CIDv1 block".into()));
                     }
+                    record_foreign_block(
+                        &mut seen_foreign,
+                        &frame[..cid_len],
+                        payload,
+                        block_count,
+                        limits.max_block_count,
+                        "foreign CIDv1",
+                    )?;
                 }
             }
         }
@@ -440,6 +454,33 @@ fn verify_v1_cid_hash(cid: &Cid, payload: &[u8]) -> Result<(), CARError> {
     if !cid.matches_content(payload) {
         return Err(CARError::HashMismatch(cid.to_string()));
     }
+    Ok(())
+}
+
+fn record_foreign_block(
+    seen_foreign: &mut HashMap<Vec<u8>, [u8; 32]>,
+    raw_cid: &[u8],
+    payload: &[u8],
+    block_count: usize,
+    max_block_count: usize,
+    label: &str,
+) -> Result<(), CARError> {
+    let digest: [u8; 32] = Sha256::digest(payload).into();
+    if let Some(prev) = seen_foreign.get(raw_cid) {
+        if prev != &digest {
+            return Err(CARError::ConflictingDuplicateBlock(label.to_owned()));
+        }
+        return Ok(());
+    }
+    let total_seen = block_count.saturating_add(seen_foreign.len());
+    if total_seen >= max_block_count {
+        return Err(CARError::Limit(crate::error::LimitError::Exceeded {
+            kind: crate::error::LimitKind::BlockCount,
+            observed: total_seen + 1,
+            limit: max_block_count,
+        }));
+    }
+    seen_foreign.insert(raw_cid.to_vec(), digest);
     Ok(())
 }
 
