@@ -323,9 +323,26 @@ impl AtProtoClient {
 
     /// Switches the active account atomically and updates the base PDS URL when available.
     pub async fn switch_to_account(&self, did: &Did) -> Result<(), ClientError> {
+        struct SwitchGuard<'a> {
+            coordinator: &'a AccountSwitchCoordinator,
+            completed: bool,
+        }
+        impl Drop for SwitchGuard<'_> {
+            fn drop(&mut self) {
+                if !self.completed {
+                    self.coordinator
+                        .handle_switch_error(&"account switch cancelled");
+                }
+            }
+        }
+
         let current = self.account_manager.current_did().await?;
         self.switch_coordinator
             .begin_account_switch(current.as_ref(), did)?;
+        let mut guard = SwitchGuard {
+            coordinator: &self.switch_coordinator,
+            completed: false,
+        };
         let res = async {
             self.auth_manager.invalidate_continuity().await;
             self.account_manager.set_current_account(did).await?;
@@ -341,6 +358,7 @@ impl AtProtoClient {
             Ok::<(), ClientError>(())
         }
         .await;
+        guard.completed = true;
         match res {
             Ok(()) => {
                 self.switch_coordinator.complete_account_switch();

@@ -2,7 +2,7 @@
 
 use petrel_api::generated::app::bsky::feed::post::{Entity, TextSlice};
 use petrel_api::generated::app::bsky::richtext::facet::{ByteSlice, Facet};
-use petrel_bsky::{RichText, RichTextDetectionKind, all_tlds};
+use petrel_bsky::{RichText, RichTextDetectionKind, all_tlds, is_valid_domain};
 use petrel_core::{Did, Uri};
 use serde::Deserialize;
 
@@ -369,16 +369,12 @@ fn rich_text_domain_rules_and_tld_table() {
     );
 
     let tlds = all_tlds();
-    assert!(tlds.len() > 1400);
+    assert_eq!(tlds.len(), 1436);
     for expected in ["com", "org", "net", "social", "app", "blue", "xn--p1ai"] {
         assert!(tlds.contains(expected));
     }
     assert!(!tlds.contains("jpg"));
     assert!(!tlds.contains("test"));
-    assert!(
-        tlds.iter()
-            .all(|t| !t.is_empty() && *t == t.to_ascii_lowercase())
-    );
 
     // Check UTF-8 slice boundaries on multi-byte text
     let rt =
@@ -400,6 +396,61 @@ fn rich_text_domain_rules_and_tld_table() {
             "https://例.example.com/パス",
             "#東京",
             "$btc"
+        ]
+    );
+}
+
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+fn punycode_tlds_have_no_embedded_spaces_and_detect_in_rich_text() {
+    let tlds = all_tlds();
+    for expected in [
+        "xn--3ds443g",
+        "xn--4gbrim",
+        "xn--80adxhks",
+        "xn--9dbq2a",
+        "xn--eckvdtc9d",
+        "xn--flw351e",
+        "xn--h2breg3eve",
+        "xn--j6w193g",
+        "xn--lgbbat1ad8j",
+        "xn--mgbah1a3hjkrd",
+        "xn--mgbcpq6gpa1a",
+        "xn--mgbx4cd0ab",
+        "xn--nqv7fs00ema",
+        "xn--q7ce6a",
+        "xn--ses554g",
+        "xn--vhquv",
+        "xn--xkc2dl3a5ee0h",
+    ] {
+        assert!(tlds.contains(expected), "missing expected TLD: {expected}");
+        assert!(is_valid_domain(&format!("example.{expected}")));
+    }
+    assert!(!tlds.contains("xn"));
+    assert!(!tlds.contains("xn--"));
+    assert!(tlds.iter().all(|t| {
+        t.len() >= 2
+            && !t.starts_with('-')
+            && !t.ends_with('-')
+            && t.bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+            && (!t.starts_with("xn--") || t.len() > 4)
+    }));
+    assert_eq!(
+        RichText::detect("@alice.xn--80adxhks @bob.xn--3ds443g https://example.xn--3ds443g")
+            .into_iter()
+            .map(|d| d.kind)
+            .collect::<Vec<_>>(),
+        vec![
+            RichTextDetectionKind::Mention {
+                handle: "alice.xn--80adxhks".to_owned(),
+            },
+            RichTextDetectionKind::Mention {
+                handle: "bob.xn--3ds443g".to_owned(),
+            },
+            RichTextDetectionKind::Link {
+                uri: "https://example.xn--3ds443g".to_owned(),
+            },
         ]
     );
 }

@@ -1313,3 +1313,111 @@ async fn oauth_remove_account_auto_switch_rebinds_auth_manager_provider() {
         Err(AuthError::NoSession)
     ));
 }
+
+struct GatedSecretStore {
+    inner: MemorySecretStore,
+    block_next_put: std::sync::atomic::AtomicBool,
+    entered: Arc<tokio::sync::Notify>,
+    release: Arc<tokio::sync::Notify>,
+}
+
+impl petrel::storage::SecretStore for GatedSecretStore {
+    fn get<'a>(
+        &'a self,
+        namespace: &'a str,
+        key: &'a str,
+    ) -> BoxFuture<'a, Result<Option<Vec<u8>>, petrel::storage::StoreError>> {
+        self.inner.get(namespace, key)
+    }
+
+    fn put<'a>(
+        &'a self,
+        namespace: &'a str,
+        key: &'a str,
+        value: &'a [u8],
+    ) -> BoxFuture<'a, Result<(), petrel::storage::StoreError>> {
+        Box::pin(async move {
+            if self
+                .block_next_put
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
+                self.entered.notify_one();
+                self.release.notified().await;
+            }
+            self.inner.put(namespace, key, value).await
+        })
+    }
+
+    fn delete<'a>(
+        &'a self,
+        namespace: &'a str,
+        key: &'a str,
+    ) -> BoxFuture<'a, Result<(), petrel::storage::StoreError>> {
+        self.inner.delete(namespace, key)
+    }
+
+    fn take<'a>(
+        &'a self,
+        namespace: &'a str,
+        key: &'a str,
+    ) -> BoxFuture<'a, Result<Option<Vec<u8>>, petrel::storage::StoreError>> {
+        self.inner.take(namespace, key)
+    }
+
+    fn delete_namespace<'a>(
+        &'a self,
+        namespace: &'a str,
+    ) -> BoxFuture<'a, Result<(), petrel::storage::StoreError>> {
+        self.inner.delete_namespace(namespace)
+    }
+}
+
+#[tokio::test]
+async fn switch_to_account_releases_coordinator_lock_when_cancelled() {
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let secrets = Arc::new(GatedSecretStore {
+        inner: MemorySecretStore::new(),
+        block_next_put: std::sync::atomic::AtomicBool::new(false),
+        entered: Arc::clone(&entered),
+        release: Arc::clone(&release),
+    });
+    let store = SessionStore::new(secrets.clone(), "switch-cancel").unwrap();
+
+    let alice_did: Did = ALICE_DID.parse().unwrap();
+    let bob_did: Did = "did:plc:switchbob".parse().unwrap();
+    let pds_a = Url::parse("https://pds-a.cancel.test").unwrap();
+    let pds_b = Url::parse("https://pds-b.cancel.test").unwrap();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    seed_oauth_session(&store, &alice_did, &pds_a, "dpop-a", "jwt-a", now).await;
+    seed_oauth_session(&store, &bob_did, &pds_b, "dpop-b", "jwt-b", now).await;
+    store.save_current_did(&alice_did).await.unwrap();
+
+    let net = Arc::new(FakePdsNetwork::new(vec![
+        FakePdsState::new("https://pds-a.cancel.test"),
+        FakePdsState::new("https://pds-b.cancel.test"),
+    ]));
+    let resolver = Arc::new(FakeResolver::new());
+    let client =
+        AtProtoClient::new(pds_a, net, store, resolver, None, AuthMode::Legacy, false).unwrap();
+
+    secrets
+        .block_next_put
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    {
+        let mut switch_fut = std::pin::pin!(client.switch_to_account(&bob_did));
+        tokio::select! {
+            res = &mut switch_fut => panic!("switch unexpectedly completed: {res:?}"),
+            () = entered.notified() => {}
+        }
+        // Dropping `switch_fut` here simulates task cancellation mid-switch.
+    }
+
+    // Subsequent switch must succeed rather than failing with `SwitchInProgress`.
+    client.switch_to_account(&bob_did).await.unwrap();
+    assert_eq!(client.get_did().await.unwrap(), Some(bob_did));
+    assert_eq!(client.base_url().await, pds_b);
+}
