@@ -19,12 +19,27 @@ the tag `petrel-rust`.
 Known gaps, all outside phases 0 to 3:
 
 - Subscriptions are declared but there is no event-stream frame decoder.
-- Objects nested inside an XRPC input decode leniently: a malformed optional
-  field is kept in `extra_data` instead of being rejected. A server built on
-  these types must check for that until the generator emits a strict path.
+- A field of Lexicon type `unknown` accepts any data-model value, not only an
+  object.
 - The file store runs blocking file I/O inside its async methods and does not
   bind a ciphertext to its file name. Both follow the Swift store it shares a
   format with.
+
+## Lenient and strict decoding
+
+Outputs and records decode leniently: an optional field that does not match
+its Lexicon type reads as `None` and its raw value is kept in `extra_data`, so
+a client can still use, re-encode and re-sign data written by newer or sloppier
+software. An XRPC input decodes strictly at every depth, whoever calls the
+decode: a malformed optional field, or `null` in a field that is not nullable,
+in the input or in any object, array item or union member inside it, fails the
+decode with the field's path. `petrel_core::from_json_strict` and
+`from_dag_cbor_strict` apply the same rule to any type, such as a record a
+service is asked to store.
+
+`petrel-lexicon-fixture` checks both rules against the official
+`atproto-interop-tests` record vectors, generated from that repository's
+catalog Lexicons.
 
 ## Crates
 
@@ -35,6 +50,7 @@ Known gaps, all outside phases 0 to 3:
 | `petrel-oauth-scopes` | The OAuth scope grammar. Depends on nothing else here. | C |
 | `petrel` | The runtime: transport, XRPC pipeline, identity, crypto, OAuth, storage, service auth. | D and E |
 | `petrel-e2e` | End-to-end tests against the Swift test servers. Never published. | F |
+| `petrel-lexicon-fixture` | The `atproto-interop-tests` catalog Lexicons, generated as a third-party overlay, and the official record vectors read through them. Never published. | |
 
 The workspace uses Cargo resolver 3 and Rust edition 2024. The developer and
 CI toolchain is pinned in `rust-toolchain.toml`. CI tests compatibility with

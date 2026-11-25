@@ -29,6 +29,13 @@ impl petrel_core::ToValue for Input {
 
 impl petrel_core::FromValue for Input {
     fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        // An XRPC input: nothing in it may degrade, at any depth.
+        petrel_core::strictly(|| Self::from_value_in_scope(value))
+    }
+}
+
+impl Input {
+    fn from_value_in_scope(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
         let mut reader = petrel_core::ObjectReader::new(value)?;
         Ok(Self {
             draft: reader.required("draft")?,

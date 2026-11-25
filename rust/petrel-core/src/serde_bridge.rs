@@ -40,6 +40,17 @@
 //! whole object. XRPC inputs use [`ObjectReader::optional_strict`] and
 //! [`ObjectReader::optional_nullable_strict`] instead.
 //!
+//! # Strict decoding
+//!
+//! [`strictly`] runs a decode in which no optional field anywhere in the
+//! tree may degrade, and `null` is refused in a field the lexicon does not
+//! mark nullable: the first such field is the decode's error. The
+//! generated `FromValue` of every XRPC input runs inside it, so a nested
+//! object, array item or union member in an input is held to the same rule
+//! as the input's own fields, whoever calls the decode. [`from_json_strict`]
+//! and [`from_dag_cbor_strict`] do the same for any type, such as a record a
+//! service is asked to write.
+//!
 //! # Preservation of optional fields
 //!
 //! [`ObjectReader::optional`] clones the raw value before decoding so it can
@@ -47,6 +58,7 @@
 //! provided `try_from_value` that hands the value back on error; the
 //! generated code does not need to change.
 
+use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 
 use serde::de::Error as _;
@@ -81,6 +93,11 @@ pub fn from_json<T: FromValue>(json: &[u8]) -> Result<T, DecodeError> {
     T::from_value(value)
 }
 
+/// Decodes a typed value from JSON strictly: see [`strictly`].
+pub fn from_json_strict<T: FromValue>(json: &[u8]) -> Result<T, DecodeError> {
+    strictly(|| from_json(json))
+}
+
 /// Encodes a typed value as canonical DAG-CBOR.
 pub fn to_dag_cbor<T: ToValue + ?Sized>(value: &T) -> Result<Vec<u8>, EncodeError> {
     Ok(dagcbor::encode(&value.to_value()?))
@@ -95,6 +112,11 @@ pub fn cid_of<T: ToValue + ?Sized>(value: &T) -> Result<Cid, EncodeError> {
 /// refused.
 pub fn from_dag_cbor<T: FromValue>(bytes: &[u8]) -> Result<T, DecodeError> {
     T::from_value(dagcbor::decode(bytes)?)
+}
+
+/// Decodes a typed value from canonical DAG-CBOR strictly: see [`strictly`].
+pub fn from_dag_cbor_strict<T: FromValue>(bytes: &[u8]) -> Result<T, DecodeError> {
+    strictly(|| from_dag_cbor(bytes))
 }
 
 /// Decodes a typed canonical DAG-CBOR value using custom resource limits.
@@ -245,6 +267,106 @@ impl<T: FromValue> FromValue for BTreeMap<String, T> {
     }
 }
 
+thread_local! {
+    /// How many [`strictly`] calls enclose the current decode.
+    static STRICT_DEPTH: Cell<u32> = const { Cell::new(0) };
+    /// Wire names of the fields being decoded, outermost first, while strict.
+    static STRICT_PATH: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    /// The first optional field that degraded inside the outermost [`strictly`].
+    static STRICT_VIOLATION: RefCell<Option<DecodeError>> = const { RefCell::new(None) };
+}
+
+/// Runs `decode` so that an optional field that does not decode, at any
+/// depth, fails the whole decode instead of degrading to `None`.
+///
+/// Decoding is synchronous, so the rule is carried in thread-local state for
+/// the duration of the call; nested calls join the outermost one. Unknown
+/// fields and unknown members of open unions are still accepted, as the
+/// data model requires.
+pub fn strictly<T>(decode: impl FnOnce() -> Result<T, DecodeError>) -> Result<T, DecodeError> {
+    let outer = STRICT_DEPTH.get();
+    if outer == 0 {
+        // A panic inside an earlier strict decode may have left a violation.
+        STRICT_VIOLATION.take();
+    }
+    STRICT_DEPTH.set(outer + 1);
+    let scope = StrictScope { outer };
+    let result = decode();
+    let violation = if outer == 0 {
+        STRICT_VIOLATION.take()
+    } else {
+        None
+    };
+    drop(scope);
+    match (result, violation) {
+        (Err(error), _) => Err(error),
+        (Ok(_), Some(violation)) => Err(violation),
+        (Ok(value), None) => Ok(value),
+    }
+}
+
+/// Restores the strict depth when a [`strictly`] call ends, panics included.
+struct StrictScope {
+    outer: u32,
+}
+
+impl Drop for StrictScope {
+    fn drop(&mut self) {
+        STRICT_DEPTH.set(self.outer);
+        if self.outer == 0 {
+            STRICT_PATH.with_borrow_mut(Vec::clear);
+        }
+    }
+}
+
+/// Pops a field name off the strict path when its decode ends.
+struct StrictPathEntry;
+
+impl Drop for StrictPathEntry {
+    fn drop(&mut self) {
+        STRICT_PATH.with_borrow_mut(Vec::pop);
+    }
+}
+
+fn is_strict() -> bool {
+    STRICT_DEPTH.get() > 0
+}
+
+/// Decodes one field's value, tracking its name while strict so a degraded
+/// field deeper down is reported with its full path.
+fn decode_field<T: FromValue>(name: &str, value: Value) -> Result<T, DecodeError> {
+    if !is_strict() {
+        return T::from_value(value);
+    }
+    STRICT_PATH.with_borrow_mut(|path| path.push(name.to_owned()));
+    let _entry = StrictPathEntry;
+    T::from_value(value)
+}
+
+fn not_nullable() -> DecodeError {
+    DecodeError::TypeMismatch {
+        expected: "a value (the field is not nullable)",
+        found: "null",
+    }
+}
+
+/// Records that the optional field `name` degraded with `error`, when strict.
+fn record_degraded(name: &str, error: DecodeError) {
+    if !is_strict() {
+        return;
+    }
+    STRICT_VIOLATION.with_borrow_mut(|violation| {
+        if violation.is_none() {
+            let error = STRICT_PATH.with_borrow(|path| {
+                path.iter()
+                    .rev()
+                    .fold(error.in_field(name), |error, parent| error.in_field(parent))
+            });
+            *violation = Some(error);
+        }
+    });
+}
+
 /// Reads the fields of one object. See the [module docs](self) for the rules.
 #[derive(Debug)]
 pub struct ObjectReader {
@@ -275,32 +397,40 @@ impl ObjectReader {
             .fields
             .remove(name)
             .ok_or_else(|| DecodeError::MissingField(name.to_owned()))?;
-        T::from_value(value).map_err(|error| error.in_field(name))
+        decode_field(name, value).map_err(|error| error.in_field(name))
     }
 
     /// An optional field, read leniently: absent or `null` is `None`; a value
     /// that does not decode is also `None`, and its raw form is kept for
     /// [`finish`](Self::finish) to return.
+    ///
+    /// Inside [`strictly`], a value that does not decode, or `null` (the
+    /// field is not nullable), fails the decode.
     pub fn optional<T: FromValue>(&mut self, name: &str) -> Option<T> {
         match self.fields.remove(name)? {
-            Value::Null => None,
-            value => {
-                if let Ok(typed) = T::from_value(value.clone()) {
-                    Some(typed)
-                } else {
+            Value::Null => {
+                record_degraded(name, not_nullable());
+                None
+            }
+            value => match decode_field(name, value.clone()) {
+                Ok(typed) => Some(typed),
+                Err(error) => {
+                    record_degraded(name, error);
                     self.degraded.insert(name.to_owned(), value);
                     None
                 }
-            }
+            },
         }
     }
 
     /// An optional field, read strictly (XRPC inputs): absent or `null` is
-    /// `None`, a value that does not decode is an error.
+    /// `None`, a value that does not decode is an error. Inside [`strictly`],
+    /// `null` is an error too: the field is not nullable.
     pub fn optional_strict<T: FromValue>(&mut self, name: &str) -> Result<Option<T>, DecodeError> {
         match self.fields.remove(name) {
+            Some(Value::Null) if is_strict() => Err(not_nullable().in_field(name)),
             None | Some(Value::Null) => Ok(None),
-            Some(value) => T::from_value(value)
+            Some(value) => decode_field(name, value)
                 .map(Some)
                 .map_err(|error| error.in_field(name)),
         }
@@ -314,7 +444,7 @@ impl ObjectReader {
         match self.fields.remove(name) {
             None => Err(DecodeError::MissingField(name.to_owned())),
             Some(Value::Null) => Ok(None),
-            Some(value) => T::from_value(value)
+            Some(value) => decode_field(name, value)
                 .map(Some)
                 .map_err(|error| error.in_field(name)),
         }
@@ -326,14 +456,14 @@ impl ObjectReader {
     pub fn optional_nullable<T: FromValue>(&mut self, name: &str) -> Option<Nullable<T>> {
         match self.fields.remove(name)? {
             Value::Null => Some(Nullable::Null),
-            value => {
-                if let Ok(typed) = T::from_value(value.clone()) {
-                    Some(Nullable::Value(typed))
-                } else {
+            value => match decode_field(name, value.clone()) {
+                Ok(typed) => Some(Nullable::Value(typed)),
+                Err(error) => {
+                    record_degraded(name, error);
                     self.degraded.insert(name.to_owned(), value);
                     None
                 }
-            }
+            },
         }
     }
 
@@ -347,7 +477,7 @@ impl ObjectReader {
         match self.fields.remove(name) {
             None => Ok(None),
             Some(Value::Null) => Ok(Some(Nullable::Null)),
-            Some(value) => T::from_value(value)
+            Some(value) => decode_field(name, value)
                 .map(|typed| Some(Nullable::Value(typed)))
                 .map_err(|error| error.in_field(name)),
         }

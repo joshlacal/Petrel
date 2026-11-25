@@ -71,6 +71,15 @@ impl petrel_core::ToValue for {{ name }} {
 
 impl petrel_core::FromValue for {{ name }} {
     fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+{% if not lenient %}
+        // An XRPC input: nothing in it may degrade, at any depth.
+        petrel_core::strictly(|| Self::from_value_in_scope(value))
+    }
+}
+
+impl {{ name }} {
+    fn from_value_in_scope(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+{% endif %}
         let {% if properties %}mut {% elif not has_extra %}_{% endif %}reader = petrel_core::ObjectReader::new(value)?;
 {% for prop in properties %}
 {% if prop.strict_decode %}

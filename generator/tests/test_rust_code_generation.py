@@ -164,6 +164,50 @@ class RustCodeGenerationTests(unittest.TestCase):
         self.assertIn('swap: reader.optional_nullable_strict("swap")?,', code)
         self.assertNotIn('reader.optional_nullable("swap")', code)
 
+    def test_an_input_decodes_strictly_at_every_depth_and_an_output_does_not(self):
+        # Nested objects are shared between inputs and outputs and read
+        # leniently, so the input itself must put the whole decode in strict
+        # scope for a malformed nested optional field to be refused.
+        proc = {
+            "lexicon": 1,
+            "id": "com.example.nested",
+            "defs": {
+                "main": {
+                    "type": "procedure",
+                    "input": {
+                        "encoding": "application/json",
+                        "schema": {
+                            "type": "object",
+                            "required": ["inner"],
+                            "properties": {"inner": {"type": "ref", "ref": "#inner"}},
+                        },
+                    },
+                    "output": {
+                        "encoding": "application/json",
+                        "schema": {
+                            "type": "object",
+                            "required": ["inner"],
+                            "properties": {"inner": {"type": "ref", "ref": "#inner"}},
+                        },
+                    },
+                },
+                "inner": {
+                    "type": "object",
+                    "properties": {"note": {"type": "string"}},
+                },
+            },
+        }
+        code = RustCodeGenerator(proc).convert()
+        self.assertEqual(code.count("petrel_core::strictly(|| Self::from_value_in_scope(value))"), 1)
+        input_start = code.index("impl petrel_core::FromValue for Input")
+        self.assertIn(
+            "petrel_core::strictly(",
+            code[input_start : code.index("impl Input {", input_start)],
+        )
+        output_start = code.index("impl petrel_core::FromValue for Output")
+        self.assertNotIn("strictly", code[output_start : output_start + 400])
+        self.assertIn('note: reader.optional("note"),', code)
+
     def test_petrel_api_cargo_features_match_computed_namespace_graph(self):
         manifest = json.loads((GENERATOR_DIR / "manifests" / "petrel-core.json").read_text(encoding="utf-8"))
         excl = tuple(manifest["lexicons"]["exclude_namespaces"])
