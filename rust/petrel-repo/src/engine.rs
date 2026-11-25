@@ -263,6 +263,27 @@ impl RepositoryEngine {
             });
         }
 
+        // Enforce `max_block_count` over the resulting reachable CAR blocks
+        // (1 commit + unique MST nodes + live record blocks) before signing/persisting.
+        // Uses O(1) `store.len()` fast-path unless total candidate blocks approach the ceiling.
+        let candidate_upper_bound = store
+            .len()
+            .await?
+            .saturating_add(1)
+            .saturating_add(new_blocks_map.len());
+        if candidate_upper_bound > limits.max_block_count {
+            let max_tree_blocks = limits.max_block_count.saturating_sub(1);
+            let tree_blocks = mst.count_reachable_blocks_bounded(max_tree_blocks).await?;
+            let total_reachable = 1_usize.saturating_add(tree_blocks);
+            if total_reachable > limits.max_block_count {
+                return Err(EngineError::Limit(LimitError::Exceeded {
+                    kind: LimitKind::BlockCount,
+                    observed: total_reachable,
+                    limit: limits.max_block_count,
+                }));
+            }
+        }
+
         let commit = CommitCodec::prepare(&descriptor, signer, limits).await?;
 
         let new_blocks: Vec<RepositoryBlock> = new_blocks_map

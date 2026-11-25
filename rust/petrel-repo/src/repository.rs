@@ -419,19 +419,15 @@ impl<B: BlockStore + 'static> Repository<B> {
                 true,
             )
             .await?;
-            // Enforce record codec validation against policy if required.
-            if policy.requires_safe_integers
-                || policy.requires_blessed_links_in_records
-                || policy.requires_record_type_to_match_collection
-            {
-                for entry in &entries {
-                    let path = RepositoryPath::from_mst_key(&entry.key)?;
-                    let bytes = store
-                        .get_block(&entry.value)
-                        .await?
-                        .ok_or_else(|| RepositoryError::MissingBlock(entry.value.clone()))?;
-                    RecordCodec::validate_record_bytes(&bytes, Some(path.collection()), &policy)?;
-                }
+            // Always validate every record payload under the selected read policy so invalid
+            // DAG-CBOR or non-map records fail at open time even under `data_model()`.
+            for entry in &entries {
+                let path = RepositoryPath::from_mst_key(&entry.key)?;
+                let bytes = store
+                    .get_block(&entry.value)
+                    .await?
+                    .ok_or_else(|| RepositoryError::MissingBlock(entry.value.clone()))?;
+                RecordCodec::validate_record_bytes(&bytes, Some(path.collection()), &policy)?;
             }
             Some(RepositoryStatistics {
                 record_count: stats.record_count,
@@ -773,34 +769,36 @@ impl<B: BlockStore + 'static> Repository<B> {
         Ok(sink.into_bytes().await)
     }
 
-    /// Streams a CAR v1 archive of the repository to `sink`.
+    /// Streams a CAR v1 archive of the repository to `sink` without buffering block payloads.
     pub async fn export_car_to_sink<Sink: CARByteSink + ?Sized>(
         &self,
         sink: &Sink,
         order: CARExportOrder,
     ) -> Result<(), RepositoryError> {
-        let mut blocks = Vec::new();
-        blocks.push(RepositoryBlock::new(
+        let header = crate::car::writer::encode_header(std::slice::from_ref(&self.commit.cid))?;
+        sink.write_bytes(&header).await?;
+
+        let mut seen: BTreeSet<Cid> = BTreeSet::new();
+        stream_frame_if_unseen(
             self.commit.cid.clone(),
-            self.commit.signed_commit_bytes.clone(),
-        ));
+            &self.commit.signed_commit_bytes,
+            &mut seen,
+            sink,
+        )
+        .await?;
 
         match order {
             CARExportOrder::Streamable => {
-                let mut seen: BTreeSet<Cid> = BTreeSet::new();
-                seen.insert(self.commit.cid.clone());
-                collect_streamable_blocks(
+                stream_streamable_blocks(
                     self.commit.data_cid.clone(),
                     self.store.as_ref(),
                     &self.policy,
                     &mut seen,
-                    &mut blocks,
+                    sink,
                 )
                 .await?;
             }
             CARExportOrder::BreadthFirst => {
-                let mut seen: BTreeSet<Cid> = BTreeSet::new();
-                seen.insert(self.commit.cid.clone());
                 let mut queue = VecDeque::new();
                 queue.push_back(self.commit.data_cid.clone());
                 let mut record_cids = Vec::new();
@@ -820,7 +818,8 @@ impl<B: BlockStore + 'static> Repository<B> {
                         &self.policy,
                         false,
                     )?;
-                    blocks.push(RepositoryBlock::new(node_cid, bytes));
+                    let frame = crate::car::writer::encode_frame(&node_cid, &bytes)?;
+                    sink.write_bytes(&frame).await?;
                     if let Some(left) = view.left {
                         queue.push_back(left);
                     }
@@ -832,30 +831,30 @@ impl<B: BlockStore + 'static> Repository<B> {
                     }
                 }
                 for rcid in record_cids {
-                    if !seen.insert(rcid.clone()) {
-                        continue;
+                    if !seen.contains(&rcid) {
+                        let bytes = self
+                            .store
+                            .get_block(&rcid)
+                            .await?
+                            .ok_or_else(|| RepositoryError::MissingBlock(rcid.clone()))?;
+                        stream_frame_if_unseen(rcid, &bytes, &mut seen, sink).await?;
                     }
-                    let bytes = self
-                        .store
-                        .get_block(&rcid)
-                        .await?
-                        .ok_or_else(|| RepositoryError::MissingBlock(rcid.clone()))?;
-                    blocks.push(RepositoryBlock::new(rcid, bytes));
                 }
             }
             CARExportOrder::Stored => {
                 let mut all_cids = self.store.all_cids().await?;
                 all_cids.retain(|c| c != &self.commit.cid);
                 for cid in all_cids {
-                    if let Some(bytes) = self.store.get_block(&cid).await? {
-                        blocks.push(RepositoryBlock::new(cid, bytes));
+                    if !seen.contains(&cid)
+                        && let Some(bytes) = self.store.get_block(&cid).await?
+                    {
+                        stream_frame_if_unseen(cid, &bytes, &mut seen, sink).await?;
                     }
                 }
             }
         }
 
-        PublicRepositoryCAR::write_to_sink(std::slice::from_ref(&self.commit.cid), &blocks, sink)
-            .await?;
+        sink.finish().await?;
         Ok(())
     }
 
@@ -871,12 +870,25 @@ impl<B: BlockStore + 'static> Repository<B> {
     }
 }
 
-fn collect_streamable_blocks<'a, B: BlockStore>(
+async fn stream_frame_if_unseen<Sink: CARByteSink + ?Sized>(
+    cid: Cid,
+    payload: &[u8],
+    seen: &mut BTreeSet<Cid>,
+    sink: &Sink,
+) -> Result<(), RepositoryError> {
+    if seen.insert(cid.clone()) {
+        let frame = crate::car::writer::encode_frame(&cid, payload)?;
+        sink.write_bytes(&frame).await?;
+    }
+    Ok(())
+}
+
+fn stream_streamable_blocks<'a, B: BlockStore, Sink: CARByteSink + ?Sized>(
     node_cid: Cid,
     store: &'a B,
     policy: &'a RepositoryReadPolicy,
     seen: &'a mut BTreeSet<Cid>,
-    blocks: &'a mut Vec<RepositoryBlock>,
+    sink: &'a Sink,
 ) -> BoxFuture<'a, Result<(), RepositoryError>> {
     Box::pin(async move {
         let bytes = store
@@ -885,22 +897,21 @@ fn collect_streamable_blocks<'a, B: BlockStore>(
             .ok_or_else(|| RepositoryError::MissingBlock(node_cid.clone()))?;
         let view =
             crate::mst::codec::decode_mst_node(&bytes, MstKeySyntax::StrictAtProto, policy, false)?;
-        if seen.insert(node_cid.clone()) {
-            blocks.push(RepositoryBlock::new(node_cid, bytes));
-        }
+        stream_frame_if_unseen(node_cid, &bytes, seen, sink).await?;
+        drop(bytes);
         if let Some(left) = view.left {
-            collect_streamable_blocks(left, store, policy, seen, blocks).await?;
+            stream_streamable_blocks(left, store, policy, seen, sink).await?;
         }
         for entry in view.entries {
-            if seen.insert(entry.value.clone()) {
+            if !seen.contains(&entry.value) {
                 let rec_bytes = store
                     .get_block(&entry.value)
                     .await?
                     .ok_or_else(|| RepositoryError::MissingBlock(entry.value.clone()))?;
-                blocks.push(RepositoryBlock::new(entry.value, rec_bytes));
+                stream_frame_if_unseen(entry.value, &rec_bytes, seen, sink).await?;
             }
             if let Some(right) = entry.tree {
-                collect_streamable_blocks(right, store, policy, seen, blocks).await?;
+                stream_streamable_blocks(right, store, policy, seen, sink).await?;
             }
         }
         Ok(())

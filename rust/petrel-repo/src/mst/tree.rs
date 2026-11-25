@@ -343,6 +343,47 @@ impl RepositoryMst {
         Ok(out)
     }
 
+    /// Counts distinct reachable MST node + leaf record CIDs, aborting early if the
+    /// count exceeds `max_unique_blocks`.
+    pub async fn count_reachable_blocks_bounded(
+        &mut self,
+        max_unique_blocks: usize,
+    ) -> Result<usize, MstError> {
+        let mut seen_nodes = std::collections::HashSet::new();
+        let mut unique_blocks = std::collections::HashSet::new();
+        let mut stack = vec![(self.root_cid.clone(), 0_usize)];
+
+        while let Some((node_cid, depth)) = stack.pop() {
+            if depth > self.options.max_depth {
+                return Err(MstError::DepthExceeded {
+                    depth,
+                    limit: self.options.max_depth,
+                });
+            }
+            if !seen_nodes.insert(node_cid.clone()) {
+                continue;
+            }
+            unique_blocks.insert(node_cid.clone());
+            if unique_blocks.len() > max_unique_blocks {
+                return Ok(unique_blocks.len());
+            }
+            let view = self.load_node(&node_cid).await?;
+            if let Some(left) = view.left {
+                stack.push((left, depth + 1));
+            }
+            for entry in view.entries {
+                unique_blocks.insert(entry.value);
+                if unique_blocks.len() > max_unique_blocks {
+                    return Ok(unique_blocks.len());
+                }
+                if let Some(right) = entry.tree {
+                    stack.push((right, depth + 1));
+                }
+            }
+        }
+        Ok(unique_blocks.len())
+    }
+
     fn collect_blocks<'a>(
         &'a mut self,
         node_cid: &'a Cid,

@@ -1225,3 +1225,184 @@ async fn commit_diff_validates_record_blocks_and_rejects_duplicate_paths() {
     .unwrap_err();
     assert!(matches!(dup_err, CommitDiffError::InvalidOperation(_)));
 }
+
+#[derive(Debug, Default)]
+struct IncrementalSink {
+    chunks: async_lock::Mutex<Vec<Vec<u8>>>,
+    write_calls: std::sync::atomic::AtomicUsize,
+    finished: AtomicBool,
+}
+
+impl petrel_repo::car::CARByteSink for IncrementalSink {
+    fn write_bytes<'a>(
+        &'a self,
+        chunk: &'a [u8],
+    ) -> BoxFuture<'a, Result<(), petrel_repo::error::CARError>> {
+        Box::pin(async move {
+            self.write_calls.fetch_add(1, Ordering::Relaxed);
+            self.chunks.lock().await.push(chunk.to_vec());
+            Ok(())
+        })
+    }
+
+    fn finish(&self) -> BoxFuture<'_, Result<(), petrel_repo::error::CARError>> {
+        Box::pin(async move {
+            self.finished.store(true, Ordering::Relaxed);
+            Ok(())
+        })
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn data_model_open_store_validates_record_cbor_and_streaming_export_avoids_buffering() {
+    use petrel_repo::block_store::BlockStore as _;
+    use petrel_repo::car::PublicRepositoryCAR;
+    use petrel_repo::error::{LimitKind, RecordCodecError, RepositoryError};
+    use petrel_repo::repository::CARExportOrder;
+
+    let did = common::test_did();
+    let signer = P256Keypair::generate().unwrap();
+    let limits = RepositoryLimits::standard();
+    let strict = RepositoryReadPolicy::strict();
+    let data_model = RepositoryReadPolicy::data_model();
+    let store = Arc::new(InMemoryBlockStore::new());
+
+    // 1. Non-map record (CBOR array) stored with valid CID must fail `open_store(..., data_model(), true)`.
+    let non_map_bytes = dagcbor::encode(&Value::Array(vec![Value::Integer(1)]));
+    let non_map_cid = Cid::for_dag_cbor(&non_map_bytes);
+    let mut mst = petrel_repo::mst::RepositoryMst::empty();
+    let bad_root = mst
+        .insert("app.bsky.feed.post/3jzfcijpj2z2a", non_map_cid.clone())
+        .await
+        .unwrap();
+    for b in mst.new_blocks() {
+        store.put_block(&b.cid, &b.bytes).await.unwrap();
+    }
+    store.put_block(&non_map_cid, &non_map_bytes).await.unwrap();
+    let bad_commit = CommitCodec::prepare(
+        &CommitDescriptor {
+            did: did.clone(),
+            rev: RepositoryTid::parse("3jzfcijpj2z2a").unwrap(),
+            data_cid: bad_root,
+            prev_cid: None,
+        },
+        &signer,
+        &limits,
+    )
+    .await
+    .unwrap();
+    store
+        .put_block(&bad_commit.cid, &bad_commit.signed_commit_bytes)
+        .await
+        .unwrap();
+
+    let open_err = Repository::open_store(
+        bad_commit.cid,
+        Arc::clone(&store),
+        OpenVerification::SigningKey(signer.public_key().clone()),
+        Some(&did),
+        limits,
+        data_model,
+        true,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        open_err,
+        RepositoryError::Record(RecordCodecError::TopLevelNotMap)
+    ));
+
+    // 2. Engine enforces resulting reachable block count (`1 + mst_nodes + records <= max_block_count`)
+    // even against an unbounded store when creating 2 distinct layer-0 records under `max_block_count = 3`.
+    let unbounded = Arc::new(InMemoryBlockStore::new());
+    let s0 = RepositoryState::new(did.clone(), 1).unwrap();
+    let tight_limits = RepositoryLimits {
+        max_block_count: 3,
+        max_record_count: 2,
+        max_mst_node_count: 2,
+        ..RepositoryLimits::standard()
+    };
+    tight_limits.validate().unwrap();
+    let two_rec_batch = WriteBatch::new(vec![
+        create_op(
+            "app.bsky.feed.post",
+            "3jzfcijpj2z2a",
+            &post_record_value("first distinct record"),
+        )
+        .unwrap(),
+        create_op(
+            "app.bsky.feed.post",
+            "3jzfcijpj2z2b",
+            &post_record_value("second distinct record"),
+        )
+        .unwrap(),
+    ])
+    .unwrap();
+    let count_err = RepositoryEngine::apply(
+        &s0,
+        &two_rec_batch,
+        None,
+        RepositoryTid::parse("3jzfcijpj2z2a").unwrap(),
+        &signer,
+        Arc::clone(&unbounded),
+        &tight_limits,
+        &strict,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        count_err,
+        EngineError::Limit(LimitError::Exceeded {
+            kind: LimitKind::BlockCount,
+            observed: 4,
+            limit: 3,
+        })
+    ));
+    assert_eq!(unbounded.len().await.unwrap(), 0);
+
+    // 3. Streaming CAR export writes header + individual frames incrementally to `CARByteSink`
+    // (1 header + 4 blocks = 5 separate `write_bytes` calls) and roundtrips cleanly.
+    let res = RepositoryEngine::apply(
+        &s0,
+        &two_rec_batch,
+        None,
+        RepositoryTid::parse("3jzfcijpj2z2a").unwrap(),
+        &signer,
+        Arc::clone(&unbounded),
+        &limits,
+        &strict,
+    )
+    .await
+    .unwrap();
+    let repo = Repository::open_store(
+        res.commit.cid,
+        unbounded,
+        OpenVerification::SigningKey(signer.public_key().clone()),
+        Some(&did),
+        limits,
+        strict,
+        true,
+    )
+    .await
+    .unwrap();
+
+    for order in [
+        CARExportOrder::Streamable,
+        CARExportOrder::BreadthFirst,
+        CARExportOrder::Stored,
+    ] {
+        let sink = IncrementalSink::default();
+        repo.export_car_to_sink(&sink, order).await.unwrap();
+        assert!(sink.finished.load(Ordering::Relaxed));
+        let streamed: Vec<u8> = sink.chunks.lock().await.concat();
+        let (_, imported) = PublicRepositoryCAR::import_bytes(&streamed, &limits, &strict)
+            .await
+            .unwrap();
+        let imported_len = imported.len().await.unwrap();
+        assert!(imported_len >= 4);
+        // Header + 1 write call per exported block = `1 + imported_len` incremental writes.
+        assert_eq!(sink.write_calls.load(Ordering::Relaxed), 1 + imported_len);
+    }
+}
