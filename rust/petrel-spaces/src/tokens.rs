@@ -363,19 +363,20 @@ pub fn mint_client_attestation_token(
     encode_jwt(&header, &claims, signing_key)
 }
 
-fn validate_authority_credential_kid<'a>(
+fn validate_atproto_signing_kid<'a>(
     kid: Option<&'a str>,
-    authority_did: &Did,
+    issuer_did: &Did,
+    token_label: &str,
 ) -> Result<&'a str> {
     let Some(kid) = kid else {
-        return Err(SpaceError::MalformedHeader(
-            "credential header missing required kid (#atproto)".into(),
-        ));
+        return Err(SpaceError::MalformedHeader(format!(
+            "{token_label} header missing required kid (#atproto)"
+        )));
     };
-    let full_kid = format!("{authority_did}#atproto");
+    let full_kid = format!("{issuer_did}#atproto");
     if kid != "#atproto" && kid != full_kid {
         return Err(SpaceError::Unauthorized(format!(
-            "credential kid '{kid}' is not the space authority signing key ('#atproto' or '{full_kid}')"
+            "{token_label} kid '{kid}' is not the issuer #atproto signing key ('#atproto' or '{full_kid}')"
         )));
     }
     Ok(kid)
@@ -396,7 +397,7 @@ pub fn inspect_credential_token_unverified(token: &str) -> Result<(JwtHeader, Cr
             space_ref.space_did()
         )));
     }
-    let _ = validate_authority_credential_kid(header.kid.as_deref(), &iss)?;
+    let _ = validate_atproto_signing_kid(header.kid.as_deref(), &iss, "credential")?;
     validate_did_key(&claims.cnf.kid)?;
     if claims.jti.is_empty() {
         return Err(SpaceError::MalformedPayload("empty jti claim".into()));
@@ -412,8 +413,9 @@ pub fn inspect_delegation_token_unverified(token: &str) -> Result<(JwtHeader, De
     }
     let _ = JwtAlgorithm::parse(&header.alg)?;
     let _ = parse_space_ref(&claims.sub)?;
-    let _ = Did::parse(&claims.iss).map_err(|e| SpaceError::InvalidDid(e.to_string()))?;
+    let iss = Did::parse(&claims.iss).map_err(|e| SpaceError::InvalidDid(e.to_string()))?;
     let _ = Did::parse(&claims.aud).map_err(|e| SpaceError::InvalidDid(e.to_string()))?;
+    let _ = validate_atproto_signing_kid(header.kid.as_deref(), &iss, "delegation")?;
     if claims.jti.is_empty() {
         return Err(SpaceError::MalformedPayload("empty jti claim".into()));
     }
@@ -456,7 +458,7 @@ pub async fn verify_delegation_token<R: SigningKeyResolver + ?Sized>(
         MAX_DELEGATION_LIFETIME_SECS,
     )?;
 
-    let kid = header.kid.as_deref().unwrap_or("#atproto");
+    let kid = validate_atproto_signing_kid(header.kid.as_deref(), &iss, "delegation")?;
     verify_with_single_refresh(resolver, &iss, kid, &header.alg, &signing_input, &sig).await?;
     Ok(claims)
 }
@@ -495,7 +497,7 @@ pub async fn verify_credential_token<R: SigningKeyResolver + ?Sized>(
         MAX_CREDENTIAL_LIFETIME_SECS,
     )?;
 
-    let kid = validate_authority_credential_kid(header.kid.as_deref(), &iss)?;
+    let kid = validate_atproto_signing_kid(header.kid.as_deref(), &iss, "credential")?;
     verify_with_single_refresh(resolver, &iss, kid, &header.alg, &signing_input, &sig).await?;
     Ok(claims)
 }
@@ -539,7 +541,16 @@ pub async fn verify_client_attestation_token<R: SigningKeyResolver + ?Sized>(
         MAX_CLIENT_ATTESTATION_LIFETIME_SECS,
     )?;
 
-    let kid = header.kid.as_deref().unwrap_or("#atproto");
+    let Some(kid) = header.kid.as_deref() else {
+        return Err(SpaceError::MalformedHeader(
+            "client attestation header missing required kid".into(),
+        ));
+    };
+    if kid.is_empty() || kid.len() > 1024 || kid.bytes().any(|b| b < 0x20 || b == 0x7f) {
+        return Err(SpaceError::MalformedHeader(
+            "invalid client attestation JOSE kid".into(),
+        ));
+    }
     verify_with_single_refresh(resolver, &iss, kid, &header.alg, &signing_input, &sig).await?;
     Ok(claims)
 }

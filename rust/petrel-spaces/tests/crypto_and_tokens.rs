@@ -770,3 +770,224 @@ fn credential_restricts_signing_kid_to_authority_atproto_key() {
     assert!(block_on(verify_credential_token(&full_cred, now + 5, &resolver)).is_ok());
     assert_eq!(calls.load(Ordering::SeqCst), 2);
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[allow(clippy::too_many_lines)]
+#[test]
+fn delegation_restricts_signing_kid_to_issuer_atproto_key_and_attestation_allows_jwks_kid() {
+    struct TokenKidCountingResolver {
+        issuer_did: Did,
+        client_did: Did,
+        atproto_key: ATProtoJWTVerificationKey,
+        label_key: ATProtoJWTVerificationKey,
+        client_jwks_key: ATProtoJWTVerificationKey,
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl SigningKeyResolver for TokenKidCountingResolver {
+        fn resolve_signing_key<'a>(
+            &'a self,
+            did: &'a Did,
+            kid: &'a str,
+            _force_refresh: bool,
+        ) -> BoxFuture<'a, petrel_spaces::Result<ATProtoJWTVerificationKey>> {
+            Box::pin(async move {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                let full_atproto = format!("{}#atproto", self.issuer_did);
+                if did == &self.issuer_did && (kid == "#atproto" || kid == full_atproto) {
+                    return Ok(self.atproto_key.clone());
+                }
+                if did == &self.issuer_did && kid == "#atproto_label" {
+                    return Ok(self.label_key.clone());
+                }
+                if did == &self.client_did && kid == "client-jwks-key-1" {
+                    return Ok(self.client_jwks_key.clone());
+                }
+                Err(SpaceError::SigningKeyNotFound(kid.to_owned()))
+            })
+        }
+    }
+
+    let space = sample_space();
+    let user = Did::parse("did:plc:ewvi7nxzyoun6zhxrhs64oiz").unwrap();
+    let host = Did::parse("did:web:ds.catbird.blue").unwrap();
+    let client = Did::parse("did:web:client.catbird.blue").unwrap();
+
+    let atproto_kp = SigningKeyPair::generate_k256().unwrap();
+    let label_kp = SigningKeyPair::generate_k256().unwrap();
+    let client_kp = SigningKeyPair::generate_p256().unwrap();
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let resolver = TokenKidCountingResolver {
+        issuer_did: user.clone(),
+        client_did: client.clone(),
+        atproto_key: ATProtoJWTVerificationKey::from_public_key(&atproto_kp.public_key()),
+        label_key: ATProtoJWTVerificationKey::from_public_key(&label_kp.public_key()),
+        client_jwks_key: ATProtoJWTVerificationKey::from_public_key(&client_kp.public_key()),
+        calls: calls.clone(),
+    };
+
+    let now = 1_800_000_000_i64;
+    let label_del = mint_delegation_token(
+        &label_kp,
+        &user,
+        &host,
+        &space,
+        now,
+        now + 60,
+        Some("del-label"),
+        Some("#atproto_label"),
+    )
+    .unwrap();
+    assert!(matches!(
+        petrel_spaces::inspect_delegation_token_unverified(&label_del),
+        Err(SpaceError::Unauthorized(_))
+    ));
+    assert!(matches!(
+        block_on(verify_delegation_token(
+            &label_del,
+            host.as_str(),
+            now + 5,
+            &resolver
+        )),
+        Err(SpaceError::Unauthorized(_))
+    ));
+
+    let full_kem_kid = format!("{user}#atproto_kem");
+    let kem_del = mint_delegation_token(
+        &label_kp,
+        &user,
+        &host,
+        &space,
+        now,
+        now + 60,
+        Some("del-kem"),
+        Some(&full_kem_kid),
+    )
+    .unwrap();
+    assert!(matches!(
+        block_on(verify_delegation_token(
+            &kem_del,
+            host.as_str(),
+            now + 5,
+            &resolver
+        )),
+        Err(SpaceError::Unauthorized(_))
+    ));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+    // Missing kid in delegation header is also rejected before resolver lookup.
+    let no_kid_hdr = petrel_crypto::JWTBase64URL::encode(
+        br#"{"alg":"ES256K","typ":"atproto-space-delegation+jwt"}"#,
+    );
+    let parts: Vec<&str> = label_del.split('.').collect();
+    let sig_input = format!("{no_kid_hdr}.{}", parts[1]);
+    let raw_sig = atproto_kp.sign(sig_input.as_bytes()).unwrap();
+    let no_kid_del = format!(
+        "{sig_input}.{}",
+        petrel_crypto::JWTBase64URL::encode(&raw_sig)
+    );
+    assert!(matches!(
+        petrel_spaces::inspect_delegation_token_unverified(&no_kid_del),
+        Err(SpaceError::MalformedHeader(_))
+    ));
+    assert!(matches!(
+        block_on(verify_delegation_token(
+            &no_kid_del,
+            host.as_str(),
+            now + 5,
+            &resolver
+        )),
+        Err(SpaceError::MalformedHeader(_))
+    ));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+    // `#atproto` and `<issuerDID>#atproto` delegations succeed.
+    let short_del = mint_delegation_token(
+        &atproto_kp,
+        &user,
+        &host,
+        &space,
+        now,
+        now + 60,
+        Some("del-short"),
+        Some("#atproto"),
+    )
+    .unwrap();
+    assert!(
+        block_on(verify_delegation_token(
+            &short_del,
+            host.as_str(),
+            now + 5,
+            &resolver
+        ))
+        .is_ok()
+    );
+
+    let full_atproto_kid = format!("{user}#atproto");
+    let full_del = mint_delegation_token(
+        &atproto_kp,
+        &user,
+        &host,
+        &space,
+        now,
+        now + 60,
+        Some("del-full"),
+        Some(&full_atproto_kid),
+    )
+    .unwrap();
+    assert!(
+        block_on(verify_delegation_token(
+            &full_del,
+            host.as_str(),
+            now + 5,
+            &resolver
+        ))
+        .is_ok()
+    );
+
+    // Client attestation continues to allow non-#atproto OAuth JWKS kids while requiring non-empty kid.
+    let jwks_att = mint_client_attestation_token(
+        &client_kp,
+        &client,
+        &host,
+        Some(space.as_str()),
+        None,
+        now,
+        now + 120,
+        Some("att-jwks"),
+        Some("client-jwks-key-1"),
+    )
+    .unwrap();
+    assert!(
+        block_on(verify_client_attestation_token(
+            &jwks_att,
+            host.as_str(),
+            now + 5,
+            &resolver
+        ))
+        .is_ok()
+    );
+    let empty_kid_att = mint_client_attestation_token(
+        &client_kp,
+        &client,
+        &host,
+        Some(space.as_str()),
+        None,
+        now,
+        now + 120,
+        Some("att-empty-kid"),
+        Some(""),
+    )
+    .unwrap();
+    assert!(matches!(
+        block_on(verify_client_attestation_token(
+            &empty_kid_att,
+            host.as_str(),
+            now + 5,
+            &resolver
+        )),
+        Err(SpaceError::MalformedHeader(_))
+    ));
+    assert_eq!(calls.load(Ordering::SeqCst), 3);
+}
