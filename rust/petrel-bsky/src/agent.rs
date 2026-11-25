@@ -7,6 +7,7 @@ use std::time::Duration;
 use async_lock::{Mutex, RwLock};
 use bytes::Bytes;
 use http::{HeaderMap, HeaderValue, Method, Request};
+use petrel::auth::AuthContinuitySnapshot;
 use petrel::client::AtProtoClient;
 use petrel::media::{ImageMetadataStripper, ImageMetadataStrippingError};
 use petrel::net::SendOptions;
@@ -62,7 +63,7 @@ use crate::moderation::{
 use crate::preferences::{
     BskyAppProgressGuide, BskyFeedViewPreferenceUpdate, BskyLegacyFeeds, BskyLiveEventPreferences,
     BskyLiveEventPreferencesAction, BskyNewSavedFeed, BskyPreferences, BskyPreferencesBackend,
-    BskyPreferencesEngine,
+    BskyPreferencesEngine, BskyPreferencesSession,
 };
 use crate::richtext::RichText;
 
@@ -78,6 +79,9 @@ pub enum BskyAgentError {
     /// No active account DID is available.
     #[error("Not signed in")]
     NotAuthenticated,
+    /// Active account or authentication continuity changed mid-operation.
+    #[error("Authentication continuity changed during operation")]
+    AuthContinuityChanged,
     /// Server returned an XRPC/HTTP error status.
     #[error("{nsid} failed with HTTP {status}")]
     Xrpc {
@@ -2137,7 +2141,139 @@ struct NetworkPreferencesBackend {
     agent: BskyAgent,
 }
 
+struct NetworkPreferencesSession {
+    agent: BskyAgent,
+    xrpc: XrpcClient,
+    expected_continuity: Option<AuthContinuitySnapshot>,
+    expected_did: Option<Did>,
+}
+
+impl NetworkPreferencesSession {
+    async fn verify_continuity(&self) -> Result<(), BskyAgentError> {
+        let Some(ref expected) = self.expected_continuity else {
+            return Ok(());
+        };
+        let AgentTransport::Client(ref client) = self.agent.transport else {
+            return Ok(());
+        };
+        let current_continuity = client.auth_continuity_snapshot().await;
+        let current_did = client
+            .get_did()
+            .await
+            .map_err(|e| BskyAgentError::Transport(e.to_string()))?;
+        if current_continuity != *expected || current_did != self.expected_did {
+            return Err(BskyAgentError::AuthContinuityChanged);
+        }
+        Ok(())
+    }
+}
+
+impl BskyPreferencesSession for NetworkPreferencesSession {
+    fn load_preferences(&self) -> BoxFuture<'_, Result<Vec<JsonValue>, BskyAgentError>> {
+        Box::pin(async move {
+            self.verify_continuity().await?;
+            let nsid = "app.bsky.actor.getPreferences";
+            let empty: [(&str, &str); 0] = [];
+            let call = BskyAgent::build_call_options(&BskyCallOptions::default());
+            let resp = match self.xrpc.query(nsid, empty, &call).await {
+                Ok(resp) => resp,
+                Err(err) => {
+                    self.verify_continuity().await?;
+                    return Err(map_xrpc_error(nsid, err));
+                }
+            };
+            self.verify_continuity().await?;
+            let json: JsonValue = decode_response_json(&resp.body, nsid)?;
+            json.get("preferences")
+                .and_then(JsonValue::as_array)
+                .cloned()
+                .ok_or_else(|| BskyAgentError::InvalidResponse {
+                    nsid: nsid.to_owned(),
+                    reason: "Missing preferences array".to_owned(),
+                })
+        })
+    }
+
+    fn save_preferences(
+        &self,
+        preferences: Vec<JsonValue>,
+    ) -> BoxFuture<'_, Result<(), BskyAgentError>> {
+        Box::pin(async move {
+            self.verify_continuity().await?;
+            let nsid = "app.bsky.actor.putPreferences";
+            let body = serde_json::json!({ "preferences": preferences });
+            let encoded = serde_json::to_vec(&body)
+                .map_err(|e| BskyAgentError::InvalidInput(format!("encode {nsid}: {e}")))?;
+            let empty: [(&str, &str); 0] = [];
+            let call = BskyAgent::build_call_options(&BskyCallOptions::default());
+            if let Err(err) = self
+                .xrpc
+                .procedure(nsid, empty, Some(XrpcBody::json(encoded)), &call)
+                .await
+            {
+                self.verify_continuity().await?;
+                return Err(map_xrpc_error(nsid, err));
+            }
+            self.verify_continuity().await?;
+            Ok(())
+        })
+    }
+
+    fn configure_labelers(
+        &self,
+        labelers: Vec<XrpcLabeler>,
+    ) -> BoxFuture<'_, Result<(), BskyAgentError>> {
+        Box::pin(async move {
+            match (&self.agent.transport, &self.expected_continuity) {
+                (AgentTransport::Client(client), Some(expected)) => {
+                    let applied = client
+                        .configure_labelers_if_continuity(
+                            expected,
+                            self.expected_did.as_ref(),
+                            &labelers,
+                        )
+                        .await
+                        .map_err(|e| BskyAgentError::Transport(e.to_string()))?;
+                    if !applied {
+                        return Err(BskyAgentError::AuthContinuityChanged);
+                    }
+                    Ok(())
+                }
+                _ => self.agent.set_raw_labelers(labelers).await,
+            }
+        })
+    }
+}
+
 impl BskyPreferencesBackend for NetworkPreferencesBackend {
+    #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+    fn begin_session(
+        &self,
+    ) -> BoxFuture<'_, Result<Option<Arc<dyn BskyPreferencesSession>>, BskyAgentError>> {
+        Box::pin(async move {
+            let (xrpc, expected_continuity, expected_did) = match &self.agent.transport {
+                AgentTransport::Client(client) => {
+                    let continuity = client.auth_continuity_snapshot().await;
+                    let did = client
+                        .get_did()
+                        .await
+                        .map_err(|e| BskyAgentError::Transport(e.to_string()))?;
+                    let xrpc = client.xrpc().await;
+                    (xrpc, Some(continuity), did)
+                }
+                AgentTransport::Xrpc { xrpc, did } => {
+                    (xrpc.read().await.clone(), None, did.clone())
+                }
+            };
+            Ok(Some(Arc::new(NetworkPreferencesSession {
+                agent: self.agent.clone(),
+                xrpc,
+                expected_continuity,
+                expected_did,
+            }) as Arc<dyn BskyPreferencesSession>))
+        })
+    }
+
     fn load_preferences(&self) -> BoxFuture<'_, Result<Vec<JsonValue>, BskyAgentError>> {
         Box::pin(async move {
             let nsid = "app.bsky.actor.getPreferences";

@@ -128,6 +128,21 @@ impl AccountManager {
         Ok(())
     }
 
+    /// Updates an already-registered account's metadata without altering current selection.
+    /// Returns `Ok(false)` if the account no longer exists in storage.
+    pub async fn update_account(&self, account: &Account) -> Result<bool, AccountError> {
+        if self.storage.get_account(&account.did).await?.is_none() {
+            self.cache.lock().await.remove(&account.did);
+            return Ok(false);
+        }
+        self.storage.save_account(account).await?;
+        self.cache
+            .lock()
+            .await
+            .insert(account.did.clone(), account.clone());
+        Ok(true)
+    }
+
     /// Refreshes the in-memory cache for `did` from durable storage.
     pub async fn update_account_from_storage(&self, did: &Did) -> Result<(), AccountError> {
         let account = self.storage.get_account(did).await?;

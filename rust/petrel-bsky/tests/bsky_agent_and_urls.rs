@@ -644,4 +644,188 @@ mod agent_tests {
         );
         agent.delete_like(&like_ref.uri).await.unwrap();
     }
+
+    #[tokio::test]
+    #[allow(clippy::too_many_lines)]
+    async fn bsky_agent_preferences_reject_write_and_labelers_across_account_switch() {
+        use tokio::sync::Notify;
+
+        struct SharedPdsIdentityResolver;
+        impl OAuthIdentityResolver for SharedPdsIdentityResolver {
+            fn resolve_identity<'a>(
+                &'a self,
+                identifier: &'a AtIdentifier,
+                _force_refresh: bool,
+            ) -> BoxFuture<'a, Result<OAuthIdentity, OAuthIdentityError>> {
+                let raw = identifier.as_str().to_owned();
+                Box::pin(async move {
+                    let (did, handle) = match raw.as_str() {
+                        "alice.test" | "did:plc:alice" => ("did:plc:alice", "alice.test"),
+                        "bob.test" | "did:plc:bob" => ("did:plc:bob", "bob.test"),
+                        _ => return Err(OAuthIdentityError),
+                    };
+                    Ok(OAuthIdentity {
+                        did: did.parse().unwrap(),
+                        handle: Some(handle.parse().unwrap()),
+                        pds: Url::parse("https://shared-pds.test").unwrap(),
+                    })
+                })
+            }
+        }
+
+        struct GatedPrefsTransport {
+            entered_get: Arc<Notify>,
+            release_get: Arc<Notify>,
+            entered_put: Arc<Notify>,
+            release_put: Arc<Notify>,
+            gate_get: std::sync::atomic::AtomicBool,
+            gate_put: std::sync::atomic::AtomicBool,
+            puts: Mutex<Vec<RecordedReq>>,
+        }
+
+        impl DynHttpTransport for GatedPrefsTransport {
+            fn send_dyn<'a>(
+                &'a self,
+                request: Request<Bytes>,
+                _options: &'a SendOptions,
+            ) -> BoxFuture<'a, Result<Response<Bytes>, TransportError>> {
+                Box::pin(async move {
+                    let req = RecordedReq {
+                        method: request.method().to_string(),
+                        url: request.uri().to_string(),
+                        headers: request
+                            .headers()
+                            .iter()
+                            .filter_map(|(k, v)| {
+                                v.to_str()
+                                    .ok()
+                                    .map(|val| (k.as_str().to_owned(), val.to_owned()))
+                            })
+                            .collect(),
+                        body: request.into_body(),
+                    };
+                    if req.url.contains("/xrpc/com.atproto.server.createSession") {
+                        let body = req.json().unwrap();
+                        let id = body["identifier"].as_str().unwrap_or("");
+                        let (did, handle, tok) = if id == "alice.test" {
+                            ("did:plc:alice", "alice.test", "tok-alice")
+                        } else {
+                            ("did:plc:bob", "bob.test", "tok-bob")
+                        };
+                        let bytes = serde_json::to_vec(&json!({
+                            "accessJwt": tok,
+                            "refreshJwt": format!("refresh-{tok}"),
+                            "handle": handle,
+                            "did": did,
+                            "active": true
+                        }))
+                        .unwrap();
+                        return Ok(Response::builder()
+                            .status(StatusCode::OK)
+                            .header("content-type", "application/json")
+                            .body(Bytes::from(bytes))
+                            .unwrap());
+                    }
+                    if req.url.contains("/xrpc/app.bsky.actor.getPreferences") {
+                        if self.gate_get.load(std::sync::atomic::Ordering::SeqCst) {
+                            self.entered_get.notify_one();
+                            self.release_get.notified().await;
+                        }
+                        let bytes = serde_json::to_vec(&json!({
+                            "preferences": [
+                                { "$type": "app.bsky.actor.defs#adultContentPref", "enabled": false }
+                            ]
+                        }))
+                        .unwrap();
+                        return Ok(Response::builder()
+                            .status(StatusCode::OK)
+                            .header("content-type", "application/json")
+                            .body(Bytes::from(bytes))
+                            .unwrap());
+                    }
+                    if req.url.contains("/xrpc/app.bsky.actor.putPreferences") {
+                        if self.gate_put.load(std::sync::atomic::Ordering::SeqCst) {
+                            self.entered_put.notify_one();
+                            self.release_put.notified().await;
+                        }
+                        self.puts.lock().unwrap().push(req);
+                        return Ok(Response::builder()
+                            .status(StatusCode::OK)
+                            .header("content-type", "application/json")
+                            .body(Bytes::from_static(b"{}"))
+                            .unwrap());
+                    }
+                    Ok(Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .body(Bytes::from_static(b"{}"))
+                        .unwrap())
+                })
+            }
+        }
+
+        let transport = Arc::new(GatedPrefsTransport {
+            entered_get: Arc::new(Notify::new()),
+            release_get: Arc::new(Notify::new()),
+            entered_put: Arc::new(Notify::new()),
+            release_put: Arc::new(Notify::new()),
+            gate_get: std::sync::atomic::AtomicBool::new(true),
+            gate_put: std::sync::atomic::AtomicBool::new(false),
+            puts: Mutex::new(Vec::new()),
+        });
+        let store =
+            SessionStore::new(Arc::new(MemorySecretStore::new()), "prefs-switch-guard").unwrap();
+        let client = Arc::new(
+            AtProtoClient::new(
+                Url::parse("https://shared-pds.test").unwrap(),
+                transport.clone(),
+                store,
+                Arc::new(SharedPdsIdentityResolver),
+                None,
+                AuthMode::Legacy,
+                false,
+            )
+            .unwrap(),
+        );
+
+        let alice_did: Did = "did:plc:alice".parse().unwrap();
+        let bob_did: Did = "did:plc:bob".parse().unwrap();
+        client
+            .login_with_password("bob.test", "pw", None)
+            .await
+            .unwrap();
+        client
+            .login_with_password("alice.test", "pw", None)
+            .await
+            .unwrap();
+
+        let agent = Arc::new(BskyAgent::from_client(Arc::clone(&client)));
+
+        // 1. Account switch during getPreferences rejects putPreferences before write.
+        let agent_a = Arc::clone(&agent);
+        let task_a = tokio::spawn(async move { agent_a.set_adult_content_enabled(true).await });
+        transport.entered_get.notified().await;
+        client.switch_to_account(&bob_did).await.unwrap();
+        transport.release_get.notify_one();
+        let err_a = task_a.await.unwrap().unwrap_err();
+        assert_eq!(err_a, BskyAgentError::AuthContinuityChanged);
+        assert_eq!(transport.puts.lock().unwrap().len(), 0);
+
+        // 2. Account switch during update_preferences_applying_labelers rejects configure_labelers.
+        client.switch_to_account(&alice_did).await.unwrap();
+        transport
+            .gate_get
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        transport
+            .gate_put
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        let labeler: Did = "did:plc:customlabeler".parse().unwrap();
+        let agent_b = Arc::clone(&agent);
+        let task_b = tokio::spawn(async move { agent_b.add_labeler(&labeler).await });
+        transport.entered_put.notified().await;
+        client.switch_to_account(&bob_did).await.unwrap();
+        transport.release_put.notify_one();
+        let err_b = task_b.await.unwrap().unwrap_err();
+        assert_eq!(err_b, BskyAgentError::AuthContinuityChanged);
+        assert!(client.configured_labelers().await.is_none());
+    }
 }

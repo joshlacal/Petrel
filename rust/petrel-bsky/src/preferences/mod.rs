@@ -4,7 +4,7 @@ pub mod engine;
 pub mod types;
 pub mod utilities;
 
-pub use engine::{BskyPreferencesBackend, BskyPreferencesEngine};
+pub use engine::{BskyPreferencesBackend, BskyPreferencesEngine, BskyPreferencesSession};
 pub use types::{
     BskyAppProgressGuide, BskyAppState, BskyFeedViewPreference, BskyFeedViewPreferenceUpdate,
     BskyInterestsPreference, BskyLegacyFeeds, BskyLiveEventPreferences,

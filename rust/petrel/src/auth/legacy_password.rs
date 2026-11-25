@@ -237,6 +237,7 @@ pub struct LegacyPasswordStrategy {
     used_refresh_tokens: Mutex<HashSet<[u8; 32]>>,
     active_refreshes: Mutex<HashMap<Did, SharedRefreshFuture>>,
     account_statuses: Mutex<HashMap<Did, AccountStatus>>,
+    lifecycle_lock: Mutex<()>,
 }
 
 impl fmt::Debug for LegacyPasswordStrategy {
@@ -268,6 +269,7 @@ impl LegacyPasswordStrategy {
             used_refresh_tokens: Mutex::new(HashSet::new()),
             active_refreshes: Mutex::new(HashMap::new()),
             account_statuses: Mutex::new(HashMap::new()),
+            lifecycle_lock: Mutex::new(()),
         }
     }
 
@@ -473,12 +475,14 @@ impl LegacyPasswordStrategy {
         account.authorization_server = None;
         account.expected_issuer = None;
 
+        let lifecycle = self.lifecycle_lock.lock().await;
         self.save_session(&session).await?;
         self.account_manager.add_account(&account).await?;
         self.account_manager
             .set_current_account(&output.did)
             .await?;
         self.circuit_breaker.reset(&output.did).await;
+        drop(lifecycle);
 
         Ok(PasswordLoginResult {
             did: output.did,
@@ -558,6 +562,7 @@ impl LegacyPasswordStrategy {
 
     /// Logs out the current account, calling `deleteSession` before clearing local tokens.
     pub async fn logout(&self) -> Result<(), PasswordAuthError> {
+        let _lifecycle = self.lifecycle_lock.lock().await;
         let Some(did) = self.account_manager.current_did().await? else {
             return Ok(());
         };
@@ -733,6 +738,7 @@ impl LegacyPasswordStrategy {
                 "missing session".to_owned(),
             ));
         };
+        let initial_gen = session.generation();
         let Some(account) = self.account_manager.get_account(did).await? else {
             return Err(PasswordAuthError::TokenRefreshFailed(
                 "missing account".to_owned(),
@@ -742,6 +748,23 @@ impl LegacyPasswordStrategy {
             .send_refresh_request(did, &account.pds, &session)
             .await?;
         let refreshed = self.handle_refresh_response(did, &response).await?;
+
+        let _lifecycle = self.lifecycle_lock.lock().await;
+        let Some(current_session) = self.get_session(did).await? else {
+            return Err(PasswordAuthError::TokenRefreshFailed(
+                "session was removed during refresh".to_owned(),
+            ));
+        };
+        if current_session.generation() != initial_gen {
+            return Err(PasswordAuthError::TokenRefreshFailed(
+                "session was replaced during refresh".to_owned(),
+            ));
+        }
+        let Some(mut updated_account) = self.account_manager.get_account(did).await? else {
+            return Err(PasswordAuthError::TokenRefreshFailed(
+                "account was removed during refresh".to_owned(),
+            ));
+        };
 
         let hosting_status = AccountStatus::from_api(refreshed.active, refreshed.status.as_deref());
         self.account_statuses
@@ -757,11 +780,18 @@ impl LegacyPasswordStrategy {
             created_at: unix_now(),
             expires_in,
         };
-        let mut updated_account = account;
         updated_account.handle = Some(refreshed.handle);
 
         self.save_session(&new_session).await?;
-        self.account_manager.add_account(&updated_account).await?;
+        if !self
+            .account_manager
+            .update_account(&updated_account)
+            .await?
+        {
+            return Err(PasswordAuthError::TokenRefreshFailed(
+                "account was removed during refresh".to_owned(),
+            ));
+        }
         self.last_successful_refresh
             .lock()
             .await
@@ -894,6 +924,8 @@ impl AuthProvider for Arc<LegacyPasswordStrategy> {
         mut request: Request<Bytes>,
     ) -> BoxFuture<'_, Result<(Request<Bytes>, AuthCtx), AuthError>> {
         Box::pin(async move {
+            let uri = Url::parse(&request.uri().to_string())
+                .map_err(|_| AuthError::Other("invalid request URI".to_owned()))?;
             let Some(account) = self
                 .account_manager
                 .get_current_account()
@@ -902,11 +934,18 @@ impl AuthProvider for Arc<LegacyPasswordStrategy> {
             else {
                 return Err(AuthError::NoSession);
             };
+            let scheme_allowed = uri.scheme() == "https" || self.allow_loopback;
+            if !scheme_allowed || canonical_origin_string(&uri) != account.pds {
+                request.headers_mut().remove(AUTHORIZATION);
+                return Ok((request, AuthCtx::default()));
+            }
             let Some(session) = self.get_session(&account.did).await? else {
                 return Err(AuthError::NoSession);
             };
-            let header = http::HeaderValue::from_str(&format!("Bearer {}", session.access_jwt()))
-                .map_err(|_| AuthError::Other("invalid access token header".to_owned()))?;
+            let mut header =
+                http::HeaderValue::from_str(&format!("Bearer {}", session.access_jwt()))
+                    .map_err(|_| AuthError::Other("invalid access token header".to_owned()))?;
+            header.set_sensitive(true);
             request.headers_mut().insert(AUTHORIZATION, header);
             let ctx = AuthCtx {
                 did: Some(account.did),

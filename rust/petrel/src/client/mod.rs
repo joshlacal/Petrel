@@ -199,6 +199,38 @@ impl AtProtoClient {
         Ok(())
     }
 
+    /// Updates `atproto-accept-labelers` only if `expected_continuity` and `expected_did` still match.
+    pub async fn configure_labelers_if_continuity(
+        &self,
+        expected_continuity: &AuthContinuitySnapshot,
+        expected_did: Option<&Did>,
+        labelers: &[XrpcLabeler],
+    ) -> Result<bool, ClientError> {
+        let deduped = XrpcLabeler::deduplicated(labelers);
+        let mut state = self.state.write().await;
+        let current_did = self.account_manager.current_did().await?;
+        let outcome = self
+            .auth_manager
+            .perform_with_exact_auth_continuity(expected_continuity, || {
+                current_did.as_ref() == expected_did
+            })
+            .await;
+        if outcome != AuthContinuityTransactionResult::Performed(true) {
+            return Ok(false);
+        }
+        state.labelers = Some(deduped);
+        state.xrpc = build_xrpc_client(
+            &state.base_url,
+            &self.transport,
+            &self.auth_manager,
+            &state.headers,
+            &state.service_dids,
+            state.labelers.as_deref(),
+            state.request_ids,
+        )?;
+        Ok(true)
+    }
+
     /// Returns the currently configured labelers, or `None` when the header is omitted.
     pub async fn configured_labelers(&self) -> Option<Vec<XrpcLabeler>> {
         self.state.read().await.labelers.clone()
@@ -236,9 +268,16 @@ impl AtProtoClient {
         Ok(())
     }
 
-    /// Returns a cloned snapshot of the underlying [`XrpcClient`].
+    /// Returns a cloned snapshot of the underlying [`XrpcClient`], bound to the current
+    /// authentication continuity and active account DID.
     pub async fn xrpc(&self) -> XrpcClient {
-        self.state.read().await.xrpc.clone()
+        let state = self.state.read().await;
+        let continuity = self.auth_manager.auth_continuity_snapshot().await;
+        let expected_did = self.account_manager.current_did().await.ok().flatten();
+        state
+            .xrpc
+            .clone()
+            .with_auth_provider(self.auth_manager.bind_continuity(continuity, expected_did))
     }
 
     /// Returns the current authentication continuity snapshot.
@@ -462,13 +501,21 @@ impl AtProtoClient {
 
     async fn effective_call(&self, options: &CallOptions) -> (XrpcClient, CallOptions) {
         let state = self.state.read().await;
+        let continuity = self.auth_manager.auth_continuity_snapshot().await;
+        let expected_did = self.account_manager.current_did().await.ok().flatten();
         let mut effective = options.clone();
         if effective.accept_labelers.is_none()
             && let Some(ref labelers) = state.labelers
         {
             effective.accept_labelers = Some(labelers.clone());
         }
-        (state.xrpc.clone(), effective)
+        (
+            state
+                .xrpc
+                .clone()
+                .with_auth_provider(self.auth_manager.bind_continuity(continuity, expected_did)),
+            effective,
+        )
     }
 }
 

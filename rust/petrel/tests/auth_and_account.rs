@@ -105,6 +105,7 @@ struct FakePdsState {
     create_session_did_override: Option<String>,
     forced_status: HashMap<String, u16>,
     refresh_delay_ms: u64,
+    refresh_post_response_gate: Option<(Arc<tokio::sync::Notify>, Arc<tokio::sync::Notify>)>,
     access_lifetime_secs: u64,
     counter: u64,
 }
@@ -121,6 +122,7 @@ impl FakePdsState {
             create_session_did_override: None,
             forced_status: HashMap::new(),
             refresh_delay_ms: 0,
+            refresh_post_response_gate: None,
             access_lifetime_secs: 7200,
             counter: 0,
         }
@@ -209,6 +211,19 @@ impl FakePdsNetwork {
         let server = servers.get_mut(origin).unwrap();
         let tokens: Vec<String> = server.access_tokens.keys().cloned().collect();
         server.expired_access_tokens.extend(tokens);
+    }
+
+    fn set_refresh_post_response_gate(
+        &self,
+        origin: &str,
+        gate: Option<(Arc<tokio::sync::Notify>, Arc<tokio::sync::Notify>)>,
+    ) {
+        self.servers
+            .lock()
+            .unwrap()
+            .get_mut(origin)
+            .unwrap()
+            .refresh_post_response_gate = gate;
     }
 }
 
@@ -379,10 +394,15 @@ impl HttpTransport for FakePdsNetwork {
         let body: serde_json::Value =
             serde_json::from_slice(request.body()).unwrap_or_else(|_| serde_json::json!({}));
 
-        let delay_ms = if path == "/xrpc/com.atproto.server.refreshSession" {
-            self.servers.lock().unwrap()[&origin].refresh_delay_ms
+        let (delay_ms, gate) = if path == "/xrpc/com.atproto.server.refreshSession" {
+            let mut servers = self.servers.lock().unwrap();
+            let server = servers.get_mut(&origin).unwrap();
+            (
+                server.refresh_delay_ms,
+                server.refresh_post_response_gate.take(),
+            )
         } else {
-            0
+            (0, None)
         };
         let servers_ref = &self.servers;
         async move {
@@ -433,6 +453,11 @@ impl HttpTransport for FakePdsNetwork {
                 });
                 result
             };
+
+            if let Some((entered, release)) = gate {
+                entered.notify_one();
+                release.notified().await;
+            }
 
             Ok(Response::builder()
                 .status(status)
@@ -922,4 +947,186 @@ async fn legacy_password_concurrent_refresh_coalesces_without_deadlock_and_recov
         .await
         .unwrap();
     assert_eq!(action, UnauthorizedAction::GiveUp);
+}
+
+fn bob_account() -> FakeAccount {
+    FakeAccount {
+        did: "did:plc:passwordbob".to_owned(),
+        handle: "bob.test".to_owned(),
+        email: "bob@example.com".to_owned(),
+        password: "bob-password".to_owned(),
+        active: true,
+        status: None,
+        requires_auth_factor: false,
+    }
+}
+
+#[tokio::test]
+async fn legacy_password_xrpc_snapshot_and_origin_check_prevent_cross_account_token_leak() {
+    let pds_a = Url::parse("https://pds-a.test").unwrap();
+    let pds_b = Url::parse("https://pds-b.test").unwrap();
+
+    let mut state_a = FakePdsState::new("https://pds-a.test");
+    state_a
+        .accounts
+        .insert(ALICE_DID.to_owned(), alice_account());
+    let mut state_b = FakePdsState::new("https://pds-b.test");
+    state_b
+        .accounts
+        .insert(bob_account().did.clone(), bob_account());
+
+    let net = Arc::new(FakePdsNetwork::new(vec![state_a, state_b]));
+    let resolver = Arc::new(FakeResolver::new());
+    resolver.register(ALICE_DID, ALICE_HANDLE, &pds_a);
+    resolver.register(&bob_account().did, "bob.test", &pds_b);
+
+    let store = SessionStore::new(Arc::new(MemorySecretStore::new()), "pw-xrpc-snap").unwrap();
+    let client = AtProtoClient::new(
+        pds_a.clone(),
+        net.clone(),
+        store,
+        resolver.clone(),
+        None,
+        AuthMode::Legacy,
+        false,
+    )
+    .unwrap();
+
+    client
+        .login_with_password("bob.test", "bob-password", None)
+        .await
+        .unwrap();
+    client
+        .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, None)
+        .await
+        .unwrap();
+
+    let xrpc_alice = client.xrpc().await;
+    let bob_did: Did = bob_account().did.parse().unwrap();
+    client.switch_to_account(&bob_did).await.unwrap();
+
+    // Retained XRPC snapshot from Alice must fail closed after switching to Bob.
+    let err = xrpc_alice
+        .query(
+            "app.bsky.actor.getProfile",
+            [("actor", ALICE_DID)],
+            &CallOptions::default(),
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(err, petrel::xrpc::Error::Auth(_)));
+    assert_eq!(net.calls("https://pds-a.test", "getProfile").len(), 0);
+
+    // Raw LegacyPasswordStrategy pointed at PDS-A while Bob (PDS-B) is active must strip auth.
+    let raw_store = SessionStore::new(Arc::new(MemorySecretStore::new()), "pw-raw-origin").unwrap();
+    let raw_accounts = Arc::new(AccountManager::new(raw_store));
+    let strategy = Arc::new(LegacyPasswordStrategy::new(
+        raw_accounts,
+        net.clone(),
+        resolver,
+        pds_b.clone(),
+    ));
+    strategy
+        .login_with_password("bob.test", "bob-password", None)
+        .await
+        .unwrap();
+    let raw_xrpc = petrel::xrpc::XrpcClient::new(pds_a, net.clone())
+        .unwrap()
+        .with_auth_provider(Arc::new(strategy));
+    let _ = raw_xrpc
+        .query(
+            "app.bsky.actor.getProfile",
+            [("actor", ALICE_DID)],
+            &CallOptions::default(),
+        )
+        .await;
+    let calls = net.calls("https://pds-a.test", "getProfile");
+    assert_eq!(calls.len(), 1);
+    assert!(calls[0].auth.is_none());
+}
+
+#[tokio::test]
+async fn legacy_password_inflight_refresh_rejects_commit_after_logout_or_relogin() {
+    let pds_url = Url::parse("https://pds.lifecycle.test").unwrap();
+    let mut state = FakePdsState::new("https://pds.lifecycle.test");
+    state.accounts.insert(ALICE_DID.to_owned(), alice_account());
+
+    let net = Arc::new(FakePdsNetwork::new(vec![state]));
+    let resolver = Arc::new(FakeResolver::new());
+    resolver.register(ALICE_DID, ALICE_HANDLE, &pds_url);
+
+    let store = SessionStore::new(Arc::new(MemorySecretStore::new()), "pw-lifecycle").unwrap();
+    let accounts = Arc::new(AccountManager::new(store.clone()));
+    let strategy = Arc::new(LegacyPasswordStrategy::new(
+        accounts,
+        net.clone(),
+        resolver,
+        pds_url,
+    ));
+    strategy
+        .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, None)
+        .await
+        .unwrap();
+
+    // Part A: logout completes after 200 OK refresh is issued -> deleted session is NOT recreated.
+    let entered_a = Arc::new(tokio::sync::Notify::new());
+    let release_a = Arc::new(tokio::sync::Notify::new());
+    net.set_refresh_post_response_gate(
+        "https://pds.lifecycle.test",
+        Some((Arc::clone(&entered_a), Arc::clone(&release_a))),
+    );
+    let strat_a = Arc::clone(&strategy);
+    let refresh_task = tokio::spawn(async move { strat_a.refresh_token_if_needed(true).await });
+    entered_a.notified().await;
+    strategy.logout().await.unwrap();
+    release_a.notify_one();
+    let refresh_outcome = refresh_task.await.unwrap();
+    assert!(matches!(
+        refresh_outcome,
+        Err(PasswordAuthError::TokenRefreshFailed(_))
+    ));
+    let alice_did: Did = ALICE_DID.parse().unwrap();
+    assert!(strategy.get_session(&alice_did).await.unwrap().is_none());
+    assert!(store.get_current_did().await.unwrap().is_none());
+
+    // Part B: re-login replaces session after 200 OK refresh is issued -> newer tokens stay intact.
+    strategy
+        .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, None)
+        .await
+        .unwrap();
+    let entered_b = Arc::new(tokio::sync::Notify::new());
+    let release_b = Arc::new(tokio::sync::Notify::new());
+    net.set_refresh_post_response_gate(
+        "https://pds.lifecycle.test",
+        Some((Arc::clone(&entered_b), Arc::clone(&release_b))),
+    );
+    let strat_b = Arc::clone(&strategy);
+    let stale_refresh = tokio::spawn(async move { strat_b.refresh_token_if_needed(true).await });
+    entered_b.notified().await;
+    strategy
+        .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, None)
+        .await
+        .unwrap();
+    release_b.notify_one();
+    let latest_access = strategy
+        .get_session(&alice_did)
+        .await
+        .unwrap()
+        .unwrap()
+        .access_jwt()
+        .to_owned();
+    let stale_outcome = stale_refresh.await.unwrap();
+    assert!(matches!(
+        stale_outcome,
+        Err(PasswordAuthError::TokenRefreshFailed(_))
+    ));
+    assert_eq!(
+        strategy
+            .get_session(&alice_did)
+            .await
+            .unwrap()
+            .unwrap()
+            .access_jwt(),
+        latest_access
+    );
 }

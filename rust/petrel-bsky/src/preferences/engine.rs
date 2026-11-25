@@ -27,8 +27,33 @@ use super::utilities::{
     sanitize_muted_word_value, saved_feed_type, saved_feeds_to_uri_arrays, validate_saved_feed,
 };
 
+/// One account/session-pinned read-modify-write handle for preferences.
+pub trait BskyPreferencesSession: MaybeSend + MaybeSync {
+    /// Returns the `preferences` array of `app.bsky.actor.getPreferences` untouched.
+    fn load_preferences(&self) -> BoxFuture<'_, Result<Vec<JsonValue>, BskyAgentError>>;
+
+    /// Replaces the stored array via `app.bsky.actor.putPreferences` if auth continuity still holds.
+    fn save_preferences(
+        &self,
+        preferences: Vec<JsonValue>,
+    ) -> BoxFuture<'_, Result<(), BskyAgentError>>;
+
+    /// Applies the user's labeler subscriptions if auth continuity still holds.
+    fn configure_labelers(
+        &self,
+        labelers: Vec<XrpcLabeler>,
+    ) -> BoxFuture<'_, Result<(), BskyAgentError>>;
+}
+
 /// Storage backend for raw `preferences` JSON entries.
 pub trait BskyPreferencesBackend: MaybeSend + MaybeSync {
+    /// Begins one account/session-bound preference transaction, if supported by the backend.
+    fn begin_session(
+        &self,
+    ) -> BoxFuture<'_, Result<Option<Arc<dyn BskyPreferencesSession>>, BskyAgentError>> {
+        Box::pin(async { Ok(None) })
+    }
+
     /// Returns the `preferences` array of `app.bsky.actor.getPreferences` untouched.
     fn load_preferences(&self) -> BoxFuture<'_, Result<Vec<JsonValue>, BskyAgentError>>;
 
@@ -40,6 +65,37 @@ pub trait BskyPreferencesBackend: MaybeSend + MaybeSync {
 
     /// Applies the user's labeler subscriptions to subsequent requests.
     fn configure_labelers(&self, labelers: Vec<XrpcLabeler>) -> BoxFuture<'_, ()>;
+}
+
+enum ActivePreferencesSession<'a> {
+    Bound(Arc<dyn BskyPreferencesSession>),
+    Stateless(&'a dyn BskyPreferencesBackend),
+}
+
+impl ActivePreferencesSession<'_> {
+    async fn load_preferences(&self) -> Result<Vec<JsonValue>, BskyAgentError> {
+        match self {
+            Self::Bound(session) => session.load_preferences().await,
+            Self::Stateless(backend) => backend.load_preferences().await,
+        }
+    }
+
+    async fn save_preferences(&self, preferences: Vec<JsonValue>) -> Result<(), BskyAgentError> {
+        match self {
+            Self::Bound(session) => session.save_preferences(preferences).await,
+            Self::Stateless(backend) => backend.save_preferences(preferences).await,
+        }
+    }
+
+    async fn configure_labelers(&self, labelers: Vec<XrpcLabeler>) -> Result<(), BskyAgentError> {
+        match self {
+            Self::Bound(session) => session.configure_labelers(labelers).await,
+            Self::Stateless(backend) => {
+                backend.configure_labelers(labelers).await;
+                Ok(())
+            }
+        }
+    }
 }
 
 /// Read-modify-write preferences coordinator matching Swift `BskyPreferencesEngine`.
@@ -87,6 +143,13 @@ impl BskyPreferencesEngine {
             .map_err(|err| BskyAgentError::InvalidInput(format!("failed to generate TID: {err}")))
     }
 
+    async fn open_session(&self) -> Result<ActivePreferencesSession<'_>, BskyAgentError> {
+        match self.backend.begin_session().await? {
+            Some(session) => Ok(ActivePreferencesSession::Bound(session)),
+            None => Ok(ActivePreferencesSession::Stateless(self.backend.as_ref())),
+        }
+    }
+
     /// Reads, transforms, and saves preferences under the lock, returning `(written, result)`.
     pub async fn update_preferences_returning<R, F>(
         &self,
@@ -96,9 +159,10 @@ impl BskyPreferencesEngine {
         F: FnOnce(Vec<JsonValue>) -> Result<(Vec<JsonValue>, R), BskyAgentError>,
     {
         let _guard = self.lock.lock().await;
-        let current = self.backend.load_preferences().await?;
+        let session = self.open_session().await?;
+        let current = session.load_preferences().await?;
         let (next, result) = transform(current)?;
-        self.backend.save_preferences(next.clone()).await?;
+        session.save_preferences(next.clone()).await?;
         Ok((next, result))
     }
 
@@ -125,10 +189,11 @@ impl BskyPreferencesEngine {
         F: FnOnce(Vec<JsonValue>) -> Result<Vec<JsonValue>, BskyAgentError>,
     {
         let _guard = self.lock.lock().await;
-        let current = self.backend.load_preferences().await?;
+        let session = self.open_session().await?;
+        let current = session.load_preferences().await?;
         let next = transform(current)?;
-        self.backend.save_preferences(next.clone()).await?;
-        self.apply_labelers(&next).await;
+        session.save_preferences(next.clone()).await?;
+        self.apply_labelers_with(&session, &next).await?;
         Ok(next)
     }
 
@@ -143,7 +208,11 @@ impl BskyPreferencesEngine {
         pref.labelers.into_iter().map(|item| item.did).collect()
     }
 
-    async fn apply_labelers(&self, preferences: &[JsonValue]) {
+    async fn apply_labelers_with(
+        &self,
+        session: &ActivePreferencesSession<'_>,
+        preferences: &[JsonValue],
+    ) -> Result<(), BskyAgentError> {
         let mut labelers: Vec<XrpcLabeler> = self
             .app_labelers
             .iter()
@@ -158,17 +227,27 @@ impl BskyPreferencesEngine {
                 redact: false,
             });
         }
-        self.backend.configure_labelers(labelers).await;
+        session.configure_labelers(labelers).await
     }
 
     /// Fetches, migrates `savedFeedsPrefV2` if absent, applies labelers, and parses preferences.
     pub async fn get_preferences(&self) -> Result<BskyPreferences, BskyAgentError> {
-        let raw = {
-            let _guard = self.lock.lock().await;
-            let raw = self.backend.load_preferences().await?;
-            self.apply_labelers(&raw).await;
-            raw
-        };
+        let (raw, migrated_feeds) =
+            {
+                let _guard = self.lock.lock().await;
+                let session = self.open_session().await?;
+                let raw = session.load_preferences().await?;
+                self.apply_labelers_with(&session, &raw).await?;
+                let migrated =
+                    if last_valid::<SavedFeedsPrefV2>(&raw, SavedFeedsPrefV2::TYPE_IDENTIFIER)
+                        .is_none()
+                    {
+                        Some(self.migrate_saved_feeds_with(&session, &raw).await?)
+                    } else {
+                        None
+                    };
+                (raw, migrated)
+            };
 
         let mut prefs = BskyPreferences {
             moderation_prefs: ModerationPrefs {
@@ -193,6 +272,8 @@ impl BskyPreferencesEngine {
         }
 
         prefs.saved_feeds = if let Some(feeds) = saved_feeds {
+            feeds
+        } else if let Some(feeds) = migrated_feeds {
             feeds
         } else {
             self.migrate_saved_feeds_if_needed().await?
@@ -608,34 +689,40 @@ impl BskyPreferencesEngine {
 
     /// Migrates v1 `savedFeedsPref` (or creates a default Following feed) when `savedFeedsPrefV2` is absent.
     pub async fn migrate_saved_feeds_if_needed(&self) -> Result<Vec<SavedFeed>, BskyAgentError> {
-        let items = {
-            let _guard = self.lock.lock().await;
-            let current = self.backend.load_preferences().await?;
-            if let Some((existing, _)) =
-                last_valid::<SavedFeedsPrefV2>(&current, SavedFeedsPrefV2::TYPE_IDENTIFIER)
-            {
-                existing
-                    .get("items")
-                    .and_then(JsonValue::as_array)
-                    .cloned()
-                    .unwrap_or_default()
-            } else {
-                let legacy =
-                    last_valid::<SavedFeedsPref>(&current, SavedFeedsPref::TYPE_IDENTIFIER)
-                        .map(|(_, val)| val);
-                let migrated: Vec<JsonValue> = self
-                    .migrated_saved_feeds(
-                        legacy.as_ref().map(|v| v.saved.as_slice()),
-                        legacy.as_ref().map(|v| v.pinned.as_slice()),
-                    )?
-                    .iter()
-                    .map(saved_feed_json)
-                    .collect();
-                let (next_prefs, result) =
-                    Self::rewriting_saved_feeds_v2(current, |_| Ok(migrated))?;
-                self.backend.save_preferences(next_prefs).await?;
-                result
-            }
+        let _guard = self.lock.lock().await;
+        let session = self.open_session().await?;
+        let current = session.load_preferences().await?;
+        self.migrate_saved_feeds_with(&session, &current).await
+    }
+
+    async fn migrate_saved_feeds_with(
+        &self,
+        session: &ActivePreferencesSession<'_>,
+        current: &[JsonValue],
+    ) -> Result<Vec<SavedFeed>, BskyAgentError> {
+        let items = if let Some((existing, _)) =
+            last_valid::<SavedFeedsPrefV2>(current, SavedFeedsPrefV2::TYPE_IDENTIFIER)
+        {
+            existing
+                .get("items")
+                .and_then(JsonValue::as_array)
+                .cloned()
+                .unwrap_or_default()
+        } else {
+            let legacy = last_valid::<SavedFeedsPref>(current, SavedFeedsPref::TYPE_IDENTIFIER)
+                .map(|(_, val)| val);
+            let migrated: Vec<JsonValue> = self
+                .migrated_saved_feeds(
+                    legacy.as_ref().map(|v| v.saved.as_slice()),
+                    legacy.as_ref().map(|v| v.pinned.as_slice()),
+                )?
+                .iter()
+                .map(saved_feed_json)
+                .collect();
+            let (next_prefs, result) =
+                Self::rewriting_saved_feeds_v2(current.to_vec(), |_| Ok(migrated))?;
+            session.save_preferences(next_prefs).await?;
+            result
         };
         decode_saved_feeds(&items)
     }

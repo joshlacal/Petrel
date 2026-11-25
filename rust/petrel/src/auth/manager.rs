@@ -346,6 +346,98 @@ impl AuthManager {
             ActiveStrategy::None | ActiveStrategy::Gateway { .. }
         )
     }
+
+    /// Wraps this [`AuthManager`] in a provider bound to `(expected_continuity, expected_did)`.
+    #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+    #[must_use]
+    pub fn bind_continuity(
+        self: &Arc<Self>,
+        expected_continuity: AuthContinuitySnapshot,
+        expected_did: Option<Did>,
+    ) -> Arc<dyn AuthProvider> {
+        Arc::new(BoundAuthProvider {
+            auth_manager: Arc::clone(self),
+            expected_continuity,
+            expected_did,
+        })
+    }
+}
+
+#[derive(Clone)]
+struct BoundAuthProvider {
+    auth_manager: Arc<AuthManager>,
+    expected_continuity: AuthContinuitySnapshot,
+    expected_did: Option<Did>,
+}
+
+impl BoundAuthProvider {
+    async fn check_binding(&self) -> Result<(), AuthError> {
+        let continuity = self.auth_manager.auth_continuity_snapshot().await;
+        if continuity != self.expected_continuity {
+            return Err(AuthError::Other(
+                "authentication continuity changed".to_owned(),
+            ));
+        }
+        let current_did = self
+            .auth_manager
+            .account_manager
+            .current_did()
+            .await
+            .map_err(|e| AuthError::Other(e.to_string()))?;
+        if current_did != self.expected_did {
+            return Err(AuthError::Other("active account changed".to_owned()));
+        }
+        Ok(())
+    }
+}
+
+impl AuthProvider for BoundAuthProvider {
+    fn prepare(
+        &self,
+        request: Request<Bytes>,
+    ) -> BoxFuture<'_, Result<(Request<Bytes>, AuthCtx), AuthError>> {
+        Box::pin(async move {
+            self.check_binding().await?;
+            let prepared = self.auth_manager.prepare(request).await?;
+            self.check_binding().await?;
+            Ok(prepared)
+        })
+    }
+
+    fn refresh_if_needed(&self) -> BoxFuture<'_, Result<(), AuthError>> {
+        Box::pin(async move {
+            self.check_binding().await?;
+            self.auth_manager.refresh_if_needed().await
+        })
+    }
+
+    fn handle_unauthorized<'a>(
+        &'a self,
+        response: &'a Response<Bytes>,
+        ctx: &'a AuthCtx,
+    ) -> BoxFuture<'a, Result<UnauthorizedAction, AuthError>> {
+        Box::pin(async move {
+            if self.check_binding().await.is_err() {
+                return Ok(UnauthorizedAction::GiveUp);
+            }
+            self.auth_manager.handle_unauthorized(response, ctx).await
+        })
+    }
+
+    fn update_dpop_nonce<'a>(
+        &'a self,
+        origin: &'a str,
+        nonce: &'a str,
+        ctx: &'a AuthCtx,
+    ) -> BoxFuture<'a, ()> {
+        Box::pin(async move {
+            if self.check_binding().await.is_ok() {
+                self.auth_manager
+                    .update_dpop_nonce(origin, nonce, ctx)
+                    .await;
+            }
+        })
+    }
 }
 
 impl AuthProvider for AuthManager {
