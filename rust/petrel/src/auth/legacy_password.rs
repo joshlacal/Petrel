@@ -634,21 +634,15 @@ impl LegacyPasswordStrategy {
             return Err(PasswordAuthError::NoActiveAccount);
         };
 
-        if let Some(existing) = self.active_refreshes.lock().await.get(&did).cloned() {
+        let existing = {
+            let refreshes = self.active_refreshes.lock().await;
+            refreshes.get(&did).cloned()
+        };
+        if let Some(existing) = existing {
             return existing.await;
         }
 
         let token_hash = sha256_bytes(session.refresh_jwt().as_bytes());
-        {
-            let mut used = self.used_refresh_tokens.lock().await;
-            if used.contains(&token_hash) {
-                used.remove(&token_hash);
-                return Err(PasswordAuthError::TokenRefreshFailed(
-                    "refresh token replay prevented".to_owned(),
-                ));
-            }
-        }
-
         if !self.circuit_breaker.can_attempt_refresh(&did).await {
             return Err(PasswordAuthError::TokenRefreshFailed(
                 "refresh circuit breaker is open".to_owned(),
@@ -685,35 +679,51 @@ impl LegacyPasswordStrategy {
             return Ok(TokenRefreshResult::StillValid);
         }
 
-        self.used_refresh_tokens.lock().await.insert(token_hash);
-
-        let this = Arc::clone(self);
-        let did_for_task = did.clone();
-        let fut = async move {
-            let res = this.perform_refresh(&did_for_task).await;
-            this.active_refreshes.lock().await.remove(&did_for_task);
-            if let Err(ref err) = res
-                && !matches!(err, PasswordAuthError::InvalidCredentials)
-            {
-                this.used_refresh_tokens.lock().await.remove(&token_hash);
+        let shared = {
+            let mut refreshes = self.active_refreshes.lock().await;
+            if let Some(existing) = refreshes.get(&did).cloned() {
+                drop(refreshes);
+                return existing.await;
             }
-            res
-        };
-        #[cfg(not(target_arch = "wasm32"))]
-        let boxed: FuturesBoxFuture<
-            'static,
-            Result<TokenRefreshResult, PasswordAuthError>,
-        > = Box::pin(fut);
-        #[cfg(target_arch = "wasm32")]
-        let boxed: std::pin::Pin<
-            Box<dyn std::future::Future<Output = Result<TokenRefreshResult, PasswordAuthError>>>,
-        > = Box::pin(fut);
+            {
+                let mut used = self.used_refresh_tokens.lock().await;
+                if used.contains(&token_hash) {
+                    used.remove(&token_hash);
+                    return Err(PasswordAuthError::TokenRefreshFailed(
+                        "refresh token replay prevented".to_owned(),
+                    ));
+                }
+                used.insert(token_hash);
+            }
 
-        let shared = boxed.shared();
-        self.active_refreshes
-            .lock()
-            .await
-            .insert(did, shared.clone());
+            let this = Arc::clone(self);
+            let did_for_task = did.clone();
+            let fut = async move {
+                let res = this.perform_refresh(&did_for_task).await;
+                this.active_refreshes.lock().await.remove(&did_for_task);
+                if let Err(ref err) = res
+                    && !matches!(err, PasswordAuthError::InvalidCredentials)
+                {
+                    this.used_refresh_tokens.lock().await.remove(&token_hash);
+                }
+                res
+            };
+            #[cfg(not(target_arch = "wasm32"))]
+            let boxed: FuturesBoxFuture<
+                'static,
+                Result<TokenRefreshResult, PasswordAuthError>,
+            > = Box::pin(fut);
+            #[cfg(target_arch = "wasm32")]
+            let boxed: std::pin::Pin<
+                Box<
+                    dyn std::future::Future<Output = Result<TokenRefreshResult, PasswordAuthError>>,
+                >,
+            > = Box::pin(fut);
+
+            let shared = boxed.shared();
+            refreshes.insert(did, shared.clone());
+            shared
+        };
         shared.await
     }
 
@@ -922,7 +932,13 @@ impl AuthProvider for Arc<LegacyPasswordStrategy> {
         ctx: &'a AuthCtx,
     ) -> BoxFuture<'a, Result<UnauthorizedAction, AuthError>> {
         Box::pin(async move {
-            if response.status() != StatusCode::UNAUTHORIZED {
+            let error_code = serde_json::from_slice::<XrpcErrorBody>(response.body())
+                .ok()
+                .map(|body| body.error);
+            let is_refreshable = response.status() == StatusCode::UNAUTHORIZED
+                || (response.status() == StatusCode::BAD_REQUEST
+                    && error_code.as_deref() == Some("ExpiredToken"));
+            if !is_refreshable {
                 return Ok(UnauthorizedAction::GiveUp);
             }
             if let Some(status_err) = AccountStatusError::from_xrpc_body(response.body()) {
@@ -933,6 +949,12 @@ impl AuthProvider for Arc<LegacyPasswordStrategy> {
                         .insert(did.clone(), status_err.status.clone());
                 }
                 return Err(AuthError::AccountStatus(status_err));
+            }
+            if let (Some(did), Some(sent_gen)) = (ctx.did.as_ref(), ctx.session_generation)
+                && let Ok(Some(current)) = self.get_session(did).await
+                && current.generation() != sent_gen
+            {
+                return Ok(UnauthorizedAction::Retry);
             }
             match self.refresh_token_if_needed(true).await {
                 Ok(TokenRefreshResult::RefreshedSuccessfully) => Ok(UnauthorizedAction::Retry),
