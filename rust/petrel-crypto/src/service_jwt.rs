@@ -146,6 +146,13 @@ impl<'a> ServiceJWTMintOptions<'a> {
 }
 
 /// Options for verifying a service JWT directly against a known public key via [`ServiceJWT::verify_with_options`].
+///
+/// # Security
+///
+/// Leaving `expected_audience` or `expected_method` as `None` **skips** validating those claims
+/// (matching Swift `ServiceJWT.verify(_:publicKey:)` defaults). Any service authenticating
+/// inbound requests MUST validate both `aud` and `lxm` — prefer [`crate::ServiceAuthVerifier`]
+/// or construct options with [`ServiceJWTVerifyOptions::for_service`].
 #[derive(Debug, Clone)]
 pub struct ServiceJWTVerifyOptions<'a> {
     /// Signature encoding policy (defaults to [`ATProtoSignatureVerificationOptions::JWT`]).
@@ -164,7 +171,38 @@ pub struct ServiceJWTVerifyOptions<'a> {
     pub maximum_lifetime: Duration,
 }
 
+impl<'a> ServiceJWTVerifyOptions<'a> {
+    /// Creates verification options enforcing both an expected service `aud` and `lxm` NSID.
+    ///
+    /// Use this constructor (or [`crate::ServiceAuthVerifier`]) when verifying inbound service
+    /// requests instead of relying on [`Default`] (`None`/`None`).
+    #[must_use]
+    pub fn for_service(expected_audience: &'a str, expected_method: &'a str) -> Self {
+        Self {
+            expected_audience: Some(expected_audience),
+            expected_method: Some(expected_method),
+            ..Self::default()
+        }
+    }
+
+    /// Creates verification options enforcing an expected `aud` while leaving `lxm` unchecked.
+    #[must_use]
+    pub fn for_audience(expected_audience: &'a str) -> Self {
+        Self {
+            expected_audience: Some(expected_audience),
+            ..Self::default()
+        }
+    }
+}
+
 impl Default for ServiceJWTVerifyOptions<'_> {
+    /// Returns default options (`expected_audience: None`, `expected_method: None`, 5s skew, 1h max lifetime).
+    ///
+    /// # Security
+    ///
+    /// Both `expected_audience` and `expected_method` default to `None` (skipping those checks)
+    /// to match Swift `ServiceJWT.verify(_:publicKey:)`. Services authenticating requests should
+    /// use [`ServiceJWTVerifyOptions::for_service`] or [`crate::ServiceAuthVerifier`].
     fn default() -> Self {
         Self {
             signature_options: ATProtoSignatureVerificationOptions::JWT,
@@ -320,6 +358,14 @@ impl ServiceJWT {
     }
 
     /// Verifies a service JWT against a [`PublicKey`] using default options.
+    ///
+    /// # Security
+    ///
+    /// Matching Swift `ServiceJWT.verify(_:publicKey:)`, this skips `aud` and `lxm` checks
+    /// (`expected_audience: None`, `expected_method: None`). Services authenticating inbound
+    /// requests MUST verify both `aud` and `lxm` via [`Self::verify_for_service`],
+    /// [`Self::verify_with_public_key`] with [`ServiceJWTVerifyOptions::for_service`], or
+    /// [`crate::ServiceAuthVerifier`].
     pub fn verify(
         compact: &str,
         public_key: &PublicKey,
@@ -331,7 +377,26 @@ impl ServiceJWT {
         )
     }
 
+    /// Verifies a service JWT against a [`PublicKey`], requiring exact `aud` and `lxm` claims.
+    pub fn verify_for_service(
+        compact: &str,
+        public_key: &PublicKey,
+        expected_audience: &str,
+        expected_method: &str,
+    ) -> Result<ServiceJWTClaims, PetrelCryptoError> {
+        Self::verify_with_public_key(
+            compact,
+            public_key,
+            &ServiceJWTVerifyOptions::for_service(expected_audience, expected_method),
+        )
+    }
+
     /// Verifies a service JWT against an [`ATProtoJWTVerificationKey`] with explicit options.
+    ///
+    /// # Security
+    ///
+    /// Any `None` in `options.expected_audience` or `options.expected_method` skips checking
+    /// that claim. Inbound request authenticators must enforce both claims.
     pub fn verify_with_options(
         compact: &str,
         public_key: &ATProtoJWTVerificationKey,
@@ -757,6 +822,12 @@ impl SpaceServiceJWT {
     }
 
     /// Verifies a service JWT against an [`ATProtoJWTVerificationKey`] using Spaces defaults.
+    ///
+    /// # Security
+    ///
+    /// Passing `None` for `expected_audience` or `expected_method` skips checking that claim.
+    /// Services authenticating inbound requests must supply both `Some(...)` (or use
+    /// [`crate::ServiceAuthVerifier`]).
     pub fn verify(
         compact: &str,
         public_key: &ATProtoJWTVerificationKey,

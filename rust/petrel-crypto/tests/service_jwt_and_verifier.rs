@@ -820,3 +820,126 @@ fn bearer_header_rejects_multibyte_utf8_at_scheme_boundary_without_panicking() {
         Ok("abc.def.ghi".to_owned())
     );
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+fn service_jwt_for_service_options_enforce_audience_and_method() {
+    let p256 = P256Keypair::generate().unwrap();
+    let opts = ServiceJWTMintOptions::new(ISSUER, AUDIENCE, Some(METHOD));
+    let token = ServiceJWT::mint_sync(&opts, ServiceJWTSigningKey::P256(&p256)).unwrap();
+
+    // verify_for_service accepts exact aud + lxm
+    let claims = ServiceJWT::verify_for_service(&token, p256.public_key(), AUDIENCE, METHOD)
+        .expect("exact audience and method should verify");
+    assert_eq!(claims.aud, AUDIENCE);
+    assert_eq!(claims.lxm.as_deref(), Some(METHOD));
+
+    // verify_for_service rejects wrong aud or wrong lxm
+    assert!(
+        ServiceJWT::verify_for_service(
+            &token,
+            p256.public_key(),
+            "did:web:other.example.com#bsky_appview",
+            METHOD
+        )
+        .is_err()
+    );
+    assert!(
+        ServiceJWT::verify_for_service(&token, p256.public_key(), AUDIENCE, "app.bsky.feed.other")
+            .is_err()
+    );
+
+    // Token without lxm fails for_service / verify_for_service
+    let no_lxm_opts = ServiceJWTMintOptions::new(ISSUER, AUDIENCE, None);
+    let no_lxm_token =
+        ServiceJWT::mint_sync(&no_lxm_opts, ServiceJWTSigningKey::P256(&p256)).unwrap();
+    assert!(
+        ServiceJWT::verify_for_service(&no_lxm_token, p256.public_key(), AUDIENCE, METHOD).is_err()
+    );
+
+    let pinned = ServiceJWTVerifyOptions::for_service(AUDIENCE, METHOD);
+    assert!(ServiceJWT::verify_with_public_key(&token, p256.public_key(), &pinned).is_ok());
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn replay_store_scopes_by_issuer_evicts_expired_before_capacity_and_bounds_per_issuer() {
+    let clock_secs = Arc::new(Mutex::new(1_700_000_000_u64));
+    let c_clone = Arc::clone(&clock_secs);
+    let store = InMemoryServiceAuthReplayStore::with_config(
+        2,
+        Arc::new(move || ts(*c_clone.lock().unwrap())),
+    );
+
+    // Scoped by (issuer, nonce): identical nonce across two issuers is distinct.
+    assert!(
+        store
+            .claim("shared-jti", "did:plc:issuer1", ts(1_700_000_010))
+            .await
+            .unwrap()
+    );
+    assert!(
+        store
+            .claim("shared-jti", "did:plc:issuer2", ts(1_700_000_010))
+            .await
+            .unwrap()
+    );
+    assert!(
+        !store
+            .claim("shared-jti", "did:plc:issuer1", ts(1_700_000_010))
+            .await
+            .unwrap()
+    );
+
+    // Capacity is full with unexpired entries -> CapacityExceeded.
+    assert_eq!(
+        store
+            .claim("extra-jti", "did:plc:issuer3", ts(1_700_000_020))
+            .await,
+        Err(ReplayStoreError::CapacityExceeded { capacity: 2 })
+    );
+
+    // Advance past expiry (still < 30s sweep interval!) -> expired entries evict before rejecting.
+    *clock_secs.lock().unwrap() = 1_700_000_011;
+    assert!(
+        store
+            .claim("fresh-jti", "did:plc:issuer3", ts(1_700_000_030))
+            .await
+            .unwrap()
+    );
+
+    // Already-expired claims do not consume a capacity slot.
+    assert!(
+        store
+            .claim("already-expired", "did:plc:issuer4", ts(1_700_000_005))
+            .await
+            .unwrap()
+    );
+    assert_eq!(store.len(), 1);
+
+    // Optional per-issuer cap isolates abusive issuer from other issuers.
+    let c_clone2 = Arc::clone(&clock_secs);
+    let isolated = InMemoryServiceAuthReplayStore::with_config(
+        10,
+        Arc::new(move || ts(*c_clone2.lock().unwrap())),
+    )
+    .with_per_issuer_capacity(1);
+    assert!(
+        isolated
+            .claim("j1", "did:plc:noisy", ts(1_700_000_050))
+            .await
+            .unwrap()
+    );
+    assert_eq!(
+        isolated
+            .claim("j2", "did:plc:noisy", ts(1_700_000_050))
+            .await,
+        Err(ReplayStoreError::CapacityExceeded { capacity: 1 })
+    );
+    assert!(
+        isolated
+            .claim("j1", "did:plc:other", ts(1_700_000_050))
+            .await
+            .unwrap()
+    );
+}

@@ -51,6 +51,7 @@ struct ReplayState {
 /// Process-local [`ServiceAuthReplayStore`] with capacity-bounded pruning.
 pub struct InMemoryServiceAuthReplayStore {
     capacity: usize,
+    per_issuer_capacity: Option<usize>,
     clock: ClockFn,
     state: Mutex<ReplayState>,
 }
@@ -59,6 +60,7 @@ impl fmt::Debug for InMemoryServiceAuthReplayStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("InMemoryServiceAuthReplayStore")
             .field("capacity", &self.capacity)
+            .field("per_issuer_capacity", &self.per_issuer_capacity)
             .field("count", &self.len())
             .finish_non_exhaustive()
     }
@@ -80,12 +82,21 @@ impl InMemoryServiceAuthReplayStore {
     pub fn with_config(capacity: usize, clock: ClockFn) -> Self {
         Self {
             capacity: capacity.max(1),
+            per_issuer_capacity: None,
             clock,
             state: Mutex::new(ReplayState {
                 seen: HashMap::new(),
                 next_sweep: UNIX_EPOCH,
             }),
         }
+    }
+
+    /// Configures a per-issuer limit on unexpired nonces so one issuer cannot exhaust
+    /// global store capacity for other issuers in multi-tenant deployments.
+    #[must_use]
+    pub fn with_per_issuer_capacity(mut self, limit: usize) -> Self {
+        self.per_issuer_capacity = Some(limit.max(1));
+        self
     }
 
     /// Number of nonces currently remembered.
@@ -116,7 +127,15 @@ impl ServiceAuthReplayStore for InMemoryServiceAuthReplayStore {
                 .state
                 .lock()
                 .map_err(|_| ReplayStoreError::Backend("replay store lock poisoned".into()))?;
-            if now >= guard.next_sweep || guard.seen.len() >= self.capacity {
+            let issuer_limit_hit = self.per_issuer_capacity.is_some_and(|limit| {
+                guard
+                    .seen
+                    .keys()
+                    .filter(|existing| existing.issuer == key.issuer)
+                    .count()
+                    >= limit
+            });
+            if now >= guard.next_sweep || guard.seen.len() >= self.capacity || issuer_limit_hit {
                 guard.seen.retain(|_, &mut until| until > now);
                 guard.next_sweep = now + Duration::from_secs(30);
             }
@@ -124,6 +143,19 @@ impl ServiceAuthReplayStore for InMemoryServiceAuthReplayStore {
                 && recorded_until > now
             {
                 return Ok(false);
+            }
+            if expires_at <= now {
+                return Ok(true);
+            }
+            if let Some(limit) = self.per_issuer_capacity {
+                let issuer_count = guard
+                    .seen
+                    .keys()
+                    .filter(|existing| existing.issuer == key.issuer)
+                    .count();
+                if issuer_count >= limit {
+                    return Err(ReplayStoreError::CapacityExceeded { capacity: limit });
+                }
             }
             if guard.seen.len() >= self.capacity {
                 return Err(ReplayStoreError::CapacityExceeded {
