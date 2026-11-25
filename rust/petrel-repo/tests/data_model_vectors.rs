@@ -135,6 +135,7 @@ fn blob_and_strong_ref_record_codec_parity() {
     assert_eq!(like.typed_blob_references().unwrap(), vec![]);
 }
 
+#[allow(clippy::too_many_lines)]
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn record_codec_enforces_safe_integers_depth_type_and_blessed_links() {
@@ -239,5 +240,60 @@ fn record_codec_enforces_safe_integers_depth_type_and_blessed_links() {
     // Strict JSON rejects floats and padded $bytes
     assert!(parse_strict_json(br#"{"a":1.5}"#, true).is_err());
     assert!(parse_strict_json(br#"{"b":{"$bytes":"AQID="}}"#, true).is_err());
+
+    // Strict JSON and Record::from_json_bytes reject duplicate keys (top-level, nested, and wrappers)
+    // and excessive nesting depth during deserialization.
+    let dup_top = br#"{"$type":"app.bsky.feed.post","text":"first","text":"second"}"#;
+    assert!(matches!(
+        parse_strict_json(dup_top, true),
+        Err(petrel_repo::error::RecordJsonError::DuplicateKey(ref k)) if k == "text"
+    ));
+    assert!(matches!(
+        Record::from_json_bytes(dup_top),
+        Err(RecordCodecError::Json(
+            petrel_repo::error::RecordJsonError::DuplicateKey(ref k)
+        )) if k == "text"
+    ));
+
+    let dup_nested = br#"{"$type":"app.bsky.feed.post","embed":{"k":1,"k":2}}"#;
+    assert!(matches!(
+        Record::from_json_bytes(dup_nested),
+        Err(RecordCodecError::Json(
+            petrel_repo::error::RecordJsonError::DuplicateKey(ref k)
+        )) if k == "k"
+    ));
+
+    let cid_str = "bafkreiexxtxgfx3tvpg4h5pjzlzvmc2rozjbt5wc6fjlzyqgz4fswzyliq";
+    let dup_link = format!(
+        r#"{{"$type":"app.bsky.feed.post","ref":{{"$link":"{cid_str}","$link":"{cid_str}"}}}}"#
+    );
+    assert!(matches!(
+        Record::from_json_bytes(dup_link.as_bytes()),
+        Err(RecordCodecError::Json(
+            petrel_repo::error::RecordJsonError::DuplicateKey(ref k)
+        )) if k == "$link"
+    ));
+
+    let dup_bytes = br#"{"$type":"app.bsky.feed.post","blob":{"$bytes":"AQID","$bytes":"AQID"}}"#;
+    assert!(matches!(
+        Record::from_json_bytes(dup_bytes),
+        Err(RecordCodecError::Json(
+            petrel_repo::error::RecordJsonError::DuplicateKey(ref k)
+        )) if k == "$bytes"
+    ));
+
+    let deep_json = format!(
+        "{}1{}",
+        "[".repeat(MAX_RECORD_DEPTH + 2),
+        "]".repeat(MAX_RECORD_DEPTH + 2)
+    );
+    assert!(matches!(
+        parse_strict_json(deep_json.as_bytes(), true),
+        Err(petrel_repo::error::RecordJsonError::DepthExceeded(
+            MAX_RECORD_DEPTH
+        ))
+    ));
+    assert!(parse_strict_json(br#"{"a":1} trailing"#, true).is_err());
+
     let _ = dagcbor::encode(&Value::Null);
 }

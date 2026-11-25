@@ -164,6 +164,8 @@ pub enum RecordJsonError {
     InvalidUtf8,
     #[error("invalid JSON syntax: {0}")]
     Syntax(String),
+    #[error("duplicate key {0:?} in JSON object")]
+    DuplicateKey(String),
     #[error("top-level record JSON must be an object")]
     TopLevelNotObject,
     #[error("floating-point numbers are disallowed in AT Protocol records")]

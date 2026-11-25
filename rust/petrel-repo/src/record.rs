@@ -1,8 +1,11 @@
+use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::fmt;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use petrel_core::{Cid, Nsid, Value, dagcbor};
+use serde::de::{self, DeserializeSeed, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde_json::{Map as JsonMap, Value as JsonValue};
 
 use crate::error::{RecordCodecError, RecordJsonError};
@@ -425,88 +428,169 @@ fn collect_blob_cids(
 }
 
 /// Parses strict AT Protocol JSON (`RepositoryRecordJSON`):
-/// rejects floating-point tokens and accepts exact integer literals, `$link`,
-/// and `$bytes` wrappers.
+/// rejects duplicate keys, floating-point tokens, and excessive nesting depth,
+/// and accepts exact integer literals, `$link`, and `$bytes` wrappers.
 pub fn parse_strict_json(bytes: &[u8], require_safe_int: bool) -> Result<Value, RecordJsonError> {
     let json_text = std::str::from_utf8(bytes).map_err(|_| RecordJsonError::InvalidUtf8)?;
-    let parsed: JsonValue =
-        serde_json::from_str(json_text).map_err(|err| RecordJsonError::Syntax(err.to_string()))?;
-    json_to_value(&parsed, require_safe_int, 0)
+    let error_slot = RefCell::new(None);
+    let mut de = serde_json::Deserializer::from_str(json_text);
+    let seed = StrictJsonSeed {
+        require_safe_int,
+        depth: 0,
+        error: &error_slot,
+    };
+    let value = match seed.deserialize(&mut de) {
+        Ok(val) => val,
+        Err(err) => {
+            if let Some(typed_err) = error_slot.into_inner() {
+                return Err(typed_err);
+            }
+            return Err(RecordJsonError::Syntax(err.to_string()));
+        }
+    };
+    de.end()
+        .map_err(|err| RecordJsonError::Syntax(err.to_string()))?;
+    Ok(value)
 }
 
-fn json_to_value(
-    json: &JsonValue,
+#[derive(Clone, Copy)]
+struct StrictJsonSeed<'a> {
     require_safe_int: bool,
     depth: usize,
-) -> Result<Value, RecordJsonError> {
-    if depth > MAX_RECORD_DEPTH {
-        return Err(RecordJsonError::DepthExceeded(MAX_RECORD_DEPTH));
+    error: &'a RefCell<Option<RecordJsonError>>,
+}
+
+impl StrictJsonSeed<'_> {
+    fn fail<E: de::Error>(self, err: RecordJsonError) -> E {
+        let mut guard = self.error.borrow_mut();
+        if guard.is_none() {
+            *guard = Some(err);
+        }
+        de::Error::custom("strict JSON validation failed")
     }
-    match json {
-        JsonValue::Null => Ok(Value::Null),
-        JsonValue::Bool(b) => Ok(Value::Bool(*b)),
-        JsonValue::Number(num) => {
-            let raw = num.to_string();
-            if raw.contains('.') {
-                return Err(RecordJsonError::FloatingPointDisallowed);
+
+    fn check_integer<E: de::Error>(self, integer: i64) -> Result<Value, E> {
+        if self.require_safe_int && !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&integer) {
+            return Err(self.fail(RecordJsonError::IntegerOutOfRange(integer.to_string())));
+        }
+        Ok(Value::Integer(integer))
+    }
+}
+
+impl<'de> DeserializeSeed<'de> for StrictJsonSeed<'_> {
+    type Value = Value;
+
+    fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
+        if self.depth > MAX_RECORD_DEPTH {
+            return Err(self.fail(RecordJsonError::DepthExceeded(MAX_RECORD_DEPTH)));
+        }
+        deserializer.deserialize_any(self)
+    }
+}
+
+impl<'de> Visitor<'de> for StrictJsonSeed<'_> {
+    type Value = Value;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("a strict AT Protocol JSON value")
+    }
+
+    fn visit_bool<E: de::Error>(self, v: bool) -> Result<Self::Value, E> {
+        Ok(Value::Bool(v))
+    }
+
+    fn visit_i64<E: de::Error>(self, v: i64) -> Result<Self::Value, E> {
+        self.check_integer(v)
+    }
+
+    fn visit_u64<E: de::Error>(self, v: u64) -> Result<Self::Value, E> {
+        let integer = i64::try_from(v)
+            .map_err(|_| self.fail::<E>(RecordJsonError::IntegerOutOfRange(v.to_string())))?;
+        self.check_integer(integer)
+    }
+
+    fn visit_f64<E: de::Error>(self, _v: f64) -> Result<Self::Value, E> {
+        Err(self.fail(RecordJsonError::FloatingPointDisallowed))
+    }
+
+    fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+        Ok(Value::String(v.to_owned()))
+    }
+
+    fn visit_string<E: de::Error>(self, v: String) -> Result<Self::Value, E> {
+        Ok(Value::String(v))
+    }
+
+    fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
+        Ok(Value::Null)
+    }
+
+    fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
+        Ok(Value::Null)
+    }
+
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        let mut out = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+        let child_seed = StrictJsonSeed {
+            require_safe_int: self.require_safe_int,
+            depth: self.depth + 1,
+            error: self.error,
+        };
+        while let Some(item) = seq.next_element_seed(child_seed)? {
+            out.push(item);
+        }
+        Ok(Value::Array(out))
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, mut access: A) -> Result<Self::Value, A::Error> {
+        let mut map = BTreeMap::new();
+        let child_seed = StrictJsonSeed {
+            require_safe_int: self.require_safe_int,
+            depth: self.depth + 1,
+            error: self.error,
+        };
+        while let Some(key) = access.next_key::<String>()? {
+            if map.contains_key(&key) {
+                return Err(self.fail(RecordJsonError::DuplicateKey(key)));
             }
-            let integer = if let Some(i) = num.as_i64() {
-                i
-            } else if let Some(u) = num.as_u64() {
-                i64::try_from(u).map_err(|_| RecordJsonError::IntegerOutOfRange(raw))?
-            } else {
-                return Err(RecordJsonError::FloatingPointDisallowed);
+            let val = access.next_value_seed(child_seed)?;
+            map.insert(key, val);
+        }
+
+        if let Some(link_val) = map.get("$link") {
+            if map.len() != 1 {
+                return Err(self.fail(RecordJsonError::InvalidSpecialWrapper(
+                    "$link object cannot contain extra fields".into(),
+                )));
+            }
+            let Value::String(cid_str) = link_val else {
+                return Err(self.fail(RecordJsonError::InvalidSpecialWrapper(
+                    "$link value must be a string".into(),
+                )));
             };
-            if require_safe_int && !(MIN_SAFE_INT..=MAX_SAFE_INT).contains(&integer) {
-                return Err(RecordJsonError::IntegerOutOfRange(integer.to_string()));
-            }
-            Ok(Value::Integer(integer))
+            let cid = Cid::parse(cid_str).map_err(|err| {
+                self.fail::<A::Error>(RecordJsonError::InvalidSpecialWrapper(format!(
+                    "invalid $link CID: {err}"
+                )))
+            })?;
+            return Ok(Value::Link(cid));
         }
-        JsonValue::String(s) => Ok(Value::String(s.clone())),
-        JsonValue::Array(arr) => {
-            let mut out = Vec::with_capacity(arr.len());
-            for item in arr {
-                out.push(json_to_value(item, require_safe_int, depth + 1)?);
+        if let Some(bytes_val) = map.get("$bytes") {
+            if map.len() != 1 {
+                return Err(self.fail(RecordJsonError::InvalidSpecialWrapper(
+                    "$bytes object cannot contain extra fields".into(),
+                )));
             }
-            Ok(Value::Array(out))
+            let Value::String(b64) = bytes_val else {
+                return Err(self.fail(RecordJsonError::InvalidSpecialWrapper(
+                    "$bytes value must be a string".into(),
+                )));
+            };
+            let decoded = decode_lenient_unpadded_base64(b64).map_err(|err| self.fail(err))?;
+            return Ok(Value::Bytes(decoded));
         }
-        JsonValue::Object(obj) => {
-            if let Some(link_val) = obj.get("$link") {
-                if obj.len() != 1 {
-                    return Err(RecordJsonError::InvalidSpecialWrapper(
-                        "$link object cannot contain extra fields".into(),
-                    ));
-                }
-                let JsonValue::String(cid_str) = link_val else {
-                    return Err(RecordJsonError::InvalidSpecialWrapper(
-                        "$link value must be a string".into(),
-                    ));
-                };
-                let cid = Cid::parse(cid_str).map_err(|err| {
-                    RecordJsonError::InvalidSpecialWrapper(format!("invalid $link CID: {err}"))
-                })?;
-                return Ok(Value::Link(cid));
-            }
-            if let Some(bytes_val) = obj.get("$bytes") {
-                if obj.len() != 1 {
-                    return Err(RecordJsonError::InvalidSpecialWrapper(
-                        "$bytes object cannot contain extra fields".into(),
-                    ));
-                }
-                let JsonValue::String(b64) = bytes_val else {
-                    return Err(RecordJsonError::InvalidSpecialWrapper(
-                        "$bytes value must be a string".into(),
-                    ));
-                };
-                let decoded = decode_lenient_unpadded_base64(b64)?;
-                return Ok(Value::Bytes(decoded));
-            }
-            let mut map = BTreeMap::new();
-            for (k, v) in obj {
-                map.insert(k.clone(), json_to_value(v, require_safe_int, depth + 1)?);
-            }
-            Ok(Value::Object(map))
-        }
+
+        Ok(Value::Object(map))
     }
 }
 
