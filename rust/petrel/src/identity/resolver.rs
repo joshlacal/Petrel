@@ -290,12 +290,27 @@ impl<D: DnsResolver, C: IdentityCache> IdentityResolver<D, C> {
         did: &Did,
         kind: ServiceKind,
     ) -> Result<Option<Url>, IdentityError> {
+        let allow_dev_endpoint = self.allows_development_endpoint_for(did);
         self.resolve_did_document(did)
             .await?
-            .validated_service_endpoint_with_development(
-                kind,
-                self.options.allow_development_identifiers,
-            )
+            .validated_service_endpoint_with_development(kind, allow_dev_endpoint)
+    }
+
+    fn allows_development_endpoint_for(&self, did: &Did) -> bool {
+        if !self.options.allow_development_identifiers {
+            return false;
+        }
+        match did.method() {
+            "web" => DidWebIdentifier::parse(did.as_str(), true).is_ok_and(|web| {
+                let host = web.host();
+                host == "localhost"
+                    || host
+                        .rsplit_once('.')
+                        .is_some_and(|(_, tld)| tld.eq_ignore_ascii_case("test"))
+            }),
+            "plc" => is_development_url(&self.options.plc_directory),
+            _ => false,
+        }
     }
 
     pub async fn invalidate_did(&self, did: &Did) {
@@ -650,7 +665,7 @@ impl<D: DnsResolver, C: IdentityCache> IdentityResolver<D, C> {
         let options = SendOptions {
             timeout: Some(self.options.timeout),
             max_response_bytes: Some(size as u64),
-            allow_loopback: self.options.allow_development_identifiers,
+            allow_loopback: self.options.allow_development_identifiers && is_loopback_url(url),
             anonymous: true,
             ..SendOptions::default()
         };
@@ -684,6 +699,19 @@ struct ResolveHandleOutput {
 
 fn invalid_handle() -> Handle {
     "handle.invalid".parse().expect("fixed handle sentinel")
+}
+
+fn is_loopback_url(url: &Url) -> bool {
+    matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"))
+}
+
+fn is_development_url(url: &Url) -> bool {
+    is_loopback_url(url)
+        || url.host_str().is_some_and(|host| {
+            host.trim_end_matches('.')
+                .rsplit_once('.')
+                .is_some_and(|(_, tld)| tld.eq_ignore_ascii_case("test"))
+        })
 }
 
 fn strict_did(value: &str) -> Option<Did> {

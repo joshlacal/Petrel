@@ -354,3 +354,62 @@ async fn refresh_replaces_a_record_another_encoder_wrote() {
         .unwrap();
     assert_eq!(saved.session.access_token(), "after-refresh");
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn expired_oauth_states_are_swept_when_saving_or_sweeping() {
+    let (backend, sessions) = in_memory();
+    sessions
+        .save_oauth_state("abandoned-1", 1000, &"one")
+        .await
+        .unwrap();
+    sessions
+        .save_oauth_state("abandoned-2", 1200, &"two")
+        .await
+        .unwrap();
+    assert!(
+        backend
+            .get("petrel", "oauthState.abandoned-1")
+            .await
+            .unwrap()
+            .is_some()
+    );
+
+    // Saving a new state at t=1700 sweeps abandoned-1 (age 700 > 600) while
+    // retaining abandoned-2 (age 500 <= 600).
+    sessions
+        .save_oauth_state("fresh", 1700, &"three")
+        .await
+        .unwrap();
+    assert!(
+        backend
+            .get("petrel", "oauthState.abandoned-1")
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        backend
+            .get("petrel", "oauthState.abandoned-2")
+            .await
+            .unwrap()
+            .is_some()
+    );
+
+    // Sweeping at t=2000 cleans abandoned-2 (age 800 > 600).
+    assert_eq!(sessions.sweep_expired_oauth_states(2000).await.unwrap(), 1);
+    assert!(
+        backend
+            .get("petrel", "oauthState.abandoned-2")
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        backend
+            .get("petrel", "oauthState.fresh")
+            .await
+            .unwrap()
+            .is_some()
+    );
+}

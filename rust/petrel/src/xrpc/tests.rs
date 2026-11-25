@@ -597,3 +597,207 @@ async fn explicit_routing_and_validated_body_headers_take_precedence() {
     );
     assert_eq!(seen[1].0.headers()["content-type"], "application/json");
 }
+
+fn response_with_header(status: u16, header_value: &'static str) -> Response<Bytes> {
+    let mut resp = reply(status, b"");
+    resp.headers_mut()
+        .insert("www-authenticate", HeaderValue::from_static(header_value));
+    resp
+}
+
+#[tokio::test]
+async fn non_nonce_401_skips_refresh_for_scope_dpop_empty_and_service_errors() {
+    let no_refresh_cases: Vec<(&str, CallOptions, Response<Bytes>)> = vec![
+        (
+            "com.atproto.server.getSession",
+            CallOptions::default(),
+            reply(401, br#"{"error":"insufficient_scope"}"#),
+        ),
+        (
+            "com.atproto.server.getSession",
+            CallOptions::default(),
+            reply(401, br#"{"error":"invalid_dpop_proof"}"#),
+        ),
+        (
+            "com.atproto.server.getSession",
+            CallOptions::default(),
+            reply(401, b""),
+        ),
+        (
+            "com.atproto.server.getSession",
+            CallOptions::default(),
+            response_with_header(401, r#"DPoP error="insufficient_scope""#),
+        ),
+        (
+            "com.atproto.server.getSession",
+            CallOptions::default(),
+            response_with_header(401, r#"DPoP error="invalid_dpop_proof""#),
+        ),
+        (
+            "chat.bsky.convo.listConvos",
+            CallOptions::default(),
+            reply(401, br#"{"error":"NotEnrolled"}"#),
+        ),
+        (
+            "chat.bsky.convo.listConvos",
+            CallOptions::default(),
+            reply(401, br#"{"error":"AccountTakedown"}"#),
+        ),
+        (
+            "chat.bsky.convo.listConvos",
+            CallOptions::default(),
+            reply(401, b""),
+        ),
+        (
+            "chat.bsky.convo.listConvos",
+            CallOptions::default(),
+            reply(400, br#"{"error":"InvalidRequest"}"#),
+        ),
+        (
+            "app.bsky.feed.getTimeline",
+            CallOptions {
+                service: Some(Url::parse("https://api.bsky.app").unwrap()),
+                ..CallOptions::default()
+            },
+            reply(401, br#"{"error":"ExpiredToken"}"#),
+        ),
+    ];
+
+    for (nsid, options, template_resp) in no_refresh_cases {
+        let status = template_resp.status();
+        let headers = template_resp.headers().clone();
+        let body = template_resp.into_body();
+        let mock = Arc::new(MockTransport::new(
+            move |_: &Request<Bytes>, _: &SendOptions, _| {
+                let mut resp = Response::builder()
+                    .status(status)
+                    .body(body.clone())
+                    .unwrap();
+                *resp.headers_mut() = headers.clone();
+                Ok(resp)
+            },
+        ));
+        let auth = Arc::new(MockAuth::default());
+        let xrpc = XrpcClient::new(Url::parse("https://pds.example.com").unwrap(), mock.clone())
+            .unwrap()
+            .with_auth_provider(auth.clone());
+        let err = xrpc.query(nsid, EMPTY, &options).await.unwrap_err();
+        assert!(matches!(err, Error::Xrpc(_)), "unexpected err: {err:?}");
+        assert_eq!(mock.seen().len(), 1, "should not retry {nsid}");
+        assert_eq!(
+            auth.unauthorized.load(Ordering::Relaxed),
+            0,
+            "should not refresh for {nsid}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn non_nonce_401_refreshes_for_own_pds_invalid_token_challenges() {
+    let refresh_cases: Vec<(&str, Option<&str>, Response<Bytes>)> = vec![
+        (
+            "com.atproto.server.getSession",
+            None,
+            reply(401, br#"{"error":"invalid_token"}"#),
+        ),
+        (
+            "com.atproto.server.getSession",
+            None,
+            reply(401, br#"{"error":"ExpiredToken"}"#),
+        ),
+        (
+            "com.atproto.server.getSession",
+            None,
+            reply(401, br#"{"error":"InvalidToken"}"#),
+        ),
+        (
+            "com.atproto.server.getSession",
+            None,
+            response_with_header(401, r#"DPoP error="invalid_token""#),
+        ),
+        (
+            "com.atproto.server.getSession",
+            None,
+            response_with_header(401, r#"Bearer error="invalid_token""#),
+        ),
+        (
+            "chat.bsky.convo.listConvos",
+            Some("did:web:api.bsky.chat#bsky_chat"),
+            reply(401, br#"{"error":"invalid_token"}"#),
+        ),
+        (
+            "chat.bsky.convo.listConvos",
+            Some("did:web:api.bsky.chat#bsky_chat"),
+            reply(401, br#"{"error":"ExpiredToken"}"#),
+        ),
+        (
+            "chat.bsky.convo.listConvos",
+            Some("did:web:api.bsky.chat#bsky_chat"),
+            reply(400, br#"{"error":"ExpiredToken"}"#),
+        ),
+        (
+            "app.bsky.feed.getTimeline",
+            Some("did:web:api.bsky.app#bsky_appview"),
+            response_with_header(401, r#"DPoP error="invalid_token""#),
+        ),
+    ];
+
+    for (nsid, expected_proxy, template_resp) in refresh_cases {
+        let status = template_resp.status();
+        let headers = template_resp.headers().clone();
+        let body = template_resp.into_body();
+        let mock = Arc::new(MockTransport::new(
+            move |_: &Request<Bytes>, _: &SendOptions, ordinal| {
+                if ordinal == 0 {
+                    let mut resp = Response::builder()
+                        .status(status)
+                        .body(body.clone())
+                        .unwrap();
+                    *resp.headers_mut() = headers.clone();
+                    Ok(resp)
+                } else {
+                    Ok(reply(200, b"{}"))
+                }
+            },
+        ));
+        let auth = Arc::new(MockAuth::default());
+        XrpcClient::new(Url::parse("https://pds.example.com").unwrap(), mock.clone())
+            .unwrap()
+            .with_auth_provider(auth.clone())
+            .query(nsid, EMPTY, &CallOptions::default())
+            .await
+            .unwrap();
+        let seen = mock.seen();
+        assert_eq!(seen.len(), 2, "should refresh and retry {nsid}");
+        if let Some(proxy) = expected_proxy {
+            assert_eq!(seen[0].0.headers()["atproto-proxy"], proxy);
+            assert_eq!(seen[1].0.headers()["atproto-proxy"], proxy);
+        }
+        assert_eq!(auth.unauthorized.load(Ordering::Relaxed), 1);
+    }
+}
+
+#[test]
+fn call_options_debug_redacts_sensitive_headers() {
+    let mut options = CallOptions::default();
+    options.headers.insert(
+        "authorization",
+        HeaderValue::from_static("Bearer top-secret-token"),
+    );
+    options
+        .headers
+        .insert("dpop", HeaderValue::from_static("signed-dpop-proof"));
+    options
+        .headers
+        .insert("cookie", HeaderValue::from_static("sid=secret"));
+    options
+        .headers
+        .insert("accept", HeaderValue::from_static("application/json"));
+
+    let rendered = format!("{options:?}");
+    assert!(!rendered.contains("top-secret-token"), "{rendered}");
+    assert!(!rendered.contains("signed-dpop-proof"), "{rendered}");
+    assert!(!rendered.contains("sid=secret"), "{rendered}");
+    assert!(rendered.contains("<REDACTED>"), "{rendered}");
+    assert!(rendered.contains("application/json"), "{rendered}");
+}

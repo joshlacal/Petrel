@@ -259,3 +259,58 @@ async fn live_atproto_handle_round_trips() {
     assert_eq!(identity.handle, handle);
     assert_eq!(identity.verification, HandleVerification::Verified);
 }
+
+#[tokio::test]
+async fn claimed_handle_matches_swift_first_valid_at_entry_rule() {
+    let document: DidDocument = serde_json::from_slice(
+        br#"{
+            "id": "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa",
+            "alsoKnownAs": [
+                "https://example.com",
+                "example.com",
+                "at://not a handle",
+                "at://invalid..handle",
+                "at://First.Example.com",
+                "at://second.example.com"
+            ]
+        }"#,
+    )
+    .unwrap();
+    assert_eq!(
+        document.claimed_handle().unwrap().normalized(),
+        "first.example.com"
+    );
+}
+
+#[tokio::test]
+async fn allow_development_identifiers_does_not_allow_loopback_endpoints_from_public_plc() {
+    let localhost_doc = br##"{
+        "id": "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa",
+        "service": [{
+            "id": "#atproto_pds",
+            "type": "AtprotoPersonalDataServer",
+            "serviceEndpoint": "http://localhost:2583"
+        }]
+    }"##;
+    let http = Arc::new(MockTransport::new(
+        move |_: &Request<Bytes>, options: &SendOptions, _| {
+            assert!(!options.allow_loopback);
+            Ok(reply(200, localhost_doc))
+        },
+    ));
+    let resolver = IdentityResolver::new(
+        http,
+        Arc::new(Dns::new(&[])),
+        IdentityOptions {
+            allow_development_identifiers: true,
+            ..IdentityOptions::default()
+        },
+    );
+    let did: Did = DID.parse().unwrap();
+    assert!(matches!(
+        resolver
+            .resolve_service_endpoint(&did, ServiceKind::Pds)
+            .await,
+        Err(IdentityError::InvalidServiceEndpoint { .. })
+    ));
+}

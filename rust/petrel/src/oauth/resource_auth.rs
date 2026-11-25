@@ -13,7 +13,7 @@ use crate::{
 use super::{
     OAuthClient, OAuthError,
     client::valid_access_token,
-    dpop::{dpop_proof, oauth_error_code},
+    dpop::{dpop_proof, is_refreshable_token_rejection, oauth_error_code},
     metadata::{origin, require_canonical_origin},
     protocol::{OAuthProtocolError, unix_now},
 };
@@ -120,23 +120,9 @@ impl AuthProvider for SessionAuth {
     ) -> BoxFuture<'a, Result<UnauthorizedAction, AuthError>> {
         Box::pin(async move {
             let code = oauth_error_code(response.body());
-            let refreshable = response.status() == StatusCode::UNAUTHORIZED
-                || (response.status() == StatusCode::BAD_REQUEST && code == Some("ExpiredToken"));
-            if !refreshable || ctx.did.as_ref() != Some(&self.did) {
-                return Ok(UnauthorizedAction::GiveUp);
-            }
-            if matches!(
-                code,
-                Some(
-                    "AccountTakedown"
-                        | "AccountSuspended"
-                        | "AccountDeactivated"
-                        | "AccountDeleted"
-                        | "Suspended"
-                        | "Deactivated"
-                        | "Deleted"
-                )
-            ) {
+            if !is_refreshable_token_rejection(response, code)
+                || ctx.did.as_ref() != Some(&self.did)
+            {
                 return Ok(UnauthorizedAction::GiveUp);
             }
             let Some(record) = self
@@ -280,7 +266,7 @@ impl SessionAuth {
         let token = ServiceAuthToken::inspect(response.token)?;
         let now =
             i64::try_from(unix_now().map_err(OAuthError::from)?).map_err(|_| Error::Unavailable)?;
-        token.validate_claims(&self.did, audience, method, now)?;
+        token.validate_claims_for_lifetime(&self.did, audience, method, now, lifetime)?;
         Ok(token)
     }
 }

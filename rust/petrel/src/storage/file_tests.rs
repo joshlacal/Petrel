@@ -284,3 +284,82 @@ async fn one_damaged_entry_does_not_lock_the_rest_of_the_store() {
         Err(StoreError::KeyMismatch)
     ));
 }
+
+#[tokio::test]
+async fn v2_envelope_binds_namespace_and_key_as_aad_while_v1_remains_readable() {
+    let root = tempfile::tempdir().unwrap();
+    let path = store_path(&root);
+    let store = FileSecretStore::open(&path, &KEY).unwrap();
+    store.put("ns1", "k1", b"secret-v2").await.unwrap();
+
+    // Verify v2 magic prefix on disk.
+    let src_name = encode_entry_filename("ns1.k1");
+    let raw = fs::read(path.join(&src_name)).unwrap();
+    assert!(raw.starts_with(b"PTLSECv2"));
+
+    // Copying/renaming ciphertext to a different key or namespace fails AAD auth.
+    for target in ["ns1.k2", "ns2.k1"] {
+        let dst_name = encode_entry_filename(target);
+        fs::write(path.join(&dst_name), &raw).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            fs::set_permissions(path.join(&dst_name), fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        let (ns, k) = target.split_once('.').unwrap();
+        assert!(
+            matches!(store.get(ns, k).await, Err(StoreError::Corrupt(_))),
+            "renaming v2 entry to {target} must fail AAD verification"
+        );
+    }
+
+    // Legacy v1 entry (Swift format) remains readable alongside v2 entries.
+    fs::write(
+        path.join(encode_entry_filename("interop.swift-token")),
+        STANDARD
+            .decode("DSfyUqYH7i0a0Bgzwxchx19LUAqUN5sZvqp0zddzlOhI4+aGG6r2tlE=")
+            .unwrap(),
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        fs::set_permissions(
+            path.join(encode_entry_filename("interop.swift-token")),
+            fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
+    }
+    assert_eq!(
+        store
+            .get("interop", "swift-token")
+            .await
+            .unwrap()
+            .as_deref(),
+        Some(b"Swift to Rust".as_slice())
+    );
+    assert_eq!(
+        store.get("ns1", "k1").await.unwrap().as_deref(),
+        Some(b"secret-v2".as_slice())
+    );
+
+    // Rewriting a legacy v1 entry migrates it on disk to PTLSECv2 with AAD.
+    store
+        .put("interop", "swift-token", b"migrated-v2")
+        .await
+        .unwrap();
+    let migrated_raw = fs::read(path.join(encode_entry_filename("interop.swift-token"))).unwrap();
+    assert!(migrated_raw.starts_with(b"PTLSECv2"));
+    assert_eq!(
+        store
+            .get("interop", "swift-token")
+            .await
+            .unwrap()
+            .as_deref(),
+        Some(b"migrated-v2".as_slice())
+    );
+}
+
+fn encode_entry_filename(input: &str) -> String {
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(input)
+}

@@ -44,7 +44,11 @@ from main import (
 )
 from swift_code_generator import SwiftCodeGenerator
 from rust_code_generator import RustCodeGenerator
-from rust_type_converter import resolve_rust_def_type_name, rust_module_segments
+from rust_type_converter import (
+    resolve_rust_def_type_name,
+    rust_module_file_segments,
+    rust_module_segments,
+)
 from utils import convert_to_camel_case
 
 CLI_VERSION = "2.0.0"
@@ -1212,7 +1216,7 @@ def _extract_inspection_metadata(lexicon: dict[str, Any]) -> dict[str, Any]:
     ns_dir = get_namespace_path(lexicon_id)
     swift_path = f"Lexicons/{ns_dir}/{swift_symbol}.swift"
     kotlin_path = f"lexicons/{ns_dir.lower()}/{kotlin_symbol}.kt"
-    rust_path = "/".join(rust_module_segments(lexicon_id)) + ".rs"
+    rust_path = "/".join(rust_module_file_segments(lexicon_id)) + ".rs"
 
     ns_parts = [lower_camel(part) for part in namespace_segments(lexicon_id)]
     leaf_segment = lexicon_id.rsplit(".", 1)[-1]

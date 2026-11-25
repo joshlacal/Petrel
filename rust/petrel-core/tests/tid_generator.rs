@@ -75,17 +75,27 @@ fn previous_revision() {
         100
     );
     let future = Tid::from_parts(1000, 1023).unwrap();
+    let after_future = generator.next_after(&future).unwrap();
+    assert_eq!(after_future.timestamp_micros(), 1001);
+    // Chaining advances cleanly past `after_future`, while `next()` is NOT
+    // dragged into the far future by an external peer's skewed timestamp.
     assert_eq!(
-        generator.next_after(&future).unwrap().timestamp_micros(),
-        1001
-    );
-    // Following a future TID moves the local sequence with it: a second
-    // call cannot repeat the identifier, and `next` keeps increasing.
-    assert_eq!(
-        generator.next_after(&future).unwrap().timestamp_micros(),
+        generator
+            .next_after(&after_future)
+            .unwrap()
+            .timestamp_micros(),
         1002
     );
-    assert_eq!(generator.next().unwrap().timestamp_micros(), 1003);
+    let local = generator.next().unwrap();
+    assert_eq!(local.timestamp_micros(), 103);
+    assert!(local > prior);
+
+    let near_max = Tid::from_parts(Tid::MAX_TIMESTAMP_MICROS - 1, 0).unwrap();
+    assert_eq!(
+        generator.next_after(&near_max).unwrap().timestamp_micros(),
+        Tid::MAX_TIMESTAMP_MICROS
+    );
+    assert!(generator.next().unwrap().timestamp_micros() < 1000);
     for first in "234567ab".chars() {
         let tid = Tid::parse(format!("{first}222222222222")).unwrap();
         assert!(generator.next_after(&tid).unwrap() > tid);

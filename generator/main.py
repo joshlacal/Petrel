@@ -9,7 +9,11 @@ from base_code_generator import validate_lexicon_schema
 from swift_code_generator import SwiftCodeGenerator, convert_json_to_swift
 from kotlin_code_generator import KotlinCodeGenerator
 from kotlin_type_converter import convert_to_pascal_case
-from rust_type_converter import compute_rust_boxed_fields, rust_module_segments
+from rust_type_converter import (
+    compute_rust_boxed_fields,
+    rust_module_file_segments,
+    rust_module_segments,
+)
 from utils import convert_to_camel_case, swift_member_name, namespace_type_name
 from cycle_detector import CycleDetector
 from generated_projection import write_swift_projection, write_kotlin_projection, write_rust_projection
@@ -854,7 +858,7 @@ def compute_rust_namespace_features(lexicons, schemas_by_ref=None):
     feature_deps = {}
 
     def feature_for_nsid(nsid: str) -> str:
-        parts = rust_module_segments(nsid)
+        parts = rust_module_file_segments(nsid)
         return "_".join(parts[:2]) if len(parts) >= 2 else parts[0]
 
     for _fp, lex in lexicons:
@@ -935,22 +939,24 @@ async def generate_rust_from_lexicons_recursive(
             raise ValueError(f"duplicate generated Rust target: {relative_path}")
         expected_files[relative_path] = content
 
-    # Track directory -> sorted child module names so every directory gets a `mod.rs`.
+    # Track directory -> sorted (file_stem, mod_ident) pairs so every directory gets a `mod.rs`.
     dir_children = {(): set()}
     lexicon_entries = []
     for _filepath, lexicon in lexicons:
         lexicon_id = lexicon.get('id', '')
-        mod_parts = tuple(rust_module_segments(lexicon_id))
-        for depth in range(len(mod_parts)):
-            parent = mod_parts[:depth]
-            child = mod_parts[depth]
-            dir_children.setdefault(parent, set()).add(child)
-            if depth + 1 < len(mod_parts):
-                dir_children.setdefault(mod_parts[: depth + 1], set())
-        lexicon_entries.append((lexicon, mod_parts))
+        file_parts = tuple(rust_module_file_segments(lexicon_id))
+        mod_idents = tuple(rust_module_segments(lexicon_id))
+        for depth in range(len(file_parts)):
+            parent = file_parts[:depth]
+            child_stem = file_parts[depth]
+            child_ident = mod_idents[depth]
+            dir_children.setdefault(parent, set()).add((child_stem, child_ident))
+            if depth + 1 < len(file_parts):
+                dir_children.setdefault(file_parts[: depth + 1], set())
+        lexicon_entries.append((lexicon, file_parts))
 
     prefix_module_bodies = {}
-    for lexicon, mod_parts in lexicon_entries:
+    for lexicon, file_parts in lexicon_entries:
         lexicon_id = lexicon.get('id', '')
         overrides = property_type_overrides.pop(lexicon_id, None)
         rust_code = RustCodeGenerator(
@@ -964,14 +970,14 @@ async def generate_rust_from_lexicons_recursive(
             boxed_fields=boxed_fields,
         ).convert()
 
-        if mod_parts in dir_children:
-            if mod_parts in prefix_module_bodies:
+        if file_parts in dir_children:
+            if file_parts in prefix_module_bodies:
                 raise ValueError(
-                    f"duplicate generated Rust target: {'/'.join(mod_parts)}/mod.rs"
+                    f"duplicate generated Rust target: {'/'.join(file_parts)}/mod.rs"
                 )
-            prefix_module_bodies[mod_parts] = rust_code
+            prefix_module_bodies[file_parts] = rust_code
         else:
-            rel_path = "/".join(mod_parts) + ".rs"
+            rel_path = "/".join(file_parts) + ".rs"
             add_expected_file(rel_path, rust_code)
 
     if property_type_overrides:
@@ -981,13 +987,13 @@ async def generate_rust_from_lexicons_recursive(
         )
 
     for dir_parts in sorted(dir_children):
-        children = sorted(dir_children[dir_parts])
+        children = sorted(dir_children[dir_parts], key=lambda item: item[0])
         mod_lines = []
-        for child in children:
+        for child_stem, child_ident in children:
             if features and len(dir_parts) == 1:
-                feat_name = f"{dir_parts[0]}_{child}"
+                feat_name = f"{dir_parts[0]}_{child_stem}"
                 mod_lines.append(f'#[cfg(feature = "{feat_name}")]')
-            mod_lines.append(f"pub mod {child};")
+            mod_lines.append(f"pub mod {child_ident};")
         body = prefix_module_bodies.get(dir_parts)
         if body:
             preamble, rest = _split_rust_module_preamble(body)

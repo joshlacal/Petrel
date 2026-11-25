@@ -40,6 +40,7 @@ pub use events::{AuthEvent, AuthSubscription};
 pub use file::FileSecretStore;
 pub use memory::MemorySecretStore;
 pub use session::{PendingRefresh, SessionStore};
+pub(crate) use session::{RefreshLease, RefreshLeaseAcquire};
 
 /// A secret store operation failed.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

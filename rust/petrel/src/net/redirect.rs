@@ -4,6 +4,8 @@ use http::{
     header::{AUTHORIZATION, CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, HOST, LOCATION},
 };
 
+use crate::rt::Instant;
+
 use super::{
     DynHttpTransport, SendOptions, TransportError,
     policy::{
@@ -41,13 +43,22 @@ pub async fn send_with_redirects(
     let (mut url, mut origin) = validate_request_uri(request.uri(), options.allow_loopback)
         .map_err(|error| TransportError::PolicyViolation(error.to_string()))?;
     let mut options = options.clone();
+    let deadline = options.timeout.and_then(|d| Instant::now().checked_add(d));
     if options.anonymous {
         retain_anonymous_headers(request.headers_mut());
     }
     request.headers_mut().remove(HOST);
 
     for hop in 0..=MAX_REDIRECTS {
-        let mut response = match transport.send_dyn(request.clone(), &options).await {
+        if let Some(deadline) = deadline {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Err(TransportError::Timeout);
+            }
+            options.timeout = Some(remaining);
+        }
+        let mut response = match send_with_hop_deadline(transport, request.clone(), &options).await
+        {
             Err(TransportError::Connect(reason)) if hop != 0 => {
                 return Err(TransportError::ConnectionLost(reason));
             }
@@ -87,6 +98,24 @@ pub async fn send_with_redirects(
     }
 
     unreachable!("every redirect either advances or reaches the limit")
+}
+
+async fn send_with_hop_deadline(
+    transport: &dyn DynHttpTransport,
+    request: Request<Bytes>,
+    options: &SendOptions,
+) -> Result<Response<Bytes>, TransportError> {
+    #[cfg(any(
+        all(not(target_arch = "wasm32"), feature = "native"),
+        all(target_arch = "wasm32", feature = "wasm")
+    ))]
+    if let Some(remaining) = options.timeout {
+        return crate::rt::timeout(remaining, transport.send_dyn(request, options))
+            .await
+            .map_err(|_| TransportError::Timeout)?;
+    }
+
+    transport.send_dyn(request, options).await
 }
 
 fn invalid_location(_: impl std::error::Error) -> TransportError {
@@ -243,5 +272,49 @@ mod integration_tests {
             assert!(matches!(result, Err(TransportError::PolicyViolation(_))));
             assert_eq!(transport.seen().len(), expected_sends);
         }
+    }
+
+    #[tokio::test]
+    async fn redirect_chain_enforces_cumulative_total_deadline() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+        use std::time::Duration;
+
+        use crate::net::HttpTransport;
+
+        struct SlowRedirectTransport {
+            calls: Arc<AtomicUsize>,
+        }
+
+        impl HttpTransport for SlowRedirectTransport {
+            async fn send(
+                &self,
+                _request: Request<Bytes>,
+                _options: &SendOptions,
+            ) -> Result<Response<Bytes>, TransportError> {
+                let hop = self.calls.fetch_add(1, Ordering::Relaxed);
+                crate::rt::sleep(Duration::from_millis(35)).await;
+                Ok(Response::builder()
+                    .status(302)
+                    .header(LOCATION, format!("/hop-{}", hop + 1))
+                    .body(Bytes::new())
+                    .unwrap())
+            }
+        }
+
+        let transport = SlowRedirectTransport {
+            calls: Arc::new(AtomicUsize::new(0)),
+        };
+        let request = Request::get("https://pds.example/start")
+            .body(Bytes::new())
+            .unwrap();
+        let mut options = SendOptions::new();
+        options.timeout = Some(Duration::from_millis(60));
+        let result =
+            send_with_redirects(&transport, request, &options, RedirectPolicy::Follow).await;
+        assert_eq!(result.unwrap_err(), TransportError::Timeout);
+        assert!(transport.calls.load(Ordering::Relaxed) <= 2);
     }
 }

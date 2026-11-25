@@ -3,11 +3,23 @@ pub struct {{ endpoint_name }};
 
 impl {{ endpoint_name }} {
     pub const NSID: &'static str = {{ lexicon_id | escape_str_literal }};
+    pub const SUBPROTOCOL: Option<&'static str> = {{ subprotocol_expr }};
 {% if known_message_types %}
     pub const KNOWN_MESSAGE_TYPES: &'static [&'static str] = &[
 {% for tag in known_message_types %}
         {{ tag | escape_str_literal }},
 {% endfor %}
     ];
+{% else %}
+    pub const KNOWN_MESSAGE_TYPES: &'static [&'static str] = &[];
 {% endif %}
+}
+
+impl petrel_core::XrpcSubscription for {{ endpoint_name }} {
+    const NSID: &'static str = Self::NSID;
+    const SUBPROTOCOL: Option<&'static str> = Self::SUBPROTOCOL;
+    const KNOWN_MESSAGE_TYPES: &'static [&'static str] = Self::KNOWN_MESSAGE_TYPES;
+    type Params = {{ params_type }};
+    type Message = {{ message_type }};
+    type Error = {{ error_type }};
 }

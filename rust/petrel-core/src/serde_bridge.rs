@@ -114,6 +114,15 @@ pub fn from_json<T: FromValue>(json: &[u8]) -> Result<T, DecodeError> {
     T::from_value(value)
 }
 
+/// Decodes a typed value strictly from JSON (e.g. an XRPC request body).
+/// Floats, duplicate keys, and malformed optional fields anywhere in the
+/// object tree are refused.
+pub fn from_json_strict<T: FromValue>(json: &[u8]) -> Result<T, DecodeError> {
+    let value: Value =
+        serde_json::from_slice(json).map_err(|error| DecodeError::Json(error.to_string()))?;
+    T::from_value_strict(value)
+}
+
 /// Encodes a typed value as canonical DAG-CBOR.
 pub fn to_dag_cbor<T: ToValue + ?Sized>(value: &T) -> Result<Vec<u8>, EncodeError> {
     Ok(dagcbor::encode(&value.to_value()?))
@@ -130,12 +139,27 @@ pub fn from_dag_cbor<T: FromValue>(bytes: &[u8]) -> Result<T, DecodeError> {
     T::from_value(dagcbor::decode(bytes)?)
 }
 
+/// Decodes a typed value strictly from canonical DAG-CBOR. Non-canonical
+/// input and malformed optional fields anywhere in the object tree are refused.
+pub fn from_dag_cbor_strict<T: FromValue>(bytes: &[u8]) -> Result<T, DecodeError> {
+    T::from_value_strict(dagcbor::decode(bytes)?)
+}
+
 /// Decodes a typed canonical DAG-CBOR value using custom resource limits.
 pub fn from_dag_cbor_with<T: FromValue>(
     bytes: &[u8],
     limits: dagcbor::Limits,
 ) -> Result<T, DecodeError> {
     T::from_value(dagcbor::decode_with(bytes, limits)?)
+}
+
+/// Decodes a typed canonical DAG-CBOR value strictly using custom resource
+/// limits.
+pub fn from_dag_cbor_with_strict<T: FromValue>(
+    bytes: &[u8],
+    limits: dagcbor::Limits,
+) -> Result<T, DecodeError> {
+    T::from_value_strict(dagcbor::decode_with(bytes, limits)?)
 }
 
 /// Body of a generated `impl serde::Serialize`.

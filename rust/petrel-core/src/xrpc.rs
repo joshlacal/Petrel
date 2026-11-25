@@ -92,15 +92,28 @@ impl RecordKeyType {
 /// A request body.
 ///
 /// Implemented here for `()` (no body) and [`Bytes`] (sent as is). The
-/// generator implements it for each JSON input struct with [`json_body`].
-pub trait XrpcInput {
+/// generator implements it for each JSON input struct with [`json_body`] and
+/// [`from_json_strict`](crate::from_json_strict).
+pub trait XrpcInput: Sized {
     /// The bytes to send, or `None` for no body.
     fn into_body(self) -> Result<Option<Vec<u8>>, EncodeError>;
+    /// Decodes a request body strictly on the server side.
+    fn from_body(body: &[u8]) -> Result<Self, DecodeError>;
 }
 
 impl XrpcInput for () {
     fn into_body(self) -> Result<Option<Vec<u8>>, EncodeError> {
         Ok(None)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, DecodeError> {
+        if body.is_empty() {
+            Ok(())
+        } else {
+            Err(DecodeError::Custom(
+                "unexpected body for XRPC endpoint without input".to_owned(),
+            ))
+        }
     }
 }
 
@@ -108,6 +121,32 @@ impl XrpcInput for Bytes {
     fn into_body(self) -> Result<Option<Vec<u8>>, EncodeError> {
         Ok(Some(self.0))
     }
+
+    fn from_body(body: &[u8]) -> Result<Self, DecodeError> {
+        Ok(Self(body.to_vec()))
+    }
+}
+
+/// WebSocket wire subprotocol identifier for JSON-framed XRPC subscriptions
+/// (for example `network.bsky.jetstream.subscribeEvents`).
+pub const XRPC_V1_JSON_SUBPROTOCOL: &str = "xrpc.v1.json";
+
+/// One XRPC event-stream subscription endpoint. Implemented by generated code.
+pub trait XrpcSubscription {
+    /// The endpoint's NSID, for example `com.atproto.sync.subscribeRepos`.
+    const NSID: &'static str;
+    /// Optional WebSocket subprotocol declared by the lexicon (`"xrpc.v1.json"`
+    /// for JSON-framed streams, or `None` for standard DAG-CBOR framing).
+    const SUBPROTOCOL: Option<&'static str>;
+    /// Fully-qualified message `$type` identifiers (`<nsid>#<name>`) declared
+    /// by this subscription's message schema, if any.
+    const KNOWN_MESSAGE_TYPES: &'static [&'static str];
+    /// Query parameters. `()` when the endpoint has none.
+    type Params: ToQueryParams;
+    /// Decoded stream message type (`Message`, or `()` if untyped).
+    type Message;
+    /// The endpoint's declared stream errors.
+    type Error: DeclaredXrpcError;
 }
 
 /// Body of a generated `XrpcInput::into_body` for a JSON input.

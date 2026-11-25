@@ -1,7 +1,10 @@
 use std::{
     collections::HashMap,
     fmt,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 
 use async_lock::Mutex as AsyncMutex;
@@ -11,7 +14,6 @@ use petrel_core::{AtIdentifier, Did, Handle};
 use petrel_oauth_scopes::ScopeSet;
 use serde::Deserialize;
 use url::Url;
-use web_time::Instant;
 use zeroize::Zeroize;
 
 use crate::{
@@ -270,6 +272,9 @@ pub trait DpopKeyStore: MaybeSend + MaybeSync {
     fn delete<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<(), StoreError>>;
 }
 
+/// Default software-key fallback storing raw P-256 scalars in [`SessionStore`].
+/// Browser (`wasm32`) embedders should instead pass [`super::WebCryptoKeyStore`]
+/// to [`OAuthClient::with_key_store`] so DPoP keys remain non-extractable.
 struct SoftwareKeyStore {
     storage: SessionStore,
 }
@@ -306,14 +311,19 @@ impl DpopKeyStore for SoftwareKeyStore {
     }
 }
 
+type StartTargetKey = (String, String, Option<String>);
+
 pub struct OAuthClient {
     pub(super) protocol: OAuthProtocol,
     pub(super) storage: SessionStore,
     pub(super) keys: Arc<dyn DpopKeyStore>,
     pub(super) resource_nonces: DpopNonces,
+    pub(super) instance_id: [u8; 16],
     resolver: Arc<dyn OAuthIdentityResolver>,
     config: OAuthConfig,
     pub(super) accounts: Mutex<HashMap<Did, Arc<AsyncMutex<RefreshState>>>>,
+    start_locks: Mutex<HashMap<StartTargetKey, Arc<AsyncMutex<()>>>>,
+    start_seq: AtomicU64,
     pending: AsyncMutex<Vec<PendingAuthorization>>,
 }
 
@@ -325,11 +335,12 @@ struct ResolvedAuthorizationTarget<'a> {
 }
 
 struct PendingAuthorization {
-    target: (String, String, Option<String>),
+    target: StartTargetKey,
     flow: PendingOAuthFlow,
+    expected_issuer: String,
     created_at: u64,
     reuse_until: u64,
-    finished_at: Instant,
+    finished_seq: u64,
     denied: bool,
     key_id: String,
     jkt: String,
@@ -342,6 +353,11 @@ impl fmt::Debug for OAuthClient {
 }
 
 impl OAuthClient {
+    /// Creates an OAuth client using [`SessionStore`] for software DPoP keys.
+    ///
+    /// On `wasm32` browser targets, chain [`Self::with_key_store`] with
+    /// [`super::WebCryptoKeyStore`] so private DPoP keys are held as
+    /// non-extractable WebCrypto `CryptoKey` handles instead of persisted scalars.
     // The key store uses the same shared ownership API on native and wasm.
     #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
     pub fn new(
@@ -367,10 +383,13 @@ impl OAuthClient {
                 storage: storage.clone(),
             }),
             resource_nonces: DpopNonces::default(),
+            instance_id: random_bytes::<16>()?,
             storage,
             resolver,
             config,
             accounts: Mutex::new(HashMap::new()),
+            start_locks: Mutex::new(HashMap::new()),
+            start_seq: AtomicU64::new(0),
             pending: AsyncMutex::new(Vec::new()),
         })
     }
@@ -393,7 +412,7 @@ impl OAuthClient {
         target: OAuthTarget,
         options: OAuthStartOptions<'_>,
     ) -> Result<PendingOAuthFlow, OAuthError> {
-        let started_at = Instant::now();
+        let start_seq = self.start_seq.fetch_add(1, Ordering::Relaxed);
         let requested_scope = options
             .scope
             .map(ScopeSet::parse)
@@ -419,30 +438,23 @@ impl OAuthClient {
             scope.scope_string(),
             options.state_prefix.map(str::to_owned),
         );
-        // Requests already waiting when this push succeeded share its result.
-        // A new invocation starts a fresh flow, even for the same target.
-        let mut pending = self.pending.lock().await;
+        // Serialize overlapping starts for the same target key so they share
+        // one PAR/DPoP flow without holding `pending` across network I/O.
+        let target_lock = self.start_lock(&target_key);
+        let _target_guard = target_lock.lock().await;
         let now = unix_now()?;
-        if let Some(flow) = pending.iter().find(|flow| {
-            !flow.denied
-                && flow.target == target_key
-                && now < flow.reuse_until
-                && started_at <= flow.finished_at
-        }) {
-            return Ok(flow.flow.clone());
+        let (reused, expired) = self
+            .take_reusable_or_expired_pending(&target_key, now, start_seq)
+            .await?;
+        if let Some(flow) = reused {
+            return Ok(flow);
         }
-        while let Some(index) = pending
-            .iter()
-            .position(|flow| now.saturating_sub(flow.created_at) > 600)
-        {
-            let flow = pending.swap_remove(index);
-            self.cancel_flow(&flow, now).await?;
-        }
-        if pending.len() >= 8 {
-            return Err(OAuthError::AuthorizationRejected);
+        for flow in &expired {
+            self.cancel_flow(flow, now).await?;
         }
 
         let resolved = self.resolve_target(&target).await?;
+        let expected_issuer = resolved.server.issuer().to_owned();
         let key_id = base64url(&random_bytes::<32>()?);
         let state = base64url(&random_bytes::<32>()?);
         let state = match options.state_prefix {
@@ -473,19 +485,97 @@ impl OAuthClient {
             authorize_url,
             state,
         };
-        pending.push(PendingAuthorization {
+        self.store_pending_authorization(PendingAuthorization {
             target: target_key,
             flow: flow.clone(),
+            expected_issuer,
             created_at,
             reuse_until: created_at.saturating_add(par_lifetime),
-            finished_at: Instant::now(),
+            finished_seq: self.start_seq.load(Ordering::Relaxed),
             denied: false,
             key_id,
             jkt,
-        });
+        })
+        .await?;
         Ok(flow)
     }
 
+    fn start_lock(&self, target: &StartTargetKey) -> Arc<AsyncMutex<()>> {
+        let mut locks = self
+            .start_locks
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if locks.len() > 64 {
+            locks.retain(|_, lock| Arc::strong_count(lock) > 1);
+        }
+        Arc::clone(locks.entry(target.clone()).or_default())
+    }
+
+    async fn take_reusable_or_expired_pending(
+        &self,
+        target_key: &StartTargetKey,
+        now: u64,
+        start_seq: u64,
+    ) -> Result<(Option<PendingOAuthFlow>, Vec<PendingAuthorization>), OAuthError> {
+        let mut pending = self.pending.lock().await;
+        if let Some(flow) = pending.iter().find(|flow| {
+            !flow.denied
+                && &flow.target == target_key
+                && now < flow.reuse_until
+                && start_seq < flow.finished_seq
+        }) {
+            return Ok((Some(flow.flow.clone()), Vec::new()));
+        }
+        let expired = drain_expired_pending(&mut pending, now);
+        if pending.len() >= 8 {
+            return Err(OAuthError::AuthorizationRejected);
+        }
+        Ok((None, expired))
+    }
+
+    async fn store_pending_authorization(
+        &self,
+        entry: PendingAuthorization,
+    ) -> Result<(), OAuthError> {
+        let now = entry.created_at;
+        let overflow_expired: Vec<PendingAuthorization> = {
+            let mut pending = self.pending.lock().await;
+            let expired = drain_expired_pending(&mut pending, now);
+            if pending.len() >= 8 {
+                drop(pending);
+                for stale in &expired {
+                    let _ = self.cancel_flow(stale, now).await;
+                }
+                let _ = self.cancel_flow(&entry, now).await;
+                return Err(OAuthError::AuthorizationRejected);
+            }
+            pending.push(entry);
+            expired
+        };
+        for stale in &overflow_expired {
+            let _ = self.cancel_flow(stale, now).await;
+        }
+        Ok(())
+    }
+}
+
+fn drain_expired_pending(
+    pending: &mut Vec<PendingAuthorization>,
+    now: u64,
+) -> Vec<PendingAuthorization> {
+    let mut expired = Vec::new();
+    let mut index = 0;
+    while index < pending.len() {
+        if now.saturating_sub(pending[index].created_at) > 600 {
+            expired.push(pending.swap_remove(index));
+        } else {
+            index += 1;
+        }
+    }
+    expired
+}
+
+impl OAuthClient {
     async fn resolve_target<'a>(
         &self,
         target: &'a OAuthTarget,
@@ -680,12 +770,41 @@ impl OAuthClient {
         if same_redirect(callback, &self.config.redirect_uri)
             && let Some(error) = callback_parameter(callback, "error")?
         {
-            match self.cancel_authorization(&state).await {
-                Ok(false) => return Err(OAuthError::UnknownState),
-                Err(_) => {
-                    tracing::warn!("could not remove a denied OAuth authorization from storage");
+            let callback_iss = callback_parameter(callback, "iss")?;
+            let pending_issuer = {
+                let pending = self.pending.lock().await;
+                pending
+                    .iter()
+                    .find(|flow| flow.flow.state == state)
+                    .map(|flow| flow.expected_issuer.clone())
+            };
+            if let Some(expected_issuer) = pending_issuer {
+                if callback_iss.as_deref() != Some(expected_issuer.as_str()) {
+                    return Err(OAuthError::Callback);
                 }
-                Ok(true) => {}
+                match self.cancel_authorization(&state).await {
+                    Ok(false) => return Err(OAuthError::UnknownState),
+                    Err(_) => {
+                        tracing::warn!(
+                            "could not remove a denied OAuth authorization from storage"
+                        );
+                    }
+                    Ok(true) => {}
+                }
+            } else {
+                let Some(callback_iss) = callback_iss else {
+                    return Err(OAuthError::Callback);
+                };
+                let flow: OAuthFlowState = self
+                    .storage
+                    .consume_oauth_state(&state, unix_now()?)
+                    .await?
+                    .ok_or(OAuthError::UnknownState)?;
+                self.protocol.nonces.clear_key(&flow.dpop_jkt);
+                self.keys.delete(&flow.dpop_key_id).await?;
+                if callback_iss != flow.expected_issuer {
+                    return Err(OAuthError::Callback);
+                }
             }
             return Err(if error == "access_denied" {
                 OAuthError::Cancelled

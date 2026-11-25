@@ -988,6 +988,7 @@ async fn scope_and_state_overrides_are_explicit_and_cancellable() {
     denial
         .query_pairs_mut()
         .append_pair("state", &second.state)
+        .append_pair("iss", ISSUER)
         .append_pair("error", "access_denied");
     assert_eq!(
         client.complete_authorization(&denial).await.unwrap_err(),
@@ -1360,6 +1361,7 @@ async fn denied_local_flow_stays_denied_when_state_consumption_failed() {
     denied
         .query_pairs_mut()
         .append_pair("error", "access_denied")
+        .append_pair("iss", ISSUER)
         .append_pair("state", &flow.state);
     backend.fail_take.store(true, Ordering::Relaxed);
     assert_eq!(
@@ -2089,4 +2091,378 @@ async fn failure_to_persist_selection_does_not_invalidate_a_durable_sign_in() {
             did: Some(session.did.clone())
         }]
     );
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn error_callback_requires_matching_iss_before_cancelling() {
+    let server = Arc::new(Server::new(Scenario::Public));
+    let client = client(&server, ClientAuth::Public);
+    let flow = client
+        .start_authorization_with_options(
+            OAuthTarget::Identifier(DID.parse().unwrap()),
+            super::OAuthStartOptions::default(),
+        )
+        .await
+        .unwrap();
+
+    // Missing `iss` on error callback is rejected and does NOT cancel the flow.
+    let mut missing_iss = Url::parse(REDIRECT).unwrap();
+    missing_iss
+        .query_pairs_mut()
+        .append_pair("error", "access_denied")
+        .append_pair("state", &flow.state);
+    assert_eq!(
+        client
+            .complete_authorization(&missing_iss)
+            .await
+            .unwrap_err(),
+        OAuthError::Callback
+    );
+
+    // Wrong `iss` on error callback is rejected and does NOT cancel the flow.
+    let mut wrong_iss = Url::parse(REDIRECT).unwrap();
+    wrong_iss
+        .query_pairs_mut()
+        .append_pair("error", "access_denied")
+        .append_pair("iss", "https://evil.example")
+        .append_pair("state", &flow.state);
+    assert_eq!(
+        client.complete_authorization(&wrong_iss).await.unwrap_err(),
+        OAuthError::Callback
+    );
+
+    // Genuine callback still completes because neither forged error callback cancelled it.
+    let session = client
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+    assert_eq!(session.did.as_str(), DID);
+
+    // After client restart (state only in storage), wrong `iss` fails as Callback,
+    // and matching `iss` cancels cleanly.
+    let backend = Arc::new(FaultStore::default());
+    let storage = SessionStore::new(backend, "fixtures").unwrap();
+    let config = OAuthConfig::new(
+        CLIENT,
+        Url::parse(REDIRECT).unwrap(),
+        SCOPE,
+        ClientAuth::Public,
+    )
+    .unwrap();
+    let first = OAuthClient::new(
+        server.clone(),
+        server.clone(),
+        storage.clone(),
+        config.clone(),
+    )
+    .unwrap();
+    let flow_two = first
+        .start_authorization_with_options(
+            OAuthTarget::Identifier(DID.parse().unwrap()),
+            super::OAuthStartOptions::default(),
+        )
+        .await
+        .unwrap();
+    let restarted = OAuthClient::new(server.clone(), server.clone(), storage, config).unwrap();
+    let mut restarted_bad = Url::parse(REDIRECT).unwrap();
+    restarted_bad
+        .query_pairs_mut()
+        .append_pair("error", "access_denied")
+        .append_pair("iss", "https://wrong.example")
+        .append_pair("state", &flow_two.state);
+    assert_eq!(
+        restarted
+            .complete_authorization(&restarted_bad)
+            .await
+            .unwrap_err(),
+        OAuthError::Callback
+    );
+
+    let flow_three = first
+        .start_authorization_with_options(
+            OAuthTarget::Identifier(DID.parse().unwrap()),
+            super::OAuthStartOptions::default(),
+        )
+        .await
+        .unwrap();
+    let mut restarted_ok = Url::parse(REDIRECT).unwrap();
+    restarted_ok
+        .query_pairs_mut()
+        .append_pair("error", "access_denied")
+        .append_pair("iss", ISSUER)
+        .append_pair("state", &flow_three.state);
+    assert_eq!(
+        restarted
+            .complete_authorization(&restarted_ok)
+            .await
+            .unwrap_err(),
+        OAuthError::Cancelled
+    );
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn session_auth_does_not_burn_or_refresh_on_scope_dpop_or_empty_401() {
+    let server = Arc::new(Server::new(Scenario::Public));
+    let client = client(&server, ClientAuth::Public);
+    start(&client).await;
+    client
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+    let did: petrel_core::Did = DID.parse().unwrap();
+    let auth = client.session_auth(did);
+    let request = Request::get(format!("{PDS}/xrpc/example"))
+        .body(Bytes::new())
+        .unwrap();
+    let (_, ctx) = auth.prepare(request).await.unwrap();
+
+    for resp in [
+        json_response(401, None, &json!({"error": "insufficient_scope"})),
+        json_response(401, None, &json!({"error": "invalid_dpop_proof"})),
+        json_response(401, None, &json!({"error": "use_dpop_nonce"})),
+        Response::builder()
+            .status(401)
+            .header("www-authenticate", r#"DPoP error="insufficient_scope""#)
+            .body(Bytes::new())
+            .unwrap(),
+        Response::builder()
+            .status(401)
+            .header("www-authenticate", r#"DPoP error="invalid_dpop_proof""#)
+            .body(Bytes::new())
+            .unwrap(),
+        Response::builder().status(401).body(Bytes::new()).unwrap(),
+    ] {
+        assert_eq!(
+            auth.handle_unauthorized(&resp, &ctx).await.unwrap(),
+            crate::xrpc::UnauthorizedAction::GiveUp
+        );
+    }
+    assert_eq!(server.exchanges.lock().unwrap().refreshes, 0);
+
+    let invalid_token = Response::builder()
+        .status(401)
+        .header("www-authenticate", r#"DPoP error="invalid_token""#)
+        .body(Bytes::new())
+        .unwrap();
+    assert_eq!(
+        auth.handle_unauthorized(&invalid_token, &ctx)
+            .await
+            .unwrap(),
+        crate::xrpc::UnauthorizedAction::Retry
+    );
+    assert_eq!(server.exchanges.lock().unwrap().refreshes, 1);
+}
+
+#[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn two_clients_sharing_store_refresh_once_without_replaying_refresh_token() {
+    use std::{
+        future::{Future, poll_fn},
+        task::Poll,
+    };
+
+    let server = Arc::new(Server::new(Scenario::Public));
+    let storage = SessionStore::new(Arc::new(MemorySecretStore::new()), "fixtures").unwrap();
+    let config = OAuthConfig::new(
+        CLIENT,
+        Url::parse(REDIRECT).unwrap(),
+        SCOPE,
+        ClientAuth::Public,
+    )
+    .unwrap();
+    let client_a = Arc::new(
+        OAuthClient::new(
+            server.clone(),
+            server.clone(),
+            storage.clone(),
+            config.clone(),
+        )
+        .unwrap(),
+    );
+    let client_b =
+        Arc::new(OAuthClient::new(server.clone(), server.clone(), storage, config).unwrap());
+
+    start(&client_a).await;
+    let session = client_a
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+    assert_eq!(session.access_token(), "access-first");
+
+    let hold_response = server.refresh_response_gate.lock().await;
+    let mut call_a = Box::pin(client_a.refresh(&session.did, true));
+    let mut call_b = Box::pin(client_b.refresh(&session.did, true));
+    poll_fn(|cx| {
+        assert!(call_a.as_mut().poll(cx).is_pending());
+        assert!(call_b.as_mut().poll(cx).is_pending());
+        Poll::Ready(())
+    })
+    .await;
+    drop(hold_response);
+
+    let (res_a, res_b) = futures_util::future::join(call_a, call_b).await;
+    assert_eq!(res_a.unwrap().access_token(), "access-second");
+    assert_eq!(res_b.unwrap().access_token(), "access-second");
+    assert_eq!(server.exchanges.lock().unwrap().refreshes, 1);
+}
+
+#[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn overlapping_start_authorizations_coalesce_without_exhausting_limit() {
+    use std::{
+        future::{Future, poll_fn},
+        task::Poll,
+    };
+
+    struct ParGateTransport {
+        inner: Arc<Server>,
+        par_gate: async_lock::Mutex<()>,
+    }
+
+    impl HttpTransport for ParGateTransport {
+        async fn send(
+            &self,
+            request: Request<Bytes>,
+            options: &SendOptions,
+        ) -> Result<Response<Bytes>, TransportError> {
+            if request.uri().path() == "/par" {
+                drop(self.par_gate.lock().await);
+            }
+            self.inner.send(request, options).await
+        }
+    }
+
+    let server = Arc::new(Server::new(Scenario::Public));
+    let target = OAuthTarget::Identifier(DID.parse().unwrap());
+
+    let transport = Arc::new(ParGateTransport {
+        inner: server.clone(),
+        par_gate: async_lock::Mutex::new(()),
+    });
+    let storage = SessionStore::new(Arc::new(MemorySecretStore::new()), "fixtures").unwrap();
+    let config = OAuthConfig::new(
+        CLIENT,
+        Url::parse(REDIRECT).unwrap(),
+        SCOPE,
+        ClientAuth::Public,
+    )
+    .unwrap();
+    let client =
+        Arc::new(OAuthClient::new(transport.clone(), server.clone(), storage, config).unwrap());
+
+    let hold_par = transport.par_gate.lock().await;
+    let mut calls = (0..10)
+        .map(|_| {
+            Box::pin(client.start_authorization_with_options(
+                target.clone(),
+                super::OAuthStartOptions::default(),
+            ))
+        })
+        .collect::<Vec<_>>();
+    poll_fn(|cx| {
+        for call in &mut calls {
+            assert!(call.as_mut().poll(cx).is_pending());
+        }
+        Poll::Ready(())
+    })
+    .await;
+    drop(hold_par);
+
+    let flows: Vec<_> = join_all(calls)
+        .await
+        .into_iter()
+        .map(Result::unwrap)
+        .collect();
+    assert_eq!(server.exchanges.lock().unwrap().par.len(), 1);
+    for flow in &flows[1..] {
+        assert_eq!(flow.state, flows[0].state);
+        assert_eq!(flow.authorize_url, flows[0].authorize_url);
+    }
+
+    // A fresh sequential start after completion issues a new flow rather than reusing.
+    let fresh = client
+        .start_authorization_with_options(target.clone(), super::OAuthStartOptions::default())
+        .await
+        .unwrap();
+    assert_ne!(fresh.state, flows[0].state);
+    assert_eq!(server.exchanges.lock().unwrap().par.len(), 2);
+
+    // Dropping an in-flight leader cleanly releases the per-target lock for followers.
+    let hold_par = transport.par_gate.lock().await;
+    let mut leader = Box::pin(
+        client
+            .start_authorization_with_options(target.clone(), super::OAuthStartOptions::default()),
+    );
+    let mut follower = Box::pin(
+        client.start_authorization_with_options(target, super::OAuthStartOptions::default()),
+    );
+    poll_fn(|cx| {
+        assert!(leader.as_mut().poll(cx).is_pending());
+        assert!(follower.as_mut().poll(cx).is_pending());
+        Poll::Ready(())
+    })
+    .await;
+    drop(leader);
+    drop(hold_par);
+    let recovered = follower.await.unwrap();
+    assert_ne!(recovered.state, fresh.state);
+    assert_eq!(server.exchanges.lock().unwrap().par.len(), 3);
+}
+
+#[cfg(all(target_arch = "wasm32", target_os = "unknown", feature = "wasm"))]
+#[allow(clippy::arc_with_non_send_sync)]
+#[wasm_bindgen_test::wasm_bindgen_test]
+async fn web_crypto_key_store_binds_oauth_session_without_persisting_raw_scalar() {
+    use super::{MemoryWebCryptoKeyStorage, WebCryptoKeyStorage, WebCryptoKeyStore};
+    use crate::storage::SecretStore as _;
+
+    let server = Arc::new(Server::new(Scenario::Public));
+    let secrets = Arc::new(MemorySecretStore::new());
+    let storage = SessionStore::new(secrets.clone(), "fixtures").unwrap();
+    let config = OAuthConfig::new(
+        CLIENT,
+        Url::parse(REDIRECT).unwrap(),
+        SCOPE,
+        ClientAuth::Public,
+    )
+    .unwrap();
+    let vault = Arc::new(MemoryWebCryptoKeyStorage::new());
+    let client = Arc::new(
+        OAuthClient::new(server.clone(), server.clone(), storage.clone(), config)
+            .unwrap()
+            .with_key_store(WebCryptoKeyStore::shared(vault.clone())),
+    );
+
+    start(&client).await;
+    let session = client
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+    assert_eq!(session.access_token(), "access-first");
+
+    let did: petrel_core::Did = DID.parse().unwrap();
+    let record = storage.get_session(&did).await.unwrap().unwrap();
+    assert!(
+        secrets
+            .get("fixtures", &format!("dpopKey.{}", record.dpop_key_id))
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(vault.load_key(&record.dpop_key_id).await.unwrap().is_some());
+
+    let auth = client.session_auth(did);
+    let req = Request::get(format!("{PDS}/xrpc/example"))
+        .body(Bytes::new())
+        .unwrap();
+    let (prepared, _) = auth.prepare(req).await.unwrap();
+    assert_eq!(
+        prepared.headers()[header::AUTHORIZATION],
+        "DPoP access-first"
+    );
+    assert!(prepared.headers().contains_key("dpop"));
 }
