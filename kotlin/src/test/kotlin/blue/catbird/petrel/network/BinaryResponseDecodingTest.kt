@@ -69,7 +69,7 @@ class BinaryResponseDecodingTest {
 
         val response = client.com.atproto.space.exportSpaceMeta(
             ComAtprotoSpaceExportSpaceMetaParameters(
-                space = SpaceRef.parse("at://did:plc:owner/space/blue.catbird.circle/3abc")
+                space = SpaceRef.parse("at:space/did:plc:owner/blue.catbird.circle/3abc")
             )
         )
 
@@ -109,7 +109,7 @@ class BinaryResponseDecodingTest {
 
         val response = client.com.atproto.space.exportSpaceMeta(
             ComAtprotoSpaceExportSpaceMetaParameters(
-                space = SpaceRef.parse("at://did:plc:owner/space/blue.catbird.circle/3abc")
+                space = SpaceRef.parse("at:space/did:plc:owner/blue.catbird.circle/3abc")
             )
         )
 

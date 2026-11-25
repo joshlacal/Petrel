@@ -1,0 +1,23 @@
+[package]
+name = "petrel-oauth-scopes"
+description = "AT Protocol OAuth scope grammar for Petrel. Mirror of the Swift PetrelOAuthScopes module. No dependencies on the other Petrel crates."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+wasm = []
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+url.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test.workspace = true
+
+[lints]
+workspace = true

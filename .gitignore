@@ -71,3 +71,6 @@ Server/keys/
 /docs/theme-settings.json
 /docs/tutorials/
 /docs/videos/
+
+# Rust workspace build output (Petrel/rust)
+/rust/target/

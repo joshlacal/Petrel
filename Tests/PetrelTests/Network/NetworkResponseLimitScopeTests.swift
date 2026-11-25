@@ -156,7 +156,7 @@ struct NetworkResponseLimitScopeTests {
             #expect(large.count > NetworkResponseLimits.default.maximumWireBytes)
             ResponseLimitScopeURLProtocol.setBody(large)
             let input = try ComAtprotoSpaceGetBlob.Parameters(
-                space: SpaceRef(uriString: "at://did:plc:owner/space/com.example.drive/self"),
+                space: SpaceRef(uriString: "at:space/did:plc:owner/com.example.drive/self"),
                 repo: DID(didString: "did:plc:owner"),
                 cid: CIDString(CID.fromDAGCBOR(Data("response-limit-scope".utf8)))
             )
@@ -234,7 +234,7 @@ struct NetworkResponseLimitScopeTests {
             let provider = RefreshingRetryProvider(networkService: networkService)
             await networkService.setAuthenticationProvider(provider)
             let input = try ComAtprotoSpaceGetBlob.Parameters(
-                space: SpaceRef(uriString: "at://did:plc:owner/space/com.example.drive/self"),
+                space: SpaceRef(uriString: "at:space/did:plc:owner/com.example.drive/self"),
                 repo: DID(didString: "did:plc:owner"),
                 cid: CIDString(CID.fromDAGCBOR(Data("post-refresh-retry".utf8)))
             )

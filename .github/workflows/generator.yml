@@ -77,3 +77,11 @@ jobs:
           Scripts/regenerate-generated.sh
           git diff --exit-code -- Sources/Petrel/Generated Sources/PetrelLexicon/Generated Sources/PetrelOzone/Generated Tests/LexiconFixture/Generated
           test -z "$(git status --porcelain --untracked-files=all -- Sources/Petrel/Generated Sources/PetrelLexicon/Generated Sources/PetrelOzone/Generated Tests/LexiconFixture/Generated)"
+      - name: Regenerate Rust twice and require a clean projection
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$PETREL_PYTHON" run.py --manifest generator/manifests/petrel-core.json --language rust
+          "$PETREL_PYTHON" run.py --manifest generator/manifests/petrel-core.json --language rust
+          git diff --exit-code -- rust/petrel-api/src/generated
+          test -z "$(git status --porcelain --untracked-files=all -- rust/petrel-api/src/generated)"

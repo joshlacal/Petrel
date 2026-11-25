@@ -1,0 +1,43 @@
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Error {
+{% for err in errors %}
+{% if err.description %}
+{{ err.description | escape_doc | indent(4, true) }}
+{% endif %}
+    {{ err.variant }},
+{% endfor %}
+    /// An error name not declared in the lexicon, kept verbatim.
+    Unknown(String),
+}
+
+impl petrel_core::DeclaredXrpcError for Error {
+    fn from_wire_name(name: &str) -> Self {
+        match name {
+{% for err in errors %}
+            {{ err.wire_literal }} => Self::{{ err.variant }},
+{% endfor %}
+            other => Self::Unknown(other.to_owned()),
+        }
+    }
+
+    fn wire_name(&self) -> &str {
+        match self {
+{% for err in errors %}
+            Self::{{ err.variant }} => {{ err.wire_literal }},
+{% endfor %}
+            Self::Unknown(name) => name.as_str(),
+        }
+    }
+
+    fn is_declared(&self) -> bool {
+        !matches!(self, Self::Unknown(_))
+    }
+}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(petrel_core::DeclaredXrpcError::wire_name(self))
+    }
+}
+
+impl std::error::Error for Error {}

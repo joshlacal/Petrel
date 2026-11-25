@@ -626,7 +626,7 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
         let large = Data(repeating: 0x41, count: 11 * 1_048_576)
         let fixture = await makeFixture(headers: ["Content-Type": "application/octet-stream"], body: large)
         let input = try ComAtprotoSpaceGetBlob.Parameters(
-            space: SpaceRef(uriString: "at://did:plc:exact/space/com.example.drive/self"),
+            space: SpaceRef(uriString: "at:space/did:plc:exact/com.example.drive/self"),
             repo: DID(didString: "did:plc:exact"),
             cid: CIDString(CID.fromDAGCBOR(Data("exact-auth-limit".utf8)))
         )

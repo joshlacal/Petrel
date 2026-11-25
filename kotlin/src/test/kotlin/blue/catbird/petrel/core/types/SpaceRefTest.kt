@@ -14,15 +14,15 @@ class SpaceRefTest {
     @Test
     fun `SpaceRef accepts valid canonical vectors`() {
         val validURIs = listOf(
-            "at://did:m:v/space/com.example.group/default",
-            "at://did:plc:asdf123/space/com.example.group/default",
-            "at://did:plc:owner/space/blue.catbird.circle/3abc",
-            "at://did:web:example.com/space/blue.catbird.circle/3abc",
-            "at://did:plc:owner/space/com.atproto.simplespace.space/tid123",
-            "at://did:plc:auth123/space/com.example.drive/self",
-            "at://did:plc:asdf123/space/com.example.group/test-key_123",
-            "at://did:plc:asdf123/space/com.example.group/2024-01-01",
-            "at://did:plc:asdf123/space/com.example.group/rkey:~._-"
+            "at:space/did:m:v/com.example.group/default",
+            "at:space/did:plc:asdf123/com.example.group/default",
+            "at:space/did:plc:owner/blue.catbird.circle/3abc",
+            "at:space/did:web:example.com/blue.catbird.circle/3abc",
+            "at:space/did:plc:owner/com.atproto.simplespace.space/tid123",
+            "at:space/did:plc:auth123/com.example.drive/self",
+            "at:space/did:plc:asdf123/com.example.group/test-key_123",
+            "at:space/did:plc:asdf123/com.example.group/2024-01-01",
+            "at:space/did:plc:asdf123/com.example.group/rkey:~._-"
         )
 
         for (uri in validURIs) {
@@ -38,16 +38,16 @@ class SpaceRefTest {
         }
 
         val did2048 = "did:plc:" + "a".repeat(2040)
-        val validDID2048URI = "at://$did2048/space/com.example.group/default"
+        val validDID2048URI = "at:space/$did2048/com.example.group/default"
         val refDID2048 = SpaceRef.parse(validDID2048URI)
         assertEquals(validDID2048URI, refDID2048.value)
 
         val nsid317 = "com.example." + "a".repeat(63) + "." + "a".repeat(63) + "." + "a".repeat(63) + "." + "a".repeat(63) + "." + "a".repeat(49)
-        val validNSID317URI = "at://did:plc:asdf123/space/$nsid317/default"
+        val validNSID317URI = "at:space/did:plc:asdf123/$nsid317/default"
         val refNSID317 = SpaceRef.parse(validNSID317URI)
         assertEquals(validNSID317URI, refNSID317.value)
 
-        val valid512 = "at://did:plc:asdf123/space/com.example.group/" + "a".repeat(512)
+        val valid512 = "at:space/did:plc:asdf123/com.example.group/" + "a".repeat(512)
         val ref512 = SpaceRef.parse(valid512)
         assertEquals(valid512, ref512.value)
     }
@@ -60,41 +60,46 @@ class SpaceRefTest {
         val malformedURIs = listOf(
             // Scheme / prefix errors
             "https://example.com/space/blue.catbird.circle/3abc",
-            "at:/did:plc:asdf123/space/com.example.group/default",
-            "AT://did:plc:asdf123/space/com.example.group/default",
+            "at:space",
+            "at:/space/did:plc:asdf123/com.example.group/default",
+            "at:space:did:plc:asdf123/com.example.group/default",
+            "AT:SPACE/did:plc:asdf123/com.example.group/default",
+            // The spaces alpha form is rejected strictly
+            "at://did:plc:asdf123/space/com.example.group/default",
+            "at://did:web:example.com/space/blue.catbird.circle/3abc",
             // Segment count and structure errors
             "at://did:plc:asdf123",
-            "at://did:plc:asdf123/space",
-            "at://did:plc:asdf123/space/com.example.group",
-            "at://did:plc:asdf123/space/com.example.group/default/extra",
-            "at://did:plc:asdf123/space/com.example.group/default/did:plc:user1/com.atproto.feed.post/abc123",
+            "at:space/did:plc:asdf123",
+            "at:space/did:plc:asdf123/com.example.group",
+            "at:space/did:plc:asdf123/com.example.group/default/extra",
+            "at:space/did:plc:asdf123/com.example.group/default/did:plc:user1/com.atproto.feed.post/abc123",
             "at://did:plc:asdf123/com.atproto.feed.post/abc",
-            "at://did:plc:asdf123/space//default",
-            "at://did:plc:asdf123/space/com.example.group/",
-            "at:///space/com.example.group/default",
-            "at://did:plc:asdf123//com.example.group/default",
-            "at://did:plc:asdf123/other/com.example.group/default",
+            "at:space/did:plc:asdf123//default",
+            "at:space/did:plc:asdf123/com.example.group/",
+            "at:space//com.example.group/default",
+            "at:space//did:plc:asdf123/com.example.group/default",
+            "at:other/did:plc:asdf123/com.example.group/default",
             // Authority DID errors
-            "at://user.bsky.social/space/com.example.group/default",
-            "at://did::owner/space/blue.catbird.circle/3abc",
-            "at://did:plc:/space/blue.catbird.circle/3abc",
-            "at://invalid-did/space/blue.catbird.circle/3abc",
-            "at://did:plc:ünicode/space/com.example.group/default",
-            "at://$did2049/space/com.example.group/default",
+            "at:space/user.bsky.social/com.example.group/default",
+            "at:space/did::owner/blue.catbird.circle/3abc",
+            "at:space/did:plc:/blue.catbird.circle/3abc",
+            "at:space/invalid-did/blue.catbird.circle/3abc",
+            "at:space/did:plc:ünicode/com.example.group/default",
+            "at:space/$did2049/com.example.group/default",
             // SpaceType NSID errors
-            "at://did:plc:asdf123/space/short/default",
-            "at://did:plc:asdf123/space/-bad.example/3abc",
-            "at://did:plc:asdf123/space/com.example.-group/default",
-            "at://did:plc:asdf123/space/com.example..group/default",
-            "at://did:plc:asdf123/space/1com.example.group/default",
-            "at://did:plc:asdf123/space/$nsid318/default",
+            "at:space/did:plc:asdf123/short/default",
+            "at:space/did:plc:asdf123/-bad.example/3abc",
+            "at:space/did:plc:asdf123/com.example.-group/default",
+            "at:space/did:plc:asdf123/com.example..group/default",
+            "at:space/did:plc:asdf123/1com.example.group/default",
+            "at:space/did:plc:asdf123/$nsid318/default",
             // Skey RecordKey errors
-            "at://did:plc:asdf123/space/com.example.group/.",
-            "at://did:plc:asdf123/space/com.example.group/..",
-            "at://did:plc:asdf123/space/com.example.group/has space",
-            "at://did:plc:asdf123/space/com.example.group/has/slash",
-            "at://did:plc:asdf123/space/com.example.group/has@invalid",
-            "at://did:plc:asdf123/space/com.example.group/has%percent"
+            "at:space/did:plc:asdf123/com.example.group/.",
+            "at:space/did:plc:asdf123/com.example.group/..",
+            "at:space/did:plc:asdf123/com.example.group/has space",
+            "at:space/did:plc:asdf123/com.example.group/has/slash",
+            "at:space/did:plc:asdf123/com.example.group/has@invalid",
+            "at:space/did:plc:asdf123/com.example.group/has%percent"
         )
 
         for (uri in malformedURIs) {
@@ -106,7 +111,7 @@ class SpaceRefTest {
             }
         }
 
-        val overlengthSkey = "at://did:plc:asdf123/space/com.example.group/" + "a".repeat(513)
+        val overlengthSkey = "at:space/did:plc:asdf123/com.example.group/" + "a".repeat(513)
         assertFailsWith<IllegalArgumentException> {
             SpaceRef.parse(overlengthSkey)
         }
@@ -114,7 +119,7 @@ class SpaceRefTest {
             Json.decodeFromString<SpaceRef>("\"$overlengthSkey\"")
         }
 
-        val overlengthURI = "at://did:plc:asdf123/space/com.example.group/" + "a".repeat(8200)
+        val overlengthURI = "at:space/did:plc:asdf123/com.example.group/" + "a".repeat(8200)
         assertFailsWith<IllegalArgumentException> {
             SpaceRef.parse(overlengthURI)
         }
@@ -126,7 +131,7 @@ class SpaceRefTest {
     @Test
     fun `SpaceRef component factory routes through full validation`() {
         val valid = SpaceRef.create("did:m:v", "com.example.group", "default")
-        assertEquals("at://did:m:v/space/com.example.group/default", valid.value)
+        assertEquals("at:space/did:m:v/com.example.group/default", valid.value)
         assertEquals("did:m:v", valid.spaceDID)
         assertEquals("com.example.group", valid.spaceType)
         assertEquals("default", valid.skey)
@@ -150,6 +155,23 @@ class SpaceRefTest {
         assertFailsWith<IllegalArgumentException> {
             SpaceRef.create("did:plc:asdf123", "com.example.group", "..")
         }
+    }
+
+    @Test
+    fun `fromLegacySpaceUri rewrites only the spaces alpha form`() {
+        assertEquals(
+            "at:space/did:plc:asdf123/com.example.group/default",
+            SpaceRef.fromLegacySpaceUri("at://did:plc:asdf123/space/com.example.group/default")
+        )
+        assertEquals(
+            "at:space/did:plc:asdf123/com.example.group/default/did:plc:user1/com.atproto.feed.post/abc123",
+            SpaceRef.fromLegacySpaceUri(
+                "at://did:plc:asdf123/space/com.example.group/default/did:plc:user1/com.atproto.feed.post/abc123"
+            )
+        )
+        assertEquals(null, SpaceRef.fromLegacySpaceUri("at:space/did:plc:asdf123/com.example.group/default"))
+        assertEquals(null, SpaceRef.fromLegacySpaceUri("at://did:plc:asdf123/com.atproto.feed.post/abc"))
+        assertEquals(null, SpaceRef.fromLegacySpaceUri("at://did:plc:asdf123/space"))
     }
 
     @Test

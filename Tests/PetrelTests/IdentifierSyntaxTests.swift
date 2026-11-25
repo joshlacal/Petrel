@@ -81,12 +81,12 @@ struct IdentifierStrayCharacterTests {
         ),
         Format(
             name: "at-uri (space record)",
-            valid: "at://did:plc:asdf123/space/com.example.group/default/did:plc:user1/com.atproto.feed.post/abc123",
+            valid: "at:space/did:plc:asdf123/com.example.group/default/did:plc:user1/com.atproto.feed.post/abc123",
             isValid: { ATProtocolURI.isValidATURI($0) && (try? ATProtocolURI(uriString: $0)) != nil },
             decodes: { (try? decodeJSON(ATProtocolURI.self, $0)) != nil }
         ),
         Format(
-            name: "space-ref", valid: "at://did:plc:asdf123/space/com.example.group/default",
+            name: "space-ref", valid: "at:space/did:plc:asdf123/com.example.group/default",
             isValid: { (try? SpaceRef(uriString: $0)) != nil },
             decodes: { (try? decodeJSON(SpaceRef.self, $0)) != nil }
         ),
@@ -618,7 +618,7 @@ struct ATURISyntaxTests {
 
 @Suite("AT-URI: permissioned-data space grammar")
 struct SpaceURISyntaxTests {
-    private static let space = "at://did:plc:asdf123/space/com.example.group/default"
+    private static let space = "at:space/did:plc:asdf123/com.example.group/default"
     private static let record = space + "/did:plc:user1/com.atproto.feed.post/abc123"
 
     @Test("a space and a record in a space parse with every part validated")
@@ -681,33 +681,37 @@ struct SpaceURISyntaxTests {
     }
 
     @Test("anything other than the two exact shapes is rejected", arguments: [
-        // Marker alone, or missing parts.
-        "at://did:plc:x/space",
-        "at://did:plc:x/space/",
-        "at://did:plc:x/space/com.example.t",
-        "at://did:plc:x/space/com.example.t/",
+        // Prefix alone, or missing parts.
+        "at:space",
+        "at:space/",
+        "at:space//did:plc:x/com.example.t/k",
+        "at:space/did:plc:x",
+        "at:space/did:plc:x/",
+        "at:space/did:plc:x/com.example.t",
+        "at:space/did:plc:x/com.example.t/",
         // A record needs author, collection and key together.
-        "at://did:plc:x/space/com.example.t/k/did:plc:user1",
-        "at://did:plc:x/space/com.example.t/k/did:plc:user1/com.example.c",
-        "at://did:plc:x/space/com.example.t/k/did:plc:user1/com.example.c/r/extra",
+        "at:space/did:plc:x/com.example.t/k/did:plc:user1",
+        "at:space/did:plc:x/com.example.t/k/did:plc:user1/com.example.c",
+        "at:space/did:plc:x/com.example.t/k/did:plc:user1/com.example.c/r/extra",
         // Authority must be a DID.
+        "at:space/handle.example.com/com.example.t/k",
+        "at:space/handle.example.com//////",
         "at://handle.example.com/space/com.example.t/k",
-        "at://handle.example.com/space//////",
         // Every part is validated against its own grammar.
-        "at://did:plc:x/space/short/k",
-        "at://did:plc:x/space/com.example.t/..",
-        "at://did:plc:x/space/com.example.t/k/not-a-did/com.example.c/r",
-        "at://did:plc:x/space/com.example.t/k/did:plc:user1/not_an_nsid/r",
-        "at://did:plc:x/space/com.example.t/k/did:plc:user1/com.example.c/..",
-        "at://did:plc:x/space/com.example.t/k/user.example.com/com.example.c/r",
+        "at:space/did:plc:x/short/k",
+        "at:space/did:plc:x/com.example.t/..",
+        "at:space/did:plc:x/com.example.t/k/not-a-did/com.example.c/r",
+        "at:space/did:plc:x/com.example.t/k/did:plc:user1/not_an_nsid/r",
+        "at:space/did:plc:x/com.example.t/k/did:plc:user1/com.example.c/..",
+        "at:space/did:plc:x/com.example.t/k/user.example.com/com.example.c/r",
         // Empty segments, whitespace, query, fragment, line terminators.
-        "at://did:plc:x/space//k",
-        "at://did:plc:x/space/com.example.t//did:plc:user1/com.example.c/r",
-        "at://did:plc:x/space/ a b?c=d#frag\n",
-        "at://did:plc:x/space/com.example.t/k?c=d",
-        "at://did:plc:x/space/com.example.t/k#frag",
-        "at://did:plc:x/space/com.example.t/k\n",
-        "at://did:plc:x/space/not an nsid/!!/x/y/z/extra/more",
+        "at:space/did:plc:x//k",
+        "at:space/did:plc:x/com.example.t//did:plc:user1/com.example.c/r",
+        "at:space/did:plc:x/ a b?c=d#frag\n",
+        "at:space/did:plc:x/com.example.t/k?c=d",
+        "at:space/did:plc:x/com.example.t/k#frag",
+        "at:space/did:plc:x/com.example.t/k\n",
+        "at:space/did:plc:x/not an nsid/!!/x/y/z/extra/more",
     ])
     func malformedSpaceURIs(_ string: String) {
         #expect(!ATProtocolURI.isValidATURI(string))
@@ -715,21 +719,39 @@ struct SpaceURISyntaxTests {
         #expect(throws: (any Error).self) { try decodeJSON(ATProtocolURI.self, string) }
     }
 
+    /// The spaces alpha form, `at://{spaceDid}/space/…`, is rejected by every
+    /// parser; only decoding reads it, for record values written during the alpha.
+    @Test("the spaces alpha form is rejected strictly and read only when decoding", arguments: [
+        "at://did:plc:asdf123/space/com.example.group/default",
+        "at://did:plc:asdf123/space/com.example.group/default/did:plc:user1/com.atproto.feed.post/abc123",
+    ])
+    func legacySpaceForm(_ string: String) throws {
+        #expect(!ATProtocolURI.isValidATURI(string))
+        #expect(!ATProtocolURI.isValidATURI(string, grammar: .restricted))
+        #expect(throws: ATProtocolError.self) { try ATProtocolURI(uriString: string) }
+        #expect(throws: (any Error).self) { try decodeJSON(SpaceRef.self, string) }
+
+        let decoded = try decodeJSON(ATProtocolURI.self, string)
+        #expect(decoded.isSpace)
+        #expect(decoded.uriString() == string)
+        #expect(decoded.normalized().uriString() == ATProtocolURI.fromLegacySpaceURI(string))
+    }
+
     @Test("normalization applies to the space type and the record collection")
     func normalization() throws {
         let written = try ATProtocolURI(
-            uriString: "at://did:plc:asdf123/space/COM.Example.group/Default/did:plc:user1/COM.atproto.feed.post/Abc"
+            uriString: "at:space/did:plc:asdf123/COM.Example.group/Default/did:plc:user1/COM.atproto.feed.post/Abc"
         )
         #expect(
             written.normalized().uriString()
-                == "at://did:plc:asdf123/space/com.example.group/Default/did:plc:user1/com.atproto.feed.post/Abc"
+                == "at:space/did:plc:asdf123/com.example.group/Default/did:plc:user1/com.atproto.feed.post/Abc"
         )
     }
 
     @Test("isEqual distinguishes two spaces under one authority")
     func equality() throws {
-        let one = try ATProtocolURI(uriString: "at://did:plc:asdf123/space/com.example.group/one")
-        let two = try ATProtocolURI(uriString: "at://did:plc:asdf123/space/com.example.group/two")
+        let one = try ATProtocolURI(uriString: "at:space/did:plc:asdf123/com.example.group/one")
+        let two = try ATProtocolURI(uriString: "at:space/did:plc:asdf123/com.example.group/two")
         #expect(!one.isEqual(to: two))
     }
 }

@@ -122,7 +122,7 @@ Petrel supports multiple authentication strategies unified under the `AuthStrate
 
 - `struct CID`: Content Identifiers for IPLD blocks. Implements multihash parsing and DAG-CBOR encoding tag 42 (`$link`).
 - `actor TIDGenerator`: Generates monotonic sortable timestamp identifiers (TIDs) for repository records.
-- `struct SpaceRef`: Identifiers for permissioned space data (`at://{spaceDid}/space/{spaceType}/{skey}`).
+- `struct SpaceRef`: Identifiers for permissioned space data (`at:space/{spaceDid}/{spaceType}/{skey}`).
 - `CARReader`, `CARRepository`, `MSTTraverser`: Primitives for reading and verifying IPLD Content Addressable Archives (CAR) and Merkle Search Trees (MST).
 - `RichText`: Utilities for parsing and applying Bluesky rich text facets (mentions, links, tags) to `AttributedString`.
 

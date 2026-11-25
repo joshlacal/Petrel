@@ -1,0 +1,13 @@
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct {{ space_name }};
+
+impl {{ space_name }} {
+    pub const NSID: &'static str = {{ lexicon_id | escape_str_literal }};
+    pub const KEY_TYPE: &'static str = {{ key_type | escape_str_literal }};
+    pub const TITLE: Option<&'static str> = {{ title_expr }};
+    pub const COLLECTIONS: &'static [&'static str] = &[
+{% for coll in collections %}
+        {{ coll | escape_str_literal }},
+{% endfor %}
+    ];
+}

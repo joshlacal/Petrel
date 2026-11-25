@@ -100,7 +100,7 @@ struct IdentifiersArticleTests {
         )
         #expect(built == uri)
 
-        let string = "at://did:plc:asdf123/space/com.example.group/default"
+        let string = "at:space/did:plc:asdf123/com.example.group/default"
         #expect(throws: ATProtocolError.self) { try ATProtocolURI(uriString: string, grammar: .restricted) }
         #expect(!ATProtocolURI.isValidATURI(string, grammar: .restricted))
         #expect(ATProtocolURI.isValidATURI(string))

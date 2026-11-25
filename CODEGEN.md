@@ -92,7 +92,7 @@ Generates code for every schema in the manifest's `lexicons.emit`.
 | Option | Default | Description |
 | :-- | :-- | :-- |
 | `--manifest <file>` | `petrel-manifest.json` | Manifest path. |
-| `--language {swift,kotlin,both}` | `both` | Languages to emit (of those configured in the manifest). |
+| `--language {swift,kotlin,both,rust,all}` | `all` | Languages to emit (of those configured in the manifest; `both` = Swift + Kotlin). |
 | `--stdout` | | Print generated files instead of writing them. |
 | `--check` | | Exit non-zero if files on disk differ from what would be generated. Does not write. |
 | `--no-format` | | Skip formatting Swift output with the pinned SwiftFormat. |
@@ -105,7 +105,7 @@ Validates one Lexicon file (`-` reads stdin) and previews the result.
 
 | Option | Description |
 | :-- | :-- |
-| `--language {summary,swift,kotlin,both}` | Output mode. Default: summary. |
+| `--language {summary,swift,kotlin,rust,both,all}` | Output mode. Default: summary. |
 | `--stdout` | Print generated code (Swift and Kotlin unless `--language` is set). |
 | `--overlay` | Render code as an overlay would (`import Petrel`). |
 | `--json` | Print inspection metadata as JSON. |
@@ -183,8 +183,14 @@ Petrel's own manifest is `generator/manifests/petrel-core.json` (`kind: "core"`)
 | `swift.emit_server_contracts` | bool or string[] | Emit server handler protocols and strict input decoding, for all endpoints or those under the listed prefixes. Default `false`. |
 | `swift.emit_xrpc_error_parsing` | bool or string[] | Parse generic XRPC error bodies into thrown errors for endpoints that declare no `errors`. Endpoints that declare `errors` always get a typed error enum. Default `false`. |
 | `kotlin.output` | string | Kotlin output directory. |
+| `rust.output` | string | Rust output directory (`mod.rs` + `.rs` modules). |
+| `rust.crate` | string | Crate name for this package (e.g. `petrel_api`, `petrel_catbird`). |
+| `rust.crate_path` | string | Root path prefix for same-crate refs (default `crate`, or `crate::generated`). |
+| `rust.reference_crate` | string | External crate path prefix for overlay reference-set refs (default `petrel_api`). |
+| `rust.features` | bool | Emit `#[cfg(feature = "...")]` namespace gates in depth-1 `mod.rs` files. |
+| `rust.property_type_overrides` | object | Optional `{nsid: {"Struct.prop": "RustType"}}` overrides; unused entries raise. |
 
-Omit `swift` or `kotlin` to generate only the other language.
+Omit `swift`, `kotlin`, or `rust` to skip generating that language.
 
 ## Formatting
 
@@ -195,6 +201,7 @@ diff. CI pins SwiftFormat 0.61.1; other versions can wrap differently.
 - Overlays: `swiftformat Sources/<Name>/Generated` with default rules. Do not pass Petrel's
   `.swiftformat`; it rewraps output and leaves files dirty after every regeneration.
 - Kotlin: do not reformat. The generator's output is final.
+- Rust: do not reformat. The generator's output is final (`#[rustfmt::skip] pub mod generated;` in `lib.rs`).
 
 ## Versioning
 

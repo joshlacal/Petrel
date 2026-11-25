@@ -1,0 +1,13 @@
+#[derive(Debug)]
+pub struct {{ endpoint_name }};
+
+impl petrel_core::XrpcRequest for {{ endpoint_name }} {
+    const NSID: &'static str = {{ lexicon_id | escape_str_literal }};
+    const METHOD: petrel_core::XrpcMethod = petrel_core::XrpcMethod::{{ method_variant }};
+    const INPUT_ENCODING: Option<&'static str> = {{ input_encoding_expr }};
+    const OUTPUT_ENCODING: Option<&'static str> = {{ output_encoding_expr }};
+    type Params = {{ params_type }};
+    type Input = {{ input_type }};
+    type Output = {{ output_type }};
+    type Error = {{ error_type }};
+}

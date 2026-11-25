@@ -479,8 +479,8 @@ struct SpacesCrossLanguageVectorsTests {
             let wrongKeyRaw = P256.Signing.PrivateKey().rawRepresentation
 
             for authorityDID in ["did:plc:ewvi7nxzyoun6zhxrhs64oiz", "did:web:ds.catbird.blue"] {
-                let space = try SpaceRef(uriString: "at://\(authorityDID)/space/blue.catbird.mlsChat/3l2aaaaaaaaaa")
-                let wrongSpace = "at://\(authorityDID)/space/blue.catbird.mlsChat/other-space"
+                let space = try SpaceRef(uriString: "at:space/\(authorityDID)/blue.catbird.mlsChat/3l2aaaaaaaaaa")
+                let wrongSpace = "at:space/\(authorityDID)/blue.catbird.mlsChat/other-space"
 
                 @Sendable func makeDidDocJSON(signingKey: P256.Signing.PrivateKey) -> Data {
                     let multibase = String(P256DIDKey(publicKey: signingKey.publicKey).value.dropFirst("did:key:".count))

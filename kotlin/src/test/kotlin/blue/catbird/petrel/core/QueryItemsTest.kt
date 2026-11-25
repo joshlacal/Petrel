@@ -45,7 +45,7 @@ class QueryItemsTest {
     fun `every scalar CID parameter is sent as its string`() {
         val cases = listOf(
             Triple("com.atproto.space.getBlob", "cid", ComAtprotoSpaceGetBlobParameters(
-                space = SpaceRef.parse("at://did:plc:asdf123/space/com.example.group/default"),
+                space = SpaceRef.parse("at:space/did:plc:asdf123/com.example.group/default"),
                 repo = did,
                 cid = cid,
             ).toQueryItems()),
