@@ -1723,6 +1723,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "petrel-repo"
+version = "0.0.0"
+dependencies = [
+ "async-lock",
+ "base64 0.22.1",
+ "bs58",
+ "bytes",
+ "futures-util",
+ "getrandom 0.2.17",
+ "k256",
+ "p256",
+ "petrel",
+ "petrel-core",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "wasm-bindgen-test",
+ "web-time",
+]
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"

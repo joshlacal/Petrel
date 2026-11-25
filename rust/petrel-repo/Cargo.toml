@@ -1,0 +1,45 @@
+[package]
+name = "petrel-repo"
+description = "AT Protocol repository engine for Petrel: CAR v1 framing, block stores, Merkle Search Trees, commit signing/verification, diffing, and record codecs."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["native"]
+native = ["petrel/native"]
+wasm = ["petrel/wasm", "petrel-core/wasm", "dep:getrandom", "getrandom/js"]
+
+[dependencies]
+petrel-core = { workspace = true }
+petrel = { workspace = true }
+async-lock = { workspace = true }
+base64 = { workspace = true }
+bs58 = { workspace = true }
+bytes = { workspace = true }
+futures-util = { workspace = true }
+k256 = { workspace = true }
+p256 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+web-time = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+getrandom = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { workspace = true, optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+tempfile = { workspace = true }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
+[lints]
+workspace = true
