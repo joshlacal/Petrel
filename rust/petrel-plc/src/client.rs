@@ -696,6 +696,14 @@ impl PlcDirectoryClient {
         options.timeout = Some(self.configuration.timeout);
         options.max_response_bytes = Some(maximum_bytes as u64);
         options.allow_loopback = self.configuration.is_laboratory;
+        options.allowed_cleartext_origin = if self.configuration.is_laboratory
+            && self.configuration.origin.scheme() == "http"
+            && !is_loopback_literal(&self.configuration.origin)
+        {
+            Origin::from_url(&self.configuration.origin).ok()
+        } else {
+            None
+        };
         options.anonymous = true;
         let response = send_with_redirects(
             self.transport.as_ref(),

@@ -40,7 +40,7 @@ pub async fn send_with_redirects(
     options: &SendOptions,
     redirects: RedirectPolicy,
 ) -> Result<Response<Bytes>, TransportError> {
-    let (mut url, mut origin) = validate_request_uri(request.uri(), options.allow_loopback)
+    let (mut url, mut origin) = validate_request_uri(request.uri(), options)
         .map_err(|error| TransportError::PolicyViolation(error.to_string()))?;
     let mut options = options.clone();
     let deadline = options.timeout.and_then(|d| Instant::now().checked_add(d));
@@ -91,6 +91,7 @@ pub async fn send_with_redirects(
         update_request(&mut request, response.status(), cross_origin)?;
         if cross_origin {
             options.anonymous = true;
+            options.allowed_cleartext_origin = None;
             retain_anonymous_headers(request.headers_mut());
         }
         *request.uri_mut() = url.as_str().parse().map_err(invalid_location)?;

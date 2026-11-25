@@ -403,6 +403,82 @@ async fn pds_operation_flow_verifies_requested_changes_and_rejects_tampering() {
     let _ = msg_response(404, "not found");
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn allowlisted_non_loopback_laboratory_origin_passes_request_policy() {
+    let id = PlcTestIdentity::generate();
+    let (did, op) = id.genesis("alice.lab.example").await;
+    let doc_data = make_document_data_json(&did, &op);
+    let lab_origin = Url::parse("http://plc.lab:2582").unwrap();
+    let expected_origin = petrel::net::Origin::from_url(&lab_origin).unwrap();
+    let expected_did = did.clone();
+
+    let transport = Arc::new(SequenceTransport::new(move |req, options, ordinal| {
+        assert_eq!(
+            options.allowed_cleartext_origin.as_ref(),
+            Some(&expected_origin)
+        );
+        if ordinal == 0 {
+            assert_eq!(req.method(), Method::GET);
+            assert_eq!(
+                req.uri().to_string(),
+                format!("http://plc.lab:2582/{expected_did}/data")
+            );
+            Ok(Response::builder()
+                .status(200)
+                .header("content-type", "application/json")
+                .body(Bytes::from(doc_data.clone()))
+                .unwrap())
+        } else {
+            assert_eq!(req.method(), Method::POST);
+            assert_eq!(
+                req.uri().to_string(),
+                format!("http://plc.lab:2582/{expected_did}")
+            );
+            Ok(Response::builder()
+                .status(200)
+                .header("content-type", "application/json")
+                .body(Bytes::from_static(b"{}"))
+                .unwrap())
+        }
+    }));
+
+    let client = PlcDirectoryClient::new(
+        PlcClientConfiguration::laboratory(
+            &lab_origin,
+            PlcSubmitSuccessResponsePolicy::Strict,
+            Some("plc.lab"),
+        )
+        .unwrap(),
+        transport.clone(),
+    );
+
+    let data = client.get_document_data(&did).await.unwrap();
+    assert_eq!(data.did, did);
+    client.submit(&did, &op).await.unwrap();
+
+    // Without the scoped cleartext origin allowance, allow_loopback alone still rejects `http://plc.lab:2582`.
+    let mut loopback_only = petrel::net::SendOptions::new();
+    loopback_only.allow_loopback = true;
+    let req = Request::builder()
+        .method(Method::GET)
+        .uri(format!("http://plc.lab:2582/{did}/data"))
+        .body(Bytes::new())
+        .unwrap();
+    let err = petrel::net::send_with_redirects(
+        transport.as_ref(),
+        req,
+        &loopback_only,
+        petrel::net::RedirectPolicy::Never,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        err,
+        petrel::net::TransportError::PolicyViolation(_)
+    ));
+}
+
 // Keep unused imports clean on wasm32
 #[allow(dead_code)]
 fn _use_http_transport_marker<T: HttpTransport>(_: &T) {}
