@@ -3,7 +3,10 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt,
-    sync::Arc,
+    sync::{
+        Arc, Weak,
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+    },
     time::Duration,
 };
 
@@ -220,6 +223,12 @@ type SharedRefreshFuture = Shared<
     >,
 >;
 
+struct ActiveRefreshEntry {
+    generation: u64,
+    active_waiters: Arc<AtomicUsize>,
+    future: SharedRefreshFuture,
+}
+
 /// App-password authentication strategy (`com.atproto.server.*Session`).
 ///
 /// Used by CLI/daemon clients (`catmos-cli`, `BIRDaemon`) and tests requiring
@@ -235,7 +244,8 @@ pub struct LegacyPasswordStrategy {
     last_refresh_attempt: Mutex<HashMap<Did, Instant>>,
     last_successful_refresh: Mutex<HashMap<Did, Instant>>,
     used_refresh_tokens: Mutex<HashSet<[u8; 32]>>,
-    active_refreshes: Mutex<HashMap<Did, SharedRefreshFuture>>,
+    next_refresh_generation: AtomicU64,
+    active_refreshes: Mutex<HashMap<Did, ActiveRefreshEntry>>,
     account_statuses: Mutex<HashMap<Did, AccountStatus>>,
     lifecycle_lock: Mutex<()>,
 }
@@ -267,6 +277,7 @@ impl LegacyPasswordStrategy {
             last_refresh_attempt: Mutex::new(HashMap::new()),
             last_successful_refresh: Mutex::new(HashMap::new()),
             used_refresh_tokens: Mutex::new(HashSet::new()),
+            next_refresh_generation: AtomicU64::new(1),
             active_refreshes: Mutex::new(HashMap::new()),
             account_statuses: Mutex::new(HashMap::new()),
             lifecycle_lock: Mutex::new(()),
@@ -646,12 +657,10 @@ impl LegacyPasswordStrategy {
             return Err(PasswordAuthError::NoActiveAccount);
         };
 
-        let existing = {
-            let refreshes = self.active_refreshes.lock().await;
-            refreshes.get(&did).cloned()
-        };
-        if let Some(existing) = existing {
-            return existing.await;
+        if let Some((existing, mut waiter)) = self.try_join_active_refresh(&did).await {
+            let res = existing.await;
+            waiter.mark_finished();
+            return res;
         }
 
         let token_hash = sha256_bytes(session.refresh_jwt().as_bytes());
@@ -691,52 +700,117 @@ impl LegacyPasswordStrategy {
             return Ok(TokenRefreshResult::StillValid);
         }
 
-        let shared = {
-            let mut refreshes = self.active_refreshes.lock().await;
-            if let Some(existing) = refreshes.get(&did).cloned() {
-                drop(refreshes);
-                return existing.await;
-            }
-            {
-                let mut used = self.used_refresh_tokens.lock().await;
-                if used.contains(&token_hash) {
-                    used.remove(&token_hash);
-                    return Err(PasswordAuthError::TokenRefreshFailed(
-                        "refresh token replay prevented".to_owned(),
-                    ));
-                }
-                used.insert(token_hash);
-            }
+        let (shared, mut waiter) = self.spawn_or_join_refresh(did, token_hash).await?;
+        let res = shared.await;
+        waiter.mark_finished();
+        res
+    }
 
-            let this = Arc::clone(self);
-            let did_for_task = did.clone();
-            let fut = async move {
-                let res = this.perform_refresh(&did_for_task).await;
-                this.active_refreshes.lock().await.remove(&did_for_task);
-                if let Err(ref err) = res
-                    && !matches!(err, PasswordAuthError::InvalidCredentials)
-                {
-                    this.used_refresh_tokens.lock().await.remove(&token_hash);
-                }
-                res
+    async fn spawn_or_join_refresh(
+        self: &Arc<Self>,
+        did: Did,
+        token_hash: [u8; 32],
+    ) -> Result<(SharedRefreshFuture, RefreshWaiterGuard), PasswordAuthError> {
+        let mut refreshes = self.active_refreshes.lock().await;
+        refreshes.retain(|_, entry| entry.active_waiters.load(Ordering::Acquire) > 0);
+        if let Some(existing) = refreshes.get(&did)
+            && try_increment_waiter(&existing.active_waiters)
+        {
+            let shared = existing.future.clone();
+            let waiter = RefreshWaiterGuard {
+                strategy: Arc::downgrade(self),
+                did,
+                generation: existing.generation,
+                active_waiters: Arc::clone(&existing.active_waiters),
+                finished: false,
             };
-            #[cfg(not(target_arch = "wasm32"))]
-            let boxed: FuturesBoxFuture<
-                'static,
-                Result<TokenRefreshResult, PasswordAuthError>,
-            > = Box::pin(fut);
-            #[cfg(target_arch = "wasm32")]
-            let boxed: std::pin::Pin<
-                Box<
-                    dyn std::future::Future<Output = Result<TokenRefreshResult, PasswordAuthError>>,
-                >,
-            > = Box::pin(fut);
+            return Ok((shared, waiter));
+        }
 
-            let shared = boxed.shared();
-            refreshes.insert(did, shared.clone());
-            shared
+        refreshes.remove(&did);
+        {
+            let mut used = self.used_refresh_tokens.lock().await;
+            if used.contains(&token_hash) {
+                used.remove(&token_hash);
+                return Err(PasswordAuthError::TokenRefreshFailed(
+                    "refresh token replay prevented".to_owned(),
+                ));
+            }
+            used.insert(token_hash);
+        }
+
+        let generation = self.next_refresh_generation.fetch_add(1, Ordering::Relaxed);
+        let active_waiters = Arc::new(AtomicUsize::new(1));
+        let weak_this = Arc::downgrade(self);
+        let did_for_task = did.clone();
+        let fut = async move {
+            let mut cleanup = RefreshCleanupGuard {
+                strategy: Weak::clone(&weak_this),
+                did: did_for_task.clone(),
+                generation,
+                token_hash,
+                finished: false,
+            };
+            let Some(this) = weak_this.upgrade() else {
+                return Err(PasswordAuthError::NoActiveAccount);
+            };
+            let res = this.perform_refresh(&did_for_task).await;
+            drop(this);
+            let keep_token_burned =
+                res.is_ok() || matches!(res, Err(PasswordAuthError::InvalidCredentials));
+            cleanup.finish_async(keep_token_burned).await;
+            res
         };
-        shared.await
+        #[cfg(not(target_arch = "wasm32"))]
+        let boxed: FuturesBoxFuture<
+            'static,
+            Result<TokenRefreshResult, PasswordAuthError>,
+        > = Box::pin(fut);
+        #[cfg(target_arch = "wasm32")]
+        let boxed: std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<TokenRefreshResult, PasswordAuthError>>>,
+        > = Box::pin(fut);
+
+        let shared = boxed.shared();
+        let waiter = RefreshWaiterGuard {
+            strategy: Arc::downgrade(self),
+            did: did.clone(),
+            generation,
+            active_waiters: Arc::clone(&active_waiters),
+            finished: false,
+        };
+        refreshes.insert(
+            did,
+            ActiveRefreshEntry {
+                generation,
+                active_waiters,
+                future: shared.clone(),
+            },
+        );
+        Ok((shared, waiter))
+    }
+
+    async fn try_join_active_refresh(
+        self: &Arc<Self>,
+        did: &Did,
+    ) -> Option<(SharedRefreshFuture, RefreshWaiterGuard)> {
+        let mut refreshes = self.active_refreshes.lock().await;
+        refreshes.retain(|_, entry| entry.active_waiters.load(Ordering::Acquire) > 0);
+        let existing = refreshes.get(did)?;
+        if !try_increment_waiter(&existing.active_waiters) {
+            refreshes.remove(did);
+            return None;
+        }
+        Some((
+            existing.future.clone(),
+            RefreshWaiterGuard {
+                strategy: Arc::downgrade(self),
+                did: did.clone(),
+                generation: existing.generation,
+                active_waiters: Arc::clone(&existing.active_waiters),
+                finished: false,
+            },
+        ))
     }
 
     async fn perform_refresh(&self, did: &Did) -> Result<TokenRefreshResult, PasswordAuthError> {
@@ -1017,6 +1091,104 @@ impl AuthProvider for Arc<LegacyPasswordStrategy> {
         _ctx: &'a AuthCtx,
     ) -> BoxFuture<'a, ()> {
         Box::pin(async {})
+    }
+}
+
+fn try_increment_waiter(active_waiters: &AtomicUsize) -> bool {
+    let mut current = active_waiters.load(Ordering::Acquire);
+    while current > 0 {
+        match active_waiters.compare_exchange_weak(
+            current,
+            current + 1,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        ) {
+            Ok(_) => return true,
+            Err(observed) => current = observed,
+        }
+    }
+    false
+}
+
+struct RefreshWaiterGuard {
+    strategy: Weak<LegacyPasswordStrategy>,
+    did: Did,
+    generation: u64,
+    active_waiters: Arc<AtomicUsize>,
+    finished: bool,
+}
+
+impl RefreshWaiterGuard {
+    const fn mark_finished(&mut self) {
+        self.finished = true;
+    }
+}
+
+impl Drop for RefreshWaiterGuard {
+    fn drop(&mut self) {
+        let prev = self.active_waiters.fetch_sub(1, Ordering::AcqRel);
+        if self.finished || prev != 1 {
+            return;
+        }
+        if let Some(strategy) = self.strategy.upgrade()
+            && let Some(mut refreshes) = strategy.active_refreshes.try_lock()
+            && refreshes
+                .get(&self.did)
+                .is_some_and(|entry| entry.generation == self.generation)
+        {
+            refreshes.remove(&self.did);
+        }
+    }
+}
+
+struct RefreshCleanupGuard {
+    strategy: Weak<LegacyPasswordStrategy>,
+    did: Did,
+    generation: u64,
+    token_hash: [u8; 32],
+    finished: bool,
+}
+
+impl RefreshCleanupGuard {
+    async fn finish_async(&mut self, keep_token_burned: bool) {
+        self.finished = true;
+        if let Some(strategy) = self.strategy.upgrade() {
+            let mut refreshes = strategy.active_refreshes.lock().await;
+            if refreshes
+                .get(&self.did)
+                .is_some_and(|entry| entry.generation == self.generation)
+            {
+                refreshes.remove(&self.did);
+            }
+            drop(refreshes);
+            if !keep_token_burned {
+                strategy
+                    .used_refresh_tokens
+                    .lock()
+                    .await
+                    .remove(&self.token_hash);
+            }
+        }
+    }
+}
+
+impl Drop for RefreshCleanupGuard {
+    fn drop(&mut self) {
+        if self.finished {
+            return;
+        }
+        if let Some(strategy) = self.strategy.upgrade() {
+            if let Some(mut refreshes) = strategy.active_refreshes.try_lock()
+                && refreshes
+                    .get(&self.did)
+                    .is_some_and(|entry| entry.generation == self.generation)
+            {
+                refreshes.remove(&self.did);
+            }
+            if let Some(mut used) = strategy.used_refresh_tokens.try_lock() {
+                used.remove(&self.token_hash);
+            }
+        }
     }
 }
 
