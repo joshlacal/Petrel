@@ -420,9 +420,20 @@ impl<B: BlockStore + 'static> Repository<B> {
     ) -> Result<Self, RepositoryError> {
         limits.validate()?;
         let resolver = verification.as_resolver();
-        let commit = CommitCodec::verify_from_store(
-            &commit_cid,
-            store.as_ref(),
+        let commit_bytes = store
+            .get_block(&commit_cid)
+            .await?
+            .ok_or_else(|| crate::error::CommitError::MissingBlock(commit_cid.clone()))?;
+        if commit_bytes.len() > limits.max_single_block_bytes {
+            return Err(RepositoryError::Limit(crate::error::LimitError::Exceeded {
+                kind: crate::error::LimitKind::SingleBlockBytes,
+                observed: commit_bytes.len(),
+                limit: limits.max_single_block_bytes,
+            }));
+        }
+        let commit = CommitCodec::verify(
+            &commit_bytes,
+            Some(&commit_cid),
             expected_did,
             resolver.as_ref(),
             &policy,

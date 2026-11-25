@@ -966,30 +966,28 @@ impl CARRepository {
             }
         };
 
-        let mut visited = HashSet::new();
-        let mut collections: BTreeMap<String, BTreeMap<String, Cid>> = BTreeMap::new();
-        let mut record_cids: Vec<(String, Cid)> = Vec::new();
-        let mut cid_refcounts: HashMap<Cid, usize> = HashMap::new();
-        let mut mst_node_count = 0_usize;
-        let mut last_key: Option<String> = None;
+        let mut state = MstTraverseState {
+            visited: HashSet::new(),
+            mst_node_count: 0,
+            visited_record_count: 0,
+            last_key: None,
+            collections: BTreeMap::new(),
+            record_cids: Vec::new(),
+            cid_refcounts: HashMap::new(),
+        };
 
         traverse_mst_node(
             &data_cid,
             &reader.blocks,
             0,
-            &mut visited,
-            &mut mst_node_count,
             limits.max_mst_node_count,
             limits.max_record_count,
-            &mut last_key,
-            &mut collections,
-            &mut record_cids,
-            &mut cid_refcounts,
+            &mut state,
         )?;
 
         let mut records: BTreeMap<String, Vec<u8>> = BTreeMap::new();
-        for (full_key, value_cid) in record_cids {
-            if let Some(remaining) = cid_refcounts.get_mut(&value_cid) {
+        for (full_key, value_cid) in state.record_cids {
+            if let Some(remaining) = state.cid_refcounts.get_mut(&value_cid) {
                 let bytes_opt = if *remaining <= 1 {
                     reader.blocks.remove(&value_cid)
                 } else {
@@ -1009,37 +1007,42 @@ impl CARRepository {
             data_cid,
             prev_cid,
             sig,
-            collections,
+            collections: state.collections,
             records,
         })
     }
 }
 
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+struct MstTraverseState {
+    visited: HashSet<Cid>,
+    mst_node_count: usize,
+    visited_record_count: usize,
+    last_key: Option<String>,
+    collections: BTreeMap<String, BTreeMap<String, Cid>>,
+    record_cids: Vec<(String, Cid)>,
+    cid_refcounts: HashMap<Cid, usize>,
+}
+
+#[allow(clippy::too_many_lines)]
 fn traverse_mst_node(
     node_cid: &Cid,
     blocks: &BTreeMap<Cid, Vec<u8>>,
     depth: usize,
-    visited: &mut HashSet<Cid>,
-    mst_node_count: &mut usize,
     max_mst_node_count: usize,
     max_record_count: usize,
-    last_key: &mut Option<String>,
-    collections: &mut BTreeMap<String, BTreeMap<String, Cid>>,
-    record_cids: &mut Vec<(String, Cid)>,
-    cid_refcounts: &mut HashMap<Cid, usize>,
+    state: &mut MstTraverseState,
 ) -> Result<(), CARReaderError> {
     if depth > MAXIMUM_MST_TRAVERSAL_DEPTH {
         return Err(CARReaderError::MstDepthLimitExceeded);
     }
-    if !visited.insert(node_cid.clone()) {
+    if !state.visited.insert(node_cid.clone()) {
         return Err(CARReaderError::MstCycle(node_cid.to_string()));
     }
-    *mst_node_count = mst_node_count.saturating_add(1);
-    if *mst_node_count > max_mst_node_count {
+    state.mst_node_count = state.mst_node_count.saturating_add(1);
+    if state.mst_node_count > max_mst_node_count {
         return Err(CARReaderError::Limit(LimitError::Exceeded {
             kind: LimitKind::MstNodeCount,
-            observed: *mst_node_count,
+            observed: state.mst_node_count,
             limit: max_mst_node_count,
         }));
     }
@@ -1060,14 +1063,9 @@ fn traverse_mst_node(
                 left_cid,
                 blocks,
                 depth + 1,
-                visited,
-                mst_node_count,
                 max_mst_node_count,
                 max_record_count,
-                last_key,
-                collections,
-                record_cids,
-                cid_refcounts,
+                state,
             )?,
             Value::Null => {}
             _ => {
@@ -1119,14 +1117,14 @@ fn traverse_mst_node(
             .map_err(|_| CARReaderError::InvalidMstNode("non-UTF-8 MST key".into()))?;
         current_prefix = key_bytes;
 
-        if let Some(prev) = last_key.as_ref()
+        if let Some(prev) = state.last_key.as_ref()
             && &full_key <= prev
         {
             return Err(CARReaderError::InvalidMstOrder(format!(
                 "{full_key:?} is not strictly greater than {prev:?}"
             )));
         }
-        *last_key = Some(full_key.clone());
+        state.last_key = Some(full_key.clone());
 
         let (collection, rkey) = full_key.split_once('/').ok_or_else(|| {
             CARReaderError::InvalidMstNode(format!("key missing collection/rkey '/': {full_key}"))
@@ -1142,18 +1140,22 @@ fn traverse_mst_node(
                 "MST entry missing value link 'v'".into(),
             ));
         };
-        if record_cids.len() >= max_record_count {
+        if state.visited_record_count >= max_record_count {
             return Err(CARReaderError::Limit(LimitError::Exceeded {
                 kind: LimitKind::RecordCount,
-                observed: record_cids.len() + 1,
+                observed: state.visited_record_count + 1,
                 limit: max_record_count,
             }));
         }
+        state.visited_record_count = state.visited_record_count.saturating_add(1);
         if blocks.contains_key(value_cid) {
-            *cid_refcounts.entry(value_cid.clone()).or_insert(0) += 1;
-            record_cids.push((full_key.clone(), value_cid.clone()));
+            *state.cid_refcounts.entry(value_cid.clone()).or_insert(0) += 1;
+            state
+                .record_cids
+                .push((full_key.clone(), value_cid.clone()));
         }
-        collections
+        state
+            .collections
             .entry(collection.to_owned())
             .or_default()
             .insert(rkey.to_owned(), value_cid.clone());
@@ -1164,14 +1166,9 @@ fn traverse_mst_node(
                     right_cid,
                     blocks,
                     depth + 1,
-                    visited,
-                    mst_node_count,
                     max_mst_node_count,
                     max_record_count,
-                    last_key,
-                    collections,
-                    record_cids,
-                    cid_refcounts,
+                    state,
                 )?,
                 Value::Null => {}
                 _ => {
@@ -1183,6 +1180,6 @@ fn traverse_mst_node(
         }
     }
 
-    visited.remove(node_cid);
+    state.visited.remove(node_cid);
     Ok(())
 }

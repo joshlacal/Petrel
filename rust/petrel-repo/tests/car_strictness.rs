@@ -527,6 +527,7 @@ async fn public_car_counts_foreign_blocks_toward_max_block_count() {
     );
 }
 
+#[allow(clippy::too_many_lines)]
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn car_reader_and_car_repository_enforce_limits() {
@@ -628,4 +629,32 @@ fn car_reader_and_car_repository_enforce_limits() {
     let parsed_repo =
         CARRepository::parse_with_limits(&repo_car, &RepositoryLimits::standard()).unwrap();
     assert_eq!(parsed_repo.records.len(), 2);
+
+    // 5. Partial CAR omitting record payloads still counts visited MST leaf entries toward
+    //    `max_record_count` (Codex 4697647824).
+    let mut partial_blocks = Vec::new();
+    for (raw_cid, raw_bytes) in &repo_blocks {
+        if raw_cid.as_slice() != rec_cid.as_bytes() {
+            partial_blocks.push((raw_cid.clone(), raw_bytes.clone()));
+        }
+    }
+    let partial_car = common::encode_raw_car(std::slice::from_ref(&commit_cid), &partial_blocks);
+    let partial_one_record = RepositoryLimits {
+        max_block_count: 10,
+        max_mst_node_count: 10,
+        max_record_count: 1,
+        ..RepositoryLimits::standard()
+    };
+    assert!(matches!(
+        CARRepository::parse_with_limits(&partial_car, &partial_one_record),
+        Err(CARReaderError::Limit(LimitError::Exceeded {
+            kind: LimitKind::RecordCount,
+            observed: 2,
+            limit: 1,
+        }))
+    ));
+    let parsed_partial =
+        CARRepository::parse_with_limits(&partial_car, &RepositoryLimits::standard()).unwrap();
+    assert_eq!(parsed_partial.collections["app.bsky.feed.post"].len(), 2);
+    assert!(parsed_partial.records.is_empty());
 }

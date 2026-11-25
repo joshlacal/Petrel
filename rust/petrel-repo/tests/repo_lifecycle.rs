@@ -2008,6 +2008,31 @@ async fn open_car_source_rolls_back_on_error_and_open_store_enforces_block_count
         .is_ok()
     );
 
+    // `open_store` also enforces `max_single_block_bytes` on the commit block itself (Codex 4697647815).
+    let tiny_commit_limits = RepositoryLimits {
+        max_single_block_bytes: 64,
+        ..limits
+    };
+    let err_commit_size = Repository::open_store(
+        empty_cid.clone(),
+        Arc::clone(empty_repo.store()),
+        OpenVerification::SigningKey(signer.public_key().clone()),
+        Some(&did),
+        tiny_commit_limits,
+        policy,
+        true,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        err_commit_size,
+        RepositoryError::Limit(LimitError::Exceeded {
+            kind: LimitKind::SingleBlockBytes,
+            limit: 64,
+            ..
+        })
+    ));
+
     // Populated repo where two keys share the exact same record CID: 1 commit + 1 MST + 1 record = 3 blocks.
     let shared_val = post_record_value("shared");
     let batch = WriteBatch::new(vec![
