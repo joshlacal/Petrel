@@ -1,0 +1,45 @@
+[package]
+name = "petrel-core"
+description = "AT Protocol data model for Petrel: identifiers, Value, strict DAG-CBOR, the typed<->Value bridge and the XRPC endpoint traits. No HTTP, no crypto beyond SHA-256."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["std", "serde"]
+# The data model always uses std and serde. Expose their feature names so
+# callers can name these capabilities in uniform workspace commands.
+std = []
+serde = []
+wasm = ["getrandom/js"]
+wasm-js = ["wasm"]
+chrono = ["dep:chrono"]
+time = ["dep:time"]
+jiff = ["dep:jiff"]
+ipld-interop = ["dep:cid"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+base64 = { workspace = true }
+sha2 = { workspace = true }
+web-time = { workspace = true }
+chrono = { workspace = true, optional = true }
+time = { workspace = true, optional = true }
+jiff = { workspace = true, optional = true }
+cid = { workspace = true, optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+getrandom = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { workspace = true, optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
+[lints]
+workspace = true

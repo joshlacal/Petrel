@@ -1,0 +1,6 @@
+# CI and contributors use the same compiler, Clippy, and formatter.
+# The workspace also checks compiler compatibility with Rust 1.88.
+[toolchain]
+channel = "1.100.0"
+components = ["clippy", "rustfmt"]
+targets = ["wasm32-unknown-unknown"]

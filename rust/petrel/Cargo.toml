@@ -1,0 +1,100 @@
+[package]
+name = "petrel"
+description = "Petrel AT Protocol runtime: transport, XRPC pipeline, identity, crypto, OAuth (including client assertion backends), storage and service auth."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# Shared file: Lanes D and E both build in this crate and do not edit this
+# manifest. Everything they are expected to need is already declared.
+[features]
+default = ["native"]
+# reqwest over rustls, tokio timers, hickory DNS. Dependencies are declared
+# only for non-wasm targets, so turning this on for wasm32 pulls none of them.
+native = ["dep:reqwest", "dep:tokio", "dep:hickory-resolver", "dep:brotli", "dep:flate2"]
+# Browser/worker build: direct Fetch API, gloo timers,
+# getrandom's JS backend, DNS over HTTPS. No tokio anywhere on this path.
+wasm = [
+    "dep:gloo-timers",
+    "dep:wasm-bindgen",
+    "dep:wasm-bindgen-futures",
+    "dep:js-sys",
+    "dep:web-sys",
+    "getrandom/js",
+    "petrel-core/wasm",
+]
+# Encrypted on-disk SecretStore (native only in practice).
+file-store = ["dep:aes-gcm", "dep:rustix", "dep:fs4"]
+
+[dependencies]
+petrel-api = { workspace = true, features = ["com_atproto"] }
+petrel-core = { workspace = true }
+petrel-oauth-scopes = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+base64 = { workspace = true }
+bs58 = { workspace = true }
+sha2 = { workspace = true }
+p256 = { workspace = true }
+k256 = { workspace = true }
+getrandom = { workspace = true }
+http = { workspace = true }
+bytes = { workspace = true }
+url = { workspace = true }
+async-lock = { workspace = true }
+futures-util = { workspace = true }
+web-time = { workspace = true }
+tracing = { workspace = true }
+aes-gcm = { workspace = true, optional = true }
+zeroize = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+reqwest = { workspace = true, optional = true, features = ["rustls", "http2"] }
+tokio = { workspace = true, optional = true, features = ["time"] }
+hickory-resolver = { workspace = true, optional = true }
+brotli = { workspace = true, optional = true }
+flate2 = { workspace = true, optional = true }
+
+[target.'cfg(unix)'.dependencies]
+rustix = { workspace = true, optional = true }
+
+[target.'cfg(windows)'.dependencies]
+fs4 = { workspace = true, optional = true }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+gloo-timers = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { workspace = true, optional = true }
+js-sys = { workspace = true, optional = true }
+web-sys = { workspace = true, optional = true, features = [
+    "AbortController",
+    "AbortSignal",
+    "Crypto",
+    "CryptoKey",
+    "Headers",
+    "ReadableStream",
+    "ReadableStreamDefaultReader",
+    "Request",
+    "RequestCredentials",
+    "RequestInit",
+    "RequestMode",
+    "RequestRedirect",
+    "Response",
+    "ResponseType",
+    "SubtleCrypto",
+    "Window",
+    "WorkerGlobalScope",
+] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+tempfile = { workspace = true }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
+[lints]
+workspace = true

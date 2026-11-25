@@ -26,7 +26,7 @@ except ImportError:  # pragma: no cover - pure-Python fallback (e.g. minimal WAS
     _orjson = None
 
 from cycle_detector import CycleDetector
-from generated_projection import GENERATED_KOTLIN_HEADER, GENERATED_SWIFT_HEADER
+from generated_projection import GENERATED_KOTLIN_HEADER, GENERATED_RUST_HEADER, GENERATED_SWIFT_HEADER
 from kotlin_code_generator import KotlinCodeGenerator
 from kotlin_type_converter import convert_to_pascal_case
 from main import (
@@ -43,6 +43,8 @@ from main import (
     run_manifest,
 )
 from swift_code_generator import SwiftCodeGenerator
+from rust_code_generator import RustCodeGenerator
+from rust_type_converter import resolve_rust_def_type_name, rust_module_segments
 from utils import convert_to_camel_case
 
 CLI_VERSION = "2.0.0"
@@ -467,6 +469,18 @@ def _choose_working_directory_for_manifest(manifest_path: Path, manifest: dict[s
     ):
         return cwd
 
+    if manifest_dir.name == "manifests":
+        if all((cwd / entry).exists() for entry in emit_entries) and (
+            (cwd / "generator" / "main.py").is_file()
+            or any(entry.startswith("..") for entry in emit_entries)
+        ):
+            return cwd
+        sibling_petrel = manifest_dir.parent.parent / "Petrel"
+        if sibling_petrel.is_dir() and all(
+            (sibling_petrel / entry).exists() for entry in emit_entries
+        ):
+            return sibling_petrel
+
     return manifest_dir
 
 
@@ -819,7 +833,7 @@ def _staged_manifest_outputs(
         targets: list[tuple[str, str, Path, Path, str, str]] = []
         swift_format_dirs: list[tuple[Path, Path]] = []
         actual_swift = _resolve_manifest_swift_output(manifest_path, staged_manifest)
-        if actual_swift is not None and language in ("swift", "both"):
+        if actual_swift is not None and language in ("swift", "both", "all"):
             actual_lex_docs: Path | None = None
             if kind != "app-intents":
                 lex_docs = staged_manifest["swift"].get("lexicon_documents")
@@ -892,13 +906,28 @@ def _staged_manifest_outputs(
             and isinstance(kotlin_cfg, dict)
             and isinstance(kotlin_cfg.get("output"), str)
             and kotlin_cfg["output"]
-            and language in ("kotlin", "both")
+            and language in ("kotlin", "both", "all")
         ):
             actual_kotlin = Path(kotlin_cfg["output"]).resolve()
             staged_kotlin = temp_root / "kotlin-out"
             staged_manifest["kotlin"]["output"] = str(staged_kotlin)
             targets.append(
                 ("Kotlin", "kotlin", actual_kotlin, staged_kotlin, ".kt", GENERATED_KOTLIN_HEADER)
+            )
+
+        rust_cfg = staged_manifest.get("rust")
+        if (
+            kind != "app-intents"
+            and isinstance(rust_cfg, dict)
+            and isinstance(rust_cfg.get("output"), str)
+            and rust_cfg["output"]
+            and language in ("rust", "all")
+        ):
+            actual_rust = Path(rust_cfg["output"]).resolve()
+            staged_rust = temp_root / "rust-out"
+            staged_manifest["rust"]["output"] = str(staged_rust)
+            targets.append(
+                ("Rust", "rust", actual_rust, staged_rust, ".rs", GENERATED_RUST_HEADER)
             )
 
         swiftformat_runner = (
@@ -1036,7 +1065,7 @@ def cmd_generate(args: argparse.Namespace) -> int:
         )
         return 1
 
-    language = args.language or "both"
+    language = args.language or "all"
     no_format = bool(getattr(args, "no_format", False))
     default_core_roots = load_bundled_core_namespace_roots()
     work_dir = _choose_working_directory_for_manifest(manifest_path, manifest)
@@ -1078,7 +1107,7 @@ def cmd_generate(args: argparse.Namespace) -> int:
             not no_format
             and kind != "app-intents"
             and _resolve_manifest_swift_output(manifest_path, manifest) is not None
-            and language in ("swift", "both")
+            and language in ("swift", "both", "all")
         )
         swiftformat_runner = (
             _find_pinned_swiftformat(require=False) if wants_swift_format else None
@@ -1177,9 +1206,13 @@ def _extract_inspection_metadata(lexicon: dict[str, Any]) -> dict[str, Any]:
 
     swift_symbol = convert_to_camel_case(lexicon_id)
     kotlin_symbol = convert_to_pascal_case(lexicon_id)
+    rust_symbol = resolve_rust_def_type_name(
+        lexicon_id, "main", lexicon_defs=defs
+    )
     ns_dir = get_namespace_path(lexicon_id)
     swift_path = f"Lexicons/{ns_dir}/{swift_symbol}.swift"
     kotlin_path = f"lexicons/{ns_dir.lower()}/{kotlin_symbol}.kt"
+    rust_path = "/".join(rust_module_segments(lexicon_id)) + ".rs"
 
     ns_parts = [lower_camel(part) for part in namespace_segments(lexicon_id)]
     leaf_segment = lexicon_id.rsplit(".", 1)[-1]
@@ -1259,8 +1292,10 @@ def _extract_inspection_metadata(lexicon: dict[str, Any]) -> dict[str, Any]:
         "record_key": main_def.get("key") if primary_type == "record" else None,
         "swift_symbol": swift_symbol,
         "kotlin_symbol": kotlin_symbol,
+        "rust_symbol": rust_symbol,
         "swift_path": swift_path,
         "kotlin_path": kotlin_path,
+        "rust_path": rust_path,
         "client_accessor": client_accessor,
         "definitions": list(defs.keys()),
         "fields": fields,
@@ -1274,10 +1309,12 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     if effective_mode is None:
         effective_mode = "both" if args.stdout else "summary"
 
-    need_swift = args.json or effective_mode in ("summary", "swift", "both")
-    need_kotlin = (not args.json) and effective_mode in ("kotlin", "both")
+    need_swift = (not args.json) and effective_mode in ("summary", "swift", "both", "all")
+    need_kotlin = (not args.json) and effective_mode in ("kotlin", "both", "all")
+    need_rust = (not args.json) and effective_mode in ("rust", "all")
     swift_code = ""
     kotlin_code = ""
+    rust_code = ""
 
     try:
         if args.lexicon == "-":
@@ -1309,6 +1346,12 @@ def cmd_inspect(args: argparse.Namespace) -> int:
                     cycle_detector,
                     overlay=args.overlay,
                 ).convert()
+            if need_rust:
+                rust_code = RustCodeGenerator(
+                    lexicon,
+                    cycle_detector,
+                    overlay=args.overlay,
+                ).convert()
         metadata = _extract_inspection_metadata(lexicon)
     except Exception as exc:
         print(f"error: failed to inspect {source_label}: {exc}", file=sys.stderr)
@@ -1330,7 +1373,13 @@ def cmd_inspect(args: argparse.Namespace) -> int:
             sys.stdout.write("\n")
         return 0
 
-    if effective_mode == "both":
+    if effective_mode == "rust":
+        sys.stdout.write(rust_code)
+        if not rust_code.endswith("\n"):
+            sys.stdout.write("\n")
+        return 0
+
+    if effective_mode in ("both", "all"):
         sys.stdout.write(f"// === [swift] {metadata['swift_path']} ===\n")
         sys.stdout.write(swift_code)
         if not swift_code.endswith("\n"):
@@ -1339,6 +1388,11 @@ def cmd_inspect(args: argparse.Namespace) -> int:
         sys.stdout.write(kotlin_code)
         if not kotlin_code.endswith("\n"):
             sys.stdout.write("\n")
+        if effective_mode == "all":
+            sys.stdout.write(f"\n// === [rust] {metadata['rust_path']} ===\n")
+            sys.stdout.write(rust_code)
+            if not rust_code.endswith("\n"):
+                sys.stdout.write("\n")
         return 0
 
     print(f"Lexicon:         {metadata['id']}")
@@ -1348,6 +1402,7 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     print(f"Primary Type:    {kind_detail}")
     print(f"Swift Symbol:    {metadata['swift_symbol']}  ->  {metadata['swift_path']}")
     print(f"Kotlin Symbol:   {metadata['kotlin_symbol']}  ->  {metadata['kotlin_path']}")
+    print(f"Rust Symbol:     {metadata['rust_symbol']}  ->  {metadata['rust_path']}")
     print(f"Client Path:     {metadata['client_accessor']}")
     print(f"Definitions:     {', '.join(metadata['definitions'])}")
     if metadata["fields"]:
@@ -1462,9 +1517,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gen_parser.add_argument(
         "--language",
-        choices=["swift", "kotlin", "both"],
-        default="both",
-        help="Target language(s) to emit (default: both)",
+        choices=["swift", "kotlin", "both", "rust", "all"],
+        default="all",
+        help="Target language(s) to emit (default: all)",
     )
     gen_mode_group = gen_parser.add_mutually_exclusive_group()
     gen_mode_group.add_argument(
@@ -1495,9 +1550,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     inspect_parser.add_argument(
         "--language",
-        choices=["summary", "swift", "kotlin", "both"],
+        choices=["summary", "swift", "kotlin", "rust", "both", "all"],
         default=None,
-        help="Output mode: summary card, swift source, kotlin source, or both (default: summary)",
+        help="Output mode: summary card, swift, kotlin, rust, both (swift+kotlin), or all (default: summary)",
     )
     inspect_parser.add_argument(
         "--stdout",

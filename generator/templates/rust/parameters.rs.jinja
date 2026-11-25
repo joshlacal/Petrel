@@ -1,0 +1,65 @@
+#[derive(Debug, Clone, PartialEq)]
+pub struct Parameters {
+{% for prop in properties %}
+{% if prop.description %}
+{{ prop.description | escape_doc | indent(4, true) }}
+{% endif %}
+    pub {{ prop.ident }}: {{ prop.rust_type }},
+{% endfor %}
+}
+
+impl Parameters {
+    pub fn new({% for p in required_params %}{{ p.ident }}: {{ p.rust_type }}{% if not loop.last %}, {% endif %}{% endfor %}) -> Self {
+        Self {
+{% for prop in properties %}
+{% if prop.default_expr %}
+            {{ prop.ident }}: {{ prop.default_expr }},
+{% elif prop.in_new_params %}
+            {{ prop.ident }},
+{% else %}
+            {{ prop.ident }}: None,
+{% endif %}
+{% endfor %}
+        }
+    }
+}
+{% if all_optional %}
+
+impl Default for Parameters {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+{% endif %}
+
+impl petrel_core::ToQueryParams for Parameters {
+    fn to_query_params(&self, {% if not properties %}_{% endif %}out: &mut Vec<(&'static str, String)>) {
+{% for prop in properties %}
+{% if prop.is_array %}
+{% if prop.is_option %}
+        if let Some(items) = &self.{{ prop.ident }} {
+            petrel_core::xrpc::push_array_param(out, {{ prop.wire_literal }}, items);
+        }
+{% else %}
+        petrel_core::xrpc::push_array_param(out, {{ prop.wire_literal }}, &self.{{ prop.ident }});
+{% endif %}
+{% elif prop.is_option %}
+        petrel_core::xrpc::push_optional_param(out, {{ prop.wire_literal }}, self.{{ prop.ident }}.as_ref());
+{% else %}
+        petrel_core::xrpc::push_param(out, {{ prop.wire_literal }}, &self.{{ prop.ident }});
+{% endif %}
+{% endfor %}
+    }
+}
+{% if cursor_ident %}
+
+impl petrel_core::xrpc::CursorParams for Parameters {
+    fn cursor(&self) -> Option<&str> {
+        self.{{ cursor_ident }}.as_deref()
+    }
+
+    fn set_cursor(&mut self, cursor: Option<String>) {
+        self.{{ cursor_ident }} = cursor;
+    }
+}
+{% endif %}
