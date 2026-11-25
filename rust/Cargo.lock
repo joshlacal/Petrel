@@ -1726,6 +1726,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "petrel-plc"
+version = "0.0.0"
+dependencies = [
+ "bytes",
+ "http",
+ "petrel",
+ "petrel-api",
+ "petrel-core",
+ "petrel-crypto",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "tokio",
+ "url",
+ "wasm-bindgen-test",
+ "web-time",
+]
+
+[[package]]
 name = "petrel-repo"
 version = "0.0.0"
 dependencies = [

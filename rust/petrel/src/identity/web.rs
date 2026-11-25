@@ -93,12 +93,20 @@ impl DidWebIdentifier {
         })
     }
 
+    pub fn did(&self) -> &str {
+        &self.did
+    }
+
     pub fn host(&self) -> &str {
         &self.host
     }
 
     pub fn port(&self) -> Option<u16> {
         self.port
+    }
+
+    pub fn is_valid(did: &str, allow_development_hosts: bool) -> bool {
+        Self::parse(did, allow_development_hosts).is_ok()
     }
 
     pub fn is_development_host(&self) -> bool {
