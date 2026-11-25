@@ -102,10 +102,11 @@ async fn exchange(
         .call1(&global, &request)
         .and_then(JsCast::dyn_into)
         .map_err(js_failure)?;
-    let response: web_sys::Response = JsFuture::from(promise)
-        .await
-        .and_then(JsCast::dyn_into)
-        .map_err(js_failure)?;
+    // Fetch rejects only for network failures (offline, DNS, refused, reset,
+    // CORS), and the browser does not say whether the request left. Report it
+    // as a lost connection so callers treat it as retryable.
+    let response = JsFuture::from(promise).await.map_err(network_failure)?;
+    let response: web_sys::Response = response.dyn_into().map_err(|_| invalid_response())?;
     if response.type_() == ResponseType::Opaqueredirect || response.redirected() {
         return Err(TransportError::PolicyViolation(
             "browser Fetch hides redirect destinations".to_owned(),
@@ -141,7 +142,9 @@ async fn exchange(
             .dyn_into()
             .map_err(|_| invalid_response())?;
         loop {
-            let read = JsFuture::from(reader.read()).await.map_err(js_failure)?;
+            let read = JsFuture::from(reader.read())
+                .await
+                .map_err(network_failure)?;
             let done = Reflect::get(&read, &JsValue::from_str("done")).map_err(js_failure)?;
             if done.as_bool() == Some(true) {
                 break;
@@ -166,6 +169,35 @@ fn js_failure(_: JsValue) -> TransportError {
     TransportError::Other("browser Fetch failed".to_owned())
 }
 
+#[allow(clippy::needless_pass_by_value)]
+fn network_failure(_: JsValue) -> TransportError {
+    TransportError::ConnectionLost("browser Fetch network failure".to_owned())
+}
+
 fn invalid_response() -> TransportError {
     TransportError::Other("invalid browser Fetch response".to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[wasm_bindgen_test::wasm_bindgen_test]
+    async fn a_refused_connection_is_a_lost_connection() {
+        // Port 9 (discard) has no listener, so Fetch rejects without a response.
+        let request = Request::builder()
+            .uri("http://127.0.0.1:9/xrpc/com.atproto.server.describeServer")
+            .body(Bytes::new())
+            .unwrap();
+        let options = SendOptions {
+            timeout: Some(Duration::from_secs(10)),
+            allow_loopback: true,
+            ..SendOptions::default()
+        };
+        let error = FetchTransport.send(request, &options).await.unwrap_err();
+        assert!(
+            matches!(error, TransportError::ConnectionLost(_)),
+            "unexpected error: {error:?}"
+        );
+    }
 }
