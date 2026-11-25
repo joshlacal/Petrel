@@ -157,7 +157,7 @@ pub fn decode_mst_node(
     let left = match map.get("l") {
         Some(Value::Null) => None,
         Some(Value::Link(cid)) => {
-            if policy.requires_blessed_record_links_in_mst && !cid.is_blessed() {
+            if cid.blessed_kind() != Some(petrel_core::cid::BlessedKind::DagCbor) {
                 return Err(MstError::UnblessedLink(cid.to_string()));
             }
             Some(cid.clone())
@@ -241,7 +241,9 @@ pub fn decode_mst_node(
 
         let value = match entry_map.get("v") {
             Some(Value::Link(cid)) => {
-                if policy.requires_blessed_record_links_in_mst && !cid.is_blessed() {
+                if policy.requires_blessed_record_links_in_mst
+                    && cid.blessed_kind() != Some(petrel_core::cid::BlessedKind::DagCbor)
+                {
                     return Err(MstError::UnblessedLink(cid.to_string()));
                 }
                 cid.clone()
@@ -256,7 +258,7 @@ pub fn decode_mst_node(
         let tree = match entry_map.get("t") {
             Some(Value::Null) => None,
             Some(Value::Link(cid)) => {
-                if policy.requires_blessed_record_links_in_mst && !cid.is_blessed() {
+                if cid.blessed_kind() != Some(petrel_core::cid::BlessedKind::DagCbor) {
                     return Err(MstError::UnblessedLink(cid.to_string()));
                 }
                 Some(cid.clone())

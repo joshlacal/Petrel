@@ -379,6 +379,8 @@ pub enum RepositoryError {
     Limit(#[from] LimitError),
     #[error("record not found at {0}")]
     RecordNotFound(String),
+    #[error("unsupported non-blessed record CID at {path}: {cid}")]
+    UnsupportedRecordCid { path: String, cid: Cid },
     #[error("repository did not verify full tree structure")]
     TreeNotVerified,
     #[error("missing block {0}")]

@@ -1739,3 +1739,206 @@ async fn data_model_open_store_validates_record_cbor_and_streaming_export_avoids
     .unwrap();
     assert_eq!(reopened_no_l0.statistics().unwrap().record_count, 2);
 }
+
+#[allow(clippy::too_many_lines)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn non_blessed_leaf_link_preserved_under_data_model_and_rejected_under_strict() {
+    use petrel_repo::car::{DataCARByteSink, PublicRepositoryCAR};
+    use petrel_repo::error::{MstError, RepositoryError};
+    use petrel_repo::mst::codec::{
+        MstNodeEntryView, MstNodeView, decode_mst_node, encode_mst_node,
+    };
+    use petrel_repo::mst::{MstKeySyntax, MstOptions, RepositoryMst};
+    use petrel_repo::repository::CARExportOrder;
+
+    let did = common::test_did();
+    let signer = P256Keypair::generate().unwrap();
+    let limits = RepositoryLimits::standard();
+    let data_model = RepositoryReadPolicy::data_model();
+    let strict = RepositoryReadPolicy::strict();
+
+    // Build a CIDv1(dag-cbor, sha2-512) non-blessed leaf link with no payload in the CAR.
+    let mut foreign_bytes = vec![0x01, 0x71, 0x13, 0x40];
+    foreign_bytes.extend(std::iter::repeat_n(5_u8, 64));
+    let foreign = Cid::from_bytes(&foreign_bytes).unwrap();
+    assert!(foreign.blessed_kind().is_none());
+
+    let mut mst = RepositoryMst::empty_with_options(MstOptions {
+        policy: data_model,
+        ..MstOptions::default()
+    });
+    let root_cid = mst
+        .insert("app.bsky.feed.post/self", foreign.clone())
+        .await
+        .unwrap();
+    let commit = CommitCodec::prepare(
+        &CommitDescriptor {
+            did: did.clone(),
+            rev: RepositoryTid::parse("3jzfcijpj2z2a").unwrap(),
+            data_cid: root_cid,
+            prev_cid: None,
+        },
+        &signer,
+        &limits,
+    )
+    .await
+    .unwrap();
+
+    let mut archive_blocks = vec![RepositoryBlock::new(
+        commit.cid.clone(),
+        commit.signed_commit_bytes.clone(),
+    )];
+    archive_blocks.extend(mst.new_blocks());
+    let car =
+        PublicRepositoryCAR::write(std::slice::from_ref(&commit.cid), &archive_blocks).unwrap();
+
+    // 1. Opening with `data_model()` + `verifies_tree = true` preserves the foreign leaf link.
+    let opened = Repository::open_car_with_options(
+        &car,
+        OpenVerification::SigningKey(signer.public_key().clone()),
+        Some(&did),
+        limits,
+        data_model,
+        true,
+    )
+    .await
+    .unwrap();
+    let stats = opened.statistics().unwrap();
+    assert_eq!(stats.record_count, 1);
+    assert_eq!(stats.unverifiable_record_count, 1);
+    assert_eq!(
+        opened
+            .record_cid("app.bsky.feed.post", "self")
+            .await
+            .unwrap(),
+        Some(foreign.clone())
+    );
+    let refs = opened.record_references(None).await.unwrap();
+    assert_eq!(refs.len(), 1);
+    assert_eq!(refs[0].cid, foreign);
+
+    // Direct record payload read fails with `UnsupportedRecordCid`.
+    let read_err = opened
+        .record("app.bsky.feed.post", "self")
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        read_err,
+        RepositoryError::UnsupportedRecordCid { ref path, ref cid }
+            if path == "app.bsky.feed.post/self" && cid == &foreign
+    ));
+    let records_err = opened.records(None).await.unwrap_err();
+    assert!(matches!(
+        records_err,
+        RepositoryError::UnsupportedRecordCid { ref path, ref cid }
+            if path == "app.bsky.feed.post/self" && cid == &foreign
+    ));
+
+    // All three CAR export orders succeed without MissingBlock and re-open cleanly under `data_model()`.
+    for order in [
+        CARExportOrder::Stored,
+        CARExportOrder::Streamable,
+        CARExportOrder::BreadthFirst,
+    ] {
+        let sink = DataCARByteSink::new();
+        opened.export_car_to_sink(&sink, order).await.unwrap();
+        let exported = sink.into_bytes().await;
+        if order == CARExportOrder::Stored {
+            assert_eq!(exported, car);
+        }
+        let reopened = Repository::open_car_with_options(
+            &exported,
+            OpenVerification::SigningKey(signer.public_key().clone()),
+            Some(&did),
+            limits,
+            data_model,
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            reopened
+                .record_cid("app.bsky.feed.post", "self")
+                .await
+                .unwrap(),
+            Some(foreign.clone())
+        );
+    }
+
+    // Writing a normal record keeps the foreign leaf link intact.
+    let batch = WriteBatch::new(vec![
+        create_op(
+            "app.bsky.feed.post",
+            "other",
+            &post_record_value("new verifiable record"),
+        )
+        .unwrap(),
+    ])
+    .unwrap();
+    let committed = opened.commit_writes(batch, &signer).await.unwrap();
+    let written_stats = committed.repository.statistics().unwrap();
+    assert_eq!(written_stats.record_count, 2);
+    assert_eq!(written_stats.unverifiable_record_count, 1);
+    assert_eq!(
+        committed
+            .repository
+            .record_cid("app.bsky.feed.post", "self")
+            .await
+            .unwrap(),
+        Some(foreign.clone())
+    );
+    assert!(
+        committed
+            .repository
+            .record("app.bsky.feed.post", "other")
+            .await
+            .unwrap()
+            .is_some()
+    );
+
+    // 2. Strict policy rejects non-blessed leaf links.
+    let strict_err = Repository::open_car_with_options(
+        &car,
+        OpenVerification::SigningKey(signer.public_key().clone()),
+        Some(&did),
+        limits,
+        strict,
+        true,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        strict_err,
+        RepositoryError::Mst(MstError::UnblessedLink(_))
+    ));
+
+    // 3. Structural MST links (`l` and `t`) are ALWAYS required to be blessed DAG-CBOR even
+    // under `data_model()`.
+    let raw_cid = Cid::for_raw(b"not-an-mst-node");
+    let (_, bad_left_bytes) = encode_mst_node(&MstNodeView {
+        left: Some(raw_cid.clone()),
+        entries: vec![MstNodeEntryView {
+            key: "app.bsky.feed.post/other".into(),
+            value: Cid::for_dag_cbor(b"\xa0"),
+            tree: None,
+        }],
+    })
+    .unwrap();
+    let (_, bad_right_bytes) = encode_mst_node(&MstNodeView {
+        left: None,
+        entries: vec![MstNodeEntryView {
+            key: "app.bsky.feed.post/other".into(),
+            value: Cid::for_dag_cbor(b"\xa0"),
+            tree: Some(raw_cid),
+        }],
+    })
+    .unwrap();
+    for bad_node in [bad_left_bytes, bad_right_bytes] {
+        for policy in [strict, data_model] {
+            let err =
+                decode_mst_node(&bad_node, MstKeySyntax::StrictAtProto, &policy, true).unwrap_err();
+            assert!(matches!(err, MstError::UnblessedLink(_)));
+        }
+    }
+}

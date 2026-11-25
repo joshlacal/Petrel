@@ -65,6 +65,7 @@ pub enum CARExportOrder {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RepositoryStatistics {
     pub record_count: usize,
+    pub unverifiable_record_count: usize,
     pub mst_node_count: usize,
     pub tree_depth: usize,
     pub total_mst_block_bytes: usize,
@@ -347,6 +348,7 @@ impl<B: BlockStore + 'static> Repository<B> {
         let commit = VerifiedSignedCommit::from_prepared(&installed.commit);
         let statistics = Some(RepositoryStatistics {
             record_count: 0,
+            unverifiable_record_count: 0,
             mst_node_count: 1,
             tree_depth: 1,
             total_mst_block_bytes: installed.empty_mst_bytes.len(),
@@ -425,9 +427,18 @@ impl<B: BlockStore + 'static> Repository<B> {
                 true,
             )
             .await?;
-            // Always validate every record payload under the selected read policy so invalid
-            // DAG-CBOR or non-map records fail at open time even under `data_model()`.
+            // Always validate every verifiable DAG-CBOR record payload under the selected read
+            // policy so invalid DAG-CBOR or non-map records fail at open time even under
+            // `data_model()`, while preserving unsupported/non-blessed leaf CIDs under `data_model()`.
             for entry in &entries {
+                if entry.value.blessed_kind() != Some(petrel_core::cid::BlessedKind::DagCbor) {
+                    if policy.requires_blessed_record_links_in_mst {
+                        return Err(RepositoryError::Mst(crate::error::MstError::UnblessedLink(
+                            entry.value.to_string(),
+                        )));
+                    }
+                    continue;
+                }
                 let path = RepositoryPath::from_mst_key(&entry.key)?;
                 let bytes = store
                     .get_block(&entry.value)
@@ -437,6 +448,7 @@ impl<B: BlockStore + 'static> Repository<B> {
             }
             Some(RepositoryStatistics {
                 record_count: stats.record_count,
+                unverifiable_record_count: stats.unverifiable_record_count,
                 mst_node_count: stats.node_count,
                 tree_depth: stats.tree_depth,
                 total_mst_block_bytes: stats.total_mst_block_bytes,
@@ -542,6 +554,12 @@ impl<B: BlockStore + 'static> Repository<B> {
         let Some(cid) = mst.get(path.mst_key()).await? else {
             return Ok(None);
         };
+        if cid.blessed_kind() != Some(petrel_core::cid::BlessedKind::DagCbor) {
+            return Err(RepositoryError::UnsupportedRecordCid {
+                path: path.mst_key().to_owned(),
+                cid,
+            });
+        }
         let bytes = self
             .store
             .get_block(&cid)
@@ -605,6 +623,12 @@ impl<B: BlockStore + 'static> Repository<B> {
         let refs = self.record_references(collection).await?;
         let mut out = Vec::with_capacity(refs.len());
         for item in refs {
+            if item.cid.blessed_kind() != Some(petrel_core::cid::BlessedKind::DagCbor) {
+                return Err(RepositoryError::UnsupportedRecordCid {
+                    path: item.path.mst_key().to_owned(),
+                    cid: item.cid,
+                });
+            }
             let bytes = self
                 .store
                 .get_block(&item.cid)
@@ -672,12 +696,10 @@ impl<B: BlockStore + 'static> Repository<B> {
         for (cid, bytes) in proof_map {
             blocks.push(RepositoryBlock::new(cid, bytes));
         }
-        if let Some(ref rcid) = record_cid {
-            let rec_bytes = self
-                .store
-                .get_block(rcid)
-                .await?
-                .ok_or_else(|| RepositoryError::MissingBlock(rcid.clone()))?;
+        if let Some(ref rcid) = record_cid
+            && let Some(rec_bytes) =
+                load_export_record_block(rcid, self.store.as_ref(), &self.policy).await?
+        {
             blocks.push(RepositoryBlock::new(rcid.clone(), rec_bytes));
         }
 
@@ -737,6 +759,7 @@ impl<B: BlockStore + 'static> Repository<B> {
             .await?;
             Some(RepositoryStatistics {
                 record_count: mst_stats.record_count,
+                unverifiable_record_count: mst_stats.unverifiable_record_count,
                 mst_node_count: mst_stats.node_count,
                 tree_depth: mst_stats.tree_depth,
                 total_mst_block_bytes: mst_stats.total_mst_block_bytes,
@@ -837,12 +860,11 @@ impl<B: BlockStore + 'static> Repository<B> {
                     }
                 }
                 for rcid in record_cids {
-                    if !seen.contains(&rcid) {
-                        let bytes = self
-                            .store
-                            .get_block(&rcid)
-                            .await?
-                            .ok_or_else(|| RepositoryError::MissingBlock(rcid.clone()))?;
+                    if !seen.contains(&rcid)
+                        && let Some(bytes) =
+                            load_export_record_block(&rcid, self.store.as_ref(), &self.policy)
+                                .await?
+                    {
                         stream_frame_if_unseen(rcid, &bytes, &mut seen, sink).await?;
                     }
                 }
@@ -909,11 +931,10 @@ fn stream_streamable_blocks<'a, B: BlockStore, Sink: CARByteSink + ?Sized>(
             stream_streamable_blocks(left, store, policy, seen, sink).await?;
         }
         for entry in view.entries {
-            if !seen.contains(&entry.value) {
-                let rec_bytes = store
-                    .get_block(&entry.value)
-                    .await?
-                    .ok_or_else(|| RepositoryError::MissingBlock(entry.value.clone()))?;
+            if !seen.contains(&entry.value)
+                && let Some(rec_bytes) =
+                    load_export_record_block(&entry.value, store, policy).await?
+            {
                 stream_frame_if_unseen(entry.value, &rec_bytes, seen, sink).await?;
             }
             if let Some(right) = entry.tree {
@@ -922,6 +943,23 @@ fn stream_streamable_blocks<'a, B: BlockStore, Sink: CARByteSink + ?Sized>(
         }
         Ok(())
     })
+}
+
+async fn load_export_record_block<B: BlockStore + ?Sized>(
+    cid: &Cid,
+    store: &B,
+    policy: &RepositoryReadPolicy,
+) -> Result<Option<Vec<u8>>, RepositoryError> {
+    if cid.blessed_kind() != Some(petrel_core::cid::BlessedKind::DagCbor)
+        && !policy.requires_blessed_record_links_in_mst
+    {
+        return Ok(store.get_block(cid).await?);
+    }
+    let bytes = store
+        .get_block(cid)
+        .await?
+        .ok_or_else(|| RepositoryError::MissingBlock(cid.clone()))?;
+    Ok(Some(bytes))
 }
 
 /// Convenience helper constructing [`WriteOp::Create`] from a validated [`Record`] or [`Value`].

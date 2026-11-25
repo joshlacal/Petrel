@@ -12,6 +12,7 @@ use crate::mst::tree::{MstEntry, MstOptions};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MstStats {
     pub record_count: usize,
+    pub unverifiable_record_count: usize,
     pub node_count: usize,
     pub tree_depth: usize,
     pub root_layer: usize,
@@ -49,6 +50,7 @@ impl MstValidation {
             seen_cids: HashSet::new(),
             last_key: None,
             entries: Vec::new(),
+            unverifiable_record_count: 0,
             node_count: 0,
             max_depth_seen: 0,
             total_mst_block_bytes: 0,
@@ -58,6 +60,7 @@ impl MstValidation {
         let root_layer = validate_node(&mut ctx, root_cid.clone(), None, true, 0).await?;
         let stats = MstStats {
             record_count: ctx.entries.len(),
+            unverifiable_record_count: ctx.unverifiable_record_count,
             node_count: ctx.node_count,
             tree_depth: ctx.max_depth_seen + 1,
             root_layer: root_layer.unwrap_or(0),
@@ -76,6 +79,7 @@ struct ValidationContext<'s> {
     seen_cids: HashSet<Cid>,
     last_key: Option<String>,
     entries: Vec<MstEntry>,
+    unverifiable_record_count: usize,
     node_count: usize,
     max_depth_seen: usize,
     total_mst_block_bytes: usize,
@@ -220,7 +224,14 @@ fn validate_node<'c, 's: 'c>(
                 });
             }
 
-            if ctx.verify_record_blocks {
+            let is_verifiable_record =
+                entry.value.blessed_kind() == Some(petrel_core::cid::BlessedKind::DagCbor);
+            if !is_verifiable_record {
+                if ctx.options.policy.requires_blessed_record_links_in_mst {
+                    return Err(MstError::UnblessedLink(entry.value.to_string()));
+                }
+                ctx.unverifiable_record_count = ctx.unverifiable_record_count.saturating_add(1);
+            } else if ctx.verify_record_blocks {
                 let rec_bytes = ctx
                     .source
                     .get_block(&entry.value)
@@ -232,7 +243,7 @@ fn validate_node<'c, 's: 'c>(
                         limit: ctx.options.max_single_block_bytes,
                     });
                 }
-                if entry.value.hash_code() == 0x12 && !entry.value.matches_content(&rec_bytes) {
+                if !entry.value.matches_content(&rec_bytes) {
                     return Err(MstError::InvalidNode(format!(
                         "record block CID hash mismatch for {}",
                         entry.value
