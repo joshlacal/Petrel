@@ -1317,6 +1317,7 @@ async fn oauth_remove_account_auto_switch_rebinds_auth_manager_provider() {
 struct GatedSecretStore {
     inner: MemorySecretStore,
     block_next_put: std::sync::atomic::AtomicBool,
+    block_next_delete: std::sync::atomic::AtomicBool,
     entered: Arc<tokio::sync::Notify>,
     release: Arc<tokio::sync::Notify>,
 }
@@ -1353,7 +1354,16 @@ impl petrel::storage::SecretStore for GatedSecretStore {
         namespace: &'a str,
         key: &'a str,
     ) -> BoxFuture<'a, Result<(), petrel::storage::StoreError>> {
-        self.inner.delete(namespace, key)
+        Box::pin(async move {
+            if self
+                .block_next_delete
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
+                self.entered.notify_one();
+                self.release.notified().await;
+            }
+            self.inner.delete(namespace, key).await
+        })
     }
 
     fn take<'a>(
@@ -1379,6 +1389,7 @@ async fn switch_to_account_releases_coordinator_lock_when_cancelled() {
     let secrets = Arc::new(GatedSecretStore {
         inner: MemorySecretStore::new(),
         block_next_put: std::sync::atomic::AtomicBool::new(false),
+        block_next_delete: std::sync::atomic::AtomicBool::new(false),
         entered: Arc::clone(&entered),
         release: Arc::clone(&release),
     });
@@ -1420,4 +1431,172 @@ async fn switch_to_account_releases_coordinator_lock_when_cancelled() {
     client.switch_to_account(&bob_did).await.unwrap();
     assert_eq!(client.get_did().await.unwrap(), Some(bob_did));
     assert_eq!(client.base_url().await, pds_b);
+}
+
+#[tokio::test]
+async fn oauth_logout_preserves_concurrently_switched_account_and_provider() {
+    use petrel::oauth::{ClientAuth, OAuthClient, OAuthConfig};
+
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let secrets = Arc::new(GatedSecretStore {
+        inner: MemorySecretStore::new(),
+        block_next_put: std::sync::atomic::AtomicBool::new(false),
+        block_next_delete: std::sync::atomic::AtomicBool::new(false),
+        entered: Arc::clone(&entered),
+        release: Arc::clone(&release),
+    });
+    let store = SessionStore::new(secrets.clone(), "oauth-logout-race").unwrap();
+    let pds_a = Url::parse("https://pds-oauth-a.test").unwrap();
+    let pds_b = Url::parse("https://pds-oauth-b.test").unwrap();
+    let net = Arc::new(FakePdsNetwork::new(vec![
+        FakePdsState::new("https://pds-oauth-a.test"),
+        FakePdsState::new("https://pds-oauth-b.test"),
+    ]));
+    let resolver = Arc::new(FakeResolver::new());
+    let oauth_cfg = OAuthConfig::new(
+        "https://client.example/oauth-client-metadata.json",
+        Url::parse("example.client:/callback").unwrap(),
+        "atproto transition:generic",
+        ClientAuth::Public,
+    )
+    .unwrap();
+    let oauth_client =
+        Arc::new(OAuthClient::new(net, resolver.clone(), store.clone(), oauth_cfg).unwrap());
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let alice_did: Did = ALICE_DID.parse().unwrap();
+    let bob_did: Did = "did:plc:oauthbob".parse().unwrap();
+    seed_oauth_session(&store, &alice_did, &pds_a, "dpop-a", "jwt-alice", now).await;
+    seed_oauth_session(&store, &bob_did, &pds_b, "dpop-b", "jwt-bob", now).await;
+    store.save_current_did(&alice_did).await.unwrap();
+
+    let client = Arc::new(
+        AtProtoClient::new(
+            pds_a,
+            Arc::new(FakePdsNetwork::new(vec![])),
+            store.clone(),
+            resolver,
+            Some(oauth_client),
+            AuthMode::PublicOAuth,
+            false,
+        )
+        .unwrap(),
+    );
+    assert_eq!(
+        prepare_oauth_get(
+            &client,
+            "https://pds-oauth-a.test/xrpc/app.bsky.actor.getProfile?actor=alice",
+        )
+        .await
+        .unwrap(),
+        (Some(alice_did.clone()), "DPoP jwt-alice".to_owned())
+    );
+
+    secrets
+        .block_next_delete
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let c_logout = Arc::clone(&client);
+    let logout_task = tokio::spawn(async move { c_logout.logout().await });
+    entered.notified().await;
+
+    // Concurrent switch to Bob while Alice's OAuth logout is in flight.
+    client.switch_to_account(&bob_did).await.unwrap();
+    let bob_snap = client.auth_continuity_snapshot().await;
+    release.notify_one();
+    logout_task.await.unwrap().unwrap();
+
+    assert_eq!(client.get_did().await.unwrap(), Some(bob_did.clone()));
+    assert_eq!(client.base_url().await, pds_b);
+    assert_eq!(client.auth_continuity_snapshot().await, bob_snap);
+    assert_eq!(
+        prepare_oauth_get(
+            &client,
+            "https://pds-oauth-b.test/xrpc/app.bsky.actor.getProfile?actor=bob",
+        )
+        .await
+        .unwrap(),
+        (Some(bob_did), "DPoP jwt-bob".to_owned())
+    );
+    assert!(store.get_session(&alice_did).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn legacy_logout_preserves_concurrently_switched_account() {
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let secrets = Arc::new(GatedSecretStore {
+        inner: MemorySecretStore::new(),
+        block_next_put: std::sync::atomic::AtomicBool::new(false),
+        block_next_delete: std::sync::atomic::AtomicBool::new(false),
+        entered: Arc::clone(&entered),
+        release: Arc::clone(&release),
+    });
+    let store = SessionStore::new(secrets.clone(), "legacy-logout-race").unwrap();
+    let pds_a = Url::parse("https://pds-a.test").unwrap();
+    let pds_b = Url::parse("https://pds-b.test").unwrap();
+    let mut state_a = FakePdsState::new("https://pds-a.test");
+    state_a
+        .accounts
+        .insert(ALICE_DID.to_owned(), alice_account());
+    let mut state_b = FakePdsState::new("https://pds-b.test");
+    state_b
+        .accounts
+        .insert(bob_account().did.clone(), bob_account());
+
+    let net = Arc::new(FakePdsNetwork::new(vec![state_a, state_b]));
+    let resolver = Arc::new(FakeResolver::new());
+    resolver.register(ALICE_DID, ALICE_HANDLE, &pds_a);
+    resolver.register(&bob_account().did, "bob.test", &pds_b);
+
+    let client = Arc::new(
+        AtProtoClient::new(
+            pds_a,
+            net.clone(),
+            store,
+            resolver,
+            None,
+            AuthMode::Legacy,
+            false,
+        )
+        .unwrap(),
+    );
+    client
+        .login_with_password("bob.test", "bob-password", None)
+        .await
+        .unwrap();
+    client
+        .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, None)
+        .await
+        .unwrap();
+
+    let bob_did: Did = bob_account().did.parse().unwrap();
+    secrets
+        .block_next_delete
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let c_logout = Arc::clone(&client);
+    let logout_task = tokio::spawn(async move { c_logout.logout().await });
+    entered.notified().await;
+
+    client.switch_to_account(&bob_did).await.unwrap();
+    let bob_snap = client.auth_continuity_snapshot().await;
+    release.notify_one();
+    logout_task.await.unwrap().unwrap();
+
+    assert_eq!(client.get_did().await.unwrap(), Some(bob_did.clone()));
+    assert_eq!(client.base_url().await, pds_b);
+    assert_eq!(client.auth_continuity_snapshot().await, bob_snap);
+    let resp = client
+        .query(
+            "app.bsky.actor.getProfile",
+            [("actor", bob_did.as_str())],
+            &CallOptions::default(),
+        )
+        .await
+        .unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&resp.body).unwrap();
+    assert_eq!(body["did"], bob_did.as_str());
 }

@@ -286,11 +286,12 @@ impl AuthManager {
     /// Signs out of the current account and clears local credentials.
     pub async fn logout(&self) -> Result<(), AuthManagerError> {
         let strategy = self.state.lock().await.strategy.clone();
-        match strategy {
+        let should_invalidate = match strategy {
             ActiveStrategy::None | ActiveStrategy::Gateway { .. } => {
                 let _ = self.account_manager.clear_current_account().await;
+                true
             }
-            ActiveStrategy::Legacy(legacy) => legacy.logout().await?,
+            ActiveStrategy::Legacy(legacy) => legacy.logout_preserving_switch().await?,
             ActiveStrategy::OAuth { client, provider } => {
                 if let Some(did) = self
                     .account_manager
@@ -299,12 +300,28 @@ impl AuthManager {
                     .map_err(PasswordAuthError::from)?
                 {
                     let _ = client.logout(&did).await;
+                    {
+                        let mut guard = provider.lock().await;
+                        if guard
+                            .as_ref()
+                            .is_some_and(|(cached_did, _)| cached_did == &did)
+                        {
+                            *guard = None;
+                        }
+                    }
+                    self.account_manager
+                        .clear_current_account_if_selected(&did)
+                        .await
+                        .unwrap_or(false)
+                } else {
+                    *provider.lock().await = None;
+                    true
                 }
-                *provider.lock().await = None;
-                let _ = self.account_manager.clear_current_account().await;
             }
+        };
+        if should_invalidate {
+            self.invalidate_continuity().await;
         }
-        self.invalidate_continuity().await;
         Ok(())
     }
 

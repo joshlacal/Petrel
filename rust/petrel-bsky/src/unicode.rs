@@ -1583,15 +1583,15 @@ pub fn count_graphemes(text: &str) -> usize {
         let gb9c_join = incb == IncbState::Linked && in_ranges(cur_cp, INCB_CONSONANT);
 
         let no_break = match (prev, cur) {
-            (Gcb::Cr, Gcb::Lf)
-            | (Gcb::L, Gcb::L | Gcb::V | Gcb::Lv | Gcb::Lvt)
-            | (Gcb::Lv | Gcb::V, Gcb::V | Gcb::T)
-            | (Gcb::Lvt | Gcb::T, Gcb::T)
-            | (_, Gcb::Extend | Gcb::Zwj | Gcb::SpacingMark)
-            | (Gcb::Prepend, _) => true, // GB3, GB6, GB7, GB8, GB9, GB9a, GB9b
+            (Gcb::Cr, Gcb::Lf) => true, // GB3
             (Gcb::Control | Gcb::Cr | Gcb::Lf, _) | (_, Gcb::Control | Gcb::Cr | Gcb::Lf) => {
                 false // GB4, GB5
             }
+            (Gcb::L, Gcb::L | Gcb::V | Gcb::Lv | Gcb::Lvt)
+            | (Gcb::Lv | Gcb::V, Gcb::V | Gcb::T)
+            | (Gcb::Lvt | Gcb::T, Gcb::T)
+            | (_, Gcb::Extend | Gcb::Zwj | Gcb::SpacingMark)
+            | (Gcb::Prepend, _) => true, // GB6, GB7, GB8, GB9, GB9a, GB9b
             _ if gb9c_join => true,                                 // GB9c
             (Gcb::Zwj, _) if ext_pict_chain && is_ext_pict => true, // GB11
             (Gcb::Ri, Gcb::Ri) if ri_odd => true,                   // GB12, GB13

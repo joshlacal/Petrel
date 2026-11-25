@@ -475,3 +475,19 @@ fn indic_conjunct_gb9c_matches_swift_grapheme_counts() {
     assert!(!RichText::from_text("क्ष".repeat(300)).exceeds_post_limits());
     assert!(RichText::from_text("क्ष".repeat(301)).exceeds_post_limits());
 }
+
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+fn gb4_gb5_control_breaks_precede_extend_and_prepend() {
+    // GB4: (Control | CR | LF) ÷ Any (so `\n` + combining mark is 2 graphemes, not 1)
+    assert_eq!(RichText::from_text("\n\u{0301}").grapheme_length(), 2);
+    let repeated = RichText::from_text("\n\u{0301}".repeat(151));
+    assert_eq!(repeated.grapheme_length(), 302);
+    assert!(repeated.exceeds_post_limits());
+    // GB3 keeps CR+LF as 1, then GB4 breaks before combining mark
+    assert_eq!(RichText::from_text("\r\n\u{0301}").grapheme_length(), 2);
+    // GB5: Prepend ÷ (Control | CR | LF)
+    assert_eq!(RichText::from_text("\u{0600}\n").grapheme_length(), 2);
+    assert_eq!(RichText::from_text("\u{0600}\r\n").grapheme_length(), 2);
+    assert_eq!(RichText::from_text("\u{0600}\u{0000}").grapheme_length(), 2);
+}

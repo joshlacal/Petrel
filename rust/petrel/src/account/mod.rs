@@ -212,6 +212,23 @@ impl AccountManager {
         Ok(())
     }
 
+    /// Clears the current account selection only if it still points to `did`,
+    /// returning `true` when `did` was cleared (or nothing was selected) and `false`
+    /// if another account is now active.
+    pub async fn clear_current_account_if_selected(&self, did: &Did) -> Result<bool, AccountError> {
+        self.storage.clear_current_did_if_selected(did).await?;
+        let switched_to_other = self
+            .storage
+            .get_current_did()
+            .await?
+            .is_some_and(|current| current != *did);
+        if switched_to_other {
+            return Ok(false);
+        }
+        self.selection_epoch.fetch_add(1, Ordering::AcqRel);
+        Ok(true)
+    }
+
     /// Lists all discoverable accounts in deterministic DID order.
     pub async fn list_accounts(&self) -> Result<Vec<Account>, AccountError> {
         let dids = self.storage.list_account_dids().await?;

@@ -562,15 +562,22 @@ impl LegacyPasswordStrategy {
 
     /// Logs out the current account, calling `deleteSession` before clearing local tokens.
     pub async fn logout(&self) -> Result<(), PasswordAuthError> {
+        let _ = self.logout_preserving_switch().await?;
+        Ok(())
+    }
+
+    pub(crate) async fn logout_preserving_switch(&self) -> Result<bool, PasswordAuthError> {
         let _lifecycle = self.lifecycle_lock.lock().await;
         let Some(did) = self.account_manager.current_did().await? else {
-            return Ok(());
+            return Ok(true);
         };
         let _ = self.revoke_session(&did).await;
         self.delete_stored_session(&did).await?;
         self.account_statuses.lock().await.remove(&did);
-        self.account_manager.clear_current_account().await?;
-        Ok(())
+        Ok(self
+            .account_manager
+            .clear_current_account_if_selected(&did)
+            .await?)
     }
 
     /// Ends `did`'s remote session via `com.atproto.server.deleteSession`, leaving local storage untouched.
