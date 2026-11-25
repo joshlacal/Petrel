@@ -207,9 +207,15 @@ class RustEnumGenerator:
         raw_refs: List[str],
         *,
         closed: bool = False,
+        strict: bool = False,
     ) -> str:
-        """Generate a Rust enum for a named top-level union definition."""
-        return self._emit_union(union_name, raw_refs, closed=closed)
+        """Generate a Rust enum for a named top-level union definition.
+
+        ``strict`` is for a union that is an XRPC input: its decoder runs the
+        member's decoder inside a strict scope, so nothing in the input may
+        degrade, while the member types' own decoders stay lenient.
+        """
+        return self._emit_union(union_name, raw_refs, closed=closed, strict=strict)
 
     def generate_enum_for_union_array(
         self,
@@ -230,6 +236,7 @@ class RustEnumGenerator:
         raw_refs: List[str],
         *,
         closed: bool,
+        strict: bool = False,
     ) -> str:
         if union_name in self.generated_unions:
             return union_name
@@ -284,6 +291,16 @@ class RustEnumGenerator:
         lines.append(
             "    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {"
         )
+        if strict:
+            lines.append("        // An XRPC input: nothing in it may degrade, at any depth.")
+            lines.append("        petrel_core::strictly(|| Self::from_value_in_scope(value))")
+            lines.append("    }")
+            lines.append("}")
+            lines.append("")
+            lines.append(f"impl {union_name} {{")
+            lines.append(
+                "    fn from_value_in_scope(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {"
+            )
         if variants:
             lines.append("        match petrel_core::unknown::type_of(&value)? {")
             for variant in variants:

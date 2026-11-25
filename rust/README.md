@@ -33,7 +33,11 @@ a client can still use, re-encode and re-sign data written by newer or sloppier
 software. An XRPC input decodes strictly at every depth, whoever calls the
 decode: a malformed optional field, or `null` in a field that is not nullable,
 in the input or in any object, array item or union member inside it, fails the
-decode with the field's path. `petrel_core::from_json_strict` and
+decode with the field's path. That holds for an input declared as an object
+or as a union; the union's members keep their lenient decoders everywhere
+else. An input declared as a `ref` is the referenced definition's own type,
+which other places decode leniently, so decode that body with
+`petrel_core::from_json_strict`. `petrel_core::from_json_strict` and
 `from_dag_cbor_strict` apply the same rule to any type, such as a record a
 service is asked to store.
 

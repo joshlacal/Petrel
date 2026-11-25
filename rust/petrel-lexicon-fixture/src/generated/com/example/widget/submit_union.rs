@@ -39,6 +39,13 @@ impl petrel_core::ToValue for InputUnion {
 
 impl petrel_core::FromValue for InputUnion {
     fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
+        // An XRPC input: nothing in it may degrade, at any depth.
+        petrel_core::strictly(|| Self::from_value_in_scope(value))
+    }
+}
+
+impl InputUnion {
+    fn from_value_in_scope(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
             "com.example.widget.defs#gadget" => petrel_core::FromValue::from_value(value).map(Self::Gadget),
             "com.example.widget.note" => petrel_core::FromValue::from_value(value).map(Self::Note),
