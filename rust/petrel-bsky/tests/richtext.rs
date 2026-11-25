@@ -491,3 +491,36 @@ fn gb4_gb5_control_breaks_precede_extend_and_prepend() {
     assert_eq!(RichText::from_text("\u{0600}\r\n").grapheme_length(), 2);
     assert_eq!(RichText::from_text("\u{0600}\u{0000}").grapheme_length(), 2);
 }
+
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+fn gb11_resets_ext_pict_state_after_additional_zwj_or_extend() {
+    // Double ZWJ breaks GB11: `Extended_Pictographic Extend* ZWJ` is NOT followed directly by ExtPict.
+    assert_eq!(
+        RichText::from_text("👩\u{200d}\u{200d}👩").grapheme_length(),
+        2
+    );
+    let repeated = RichText::from_text("👩\u{200d}\u{200d}👩".repeat(151));
+    assert_eq!(repeated.grapheme_length(), 302);
+    assert!(repeated.exceeds_post_limits());
+
+    // Extend after ZWJ also breaks GB11, whereas Extend before ZWJ stays in `PicExtend`.
+    assert_eq!(
+        RichText::from_text("👩\u{200d}\u{0301}👩").grapheme_length(),
+        2
+    );
+    assert_eq!(
+        RichText::from_text("👩\u{fe0f}\u{200d}👩").grapheme_length(),
+        1
+    );
+
+    // Normal multi-ZWJ emoji sequences keep chaining cleanly, while double ZWJ resets locally.
+    assert_eq!(
+        RichText::from_text("👩\u{200d}👨\u{200d}👧").grapheme_length(),
+        1
+    );
+    assert_eq!(
+        RichText::from_text("👩\u{200d}\u{200d}👨\u{200d}👧").grapheme_length(),
+        2
+    );
+}

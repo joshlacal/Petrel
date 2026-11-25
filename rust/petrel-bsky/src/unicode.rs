@@ -1560,6 +1560,15 @@ fn update_incb(state: IncbState, cp: u32) -> IncbState {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExtPictState {
+    None,
+    /// Prefix matches `\p{Extended_Pictographic} Extend*`.
+    PicExtend,
+    /// Prefix matches `\p{Extended_Pictographic} Extend* ZWJ` (GB11 fires on next ExtPict).
+    PicExtendZwj,
+}
+
 /// Counts Unicode extended grapheme clusters in `text` per UAX #29 (including GB9c Indic conjuncts).
 #[must_use]
 pub fn count_graphemes(text: &str) -> usize {
@@ -1572,7 +1581,11 @@ pub fn count_graphemes(text: &str) -> usize {
     };
     let mut count = 1usize;
     let mut prev = classify_gcb(first);
-    let mut ext_pict_chain = in_ranges(first as u32, EXTENDED_PICTOGRAPHIC);
+    let mut ext_pict = if in_ranges(first as u32, EXTENDED_PICTOGRAPHIC) {
+        ExtPictState::PicExtend
+    } else {
+        ExtPictState::None
+    };
     let mut ri_odd = prev == Gcb::Ri;
     let mut incb = update_incb(IncbState::None, first as u32);
 
@@ -1581,6 +1594,7 @@ pub fn count_graphemes(text: &str) -> usize {
         let cur = classify_gcb(ch);
         let is_ext_pict = in_ranges(cur_cp, EXTENDED_PICTOGRAPHIC);
         let gb9c_join = incb == IncbState::Linked && in_ranges(cur_cp, INCB_CONSONANT);
+        let emoji_zwj_join = ext_pict == ExtPictState::PicExtendZwj && is_ext_pict;
 
         let no_break = match (prev, cur) {
             (Gcb::Cr, Gcb::Lf) => true, // GB3
@@ -1592,9 +1606,9 @@ pub fn count_graphemes(text: &str) -> usize {
             | (Gcb::Lvt | Gcb::T, Gcb::T)
             | (_, Gcb::Extend | Gcb::Zwj | Gcb::SpacingMark)
             | (Gcb::Prepend, _) => true, // GB6, GB7, GB8, GB9, GB9a, GB9b
-            _ if gb9c_join => true,                                 // GB9c
-            (Gcb::Zwj, _) if ext_pict_chain && is_ext_pict => true, // GB11
-            (Gcb::Ri, Gcb::Ri) if ri_odd => true,                   // GB12, GB13
+            _ if gb9c_join => true,               // GB9c
+            _ if emoji_zwj_join => true,          // GB11
+            (Gcb::Ri, Gcb::Ri) if ri_odd => true, // GB12, GB13
             _ => false,
         };
 
@@ -1602,13 +1616,19 @@ pub fn count_graphemes(text: &str) -> usize {
             if cur == Gcb::Ri {
                 ri_odd = !ri_odd;
             }
-            if cur != Gcb::Extend && !(prev == Gcb::Extend && cur == Gcb::Extend) && cur != Gcb::Zwj
-            {
-                ext_pict_chain = is_ext_pict;
-            }
+            ext_pict = match cur {
+                Gcb::Extend if ext_pict == ExtPictState::PicExtend => ExtPictState::PicExtend,
+                Gcb::Zwj if ext_pict == ExtPictState::PicExtend => ExtPictState::PicExtendZwj,
+                _ if is_ext_pict => ExtPictState::PicExtend,
+                _ => ExtPictState::None,
+            };
         } else {
             count += 1;
-            ext_pict_chain = is_ext_pict;
+            ext_pict = if is_ext_pict {
+                ExtPictState::PicExtend
+            } else {
+                ExtPictState::None
+            };
             ri_odd = cur == Gcb::Ri;
         }
         prev = cur;

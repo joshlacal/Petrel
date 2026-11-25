@@ -325,6 +325,120 @@ async fn request_deduplicator_coalesces_concurrent_gets_and_isolates_proxies() {
 
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::test]
+async fn request_deduplicator_drops_abandoned_entries_and_has_no_arc_cycle() {
+    struct Sentinel(Arc<AtomicUsize>);
+    impl Drop for Sentinel {
+        fn drop(&mut self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    // 1. When all waiters for an in-flight key cancel, the entry is cleaned up immediately,
+    // dropping `work`'s captured state and allowing a subsequent call to run fresh work.
+    let deduplicator = RequestDeduplicator::new();
+    let req = get_request(&[("atproto-proxy", "did:web:api.bsky.app#bsky_appview")]);
+    let dropped = Arc::new(AtomicUsize::new(0));
+    let started = Arc::new(tokio::sync::Notify::new());
+    let gate = Arc::new(tokio::sync::Notify::new());
+
+    {
+        let sentinel = Sentinel(Arc::clone(&dropped));
+        let started_inner = Arc::clone(&started);
+        let gate_inner = Arc::clone(&gate);
+        let fut = Box::pin(deduplicator.deduplicate(
+            &req,
+            Some("did:plc:user"),
+            &[],
+            move || async move {
+                let _keep = sentinel;
+                started_inner.notify_one();
+                gate_inner.notified().await;
+                Ok(Response::new(Bytes::from_static(b"first")))
+            },
+        ));
+        tokio::select! {
+            _ = fut => panic!("should stay pending until cancelled"),
+            () = started.notified() => {}
+        }
+    }
+
+    assert_eq!(dropped.load(Ordering::SeqCst), 1);
+    assert!(
+        !deduplicator
+            .is_request_in_flight(&req, Some("did:plc:user"), &[])
+            .await
+    );
+
+    let second = deduplicator
+        .deduplicate(&req, Some("did:plc:user"), &[], || async {
+            Ok(Response::new(Bytes::from_static(b"second")))
+        })
+        .await
+        .unwrap();
+    assert_eq!(second.body(), &Bytes::from_static(b"second"));
+
+    // 2. Two concurrent waiters: dropping the first preserves the entry for the second;
+    // dropping the second cleans up the entry and drops `work`'s captured state immediately.
+    let dropped_two = Arc::new(AtomicUsize::new(0));
+    let req_two = get_request(&[("atproto-proxy", "did:web:two.example.com#bsky_appview")]);
+    let started_two = Arc::new(tokio::sync::Notify::new());
+    let joined_two = Arc::new(tokio::sync::Notify::new());
+    let gate_two = Arc::new(tokio::sync::Notify::new());
+    {
+        let dropped_clone = Arc::clone(&dropped_two);
+        let started_clone = Arc::clone(&started_two);
+        let gate_clone = Arc::clone(&gate_two);
+        let mut fut1 = Box::pin(deduplicator.deduplicate(
+            &req_two,
+            Some("did:plc:user"),
+            &[],
+            move || async move {
+                let _keep = Sentinel(dropped_clone);
+                started_clone.notify_one();
+                gate_clone.notified().await;
+                Ok(Response::new(Bytes::from_static(b"never")))
+            },
+        ));
+        tokio::select! {
+            _ = &mut fut1 => panic!("first future should stay pending"),
+            () = started_two.notified() => {}
+        }
+
+        let joined_clone = Arc::clone(&joined_two);
+        let mut fut2 = Box::pin(deduplicator.deduplicate_with_hook(
+            &req_two,
+            Some("did:plc:user"),
+            &[],
+            move || joined_clone.notify_one(),
+            || async { Ok(Response::new(Bytes::from_static(b"never-2"))) },
+        ));
+        tokio::select! {
+            _ = &mut fut2 => panic!("second future should stay pending"),
+            () = joined_two.notified() => {}
+        }
+
+        // First waiter cancels: second waiter keeps the in-flight entry alive.
+        drop(fut1);
+        assert_eq!(dropped_two.load(Ordering::SeqCst), 0);
+        assert!(
+            deduplicator
+                .is_request_in_flight(&req_two, Some("did:plc:user"), &[])
+                .await
+        );
+
+        // Last waiter cancels: entry is removed immediately without leaking.
+        drop(fut2);
+        assert_eq!(dropped_two.load(Ordering::SeqCst), 1);
+        assert!(
+            !deduplicator
+                .is_request_in_flight(&req_two, Some("did:plc:user"), &[])
+                .await
+        );
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[tokio::test]
 async fn sse_transport_validates_headers_and_refuses_redirects() {
     use futures_util::StreamExt;
 
