@@ -970,20 +970,16 @@ impl CARRepository {
             visited: HashSet::new(),
             mst_node_count: 0,
             visited_record_count: 0,
+            max_mst_depth: limits.max_mst_depth.min(MAXIMUM_MST_TRAVERSAL_DEPTH),
+            max_mst_node_count: limits.max_mst_node_count,
+            max_record_count: limits.max_record_count,
             last_key: None,
             collections: BTreeMap::new(),
             record_cids: Vec::new(),
             cid_refcounts: HashMap::new(),
         };
 
-        traverse_mst_node(
-            &data_cid,
-            &reader.blocks,
-            0,
-            limits.max_mst_node_count,
-            limits.max_record_count,
-            &mut state,
-        )?;
+        traverse_mst_node(&data_cid, &reader.blocks, 0, &mut state)?;
 
         let mut records: BTreeMap<String, Vec<u8>> = BTreeMap::new();
         for (full_key, value_cid) in state.record_cids {
@@ -1017,6 +1013,9 @@ struct MstTraverseState {
     visited: HashSet<Cid>,
     mst_node_count: usize,
     visited_record_count: usize,
+    max_mst_depth: usize,
+    max_mst_node_count: usize,
+    max_record_count: usize,
     last_key: Option<String>,
     collections: BTreeMap<String, BTreeMap<String, Cid>>,
     record_cids: Vec<(String, Cid)>,
@@ -1028,22 +1027,20 @@ fn traverse_mst_node(
     node_cid: &Cid,
     blocks: &BTreeMap<Cid, Vec<u8>>,
     depth: usize,
-    max_mst_node_count: usize,
-    max_record_count: usize,
     state: &mut MstTraverseState,
 ) -> Result<(), CARReaderError> {
-    if depth > MAXIMUM_MST_TRAVERSAL_DEPTH {
+    if depth > state.max_mst_depth {
         return Err(CARReaderError::MstDepthLimitExceeded);
     }
     if !state.visited.insert(node_cid.clone()) {
         return Err(CARReaderError::MstCycle(node_cid.to_string()));
     }
     state.mst_node_count = state.mst_node_count.saturating_add(1);
-    if state.mst_node_count > max_mst_node_count {
+    if state.mst_node_count > state.max_mst_node_count {
         return Err(CARReaderError::Limit(LimitError::Exceeded {
             kind: LimitKind::MstNodeCount,
             observed: state.mst_node_count,
-            limit: max_mst_node_count,
+            limit: state.max_mst_node_count,
         }));
     }
     let node_bytes = blocks
@@ -1059,14 +1056,7 @@ fn traverse_mst_node(
 
     if let Some(left_val) = map.get("l") {
         match left_val {
-            Value::Link(left_cid) => traverse_mst_node(
-                left_cid,
-                blocks,
-                depth + 1,
-                max_mst_node_count,
-                max_record_count,
-                state,
-            )?,
+            Value::Link(left_cid) => traverse_mst_node(left_cid, blocks, depth + 1, state)?,
             Value::Null => {}
             _ => {
                 return Err(CARReaderError::InvalidMstNode(
@@ -1140,11 +1130,11 @@ fn traverse_mst_node(
                 "MST entry missing value link 'v'".into(),
             ));
         };
-        if state.visited_record_count >= max_record_count {
+        if state.visited_record_count >= state.max_record_count {
             return Err(CARReaderError::Limit(LimitError::Exceeded {
                 kind: LimitKind::RecordCount,
                 observed: state.visited_record_count + 1,
-                limit: max_record_count,
+                limit: state.max_record_count,
             }));
         }
         state.visited_record_count = state.visited_record_count.saturating_add(1);
@@ -1162,14 +1152,7 @@ fn traverse_mst_node(
 
         if let Some(tree_val) = entry.get("t") {
             match tree_val {
-                Value::Link(right_cid) => traverse_mst_node(
-                    right_cid,
-                    blocks,
-                    depth + 1,
-                    max_mst_node_count,
-                    max_record_count,
-                    state,
-                )?,
+                Value::Link(right_cid) => traverse_mst_node(right_cid, blocks, depth + 1, state)?,
                 Value::Null => {}
                 _ => {
                     return Err(CARReaderError::InvalidMstNode(

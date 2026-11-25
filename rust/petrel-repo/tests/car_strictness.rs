@@ -657,4 +657,65 @@ fn car_reader_and_car_repository_enforce_limits() {
         CARRepository::parse_with_limits(&partial_car, &RepositoryLimits::standard()).unwrap();
     assert_eq!(parsed_partial.collections["app.bsky.feed.post"].len(), 2);
     assert!(parsed_partial.records.is_empty());
+
+    // 6. `CARRepository::parse_with_limits` enforces `limits.max_mst_depth` (Codex 4697873614).
+    let layer1_key = (0..200_usize)
+        .map(|i| format!("app.bsky.feed.post/z{i}"))
+        .find(|k| petrel_repo::mst::key_depth(k.as_bytes()) >= 1)
+        .unwrap();
+    let (deep_mst, deep_mst_blocks) = petrel_repo::mst::tree::build_mst_from_entries(
+        vec![
+            ("app.bsky.feed.post/a0".to_owned(), rec_cid.clone()),
+            (layer1_key, rec_cid.clone()),
+        ],
+        petrel_repo::mst::MstOptions::default(),
+    )
+    .unwrap();
+    let mut deep_commit = BTreeMap::new();
+    deep_commit.insert("did".to_owned(), Value::String(did.as_str().to_owned()));
+    deep_commit.insert("rev".to_owned(), Value::String("3jzfcijpj2z2d".into()));
+    deep_commit.insert("data".to_owned(), Value::Link(deep_mst.root_cid().clone()));
+    deep_commit.insert("prev".to_owned(), Value::Null);
+    deep_commit.insert("version".to_owned(), Value::Integer(3));
+    let deep_unsigned = dagcbor::encode(&Value::Object(deep_commit.clone()));
+    deep_commit.insert(
+        "sig".to_owned(),
+        Value::Bytes(signer.sign_sync(&deep_unsigned).unwrap()),
+    );
+    let (deep_commit_cid, deep_commit_bytes) = cbor_block(&Value::Object(deep_commit));
+    let mut deep_blocks = vec![(deep_commit_cid.as_bytes().to_vec(), deep_commit_bytes)];
+    for b in deep_mst_blocks {
+        deep_blocks.push((b.cid.as_bytes().to_vec(), b.bytes));
+    }
+    let deep_car = common::encode_raw_car(std::slice::from_ref(&deep_commit_cid), &deep_blocks);
+    let depth_1_limits = RepositoryLimits {
+        max_mst_depth: 1,
+        ..RepositoryLimits::standard()
+    };
+    assert!(CARRepository::parse_with_limits(&deep_car, &depth_1_limits).is_ok());
+    // Wrap once more so depth hits 2 > max_mst_depth=1.
+    let (wrap_cid, wrap_bytes) = encode_mst_node(&MstNodeView {
+        left: Some(deep_mst.root_cid().clone()),
+        entries: vec![],
+    })
+    .unwrap();
+    let mut depth2_commit = BTreeMap::new();
+    depth2_commit.insert("did".to_owned(), Value::String(did.as_str().to_owned()));
+    depth2_commit.insert("rev".to_owned(), Value::String("3jzfcijpj2z2e".into()));
+    depth2_commit.insert("data".to_owned(), Value::Link(wrap_cid.clone()));
+    depth2_commit.insert("prev".to_owned(), Value::Null);
+    depth2_commit.insert("version".to_owned(), Value::Integer(3));
+    let depth2_unsigned = dagcbor::encode(&Value::Object(depth2_commit.clone()));
+    depth2_commit.insert(
+        "sig".to_owned(),
+        Value::Bytes(signer.sign_sync(&depth2_unsigned).unwrap()),
+    );
+    let (depth2_commit_cid, depth2_commit_bytes) = cbor_block(&Value::Object(depth2_commit));
+    deep_blocks.push((wrap_cid.as_bytes().to_vec(), wrap_bytes));
+    deep_blocks.push((depth2_commit_cid.as_bytes().to_vec(), depth2_commit_bytes));
+    let depth2_car = common::encode_raw_car(std::slice::from_ref(&depth2_commit_cid), &deep_blocks);
+    assert!(matches!(
+        CARRepository::parse_with_limits(&depth2_car, &depth_1_limits),
+        Err(CARReaderError::MstDepthLimitExceeded)
+    ));
 }
