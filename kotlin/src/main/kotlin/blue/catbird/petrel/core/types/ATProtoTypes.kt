@@ -506,11 +506,12 @@ object RecordKeySerializer : KSerializer<RecordKey> {
 /**
  * A reference to a permissioned-data space, as distinct from a record within one:
  *
- *     at://{spaceDid}/space/{spaceType}/{skey}
+ *     at:space/{spaceDid}/{spaceType}/{skey}
  *
  * The lexicon string format `space-ref`. Kept distinct from [ATProtocolURI]
- * because the public AT-URI grammar admits at most two path segments, so a space
- * ref does not parse as one.
+ * because a space ref does not parse under the public AT-URI grammar, and its
+ * authority must be a DID. Parsing is strict: the spaces alpha form
+ * `at://{spaceDid}/space/...` is rejected (see [SpaceRef.fromLegacySpaceUri]).
  */
 @Serializable(with = SpaceRefSerializer::class)
 class SpaceRef private constructor(
@@ -532,6 +533,28 @@ class SpaceRef private constructor(
     override fun hashCode(): Int = value.hashCode()
 
     companion object {
+        /** The prefix of every space URI. */
+        const val SPACE_URI_PREFIX = "at:space/"
+
+        // TODO: remove before beta, with fromLegacySpaceUri().
+        private val legacySpaceUriRegex = Regex("^at://([^/?#\\s]+)/space/")
+
+        /**
+         * Rewrites a space URI in its spaces alpha form, `at://{spaceDid}/space/{rest}`,
+         * as `at:space/{spaceDid}/{rest}`. Returns null for any other input. The result
+         * is not validated.
+         *
+         * Only for record values read back from storage or the network, which may embed
+         * the old form; requests, space refs, credentials and MAC headers take the
+         * current form only.
+         *
+         * TODO: remove before beta, along with support for the old form.
+         */
+        fun fromLegacySpaceUri(input: String): String? {
+            val match = legacySpaceUriRegex.find(input) ?: return null
+            return SPACE_URI_PREFIX + match.groupValues[1] + "/" + input.substring(match.range.last + 1)
+        }
+
         private val nsidRegex = Regex(
             "^([a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\\.([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))+\\.[a-zA-Z][a-zA-Z0-9]{0,62}$"
         )
@@ -560,21 +583,20 @@ class SpaceRef private constructor(
         }
 
         fun parse(uriString: String): SpaceRef {
-            require(uriString.startsWith("at://")) { "URI must start with 'at://'" }
+            require(uriString.startsWith(SPACE_URI_PREFIX)) { "URI must start with '$SPACE_URI_PREFIX'" }
             require(uriString.length <= 8192) { "SpaceRef URI exceeds maximum length of 8192 bytes" }
-            val rest = uriString.substring(5)
+            val rest = uriString.substring(SPACE_URI_PREFIX.length)
             val segments = rest.split("/")
-            require(segments.size == 4) { "URI must have exactly authority, 'space', spaceType, and skey segments" }
+            require(segments.size == 3) { "URI must have exactly spaceDid, spaceType, and skey segments" }
             val authority = segments[0]
             require(isValidDID(authority)) { "invalid authority DID '$authority'" }
-            require(segments[1] == "space") { "path segment after authority must be 'space', got '${segments[1]}'" }
-            val spaceType = segments[2]
+            val spaceType = segments[1]
             require(isValidNSID(spaceType)) { "invalid spaceType NSID '$spaceType'" }
-            val skey = segments[3]
+            val skey = segments[2]
             require(isValidRecordKey(skey)) { "invalid skey RecordKey '$skey'" }
 
             return SpaceRef(
-                value = "at://$authority/space/$spaceType/$skey",
+                value = "$SPACE_URI_PREFIX$authority/$spaceType/$skey",
                 spaceDID = authority,
                 spaceType = spaceType,
                 skey = skey
@@ -582,7 +604,7 @@ class SpaceRef private constructor(
         }
 
         fun create(spaceDID: String, spaceType: String, skey: String): SpaceRef {
-            return parse("at://$spaceDID/space/$spaceType/$skey")
+            return parse("$SPACE_URI_PREFIX$spaceDID/$spaceType/$skey")
         }
     }
 }

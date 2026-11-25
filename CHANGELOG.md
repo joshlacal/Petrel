@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- Spaces URIs follow the November 24 alpha (`bluesky-social/atproto` `permissioned-data-alpha`
+  at `1f510f8e`): a space is `at:space/{spaceDid}/{spaceType}/{skey}` and a record in it
+  `at:space/{spaceDid}/{spaceType}/{skey}/{authorDid}/{collection}/{rkey}`. `SpaceRef` and
+  `ATProtocolURI` parse, print and send only this form, in Swift and Kotlin; the alpha form
+  `at://{spaceDid}/space/...` is rejected. Decoding an `ATProtocolURI` still reads the old form,
+  for records written during the alpha, and keeps the string as written; `normalized()` returns
+  the new form. Added `ATProtocolURI.spaceURIPrefix` and `ATProtocolURI.fromLegacySpaceURI(_:)`
+  (Kotlin: `SpaceRef.SPACE_URI_PREFIX`, `SpaceRef.fromLegacySpaceUri`); the old form will be
+  dropped before the beta.
+
 ## [2.0.0] - 2026-11-24
 
 Petrel 2.0.0 turns the single `Petrel` library of 1.1.0 into a family of products that together

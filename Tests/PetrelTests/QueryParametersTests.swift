@@ -87,7 +87,7 @@ struct QueryParametersTests {
         let cases: [(endpoint: String, name: String, items: [URLQueryItem])] = try [
             ("com.atproto.sync.getBlob", "cid", ComAtprotoSyncGetBlob.Parameters(did: did, cid: CIDString(cid)).asQueryItems()),
             ("com.atproto.space.getBlob", "cid", ComAtprotoSpaceGetBlob.Parameters(
-                space: SpaceRef(uriString: "at://did:plc:asdf123/space/com.example.group/default"),
+                space: SpaceRef(uriString: "at:space/did:plc:asdf123/com.example.group/default"),
                 repo: did,
                 cid: CIDString(cid)
             ).asQueryItems()),
@@ -158,7 +158,7 @@ struct QueryParametersTests {
             datetime: #require(ATProtocolDate(iso8601String: "2026-10-01T12:34:56.789Z")),
             uri: URI(uriString: "https://example.com/page"),
             atUri: ATProtocolURI(uriString: "at://did:plc:asdf123/app.bsky.feed.post/3jzfcijpj2z2a"),
-            space: SpaceRef(uriString: "at://did:plc:asdf123/space/com.example.group/default"),
+            space: SpaceRef(uriString: "at:space/did:plc:asdf123/com.example.group/default"),
             actor: ATIdentifier(string: "alice.bsky.social"),
             did: DID(didString: "did:plc:asdf123"),
             handle: Handle(handleString: "alice.bsky.social"),
@@ -178,7 +178,7 @@ struct QueryParametersTests {
             URLQueryItem(name: "datetime", value: "2026-10-01T12:34:56.789Z"),
             URLQueryItem(name: "uri", value: "https://example.com/page"),
             URLQueryItem(name: "atUri", value: "at://did:plc:asdf123/app.bsky.feed.post/3jzfcijpj2z2a"),
-            URLQueryItem(name: "space", value: "at://did:plc:asdf123/space/com.example.group/default"),
+            URLQueryItem(name: "space", value: "at:space/did:plc:asdf123/com.example.group/default"),
             URLQueryItem(name: "actor", value: "alice.bsky.social"),
             URLQueryItem(name: "did", value: "did:plc:asdf123"),
             URLQueryItem(name: "handle", value: "alice.bsky.social"),

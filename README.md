@@ -125,7 +125,7 @@ The rows follow the capability columns of [atproto.com/sdks](https://atproto.com
 
 | Capability | Product | Guide | Tests | Limits |
 | :-- | :-- | :-- | :-- | :-- |
-| Identifiers | `Petrel` | [Identifiers](Sources/Petrel/Petrel.docc/Identifiers.md) | [SyntaxVectorTests](Tests/PetrelTests/SyntaxVectorTests.swift) | `ATProtocolURI` accepts the Spaces alpha form `at://<did>/space/…` by default; pass `grammar: .restricted` for the published grammar only. |
+| Identifiers | `Petrel` | [Identifiers](Sources/Petrel/Petrel.docc/Identifiers.md) | [SyntaxVectorTests](Tests/PetrelTests/SyntaxVectorTests.swift) | `ATProtocolURI` accepts Spaces URIs, `at:space/<did>/…`, by default; pass `grammar: .restricted` for the published grammar only. |
 | Bluesky helpers | `Petrel` | [Posting](Sources/Petrel/Petrel.docc/BlueskyPosting.md), [Moderation](Sources/Petrel/Petrel.docc/BlueskyModeration.md), [Preferences](Sources/Petrel/Petrel.docc/BlueskyPreferences.md) | [ModerationBehaviorsTests](Tests/PetrelTests/ModerationBehaviorsTests.swift) | Label signatures are not verified. |
 | Lexicon | `Petrel`, `PetrelLexicon` | [XRPC client](Sources/Petrel/Petrel.docc/XRPCClient.md), [Custom Lexicons](Sources/Petrel/Petrel.docc/CustomLexicons.md), [Runtime validation](Sources/PetrelLexicon/PetrelLexicon.docc/RuntimeValidation.md) | [LexiconVectorTests](Tests/PetrelLexiconTests/LexiconVectorTests.swift) | Numbers decoded through `Codable` keep Foundation's 38-digit limit; `LexValue(json:)` rejects what it cannot represent. |
 | Identity | `Petrel` | [Identity](Sources/Petrel/Petrel.docc/Identity.md) | [DIDResolutionBidirectionalTests](Tests/PetrelTests/DIDResolutionBidirectionalTests.swift) | |

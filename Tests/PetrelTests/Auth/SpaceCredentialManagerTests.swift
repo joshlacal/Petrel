@@ -234,10 +234,10 @@ struct SpaceHTTPSignatureTests {
 
     @Test("audience defaults to the repo DID, else the bare space authority DID")
     func audienceDerivation() throws {
-        let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
-        let repoURL = try #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getRecord?space=at://did:plc:auth123/space/com.example.drive/self&repo=did:plc:writer&collection=a.b.c&rkey=self"))
+        let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
+        let repoURL = try #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getRecord?space=at:space/did:plc:auth123/com.example.drive/self&repo=did:plc:writer&collection=a.b.c&rkey=self"))
         #expect(SpaceHTTPSignature.audience(for: repoURL, space: space) == "did:plc:writer")
-        let hostURL = try #require(URL(string: "https://space.test/xrpc/com.atproto.space.listWriters?space=at://did:plc:auth123/space/com.example.drive/self"))
+        let hostURL = try #require(URL(string: "https://space.test/xrpc/com.atproto.space.listWriters?space=at:space/did:plc:auth123/com.example.drive/self"))
         #expect(SpaceHTTPSignature.audience(for: hostURL, space: space) == "did:plc:auth123")
     }
 
@@ -301,7 +301,7 @@ struct SpaceCredentialManagerTests {
             let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
 
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
             let spaceRev = "3kbcq3p7ad422"
             let lastIssuedJWT = Mutex<String>("")
@@ -395,7 +395,7 @@ struct SpaceCredentialManagerTests {
             let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
 
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
             let lastIssuedJWT = Mutex<String>("")
 
@@ -496,7 +496,7 @@ struct SpaceCredentialManagerTests {
             let session = makeMockSession()
             defer { session.invalidateAndCancel() }
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let sent = Mutex<Int>(0)
             SpaceMockURLProtocol.setHandler { request in
                 sent.withLock { $0 += 1 }
@@ -525,7 +525,7 @@ struct SpaceCredentialManagerTests {
             let session = makeMockSession()
             defer { session.invalidateAndCancel() }
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let exchangeCount = Mutex<Int>(0)
             let revokeNext = Mutex<Bool>(true)
 
@@ -589,7 +589,7 @@ struct SpaceCredentialManagerTests {
             let session = makeMockSession()
             defer { session.invalidateAndCancel() }
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let exchangeCount = Mutex<Int>(0)
 
             SpaceMockURLProtocol.setHandler { request in
@@ -631,7 +631,7 @@ struct SpaceCredentialManagerTests {
             let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
 
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
 
             let manager = SpaceCredentialManager(
                 client: client,
@@ -656,7 +656,7 @@ struct SpaceCredentialManagerTests {
             let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
 
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
 
             let exchangeCount = Mutex<Int>(0)
@@ -721,7 +721,7 @@ struct SpaceCredentialManagerTests {
             let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
 
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
             let issuedTokens = Mutex<Set<String>>([])
 
@@ -825,7 +825,7 @@ struct SpaceCredentialManagerTests {
             let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
 
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let exchangeCount = Mutex<Int>(0)
 
             SpaceMockURLProtocol.setHandler { request in
@@ -894,7 +894,7 @@ struct SpaceCredentialManagerTests {
             let didResolver = DummyDIDResolver()
             let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
 
             SpaceMockURLProtocol.setHandler { request in
                 let urlString = request.url?.absoluteString ?? ""
@@ -953,7 +953,7 @@ struct SpaceCredentialManagerTests {
             let didResolver = DummyDIDResolver()
             let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
 
             SpaceMockURLProtocol.setHandler { request in
                 let urlString = request.url?.absoluteString ?? ""
@@ -1012,7 +1012,7 @@ struct SpaceCredentialManagerTests {
             let didResolver = DummyDIDResolver()
             let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
 
             SpaceMockURLProtocol.setHandler { request in
                 let urlString = request.url?.absoluteString ?? ""
@@ -1068,7 +1068,7 @@ struct SpaceCredentialManagerTests {
             let didResolver = DummyDIDResolver()
             let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
 
             SpaceMockURLProtocol.setHandler { request in
                 let urlString = request.url?.absoluteString ?? ""
@@ -1121,7 +1121,7 @@ struct SpaceCredentialManagerTests {
             let didResolver = DummyDIDResolver()
             let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
 
             SpaceMockURLProtocol.setHandler { request in
                 let urlString = request.url?.absoluteString ?? ""
@@ -1172,7 +1172,7 @@ struct SpaceCredentialManagerTests {
             let didResolver = DummyDIDResolver()
             let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
 
             SpaceMockURLProtocol.setHandler { request in
                 let urlString = request.url?.absoluteString ?? ""
@@ -1222,7 +1222,7 @@ struct SpaceCredentialManagerTests {
             let session = makeMockSession()
             defer { session.invalidateAndCancel() }
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let space = try SpaceRef(uriString: "at://did:plc:customauth/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:customauth/com.example.drive/self")
             let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
             let lastIssuedJWT = Mutex<String>("")
 
@@ -1282,7 +1282,7 @@ struct SpaceCredentialManagerTests {
             let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
 
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
             let lastIssuedJWT = Mutex<String>("")
 
@@ -1332,7 +1332,7 @@ struct SpaceCredentialManagerTests {
             let session = makeMockSession()
             defer { session.invalidateAndCancel() }
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
 
             let callOrder = Mutex<[String]>([])
@@ -1403,7 +1403,7 @@ extension SpaceCredentialManagerTests {
         try await withSpaceTestSession {
             let session = makeMockSession()
             defer { session.invalidateAndCancel() }
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let repo = "did:plc:writer"
             let staleKey = Crypto.P256.KeyAgreement.PrivateKey()
             let currentKey = Crypto.P256.KeyAgreement.PrivateKey()
@@ -1494,7 +1494,7 @@ extension SpaceCredentialManagerTests {
             let session = makeMockSession()
             defer { session.invalidateAndCancel() }
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             for (status, body, expected) in [
                 (400, #"{"error":"InvalidDelegationToken","message":"expired"}"#, "token"),
                 (400, #"{"error":"Other","message":"Upstream said SpaceDeleted"}"#, "exchange"),
@@ -1563,7 +1563,7 @@ extension SpaceCredentialManagerTests {
             let session = makeMockSession()
             defer { session.invalidateAndCancel() }
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let exchangeCount = Mutex<Int>(0)
             // The manager reads this pinned time, so a stalled runner cannot carry the
             // 60 s credential past its 30 s reuse window between the reads below.
@@ -1615,7 +1615,7 @@ extension SpaceCredentialManagerTests {
                 let session = makeMockSession()
                 defer { session.invalidateAndCancel() }
                 let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-                let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+                let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
                 let exchangeCount = Mutex<Int>(0)
 
                 SpaceMockURLProtocol.setHandler { request in
@@ -1701,7 +1701,7 @@ extension SpaceCredentialManagerTests {
             let session = makeMockSession()
             defer { session.invalidateAndCancel() }
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let probes = Mutex<Int>(0)
             for (status, body) in [
                 (400, #"{"error":"SpaceNotFound","message":"Space not found"}"#),
@@ -1749,7 +1749,7 @@ extension SpaceCredentialManagerTests {
             let session = makeMockSession()
             defer { session.invalidateAndCancel() }
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let probes = Mutex<Int>(0)
             for (body, expected) in [
                 (
@@ -1797,7 +1797,7 @@ extension SpaceCredentialManagerTests {
             let session = makeMockSession()
             defer { session.invalidateAndCancel() }
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let probes = Mutex<Int>(0)
             for status in [400, 401] {
                 SpaceMockURLProtocol.setHandler { request in
@@ -1875,7 +1875,7 @@ extension SpaceCredentialManagerTests {
         try await withSpaceTestSession {
             let session = makeMockSession()
             defer { session.invalidateAndCancel() }
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let repo = "did:plc:writer"
             let rev = "3kbcq3p7ad422"
             let kemKey = Crypto.P256.KeyAgreement.PrivateKey()
@@ -1981,7 +1981,7 @@ extension SpaceCredentialManagerTests {
         try await withSpaceTestSession {
             let session = makeMockSession()
             defer { session.invalidateAndCancel() }
-            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let space = try SpaceRef(uriString: "at:space/did:plc:auth123/com.example.drive/self")
             let repo = "did:plc:writer"
             let cid = CID.fromDAGCBOR(Data("large-blob".utf8)).string
             let blob = Data(repeating: 0x5A, count: 11 * 1_048_576)

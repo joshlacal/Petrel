@@ -26,6 +26,8 @@ def frame(data):
     return prefix + data
 
 
+# Spaces alpha form, kept so the committed fixture still matches this script.
+# Use 'at:space/did:example:space/app.bsky.group/test' when regenerating it.
 space = 'at://did:example:space/space/app.bsky.group/test'
 repo = 'did:example:alice'
 rev = '3kbcq3p7ad422'

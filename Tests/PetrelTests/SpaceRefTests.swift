@@ -3,16 +3,16 @@ import Foundation
 import Testing
 
 /// Vectors ported from `packages/syntax/tests/aturi-string.test.ts` on
-/// `bluesky-social/atproto@permissioned-data`, which is the normative source for
-/// the two AT-URI grammars:
+/// `bluesky-social/atproto@permissioned-data-alpha`, which is the normative
+/// source for the two AT-URI grammars:
 ///
-///     at://{authorDid}/{collection}/{rkey}                                        public
-///     at://{spaceDid}/space/{spaceType}/{skey}[/{authorDid}/{collection}/{rkey}]  space
+///     at://{authorDid}/{collection}/{rkey}                                      public
+///     at:space/{spaceDid}/{spaceType}/{skey}[/{authorDid}/{collection}/{rkey}]  space
 @Suite("Space references and space-aware AT-URIs")
 struct SpaceRefTests {
-    private let spaceURI = "at://did:plc:asdf123/space/com.example.group/default"
+    private let spaceURI = "at:space/did:plc:asdf123/com.example.group/default"
     private let recordInSpaceURI =
-        "at://did:plc:asdf123/space/com.example.group/default/did:plc:user1/com.atproto.feed.post/abc123"
+        "at:space/did:plc:asdf123/com.example.group/default/did:plc:user1/com.atproto.feed.post/abc123"
     private let publicURI = "at://did:plc:asdf123/com.atproto.feed.post/abc"
 
     // MARK: - Public URIs are unchanged
@@ -86,14 +86,86 @@ struct SpaceRefTests {
     @Test("a space uri with a handle authority is rejected")
     func handleAuthorityIsRejected() {
         #expect(throws: ATProtocolError.self) {
-            try ATProtocolURI(uriString: "at://user.bsky.social/space/com.example.group/default")
+            try ATProtocolURI(uriString: "at:space/user.bsky.social/com.example.group/default")
         }
     }
 
     @Test("a space uri with a non-nsid space type is rejected")
     func nonNSIDSpaceTypeIsRejected() {
         #expect(throws: ATProtocolError.self) {
-            try ATProtocolURI(uriString: "at://did:plc:asdf123/space/short/default")
+            try ATProtocolURI(uriString: "at:space/did:plc:asdf123/short/default")
+        }
+    }
+
+    // MARK: - The spaces alpha form
+
+    @Test("the spaces alpha form is rejected when parsing")
+    func legacyFormIsRejected() {
+        let legacy = [
+            "at://did:plc:asdf123/space/com.example.group/default",
+            "at://did:plc:asdf123/space/com.example.group/default/did:plc:user1/com.atproto.feed.post/abc123",
+        ]
+        for uri in legacy {
+            #expect(throws: ATProtocolError.self, "Expected rejection for: \(uri)") {
+                try ATProtocolURI(uriString: uri)
+            }
+            #expect(!ATProtocolURI.isValidATURI(uri))
+            #expect(throws: ATProtocolError.self, "Expected rejection for: \(uri)") {
+                try SpaceRef(uriString: uri)
+            }
+        }
+    }
+
+    @Test("fromLegacySpaceURI rewrites only the spaces alpha form")
+    func fromLegacySpaceURIRewrites() {
+        #expect(
+            ATProtocolURI.fromLegacySpaceURI("at://did:plc:asdf123/space/com.example.group/default") == spaceURI
+        )
+        #expect(
+            ATProtocolURI.fromLegacySpaceURI(
+                "at://did:plc:asdf123/space/com.example.group/default/did:plc:user1/com.atproto.feed.post/abc123"
+            ) == recordInSpaceURI
+        )
+        #expect(ATProtocolURI.fromLegacySpaceURI(spaceURI) == nil)
+        #expect(ATProtocolURI.fromLegacySpaceURI(publicURI) == nil)
+        #expect(ATProtocolURI.fromLegacySpaceURI("at://did:plc:asdf123/space") == nil)
+    }
+
+    @Test("a decoded record value may hold the spaces alpha form")
+    func decodingAcceptsLegacyForm() throws {
+        let legacy =
+            "at://did:plc:asdf123/space/com.example.group/default/did:plc:user1/com.atproto.feed.post/abc123"
+        let uri = try JSONDecoder().decode(ATProtocolURI.self, from: Data("\"\(legacy)\"".utf8))
+
+        #expect(uri.isSpace)
+        #expect(uri.spaceDID == "did:plc:asdf123")
+        #expect(uri.authorDID == "did:plc:user1")
+        #expect(uri.collection == "com.atproto.feed.post")
+        #expect(uri.recordKey == "abc123")
+        // The record's bytes are kept as written; the current form is one call away.
+        #expect(uri.uriString() == legacy)
+        #expect(uri.normalized().uriString() == recordInSpaceURI)
+        #expect(uri.spaceRef?.uriString() == spaceURI)
+        #expect(uri.asQueryItem(name: "uri")?.value == recordInSpaceURI)
+    }
+
+    @Test("decoding still rejects a handle authority in the spaces alpha form")
+    func decodingRejectsLegacyHandle() {
+        #expect(throws: (any Error).self) {
+            try JSONDecoder().decode(
+                ATProtocolURI.self,
+                from: Data("\"at://user.bsky.social/space/com.example.group/default\"".utf8)
+            )
+        }
+    }
+
+    @Test("SpaceRef decoding takes the current form only")
+    func spaceRefDecodingIsStrict() {
+        #expect(throws: (any Error).self) {
+            try JSONDecoder().decode(
+                SpaceRef.self,
+                from: Data("\"at://did:plc:asdf123/space/com.example.group/default\"".utf8)
+            )
         }
     }
 
@@ -143,36 +215,36 @@ struct SpaceRefTests {
     @Test("SpaceRef rejects a bare space marker")
     func spaceRefRejectsBareMarker() {
         #expect(throws: ATProtocolError.self) {
-            try SpaceRef(uriString: "at://did:plc:asdf123/space")
+            try SpaceRef(uriString: "at:space/did:plc:asdf123")
         }
     }
 
     @Test("SpaceRef requires a DID authority")
     func spaceRefRequiresDIDAuthority() {
         #expect(throws: ATProtocolError.self) {
-            try SpaceRef(uriString: "at://user.bsky.social/space/com.example.group/default")
+            try SpaceRef(uriString: "at:space/user.bsky.social/com.example.group/default")
         }
     }
 
     @Test("SpaceRef requires an NSID space type")
     func spaceRefRequiresNSIDSpaceType() {
         #expect(throws: ATProtocolError.self) {
-            try SpaceRef(uriString: "at://did:plc:asdf123/space/short/default")
+            try SpaceRef(uriString: "at:space/did:plc:asdf123/short/default")
         }
     }
 
     @Test("SpaceRef accepts valid canonical vectors")
     func spaceRefAcceptsValidCanonicalVectors() throws {
         let validURIs = [
-            "at://did:m:v/space/com.example.group/default",
-            "at://did:plc:asdf123/space/com.example.group/default",
-            "at://did:plc:owner/space/blue.catbird.circle/3abc",
-            "at://did:web:example.com/space/blue.catbird.circle/3abc",
-            "at://did:plc:owner/space/com.atproto.simplespace.space/tid123",
-            "at://did:plc:auth123/space/com.example.drive/self",
-            "at://did:plc:asdf123/space/com.example.group/test-key_123",
-            "at://did:plc:asdf123/space/com.example.group/2024-01-01",
-            "at://did:plc:asdf123/space/com.example.group/rkey:~._-",
+            "at:space/did:m:v/com.example.group/default",
+            "at:space/did:plc:asdf123/com.example.group/default",
+            "at:space/did:plc:owner/blue.catbird.circle/3abc",
+            "at:space/did:web:example.com/blue.catbird.circle/3abc",
+            "at:space/did:plc:owner/com.atproto.simplespace.space/tid123",
+            "at:space/did:plc:auth123/com.example.drive/self",
+            "at:space/did:plc:asdf123/com.example.group/test-key_123",
+            "at:space/did:plc:asdf123/com.example.group/2024-01-01",
+            "at:space/did:plc:asdf123/com.example.group/rkey:~._-",
         ]
 
         for uri in validURIs {
@@ -182,16 +254,16 @@ struct SpaceRefTests {
         }
 
         let did2048 = "did:plc:" + String(repeating: "a", count: 2040)
-        let validDID2048URI = "at://\(did2048)/space/com.example.group/default"
+        let validDID2048URI = "at:space/\(did2048)/com.example.group/default"
         let refDID2048 = try SpaceRef(uriString: validDID2048URI)
         #expect(refDID2048.uriString() == validDID2048URI)
 
         let nsid317 = "com.example." + String(repeating: "a", count: 63) + "." + String(repeating: "a", count: 63) + "." + String(repeating: "a", count: 63) + "." + String(repeating: "a", count: 63) + "." + String(repeating: "a", count: 49)
-        let validNSID317URI = "at://did:plc:asdf123/space/\(nsid317)/default"
+        let validNSID317URI = "at:space/did:plc:asdf123/\(nsid317)/default"
         let refNSID317 = try SpaceRef(uriString: validNSID317URI)
         #expect(refNSID317.uriString() == validNSID317URI)
 
-        let valid512 = "at://did:plc:asdf123/space/com.example.group/\(String(repeating: "a", count: 512))"
+        let valid512 = "at:space/did:plc:asdf123/com.example.group/\(String(repeating: "a", count: 512))"
         let ref512 = try SpaceRef(uriString: valid512)
         #expect(ref512.uriString() == valid512)
     }
@@ -204,41 +276,46 @@ struct SpaceRefTests {
         let malformedURIs = [
             // Scheme / prefix errors
             "https://example.com/space/blue.catbird.circle/3abc",
-            "at:/did:plc:asdf123/space/com.example.group/default",
-            "AT://did:plc:asdf123/space/com.example.group/default",
+            "at:space",
+            "at:/space/did:plc:asdf123/com.example.group/default",
+            "at:space:did:plc:asdf123/com.example.group/default",
+            "AT:SPACE/did:plc:asdf123/com.example.group/default",
+            // The spaces alpha form is rejected strictly
+            "at://did:plc:asdf123/space/com.example.group/default",
+            "at://did:web:example.com/space/blue.catbird.circle/3abc",
             // Segment count and structure errors
             "at://did:plc:asdf123",
-            "at://did:plc:asdf123/space",
-            "at://did:plc:asdf123/space/com.example.group",
-            "at://did:plc:asdf123/space/com.example.group/default/extra",
-            "at://did:plc:asdf123/space/com.example.group/default/did:plc:user1/com.atproto.feed.post/abc123",
+            "at:space/did:plc:asdf123",
+            "at:space/did:plc:asdf123/com.example.group",
+            "at:space/did:plc:asdf123/com.example.group/default/extra",
+            "at:space/did:plc:asdf123/com.example.group/default/did:plc:user1/com.atproto.feed.post/abc123",
             "at://did:plc:asdf123/com.atproto.feed.post/abc",
-            "at://did:plc:asdf123/space//default",
-            "at://did:plc:asdf123/space/com.example.group/",
-            "at:///space/com.example.group/default",
-            "at://did:plc:asdf123//com.example.group/default",
-            "at://did:plc:asdf123/other/com.example.group/default",
+            "at:space/did:plc:asdf123//default",
+            "at:space/did:plc:asdf123/com.example.group/",
+            "at:space//com.example.group/default",
+            "at:space//did:plc:asdf123/com.example.group/default",
+            "at:other/did:plc:asdf123/com.example.group/default",
             // Authority DID errors
-            "at://user.bsky.social/space/com.example.group/default",
-            "at://did::owner/space/blue.catbird.circle/3abc",
-            "at://did:plc:/space/blue.catbird.circle/3abc",
-            "at://invalid-did/space/blue.catbird.circle/3abc",
-            "at://did:plc:ünicode/space/com.example.group/default",
-            "at://\(did2049)/space/com.example.group/default",
+            "at:space/user.bsky.social/com.example.group/default",
+            "at:space/did::owner/blue.catbird.circle/3abc",
+            "at:space/did:plc:/blue.catbird.circle/3abc",
+            "at:space/invalid-did/blue.catbird.circle/3abc",
+            "at:space/did:plc:ünicode/com.example.group/default",
+            "at:space/\(did2049)/com.example.group/default",
             // SpaceType NSID errors
-            "at://did:plc:asdf123/space/short/default",
-            "at://did:plc:asdf123/space/-bad.example/3abc",
-            "at://did:plc:asdf123/space/com.example.-group/default",
-            "at://did:plc:asdf123/space/com.example..group/default",
-            "at://did:plc:asdf123/space/1com.example.group/default",
-            "at://did:plc:asdf123/space/\(nsid318)/default",
+            "at:space/did:plc:asdf123/short/default",
+            "at:space/did:plc:asdf123/-bad.example/3abc",
+            "at:space/did:plc:asdf123/com.example.-group/default",
+            "at:space/did:plc:asdf123/com.example..group/default",
+            "at:space/did:plc:asdf123/1com.example.group/default",
+            "at:space/did:plc:asdf123/\(nsid318)/default",
             // Skey RecordKey errors
-            "at://did:plc:asdf123/space/com.example.group/.",
-            "at://did:plc:asdf123/space/com.example.group/..",
-            "at://did:plc:asdf123/space/com.example.group/has space",
-            "at://did:plc:asdf123/space/com.example.group/has/slash",
-            "at://did:plc:asdf123/space/com.example.group/has@invalid",
-            "at://did:plc:asdf123/space/com.example.group/has%percent",
+            "at:space/did:plc:asdf123/com.example.group/.",
+            "at:space/did:plc:asdf123/com.example.group/..",
+            "at:space/did:plc:asdf123/com.example.group/has space",
+            "at:space/did:plc:asdf123/com.example.group/has/slash",
+            "at:space/did:plc:asdf123/com.example.group/has@invalid",
+            "at:space/did:plc:asdf123/com.example.group/has%percent",
         ]
 
         for uri in malformedURIs {
@@ -247,12 +324,12 @@ struct SpaceRefTests {
             }
         }
 
-        let overlengthSkey = "at://did:plc:asdf123/space/com.example.group/\(String(repeating: "a", count: 513))"
+        let overlengthSkey = "at:space/did:plc:asdf123/com.example.group/\(String(repeating: "a", count: 513))"
         #expect(throws: (any Error).self) {
             try SpaceRef(uriString: overlengthSkey)
         }
 
-        let overlengthURI = "at://did:plc:asdf123/space/com.example.group/\(String(repeating: "a", count: 8200))"
+        let overlengthURI = "at:space/did:plc:asdf123/com.example.group/\(String(repeating: "a", count: 8200))"
         #expect(throws: (any Error).self) {
             try SpaceRef(uriString: overlengthURI)
         }
@@ -261,7 +338,7 @@ struct SpaceRefTests {
     @Test("SpaceRef component initializer routes through full validation")
     func spaceRefComponentInitializerValidatesFullContract() throws {
         let valid = try SpaceRef(spaceDID: "did:m:v", spaceType: "com.example.group", skey: "default")
-        #expect(valid.uriString() == "at://did:m:v/space/com.example.group/default")
+        #expect(valid.uriString() == "at:space/did:m:v/com.example.group/default")
 
         let did2049 = "did:plc:" + String(repeating: "a", count: 2041)
         #expect(throws: (any Error).self) {
