@@ -17,6 +17,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
   (Kotlin: `SpaceRef.SPACE_URI_PREFIX`, `SpaceRef.fromLegacySpaceUri`); the old form will be
   dropped before the beta.
 
+### Fixed
+
+- Resolving a handle on a domain that has no account now throws `IdentityError.handleNotFound`
+  when the domain answers `/.well-known/atproto-did` with a large or Brotli-compressed
+  "not found" page (`example.com`, for instance). It used to throw
+  `IdentityError.handleLookupFailed`, which tells the caller to retry.
+- A response with `Content-Encoding: br` or `deflate` whose body `URLSession` had already
+  decoded is no longer rejected as an invalid stream when it is text that is not JSON.
+  This affected a `/.well-known/atproto-did` answer served with Brotli.
+- `HardenedIdentityHTTPTransport` returns a non-2xx response whose body is over
+  `maximumResponseBytes` or cannot be decoded, with an empty body, instead of throwing.
+
 ## [2.0.0] - 2026-11-24
 
 Petrel 2.0.0 turns the single `Petrel` library of 1.1.0 into a family of products that together

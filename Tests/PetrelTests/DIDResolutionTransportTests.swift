@@ -133,6 +133,73 @@ struct DIDResolutionTransportTests {
         }
     }
 
+    // An unclaimed domain usually answers the well-known path with its ordinary "not found"
+    // page. However large or however encoded that page is, the answer is "no such handle",
+    // not "the lookup failed, try again".
+    @Test("A not-found page that is large or already decoded still means the handle does not exist")
+    func notFoundPagesStillMeanNotFound() async throws {
+        try await withStubs {
+            let page = "<!doctype html><html><body>" + String(repeating: "Not found. ", count: 2048) + "</body></html>"
+            let resolver = IdentityResolver()
+
+            // Larger than the 4096-byte well-known limit.
+            respond("\(handle)/.well-known/atproto-did", status: 404, page, headers: ["Content-Type": "text/html"])
+            await #expect(throws: IdentityError.handleNotFound(handle)) {
+                try await resolver.resolveHandle(handle)
+            }
+
+            // URLSession decodes Brotli itself and keeps the header, so the transport sees
+            // plain HTML labelled `br`.
+            let small = "small.handle-host.com"
+            respond(
+                "\(small)/.well-known/atproto-did", status: 404, "<!doctype html><title>Not found</title>",
+                headers: ["Content-Type": "text/html", "Content-Encoding": "br"]
+            )
+            await #expect(throws: IdentityError.handleNotFound(small)) {
+                try await resolver.resolveHandle(small)
+            }
+        }
+    }
+
+    @Test("An unsuccessful response keeps a body that fits and loses one that does not")
+    func unsuccessfulResponsesKeepReadableBodies() async throws {
+        try await withStubs {
+            let host = "pds.handle-host.com"
+            respond("\(host)/xrpc/small", status: 400, #"{"error":"RecordNotFound","message":"gone"}"#)
+            respond("\(host)/xrpc/large", status: 404, String(repeating: "x", count: 8192))
+            let transport = HardenedIdentityHTTPTransport()
+            func send(_ path: String) async throws -> IdentityHTTPResponse {
+                try await transport.send(IdentityHTTPRequest(
+                    url: URL(string: "https://\(host)/xrpc/\(path)")!, accept: "application/json",
+                    timeout: 5, maximumResponseBytes: 4096, followsRedirects: false
+                ))
+            }
+
+            // Callers such as the Lexicon resolver read the error a service sends with its status.
+            let small = try await send("small")
+            #expect(small.statusCode == 400)
+            #expect(String(decoding: small.body, as: UTF8.self).contains("RecordNotFound"))
+
+            let large = try await send("large")
+            #expect(large.statusCode == 404)
+            #expect(large.body.isEmpty)
+        }
+    }
+
+    @Test("A well-known answer that was already decoded is read, whatever encoding it was sent with")
+    func alreadyDecodedWellKnownAnswerIsRead() async throws {
+        try await withStubs {
+            respond("plc.directory/\(alice)", IdentityFixtures.document(did: alice, handles: [handle]))
+            respond(
+                "\(handle)/.well-known/atproto-did", "\(alice)\n",
+                headers: ["Content-Type": "text/plain", "Content-Encoding": "br"]
+            )
+
+            let resolved = try await IdentityResolver().resolveHandle(handle).didString()
+            #expect(resolved == alice)
+        }
+    }
+
     // No wall-clock bound: the stub never answers, so the only way out is the configured
     // timeout, which `timedOut` names. The time limit only stops a regression from hanging
     // the run.

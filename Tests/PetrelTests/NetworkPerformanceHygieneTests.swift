@@ -444,6 +444,40 @@ struct NetworkPerformanceHygieneTests {
         }
     }
 
+    @Test("A Brotli or deflate body URLSession already decoded passes through; a broken stream does not")
+    func contentDecodingPassesThroughAlreadyDecodedText() throws {
+        let limits = NetworkResponseLimits(
+            maximumWireBytes: 1000,
+            maximumDecodedBytes: 200,
+            maximumExpansionRatio: 10,
+            maximumDiagnosticBytes: 100
+        )
+        let html = Data("<!doctype html><title>Not found</title>".utf8)
+        let did = Data("did:plc:ewvi7nxzyoun6zhxrhs64oiz\n".utf8)
+
+        // Neither format has a signature, so text that does not decode was decoded already.
+        for encoding in ["br", "deflate"] {
+            #expect(try ContentDecoding.decompressIfNeeded(html, contentEncoding: encoding, limits: limits) == html)
+            #expect(try ContentDecoding.decompressIfNeeded(did, contentEncoding: encoding, limits: limits) == did)
+        }
+
+        // Bytes that are neither a valid stream nor text are still refused.
+        let garbage = Data([0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA, 0xF9, 0xF8])
+        #expect(throws: NetworkError.self) {
+            try ContentDecoding.decompressIfNeeded(garbage, contentEncoding: "br", limits: limits)
+        }
+        // A body labelled gzip that lacks the gzip signature is passed through by the framing
+        // check already; one that has it and does not decode is refused.
+        #expect(throws: NetworkError.self) {
+            try ContentDecoding.decompressIfNeeded(Data([0x1F, 0x8B, 0x08, 0x00, 0x41, 0x41]), contentEncoding: "gzip", limits: limits)
+        }
+        // Passing through does not lift the decoded-size limit.
+        let large = Data(String(repeating: "<p>", count: 100).utf8)
+        #expect(throws: NetworkError.self) {
+            try ContentDecoding.decompressIfNeeded(large, contentEncoding: "br", limits: limits)
+        }
+    }
+
     @Test("Step 7: WebSocket subscription stream drops overflow with typed error")
     func subscriptionStreamOverflowTermination() async throws {
         try await withSerializedStorageOverrideTest {
