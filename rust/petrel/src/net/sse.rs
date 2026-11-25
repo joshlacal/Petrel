@@ -1,15 +1,18 @@
 //! WHATWG `text/event-stream` (Server-Sent Events) parser and transport client.
 
 #[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use bytes::Bytes;
 use futures_util::stream::{self, Stream, StreamExt};
 use http::{HeaderMap, Request, Response, StatusCode, header::CONTENT_TYPE};
 
-#[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
-use super::policy::validate_request_uri;
 use super::{DynHttpTransport, RedirectPolicy, SendOptions, TransportError, send_with_redirects};
+#[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
+use super::{
+    native::{FilteringDns, map_reqwest},
+    policy::{retain_anonymous_headers, validate_request_uri},
+};
 
 /// Default per-event/per-line byte ceiling (8 MiB), matching Swift `ServerSentEventParser`.
 pub const DEFAULT_MAXIMUM_EVENT_BYTES: usize = 8 * 1024 * 1024;
@@ -278,21 +281,23 @@ impl fmt::Debug for NativeSseClient {
 
 #[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
 impl NativeSseClient {
-    /// Builds a redirect-free `reqwest` SSE client respecting DNS policy checks.
-    pub fn new(dns: &impl crate::identity::DnsResolver) -> Result<Self, TransportError> {
-        let _ = dns;
-        Self::system()
-    }
-
-    /// Creates a client using `reqwest`'s default system resolver (redirect-free, no proxy).
-    pub fn system() -> Result<Self, TransportError> {
+    /// Builds a redirect-free `reqwest` SSE client enforcing `validate_resolved_addresses` on `dns`.
+    pub fn new(dns: impl crate::identity::DnsResolver + 'static) -> Result<Self, TransportError> {
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .retry(reqwest::retry::never())
             .no_proxy()
+            .dns_resolver(Arc::new(FilteringDns(Arc::new(dns))))
             .build()
-            .map_err(|error| TransportError::Connect(error.to_string()))?;
+            .map_err(map_reqwest)?;
         Ok(Self { client })
+    }
+
+    /// Creates a client backed by the system resolver with DNS policy enforcement (redirect-free, no proxy).
+    pub fn system() -> Result<Self, TransportError> {
+        let resolver = crate::identity::HickoryResolver::system()
+            .map_err(|error| TransportError::Connect(error.to_string()))?;
+        Self::new(resolver)
     }
 
     /// Opens an incremental `text/event-stream` response without following redirects.
@@ -302,7 +307,7 @@ impl NativeSseClient {
         options: &SendOptions,
         maximum_event_bytes: usize,
     ) -> Result<NativeSseStream, SseError> {
-        let (parts, body) = request.into_parts();
+        let (mut parts, body) = request.into_parts();
         let (url, origin) = validate_request_uri(&parts.uri, options.allow_loopback)
             .map_err(|error| TransportError::PolicyViolation(error.to_string()))?;
         if !matches!(origin.scheme(), "http" | "https") {
@@ -311,6 +316,10 @@ impl NativeSseClient {
             )
             .into());
         }
+        if options.anonymous {
+            retain_anonymous_headers(&mut parts.headers);
+        }
+        parts.headers.remove(http::header::HOST);
         let mut req = self
             .client
             .request(parts.method, url)
@@ -321,10 +330,7 @@ impl NativeSseClient {
         if !body.is_empty() {
             req = req.body(body);
         }
-        let response = req
-            .send()
-            .await
-            .map_err(|error| TransportError::Connect(error.to_string()))?;
+        let response = req.send().await.map_err(map_reqwest)?;
         let status = response.status();
         let headers = response.headers().clone();
         validate_sse_response_headers(status, &headers)?;

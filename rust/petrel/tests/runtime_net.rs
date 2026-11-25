@@ -365,6 +365,88 @@ async fn sse_transport_validates_headers_and_refuses_redirects() {
 
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::test]
+async fn native_sse_client_validates_dns_answers_and_strips_anonymous_headers() {
+    use std::net::IpAddr;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    struct StaticDns(Vec<IpAddr>);
+    impl petrel::identity::DnsResolver for StaticDns {
+        fn txt(
+            &self,
+            _name: &str,
+        ) -> impl std::future::Future<Output = Result<Vec<String>, petrel::identity::DnsError>> + Send
+        {
+            ready(Ok(Vec::new()))
+        }
+
+        fn lookup_ip(
+            &self,
+            _host: &str,
+        ) -> impl std::future::Future<Output = Result<Vec<IpAddr>, petrel::identity::DnsError>> + Send
+        {
+            ready(Ok(self.0.clone()))
+        }
+    }
+
+    // 1. Non-literal HTTPS host resolving to private/loopback IP must fail policy before connecting.
+    for addr in ["127.0.0.1".parse().unwrap(), "10.0.0.1".parse().unwrap()] {
+        let client = petrel::net::sse::NativeSseClient::new(StaticDns(vec![addr])).unwrap();
+        let req = Request::builder()
+            .uri("https://evil.example/events")
+            .body(Bytes::new())
+            .unwrap();
+        let err = client
+            .connect(req, &SendOptions::new(), 1024)
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            SseError::Transport(TransportError::PolicyViolation(_))
+        ));
+    }
+
+    // 2. `SendOptions { anonymous: true, .. }` strips Authorization, Cookie, and DPoP headers.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let (mut sock, _) = listener.accept().await.unwrap();
+        let mut buf = vec![0_u8; 4096];
+        let n = sock.read(&mut buf).await.unwrap();
+        let raw_req = String::from_utf8_lossy(&buf[..n]).to_string();
+        sock.write_all(
+            b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\ndata: ok\n\n",
+        )
+        .await
+        .unwrap();
+        raw_req
+    });
+
+    let sse = petrel::net::sse::NativeSseClient::system().unwrap();
+    let req = Request::builder()
+        .uri(format!("http://{addr}/events"))
+        .header("accept", "text/event-stream")
+        .header("authorization", "Bearer secret-token")
+        .header("cookie", "sid=secret")
+        .header("dpop", "secret-proof")
+        .header("x-custom", "strip-non-allowlisted")
+        .body(Bytes::new())
+        .unwrap();
+    let mut opts = SendOptions::new();
+    opts.allow_loopback = true;
+    opts.anonymous = true;
+    let mut stream = sse.connect(req, &opts, 1024).await.unwrap();
+    let ev = stream.next_event().await.unwrap().unwrap();
+    assert_eq!(ev.data, "ok");
+    let raw_req = server.await.unwrap().to_ascii_lowercase();
+    assert!(!raw_req.contains("authorization:"));
+    assert!(!raw_req.contains("cookie:"));
+    assert!(!raw_req.contains("dpop:"));
+    assert!(!raw_req.contains("x-custom:"));
+    assert!(raw_req.contains("accept: text/event-stream"));
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[tokio::test]
 async fn labelers_empty_list_sends_empty_header_and_upload_blob_checks_mime_and_size() {
     let seen_headers = Arc::new(std::sync::Mutex::new(Vec::<HeaderMap>::new()));
     let seen_ref = Arc::clone(&seen_headers);

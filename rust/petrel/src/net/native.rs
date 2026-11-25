@@ -156,7 +156,7 @@ async fn read_response(
         .map_err(|error| TransportError::Other(error.to_string()))
 }
 
-struct FilteringDns<D>(Arc<D>);
+pub(super) struct FilteringDns<D>(pub(super) Arc<D>);
 
 impl<D: DnsResolver + 'static> Resolve for FilteringDns<D> {
     fn resolve(&self, name: Name) -> Resolving {
@@ -169,7 +169,7 @@ impl<D: DnsResolver + 'static> Resolve for FilteringDns<D> {
     }
 }
 
-fn map_reqwest(error: reqwest::Error) -> TransportError {
+pub(super) fn map_reqwest(error: reqwest::Error) -> TransportError {
     let mut source = error.source();
     let mut connection_lost = false;
     while let Some(cause) = source {
