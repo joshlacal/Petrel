@@ -490,17 +490,17 @@ fn end_to_end_space_host_and_sync_engine_full_lifecycle() {
             "publicKeyMultibase": host_kp.did_key().unwrap().strip_prefix("did:key:").unwrap()
         }]
     });
-    let pds_doc_json = serde_json::json!({
-        "id": pds_did.as_str(),
+    let writer_doc_json = serde_json::json!({
+        "id": writer_did.as_str(),
         "service": [{
             "id": "#atproto_pds",
             "type": "AtprotoPersonalDataServer",
             "serviceEndpoint": "https://pds.example.com"
         }],
         "verificationMethod": [{
-            "id": format!("{pds_did}#atproto_kem"),
+            "id": format!("{writer_did}#atproto_kem"),
             "type": "P256KeyAgreement",
-            "controller": pds_did.as_str(),
+            "controller": writer_did.as_str(),
             "publicKeyMultibase": pds_kem_did_key.strip_prefix("did:key:").unwrap()
         }]
     });
@@ -524,8 +524,8 @@ fn end_to_end_space_host_and_sync_engine_full_lifecycle() {
         if uri_str == "https://host.example.com/.well-known/did.json" {
             return Some(json_resp(200, &host_doc_json));
         }
-        if uri_str == "https://pds.example.com/.well-known/did.json" {
-            return Some(json_resp(200, &pds_doc_json));
+        if uri_str == format!("https://plc.directory/{writer_did_c}") {
+            return Some(json_resp(200, &writer_doc_json));
         }
         if uri_str.contains("/xrpc/com.atproto.space.authorizeSpaceSync") {
             let input: AuthorizeSpaceSyncInput = serde_json::from_slice(req.body()).unwrap();
@@ -981,17 +981,17 @@ fn sync_writer_ops_verified_rolls_back_on_later_page_failure() {
             "publicKeyMultibase": host_kp.did_key().unwrap().strip_prefix("did:key:").unwrap()
         }]
     });
-    let pds_doc_json = serde_json::json!({
-        "id": pds_did.as_str(),
+    let writer_doc_json = serde_json::json!({
+        "id": writer_did.as_str(),
         "service": [{
             "id": "#atproto_pds",
             "type": "AtprotoPersonalDataServer",
             "serviceEndpoint": "https://pds.example.com"
         }],
         "verificationMethod": [{
-            "id": format!("{pds_did}#atproto_kem"),
+            "id": format!("{writer_did}#atproto_kem"),
             "type": "P256KeyAgreement",
-            "controller": pds_did.as_str(),
+            "controller": writer_did.as_str(),
             "publicKeyMultibase": pds_kem_did_key.strip_prefix("did:key:").unwrap()
         }]
     });
@@ -1009,8 +1009,8 @@ fn sync_writer_ops_verified_rolls_back_on_later_page_failure() {
         if uri_str == "https://host.example.com/.well-known/did.json" {
             return Some(json_resp(200, &host_doc_json));
         }
-        if uri_str == "https://pds.example.com/.well-known/did.json" {
-            return Some(json_resp(200, &pds_doc_json));
+        if uri_str == format!("https://plc.directory/{writer_did_c}") {
+            return Some(json_resp(200, &writer_doc_json));
         }
         if uri_str.contains("/xrpc/com.atproto.space.authorizeSpaceSync") {
             let input: AuthorizeSpaceSyncInput = serde_json::from_slice(req.body()).unwrap();
@@ -1469,17 +1469,17 @@ fn recover_writer_repo_via_star_propagates_max_archive_bytes_above_10mib() {
             "publicKeyMultibase": host_kp.did_key().unwrap().strip_prefix("did:key:").unwrap()
         }]
     });
-    let pds_doc_json = serde_json::json!({
-        "id": pds_did.as_str(),
+    let writer_doc_json = serde_json::json!({
+        "id": writer_did.as_str(),
         "service": [{
             "id": "#atproto_pds",
             "type": "AtprotoPersonalDataServer",
             "serviceEndpoint": "https://pds.example.com"
         }],
         "verificationMethod": [{
-            "id": format!("{pds_did}#atproto_kem"),
+            "id": format!("{writer_did}#atproto_kem"),
             "type": "P256KeyAgreement",
-            "controller": pds_did.as_str(),
+            "controller": writer_did.as_str(),
             "publicKeyMultibase": pds_kem_did_key.strip_prefix("did:key:").unwrap()
         }]
     });
@@ -1496,8 +1496,8 @@ fn recover_writer_repo_via_star_propagates_max_archive_bytes_above_10mib() {
         if uri_str == "https://host.example.com/.well-known/did.json" {
             return Some(json_resp(200, &host_doc_json));
         }
-        if uri_str == "https://pds.example.com/.well-known/did.json" {
-            return Some(json_resp(200, &pds_doc_json));
+        if uri_str == format!("https://plc.directory/{writer_did_c}") {
+            return Some(json_resp(200, &writer_doc_json));
         }
         if uri_str.contains("/xrpc/com.atproto.space.authorizeSpaceSync") {
             let input: AuthorizeSpaceSyncInput = serde_json::from_slice(req.body()).unwrap();
@@ -1576,4 +1576,240 @@ fn recover_writer_repo_via_star_propagates_max_archive_bytes_above_10mib() {
     ))
     .unwrap();
     assert_eq!(recovered.records.len(), 12);
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+#[allow(clippy::too_many_lines)]
+#[test]
+fn sync_engine_uses_writer_did_for_audience_and_kem_and_retries_once_on_mac_mismatch() {
+    use petrel_spaces::verify_credential_request;
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    let now = 1_800_000_000_i64;
+    let space =
+        parse_space_ref("at:space/did:web:host.example.com/blue.catbird.mlsChat/3l2aaaaaaaaag")
+            .unwrap();
+    let host_did = Did::parse("did:web:host.example.com").unwrap();
+    let writer_did = Did::parse("did:plc:writer666666666666666666").unwrap();
+    let reader_did = Did::parse("did:plc:reader666666666666666666").unwrap();
+    let pds_did = Did::parse("did:web:pds.example.com").unwrap();
+
+    let host_kp = SigningKeyPair::generate_p256().unwrap();
+    let reader_kp = SigningKeyPair::generate_p256().unwrap();
+    let (_old_kem_sk, old_kem_did_key) = generate_p256_keypair().unwrap();
+    let (new_kem_sk, new_kem_did_key) = generate_p256_keypair().unwrap();
+    let (rogue_kem_sk, _) = generate_p256_keypair().unwrap();
+    let (_decoy_pds_sk, decoy_pds_did_key) = generate_p256_keypair().unwrap();
+
+    let mut did_resolver = StaticDidResolver::new();
+    did_resolver.insert_keypair(&host_did, &host_kp, Some("https://host.example.com"));
+    let did_resolver = Arc::new(did_resolver);
+
+    let host_doc_json = serde_json::json!({
+        "id": host_did.as_str(),
+        "service": [{
+            "id": "#atproto_space",
+            "type": "AtprotoSpaceHost",
+            "serviceEndpoint": "https://host.example.com"
+        }],
+        "verificationMethod": [{
+            "id": format!("{host_did}#atproto"),
+            "type": "Multikey",
+            "controller": host_did.as_str(),
+            "publicKeyMultibase": host_kp.did_key().unwrap().strip_prefix("did:key:").unwrap()
+        }]
+    });
+    let pds_doc_json = serde_json::json!({
+        "id": pds_did.as_str(),
+        "verificationMethod": [{
+            "id": format!("{pds_did}#atproto_kem"),
+            "type": "P256KeyAgreement",
+            "controller": pds_did.as_str(),
+            "publicKeyMultibase": decoy_pds_did_key.strip_prefix("did:key:").unwrap()
+        }]
+    });
+    let writer_doc_with_key = |kem_did_key: &str| {
+        serde_json::json!({
+            "id": writer_did.as_str(),
+            "service": [{
+                "id": "#atproto_pds",
+                "type": "AtprotoPersonalDataServer",
+                "serviceEndpoint": "https://pds.example.com"
+            }],
+            "verificationMethod": [{
+                "id": format!("{writer_did}#atproto_kem"),
+                "type": "P256KeyAgreement",
+                "controller": writer_did.as_str(),
+                "publicKeyMultibase": kem_did_key.strip_prefix("did:key:").unwrap()
+            }]
+        })
+    };
+    let writer_doc_old = writer_doc_with_key(&old_kem_did_key);
+    let writer_doc_new = writer_doc_with_key(&new_kem_did_key);
+
+    let writer_rev = Tid::parse("3l2aaaaaaaaah").unwrap();
+    let data = [0x44_u8; 32];
+
+    let pds_doc_fetches = Arc::new(AtomicUsize::new(0));
+    let writer_doc_fetches = Arc::new(AtomicUsize::new(0));
+    let get_latest_hits = Arc::new(AtomicUsize::new(0));
+    let use_rogue_kem = Arc::new(AtomicBool::new(false));
+
+    let pds_doc_fetches_c = pds_doc_fetches.clone();
+    let writer_doc_fetches_c = writer_doc_fetches.clone();
+    let get_latest_hits_c = get_latest_hits.clone();
+    let use_rogue_kem_c = use_rogue_kem.clone();
+    let space_c = space.clone();
+    let host_did_c = host_did.clone();
+    let host_kp_c = host_kp.clone();
+    let writer_did_c = writer_did.clone();
+    let writer_rev_c = writer_rev.clone();
+    let did_resolver_c = did_resolver.clone();
+
+    let transport_impl = Arc::new(ScriptedTransport::default());
+    transport_impl.push(move |req| {
+        let uri_str = req.uri().to_string();
+        if uri_str == "https://host.example.com/.well-known/did.json" {
+            return Some(json_resp(200, &host_doc_json));
+        }
+        if uri_str == "https://pds.example.com/.well-known/did.json" {
+            pds_doc_fetches_c.fetch_add(1, Ordering::SeqCst);
+            return Some(json_resp(200, &pds_doc_json));
+        }
+        if uri_str == format!("https://plc.directory/{writer_did_c}") {
+            let fetch_idx = writer_doc_fetches_c.fetch_add(1, Ordering::SeqCst);
+            return if fetch_idx == 0 {
+                Some(json_resp(200, &writer_doc_old))
+            } else {
+                Some(json_resp(200, &writer_doc_new))
+            };
+        }
+        if uri_str.contains("/xrpc/com.atproto.space.authorizeSpaceSync") {
+            let input: AuthorizeSpaceSyncInput = serde_json::from_slice(req.body()).unwrap();
+            let jwt = mint_credential_token(
+                &host_kp_c,
+                &host_did_c,
+                &space_c,
+                &input.credential_key,
+                now,
+                now + 600,
+                Some("jti-writer-aud"),
+                None,
+            )
+            .unwrap();
+            return Some(json_resp(
+                200,
+                &petrel_api::generated::com::atproto::space::authorize_space_sync::Output::new(jwt),
+            ));
+        }
+        if uri_str.contains("/xrpc/com.atproto.space.getLatestCommit") {
+            get_latest_hits_c.fetch_add(1, Ordering::SeqCst);
+
+            // Audience MUST be writer_did (repo owner), never pds_did or did:web:<pds-host>.
+            assert_eq!(
+                req.headers()
+                    .get("atproto-space-audience")
+                    .and_then(|v| v.to_str().ok()),
+                Some(writer_did_c.as_str())
+            );
+            let verified = block_on(verify_credential_request(
+                req.headers(),
+                writer_did_c.as_str(),
+                now,
+                did_resolver_c.as_ref(),
+            ))
+            .unwrap();
+            assert_eq!(verified.audience, writer_did_c.as_str());
+
+            let accept = parse_accept_signature(
+                req.headers()
+                    .get("accept-signature")
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
+            )
+            .unwrap();
+            let server_sk = if use_rogue_kem_c.load(Ordering::SeqCst) {
+                &rogue_kem_sk
+            } else {
+                &new_kem_sk
+            };
+            let secret = decapsulate_p256(server_sk, &accept.keyid).unwrap();
+            let mac = sign_commit_mac(
+                &secret,
+                &space_c,
+                &writer_did_c,
+                &writer_rev_c,
+                &data,
+                &accept.keyid,
+            )
+            .unwrap();
+            let commit = Commit::new(
+                1,
+                writer_did_c.clone(),
+                space_c.clone(),
+                writer_rev_c.clone(),
+                AtBytes(data.to_vec()),
+            );
+            let body = serde_json::to_vec(&GetLatestCommitOutput::new(commit)).unwrap();
+            return Some(
+                Response::builder()
+                    .status(200)
+                    .header("content-type", "application/json")
+                    .header("atproto-space-commit", mac.covered_signature)
+                    .header("signature-input", mac.signature_input)
+                    .header("signature", mac.signature)
+                    .body(Bytes::from(body))
+                    .unwrap(),
+            );
+        }
+        None
+    });
+
+    let transport: SharedTransport = transport_impl;
+    let host_resolver = Arc::new(SpaceHostResolver::new(transport.clone()));
+    let minter = Arc::new(LocalMinter {
+        reader_did,
+        reader_kp,
+        host_did,
+        now,
+    });
+    let exchanger = Arc::new(HttpCredentialExchanger::new(
+        transport.clone(),
+        host_resolver.clone(),
+        minter,
+    ));
+    let cred_mgr = Arc::new(SpaceCredentialManager::new(exchanger));
+    let engine = SpaceSyncEngine::new(transport, cred_mgr, host_resolver);
+    let pds_url = Url::parse("https://pds.example.com").unwrap();
+
+    // First attempt uses cached old_kem_did_key -> HTTP 200 MacMismatch -> refreshes writer_did KEM once -> succeeds.
+    let latest = block_on(engine.get_latest_commit_verified(
+        &space,
+        &writer_did,
+        &pds_url,
+        Some(&pds_did),
+        now,
+    ))
+    .unwrap();
+    assert_eq!(latest.commit.rev, writer_rev);
+    assert_eq!(pds_doc_fetches.load(Ordering::SeqCst), 0);
+    assert_eq!(writer_doc_fetches.load(Ordering::SeqCst), 2);
+    assert_eq!(get_latest_hits.load(Ordering::SeqCst), 2);
+
+    // When server signs with an unrelated key, MacMismatch refreshes writer_did KEM at most once and errors.
+    use_rogue_kem.store(true, Ordering::SeqCst);
+    let err = block_on(engine.get_latest_commit_verified(
+        &space,
+        &writer_did,
+        &pds_url,
+        Some(&pds_did),
+        now,
+    ))
+    .unwrap_err();
+    assert!(matches!(err, SpaceError::MacMismatch));
+    assert_eq!(pds_doc_fetches.load(Ordering::SeqCst), 0);
+    assert_eq!(writer_doc_fetches.load(Ordering::SeqCst), 3);
+    assert_eq!(get_latest_hits.load(Ordering::SeqCst), 4);
 }

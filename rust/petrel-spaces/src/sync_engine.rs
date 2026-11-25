@@ -22,7 +22,7 @@ use url::Url;
 
 use crate::credential_manager::{CredentialExchanger, SpaceCredentialManager};
 use crate::error::{Result, SpaceError, parse_space_ref};
-use crate::http_signature::{derive_audience, sign_credential_request};
+use crate::http_signature::sign_credential_request;
 use crate::kem::encapsulate_p256;
 use crate::mac_header::{
     MacProfile, VerifiedCommitMac, VerifiedRecordMac, format_accept_signature, verify_commit_mac,
@@ -213,7 +213,7 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
         space: &SpaceRef,
         writer_did: &Did,
         pds_url: &Url,
-        pds_did: Option<&Did>,
+        _pds_did: Option<&Did>,
         now_secs: i64,
     ) -> Result<VerifiedLatestCommit> {
         let mut url = pds_url.clone();
@@ -225,28 +225,28 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
             q.append_pair("repo", writer_did.as_str());
         }
 
-        let (resp, shared_secret) = self
-            .send_mac_protected_get(
-                space,
-                writer_did,
-                &url,
-                pds_did,
-                MacProfile::Commit,
-                None,
-                now_secs,
-            )
-            .await?;
+        self.send_mac_protected_get(
+            space,
+            writer_did,
+            &url,
+            MacProfile::Commit,
+            None,
+            now_secs,
+            |resp, shared_secret| {
+                let (covered, sig_input, sig) =
+                    extract_mac_headers(resp.headers(), MacProfile::Commit)?;
+                let mac = verify_commit_mac(shared_secret, covered, sig_input, sig)?;
+                let out: GetLatestCommitOutput = serde_json::from_slice(resp.body())
+                    .map_err(|e| SpaceError::MalformedPayload(e.to_string()))?;
 
-        let (covered, sig_input, sig) = extract_mac_headers(resp.headers(), MacProfile::Commit)?;
-        let mac = verify_commit_mac(&shared_secret, covered, sig_input, sig)?;
-        let out: GetLatestCommitOutput = serde_json::from_slice(resp.body())
-            .map_err(|e| SpaceError::MalformedPayload(e.to_string()))?;
-
-        validate_commit_matches_mac(&out.commit, &mac, space, writer_did)?;
-        Ok(VerifiedLatestCommit {
-            commit: out.commit,
-            mac,
-        })
+                validate_commit_matches_mac(&out.commit, &mac, space, writer_did)?;
+                Ok(VerifiedLatestCommit {
+                    commit: out.commit,
+                    mac,
+                })
+            },
+        )
+        .await
     }
 
     /// Fetch and MAC+STAR-verify a full writer repository via `com.atproto.space.getRepo`.
@@ -255,7 +255,7 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
         space: &SpaceRef,
         writer_did: &Did,
         pds_url: &Url,
-        pds_did: Option<&Did>,
+        _pds_did: Option<&Did>,
         now_secs: i64,
     ) -> Result<StarRepo> {
         let mut url = pds_url.clone();
@@ -269,23 +269,25 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
 
         let max_archive_bytes = self.credentials.max_archive_bytes();
         let max_response_bytes = Some(u64::try_from(max_archive_bytes).unwrap_or(u64::MAX));
-        let (resp, shared_secret) = self
+        let (resp, mac) = self
             .send_mac_protected_get(
                 space,
                 writer_did,
                 &url,
-                pds_did,
                 MacProfile::Commit,
                 max_response_bytes,
                 now_secs,
+                |resp, shared_secret| {
+                    let (covered, sig_input, sig) =
+                        extract_mac_headers(resp.headers(), MacProfile::Commit)?;
+                    let mac = verify_commit_mac(shared_secret, covered, sig_input, sig)?;
+                    if &mac.space != space || &mac.repo != writer_did {
+                        return Err(SpaceError::MacMismatch);
+                    }
+                    Ok((resp.clone(), mac))
+                },
             )
             .await?;
-
-        let (covered, sig_input, sig) = extract_mac_headers(resp.headers(), MacProfile::Commit)?;
-        let mac = verify_commit_mac(&shared_secret, covered, sig_input, sig)?;
-        if &mac.space != space || &mac.repo != writer_did {
-            return Err(SpaceError::MacMismatch);
-        }
 
         read_star_repo_authenticated(
             resp.body(),
@@ -307,7 +309,7 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
         collection: &Nsid,
         rkey: &RecordKey,
         pds_url: &Url,
-        pds_did: Option<&Did>,
+        _pds_did: Option<&Did>,
         now_secs: i64,
     ) -> Result<VerifiedSpaceRecord> {
         let mut url = pds_url.clone();
@@ -321,60 +323,59 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
             q.append_pair("rkey", rkey.as_str());
         }
 
-        let (resp, shared_secret) = self
-            .send_mac_protected_get(
-                space,
-                writer_did,
-                &url,
-                pds_did,
-                MacProfile::Record,
-                None,
-                now_secs,
-            )
-            .await?;
-
-        let (covered, sig_input, sig) = extract_mac_headers(resp.headers(), MacProfile::Record)?;
-        let mac = verify_record_mac(&shared_secret, covered, sig_input, sig)?;
-
         let expected_uri = space
             .record_uri(writer_did, collection, rkey)
             .map_err(|e| SpaceError::InvalidUri(e.to_string()))?;
-        if mac.uri.as_str() != expected_uri.as_str() {
-            return Err(SpaceError::MacMismatch);
-        }
+        self.send_mac_protected_get(
+            space,
+            writer_did,
+            &url,
+            MacProfile::Record,
+            None,
+            now_secs,
+            |resp, shared_secret| {
+                let (covered, sig_input, sig) =
+                    extract_mac_headers(resp.headers(), MacProfile::Record)?;
+                let mac = verify_record_mac(shared_secret, covered, sig_input, sig)?;
+                if mac.uri.as_str() != expected_uri.as_str() {
+                    return Err(SpaceError::MacMismatch);
+                }
 
-        let out: GetRecordOutput = serde_json::from_slice(resp.body())
-            .map_err(|e| SpaceError::MalformedPayload(e.to_string()))?;
-        let out_uri_str = out.uri.as_str();
-        let _ = parse_space_ref_record(out_uri_str)?;
-        if out_uri_str != expected_uri.as_str() {
-            return Err(SpaceError::InvalidUri(format!(
-                "getRecord uri '{out_uri_str}' != '{expected_uri}'"
-            )));
-        }
+                let out: GetRecordOutput = serde_json::from_slice(resp.body())
+                    .map_err(|e| SpaceError::MalformedPayload(e.to_string()))?;
+                let out_uri_str = out.uri.as_str();
+                let _ = parse_space_ref_record(out_uri_str)?;
+                if out_uri_str != expected_uri.as_str() {
+                    return Err(SpaceError::InvalidUri(format!(
+                        "getRecord uri '{out_uri_str}' != '{expected_uri}'"
+                    )));
+                }
 
-        let body_cid =
-            Cid::parse(out.cid.as_str()).map_err(|e| SpaceError::InvalidCid(e.to_string()))?;
-        if body_cid != mac.cid {
-            return Err(SpaceError::DataHashMismatch {
-                expected: mac.cid.to_string(),
-                actual: body_cid.to_string(),
-            });
-        }
+                let body_cid = Cid::parse(out.cid.as_str())
+                    .map_err(|e| SpaceError::InvalidCid(e.to_string()))?;
+                if body_cid != mac.cid {
+                    return Err(SpaceError::DataHashMismatch {
+                        expected: mac.cid.to_string(),
+                        actual: body_cid.to_string(),
+                    });
+                }
 
-        let raw_json: serde_json::Value = serde_json::from_slice(resp.body())
-            .map_err(|e| SpaceError::MalformedPayload(e.to_string()))?;
-        let val_json = raw_json
-            .get("value")
-            .ok_or_else(|| SpaceError::MalformedPayload("getRecord output missing value".into()))?;
-        let cbor = verify_record_cid(val_json, &mac.cid)?;
+                let raw_json: serde_json::Value = serde_json::from_slice(resp.body())
+                    .map_err(|e| SpaceError::MalformedPayload(e.to_string()))?;
+                let val_json = raw_json.get("value").ok_or_else(|| {
+                    SpaceError::MalformedPayload("getRecord output missing value".into())
+                })?;
+                let cbor = verify_record_cid(val_json, &mac.cid)?;
 
-        Ok(VerifiedSpaceRecord {
-            output: out,
-            cid: body_cid,
-            cbor,
-            mac,
-        })
+                Ok(VerifiedSpaceRecord {
+                    output: out,
+                    cid: body_cid,
+                    cbor,
+                    mac,
+                })
+            },
+        )
+        .await
     }
 
     /// Incrementally fetch `listRepoOps`, verify the MAC on each page, update `local_records`
@@ -385,7 +386,7 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
         space: &SpaceRef,
         writer_did: &Did,
         pds_url: &Url,
-        pds_did: Option<&Did>,
+        _pds_did: Option<&Did>,
         since: Option<&Tid>,
         local_records: &mut BTreeMap<String, Cid>,
         set_hash: &mut SpaceSetHash,
@@ -415,23 +416,25 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
                 }
             }
 
-            let (resp, shared_secret) = self
+            let page = self
                 .send_mac_protected_get(
                     space,
                     writer_did,
                     &url,
-                    pds_did,
                     MacProfile::Commit,
                     None,
                     now_secs,
+                    |resp, shared_secret| {
+                        let (covered, sig_input, sig) =
+                            extract_mac_headers(resp.headers(), MacProfile::Commit)?;
+                        let mac = verify_commit_mac(shared_secret, covered, sig_input, sig)?;
+                        let page: ListRepoOpsOutput = serde_json::from_slice(resp.body())
+                            .map_err(|e| SpaceError::MalformedPayload(e.to_string()))?;
+                        validate_commit_matches_mac(&page.commit, &mac, space, writer_did)?;
+                        Ok(page)
+                    },
                 )
                 .await?;
-            let (covered, sig_input, sig) =
-                extract_mac_headers(resp.headers(), MacProfile::Commit)?;
-            let mac = verify_commit_mac(&shared_secret, covered, sig_input, sig)?;
-            let page: ListRepoOpsOutput = serde_json::from_slice(resp.body())
-                .map_err(|e| SpaceError::MalformedPayload(e.to_string()))?;
-            validate_commit_matches_mac(&page.commit, &mac, space, writer_did)?;
 
             for op in &page.ops {
                 let path = format!("{}/{}", op.collection, op.rkey);
@@ -491,28 +494,38 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
         })
     }
 
-    /// Execute a GET request carrying both RFC 9421 credential headers and an HPKE
-    /// `Accept-Signature` header, retrying once on KEM key rotation (`InvalidSpaceMac`)
-    /// or `401 CredentialRevoked`.
+    /// Execute a GET request carrying both RFC 9421 credential headers (bound to `writer_did` as
+    /// audience) and an HPKE `Accept-Signature` header (targeting `writer_did`'s `#atproto_kem`),
+    /// retrying once on KEM key rotation (`InvalidSpaceMac` or HTTP 200 `MacMismatch`) or
+    /// `401 CredentialRevoked`.
     #[allow(clippy::too_many_arguments)]
-    async fn send_mac_protected_get(
+    async fn send_mac_protected_get<T, F>(
         &self,
         space: &SpaceRef,
         writer_did: &Did,
         url: &Url,
-        pds_did: Option<&Did>,
         profile: MacProfile,
         max_response_bytes: Option<u64>,
         now_secs: i64,
-    ) -> Result<(http::Response<Bytes>, zeroize::Zeroizing<[u8; 32]>)> {
-        let mut force_kem_refresh = false;
-        let mut force_cred_refresh = false;
+        mut verify: F,
+    ) -> Result<T>
+    where
+        F: FnMut(&http::Response<Bytes>, &[u8; 32]) -> Result<T>,
+    {
+        let mut kem_refreshed = false;
+        let mut refresh_kem_next = false;
+        let mut cred_refreshed = false;
+        let mut refresh_cred_next = false;
 
         for attempt in 0..3 {
-            let recipient_kem_did = pds_did.unwrap_or(writer_did);
+            let do_kem_refresh = refresh_kem_next;
+            refresh_kem_next = false;
+            let do_cred_refresh = refresh_cred_next;
+            refresh_cred_next = false;
+
             let recipient_kem_key = self
                 .resolver
-                .resolve_kem_key(recipient_kem_did, force_kem_refresh)
+                .resolve_kem_key(writer_did, do_kem_refresh)
                 .await?;
 
             let encap = encapsulate_p256(&recipient_kem_key)?;
@@ -521,11 +534,15 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
 
             let cred = self
                 .credentials
-                .credential(space, force_cred_refresh, now_secs)
+                .credential(space, do_cred_refresh, now_secs)
                 .await?;
-            let aud = derive_audience(url, pds_did.or(cred.pds_did.as_ref()))?;
-            let sig_headers =
-                sign_credential_request(&cred.jwt, &cred.proof_key, aud.as_str(), now_secs, None)?;
+            let sig_headers = sign_credential_request(
+                &cred.jwt,
+                &cred.proof_key,
+                writer_did.as_str(),
+                now_secs,
+                None,
+            )?;
 
             let mut headers = HeaderMap::new();
             sig_headers.apply_to_header_map(&mut headers)?;
@@ -557,21 +574,31 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
             .map_err(|e| SpaceError::Transport(e.to_string()))?;
 
             if attempt < 2 {
-                if self
-                    .credentials
-                    .evict_if_revoked(space, resp.status(), resp.body())
+                if !cred_refreshed
+                    && self
+                        .credentials
+                        .evict_if_revoked(space, resp.status(), resp.body())
                 {
-                    force_cred_refresh = true;
+                    cred_refreshed = true;
+                    refresh_cred_next = true;
                     continue;
                 }
-                if is_invalid_space_mac(resp.status(), resp.body()) && !force_kem_refresh {
-                    force_kem_refresh = true;
+                if !kem_refreshed && is_invalid_space_mac(resp.status(), resp.body()) {
+                    kem_refreshed = true;
+                    refresh_kem_next = true;
                     continue;
                 }
             }
 
             check_http_status(&resp)?;
-            return Ok((resp, shared_secret));
+            match verify(&resp, &shared_secret) {
+                Ok(out) => return Ok(out),
+                Err(SpaceError::MacMismatch) if attempt < 2 && !kem_refreshed => {
+                    kem_refreshed = true;
+                    refresh_kem_next = true;
+                }
+                Err(err) => return Err(err),
+            }
         }
         unreachable!("loop exits within 3 attempts")
     }
