@@ -1,14 +1,24 @@
 {
-  "$comment": "Generation manifest of the third-party fixture module. Run from the Petrel repo root: python3 run.py --manifest Tests/LexiconFixture/lexgen.json --language swift",
+  "$comment": "Generation manifest of the third-party fixture module. Run from the Petrel repo root: python3 run.py --manifest Tests/LexiconFixture/lexgen.json --language swift (or rust)",
   "package": {
     "kind": "overlay",
     "name": "LexiconFixture"
   },
   "lexicons": {
-    "emit": ["Tests/LexiconFixture/lexicons"],
-    "reference": ["petrel:core"]
+    "emit": [
+      "Tests/LexiconFixture/lexicons"
+    ],
+    "reference": [
+      "petrel:core"
+    ]
   },
   "swift": {
     "output": "Tests/LexiconFixture/Generated"
+  },
+  "rust": {
+    "output": "rust/petrel-lexicon-fixture/src/generated",
+    "crate": "petrel_lexicon_fixture",
+    "reference_crate": "petrel_api::generated",
+    "crate_path": "crate::generated"
   }
 }

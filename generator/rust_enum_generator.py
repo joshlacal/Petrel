@@ -207,9 +207,15 @@ class RustEnumGenerator:
         raw_refs: List[str],
         *,
         closed: bool = False,
+        xrpc_input: bool = False,
     ) -> str:
-        """Generate a Rust enum for a named top-level union definition."""
-        return self._emit_union(union_name, raw_refs, closed=closed)
+        """Generate a Rust enum for a named top-level union definition.
+
+        ``xrpc_input`` is for a union that is an XRPC input itself: like an
+        object input, it decodes strictly however it is reached. Its member
+        types keep both modes for every other use.
+        """
+        return self._emit_union(union_name, raw_refs, closed=closed, xrpc_input=xrpc_input)
 
     def generate_enum_for_union_array(
         self,
@@ -230,6 +236,7 @@ class RustEnumGenerator:
         raw_refs: List[str],
         *,
         closed: bool,
+        xrpc_input: bool = False,
     ) -> str:
         if union_name in self.generated_unions:
             return union_name
@@ -304,11 +311,13 @@ class RustEnumGenerator:
             lines.append("}")
             lines.append("")
         lines.append(f"impl petrel_core::FromValue for {union_name} {{")
+        if xrpc_input:
+            lines.append("    // An XRPC input: strict however it is reached.")
         lines.append(
             "    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {"
         )
         if variants:
-            lines.append("        Self::decode_member(value, false)")
+            lines.append(f"        Self::decode_member(value, {'true' if xrpc_input else 'false'})")
             lines.append("    }")
             lines.append("")
             lines.append(

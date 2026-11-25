@@ -1,0 +1,33 @@
+[package]
+name = "petrel-lexicon-fixture"
+description = "GENERATED test fixture: the atproto-interop-tests catalog Lexicons, generated as a third-party overlay. Not published."
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+petrel-core = { workspace = true }
+petrel-api = { workspace = true, features = ["app_bsky", "com_atproto"] }
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+# Generated code does not inherit the workspace lint table (a member's [lints]
+# is all-or-nothing), so this crate carries its own.
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+large_enum_variant = "allow"
+too_many_arguments = "allow"
+struct_excessive_bools = "allow"
+doc_markdown = "allow"
+module_inception = "allow"
+upper_case_acronyms = "allow"
+struct_field_names = "allow"
+too_many_lines = "allow"

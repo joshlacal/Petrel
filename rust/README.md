@@ -22,6 +22,14 @@ Known gaps, all outside phases 0 to 3:
 - The file store runs blocking file I/O inside its async methods and does not
   bind a ciphertext to its file name. Both follow the Swift store it shares a
   format with.
+- A strict decode (an XRPC input) reads `null` in an optional field that is
+  not nullable as absent, as a lenient one does. The `atproto-interop-tests`
+  record vectors call that invalid; `petrel-lexicon-fixture` pins the
+  difference.
+- An input declared as a `ref` is the shared definition's own type, so
+  `from_value` reads it leniently; a server decodes that body with
+  `FromValue::from_value_strict`. Object and union inputs are strict either
+  way.
 
 ## Crates
 
@@ -32,6 +40,7 @@ Known gaps, all outside phases 0 to 3:
 | `petrel-oauth-scopes` | The OAuth scope grammar. Depends on nothing else here. | C |
 | `petrel` | The runtime: transport, XRPC pipeline, identity, crypto, OAuth, storage, service auth. | D and E |
 | `petrel-e2e` | End-to-end tests against the Swift test servers. Never published. | F |
+| `petrel-lexicon-fixture` | The `atproto-interop-tests` catalog Lexicons, generated as a third-party overlay, and the official record vectors read through them. Never published. | |
 
 The workspace uses Cargo resolver 3 and Rust edition 2024. The developer and
 CI toolchain is pinned in `rust-toolchain.toml`. CI tests compatibility with
