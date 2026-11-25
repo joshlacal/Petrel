@@ -1405,4 +1405,123 @@ async fn data_model_open_store_validates_record_cbor_and_streaming_export_avoids
         // Header + 1 write call per exported block = `1 + imported_len` incremental writes.
         assert_eq!(sink.write_calls.load(Ordering::Relaxed), 1 + imported_len);
     }
+
+    // 4. Engine enforces resulting `max_record_count` and `max_mst_node_count` before signing
+    // or persisting even against an unbounded backing store and generous `max_block_count`.
+    let rec_limit_store = Arc::new(InMemoryBlockStore::new());
+    let rec_limits = RepositoryLimits {
+        max_block_count: 50,
+        max_record_count: 1,
+        max_mst_node_count: 10,
+        ..RepositoryLimits::standard()
+    };
+    let rec_batch_1 = WriteBatch::new(vec![
+        create_op(
+            "app.bsky.feed.post",
+            "k002",
+            &post_record_value("first record"),
+        )
+        .unwrap(),
+    ])
+    .unwrap();
+    let r_first = RepositoryEngine::apply(
+        &s0,
+        &rec_batch_1,
+        None,
+        RepositoryTid::parse("3jzfcijpj2z2a").unwrap(),
+        &signer,
+        Arc::clone(&rec_limit_store),
+        &rec_limits,
+        &strict,
+    )
+    .await
+    .unwrap();
+    let count_after_first = rec_limit_store.len().await.unwrap();
+    let rec_batch_2 = WriteBatch::new(vec![
+        create_op(
+            "app.bsky.feed.post",
+            "k005",
+            &post_record_value("second record exceeds max_record_count=1"),
+        )
+        .unwrap(),
+    ])
+    .unwrap();
+    let rec_err = RepositoryEngine::apply(
+        &r_first.state,
+        &rec_batch_2,
+        r_first.state.head_commit_cid.as_ref(),
+        RepositoryTid::parse("3jzfcijpj2z2b").unwrap(),
+        &signer,
+        Arc::clone(&rec_limit_store),
+        &rec_limits,
+        &strict,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        rec_err,
+        EngineError::Limit(LimitError::Exceeded {
+            kind: LimitKind::RecordCount,
+            observed: 2,
+            limit: 1,
+        })
+    ));
+    assert_eq!(
+        rec_limit_store.len().await.unwrap(),
+        count_after_first,
+        "failed commit must not persist any blocks"
+    );
+
+    // Also enforce `max_mst_node_count = 1` when an intervening split creates > 1 MST nodes.
+    let mut split_mid = None;
+    for i in 0..200_u32 {
+        let candidate = format!("k003_{i:03}");
+        if candidate.as_str() > "k002"
+            && candidate.as_str() < "k005"
+            && petrel_repo::mst::key_depth(format!("app.bsky.feed.post/{candidate}").as_bytes())
+                >= 1
+        {
+            split_mid = Some(candidate);
+            break;
+        }
+    }
+    let split_rkey = split_mid.unwrap();
+    let node_limits = RepositoryLimits {
+        max_block_count: 50,
+        max_record_count: 10,
+        max_mst_node_count: 1,
+        ..RepositoryLimits::standard()
+    };
+    let two_rec_same_layer = WriteBatch::new(vec![
+        create_op("app.bsky.feed.post", "k002", &post_record_value("left")).unwrap(),
+        create_op(
+            "app.bsky.feed.post",
+            &split_rkey,
+            &post_record_value("split height >= 1"),
+        )
+        .unwrap(),
+    ])
+    .unwrap();
+    let split_store = Arc::new(InMemoryBlockStore::new());
+    let node_err = RepositoryEngine::apply(
+        &s0,
+        &two_rec_same_layer,
+        None,
+        RepositoryTid::parse("3jzfcijpj2z2a").unwrap(),
+        &signer,
+        Arc::clone(&split_store),
+        &node_limits,
+        &strict,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        node_err,
+        EngineError::Limit(LimitError::Exceeded {
+            kind: LimitKind::MstNodeCount,
+            limit: 1,
+            ..
+        })
+    ));
+    assert_eq!(split_store.len().await.unwrap(), 0);
 }

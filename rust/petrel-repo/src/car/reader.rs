@@ -236,11 +236,7 @@ impl PublicRepositoryCAR {
                         continue;
                     }
                     verify_v1_cid_hash(&cid, payload)?;
-                    if let Some(existing) = store.get_block(&cid).await? {
-                        if existing.as_slice() != payload {
-                            return Err(CARError::ConflictingDuplicateBlock(cid.to_string()));
-                        }
-                    } else {
+                    if !seen_cids.contains(&cid) {
                         let total_seen = block_count.saturating_add(seen_foreign.len());
                         if total_seen >= limits.max_block_count {
                             return Err(CARError::Limit(crate::error::LimitError::Exceeded {
@@ -249,11 +245,17 @@ impl PublicRepositoryCAR {
                                 limit: limits.max_block_count,
                             }));
                         }
-                        store.put_block(&cid, payload).await?;
-                        if seen_cids.insert(cid) {
-                            block_count += 1;
-                            total_block_bytes = total_block_bytes.saturating_add(payload.len());
+                    }
+                    if let Some(existing) = store.get_block(&cid).await? {
+                        if existing.as_slice() != payload {
+                            return Err(CARError::ConflictingDuplicateBlock(cid.to_string()));
                         }
+                    } else {
+                        store.put_block(&cid, payload).await?;
+                    }
+                    if seen_cids.insert(cid) {
+                        block_count += 1;
+                        total_block_bytes = total_block_bytes.saturating_add(payload.len());
                     }
                 }
                 FrameCid::V0 { raw_cid, cid_len } => {

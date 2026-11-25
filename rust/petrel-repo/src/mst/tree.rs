@@ -81,6 +81,15 @@ enum NodeSource {
 
 type SplitPair = (Option<Cid>, Option<Cid>);
 
+/// Distinct block, MST node, and live record counts returned by
+/// [`RepositoryMst::count_reachable_counts_bounded`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReachableMstCounts {
+    pub unique_blocks: usize,
+    pub mst_node_count: usize,
+    pub record_count: usize,
+}
+
 /// Immutable, lazily-loaded AT Protocol Merkle Search Tree backed by a
 /// [`BlockSource`] plus local copy-on-write dirty node overlay.
 #[derive(Debug, Clone)]
@@ -343,14 +352,18 @@ impl RepositoryMst {
         Ok(out)
     }
 
-    /// Counts distinct reachable MST node + leaf record CIDs, aborting early if the
-    /// count exceeds `max_unique_blocks`.
-    pub async fn count_reachable_blocks_bounded(
+    /// Counts distinct reachable blocks, MST nodes, and live records, aborting
+    /// early as soon as any configured bound is exceeded.
+    pub async fn count_reachable_counts_bounded(
         &mut self,
         max_unique_blocks: usize,
-    ) -> Result<usize, MstError> {
+        max_mst_node_count: usize,
+        max_record_count: usize,
+    ) -> Result<ReachableMstCounts, MstError> {
         let mut seen_nodes = std::collections::HashSet::new();
         let mut unique_blocks = std::collections::HashSet::new();
+        let mut mst_node_count = 0_usize;
+        let mut record_count = 0_usize;
         let mut stack = vec![(self.root_cid.clone(), 0_usize)];
 
         while let Some((node_cid, depth)) = stack.pop() {
@@ -363,25 +376,39 @@ impl RepositoryMst {
             if !seen_nodes.insert(node_cid.clone()) {
                 continue;
             }
+            mst_node_count = mst_node_count.saturating_add(1);
             unique_blocks.insert(node_cid.clone());
-            if unique_blocks.len() > max_unique_blocks {
-                return Ok(unique_blocks.len());
+            if mst_node_count > max_mst_node_count || unique_blocks.len() > max_unique_blocks {
+                return Ok(ReachableMstCounts {
+                    unique_blocks: unique_blocks.len(),
+                    mst_node_count,
+                    record_count,
+                });
             }
             let view = self.load_node(&node_cid).await?;
             if let Some(left) = view.left {
                 stack.push((left, depth + 1));
             }
             for entry in view.entries {
+                record_count = record_count.saturating_add(1);
                 unique_blocks.insert(entry.value);
-                if unique_blocks.len() > max_unique_blocks {
-                    return Ok(unique_blocks.len());
+                if record_count > max_record_count || unique_blocks.len() > max_unique_blocks {
+                    return Ok(ReachableMstCounts {
+                        unique_blocks: unique_blocks.len(),
+                        mst_node_count,
+                        record_count,
+                    });
                 }
                 if let Some(right) = entry.tree {
                     stack.push((right, depth + 1));
                 }
             }
         }
-        Ok(unique_blocks.len())
+        Ok(ReachableMstCounts {
+            unique_blocks: unique_blocks.len(),
+            mst_node_count,
+            record_count,
+        })
     }
 
     fn collect_blocks<'a>(

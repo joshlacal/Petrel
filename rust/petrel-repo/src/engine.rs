@@ -263,18 +263,40 @@ impl RepositoryEngine {
             });
         }
 
-        // Enforce `max_block_count` over the resulting reachable CAR blocks
-        // (1 commit + unique MST nodes + live record blocks) before signing/persisting.
-        // Uses O(1) `store.len()` fast-path unless total candidate blocks approach the ceiling.
-        let candidate_upper_bound = store
-            .len()
-            .await?
+        // Enforce `max_block_count`, `max_mst_node_count`, and `max_record_count` over the
+        // resulting reachable tree/CAR state before signing or persisting anything. Uses O(1)
+        // `store.len()` fast-path unless total candidate blocks approach the tightest ceiling.
+        let store_len = store.len().await?;
+        let tightest_tree_limit = limits.max_mst_node_count.min(limits.max_record_count);
+        if store_len
             .saturating_add(1)
-            .saturating_add(new_blocks_map.len());
-        if candidate_upper_bound > limits.max_block_count {
+            .saturating_add(new_blocks_map.len())
+            > limits.max_block_count
+            || store_len.saturating_add(new_blocks_map.len()) > tightest_tree_limit
+        {
             let max_tree_blocks = limits.max_block_count.saturating_sub(1);
-            let tree_blocks = mst.count_reachable_blocks_bounded(max_tree_blocks).await?;
-            let total_reachable = 1_usize.saturating_add(tree_blocks);
+            let counts = mst
+                .count_reachable_counts_bounded(
+                    max_tree_blocks,
+                    limits.max_mst_node_count,
+                    limits.max_record_count,
+                )
+                .await?;
+            if counts.mst_node_count > limits.max_mst_node_count {
+                return Err(EngineError::Limit(LimitError::Exceeded {
+                    kind: LimitKind::MstNodeCount,
+                    observed: counts.mst_node_count,
+                    limit: limits.max_mst_node_count,
+                }));
+            }
+            if counts.record_count > limits.max_record_count {
+                return Err(EngineError::Limit(LimitError::Exceeded {
+                    kind: LimitKind::RecordCount,
+                    observed: counts.record_count,
+                    limit: limits.max_record_count,
+                }));
+            }
+            let total_reachable = 1_usize.saturating_add(counts.unique_blocks);
             if total_reachable > limits.max_block_count {
                 return Err(EngineError::Limit(LimitError::Exceeded {
                     kind: LimitKind::BlockCount,

@@ -354,6 +354,7 @@ async fn public_car_enforces_foreign_blocks_and_root_policies() {
 #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 async fn public_car_counts_foreign_blocks_toward_max_block_count() {
+    use petrel_repo::block_store::BlockStore as _;
     use petrel_repo::error::{LimitError, LimitKind};
 
     let (cbor_cid, cbor_bytes) = cbor_block(&Value::Integer(42));
@@ -468,4 +469,60 @@ async fn public_car_counts_foreign_blocks_toward_max_block_count() {
         .await
         .unwrap();
     assert_eq!(parsed_ok.block_count, 1);
+
+    // Pre-populated store containing identical copies still counts every distinct CAR block
+    // toward `block_count`, `total_block_bytes`, and `max_block_count`.
+    let (b1_cid, b1_bytes) = cbor_block(&Value::Integer(1));
+    let (b2_cid, b2_bytes) = cbor_block(&Value::Integer(2));
+    let (b3_cid, b3_bytes) = cbor_block(&Value::Integer(3));
+    let three_car = PublicRepositoryCAR::write(
+        std::slice::from_ref(&b1_cid),
+        &[
+            RepositoryBlock::new(b1_cid.clone(), b1_bytes.clone()),
+            RepositoryBlock::new(b2_cid.clone(), b2_bytes.clone()),
+            RepositoryBlock::new(b3_cid.clone(), b3_bytes.clone()),
+        ],
+    )
+    .unwrap();
+    let prepop_store = InMemoryBlockStore::new();
+    prepop_store.put_block(&b1_cid, &b1_bytes).await.unwrap();
+    prepop_store.put_block(&b2_cid, &b2_bytes).await.unwrap();
+    prepop_store.put_block(&b3_cid, &b3_bytes).await.unwrap();
+
+    let err_prepop = PublicRepositoryCAR::load(
+        &three_car,
+        &prepop_store,
+        &two_limits,
+        &RepositoryReadPolicy::strict(),
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        err_prepop,
+        CARError::Limit(LimitError::Exceeded {
+            kind: LimitKind::BlockCount,
+            observed: 3,
+            limit: 2,
+        })
+    ));
+
+    let three_limits = RepositoryLimits {
+        max_block_count: 3,
+        max_record_count: 3,
+        max_mst_node_count: 3,
+        ..RepositoryLimits::standard()
+    };
+    let parsed_prepop = PublicRepositoryCAR::load(
+        &three_car,
+        &prepop_store,
+        &three_limits,
+        &RepositoryReadPolicy::strict(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(parsed_prepop.block_count, 3);
+    assert_eq!(
+        parsed_prepop.total_block_bytes,
+        b1_bytes.len() + b2_bytes.len() + b3_bytes.len()
+    );
 }
