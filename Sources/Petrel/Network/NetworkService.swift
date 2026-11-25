@@ -125,6 +125,15 @@ enum ContentDecoding {
             throw NetworkError.invalidResponse(description: "Unsupported Content-Encoding: \(encoding)")
         }
         guard let decoded else {
+            // Brotli and raw deflate have no signature, so a body URLSession already decoded
+            // cannot be told from an encoded one by its first bytes. Text that does not decode
+            // was decoded already (an HTML page, a bare DID); anything else is a broken stream.
+            if encoding != "gzip", String(data: data, encoding: .utf8) != nil {
+                guard data.count <= limits.maximumDecodedBytes else {
+                    throw NetworkError.responseLimitExceeded("Decoded bytes exceeded limit")
+                }
+                return data
+            }
             throw NetworkError.invalidResponse(description: "Invalid \(encoding) response")
         }
         guard decoded.count <= limits.maximumDecodedBytes,
@@ -2021,11 +2030,17 @@ public actor NetworkService: NetworkServiceProtocol {
         return (data, httpResponse)
     }
     /// `limits` replaces the delegate's response limits for this request only.
+    ///
+    /// With `unsuccessfulBodyIsBestEffort`, a response whose status is not 2xx is always returned:
+    /// with its body when that is within the limits and decodes, and with an empty body
+    /// otherwise. Use it when the status of such a response is the answer, so an oversized or
+    /// oddly encoded error page reads as the status it carries instead of as a failed request.
     static func executeDataTask(
         _ request: URLRequest,
         using targetSession: URLSession,
         delegate: HardenedURLSessionDelegate,
         limits: NetworkResponseLimits? = nil,
+        unsuccessfulBodyIsBestEffort: Bool = false,
         onLaunch: (@Sendable () -> Void)? = nil
     ) async throws -> (Data, URLResponse) {
         try Task.checkCancellation()
@@ -2050,7 +2065,9 @@ public actor NetworkService: NetworkServiceProtocol {
         // request never returned. The cancellation handler below runs before its operation when
         // the caller is already cancelled, so the registration cannot happen inside it.
         let completion = DataTaskCompletion()
-        delegate.contextManager.register(task, limits: limits) { result in
+        delegate.contextManager.register(
+            task, limits: limits, unsuccessfulBodyIsBestEffort: unsuccessfulBodyIsBestEffort
+        ) { result in
             completion.finish(result)
         }
         delegate.contextManager.setApprovedAddresses(addresses, for: task)
@@ -2068,6 +2085,15 @@ public actor NetworkService: NetworkServiceProtocol {
             }
         } onCancel: {
             task.cancel()
+        }
+        if unsuccessfulBodyIsBestEffort,
+           let response = rawResult.1 as? HTTPURLResponse,
+           !(200 ..< 300).contains(response.statusCode)
+        {
+            let body = try? ContentDecoding.normalizeResponse(
+                rawResult.0, response: rawResult.1, limits: limits ?? delegate.limits
+            )
+            return (body ?? Data(), rawResult.1)
         }
         return (
             try ContentDecoding.normalizeResponse(rawResult.0, response: rawResult.1, limits: limits ?? delegate.limits),

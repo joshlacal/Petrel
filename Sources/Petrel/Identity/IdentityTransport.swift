@@ -89,6 +89,9 @@ public protocol IdentityHTTPTransport: Sendable {
 ///   only to `localhost`, `127.0.0.1` and `::1`.
 /// - At most five redirects are followed, and only when the request asks for them.
 /// - The response is cut off at `maximumResponseBytes`, on the wire and after decompression.
+/// - A response whose status is not 2xx is always returned. Its body is empty when it was
+///   larger than `maximumResponseBytes` or could not be decoded, so a large error page still
+///   reads as the status it carries.
 public final class HardenedIdentityHTTPTransport: IdentityHTTPTransport {
     private let userAgent: String?
     private let redirectingSession: URLSession
@@ -177,8 +180,11 @@ public final class HardenedIdentityHTTPTransport: IdentityHTTPTransport {
                         throw IdentityError.blockedByNetworkPolicy(url: urlString)
                     }
                 }
+                // A "not found" must stay one whatever the size or encoding of the page that
+                // came with it, so an unsuccessful response is returned even without its body.
                 let (data, response) = try await NetworkService.executeDataTask(
-                    prepared, using: session, delegate: delegate, limits: limits
+                    prepared, using: session, delegate: delegate, limits: limits,
+                    unsuccessfulBodyIsBestEffort: true
                 )
                 guard let http = response as? HTTPURLResponse else {
                     throw IdentityError.transport(url: urlString, reason: "The response was not an HTTP response.")

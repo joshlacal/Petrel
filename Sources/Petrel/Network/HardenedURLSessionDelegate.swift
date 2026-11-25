@@ -84,14 +84,20 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
         }
 
         /// `limits` replaces the delegate's response limits for this task only.
+        /// - Parameter unsuccessfulBodyIsBestEffort: When true, a response whose status is not 2xx
+        ///   and whose body broke the response limits completes with that response and an empty
+        ///   body, so the caller still learns the status.
         package func register(
             _ task: URLSessionTask,
             limits: NetworkResponseLimits? = nil,
+            unsuccessfulBodyIsBestEffort: Bool = false,
             completion: @escaping @Sendable (Result<(Data, URLResponse), Error>) -> Void
         ) {
             lock.lock()
             defer { lock.unlock() }
-            taskContexts[task.taskIdentifier] = TaskContext(limits: limits, completion: completion)
+            taskContexts[task.taskIdentifier] = TaskContext(
+                limits: limits, unsuccessfulBodyIsBestEffort: unsuccessfulBodyIsBestEffort, completion: completion
+            )
         }
 
         package func responseLimits(for task: URLSessionTask) -> NetworkResponseLimits? {
@@ -220,7 +226,16 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
             if context.securityViolation || wasViolated {
                 result = .failure(NetworkError.securityViolation)
             } else if context.limitExceeded || wasLimitExceeded {
-                result = .failure(NetworkError.responseLimitExceeded("Response limit exceeded"))
+                if context.unsuccessfulBodyIsBestEffort,
+                   let response = context.response as? HTTPURLResponse,
+                   !(200 ..< 300).contains(response.statusCode)
+                {
+                    // An error page that is too large is still an answer: the caller gets the
+                    // status without the body, not a failed request.
+                    result = .success((Data(), response))
+                } else {
+                    result = .failure(NetworkError.responseLimitExceeded("Response limit exceeded"))
+                }
             } else if let error {
                 result = .failure(error)
             } else if let response = context.response {
@@ -273,6 +288,7 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
         var data = Data()
         var response: URLResponse?
         var limits: NetworkResponseLimits? = nil
+        var unsuccessfulBodyIsBestEffort = false
         var completion: (@Sendable (Result<(Data, URLResponse), Error>) -> Void)? = nil
     }
 
@@ -379,6 +395,9 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
         didReceive response: URLResponse,
         completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
     ) {
+        // Recorded before the size check, so the status of an unsuccessful response is known
+        // even when its body is refused.
+        contextManager.setResponse(response, for: dataTask)
         // Check Content-Length to enforce wire size limits before downloading
         let maximumWireBytes = contextManager.responseLimits(for: dataTask)?.maximumWireBytes ?? limits.maximumWireBytes
         if let httpResponse = response as? HTTPURLResponse,
@@ -390,7 +409,6 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
             completionHandler(.cancel)
             return
         }
-        contextManager.setResponse(response, for: dataTask)
         completionHandler(.allow)
     }
 
