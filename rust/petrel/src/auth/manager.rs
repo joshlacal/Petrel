@@ -37,6 +37,8 @@ pub enum AuthManagerError {
     Password(#[from] PasswordAuthError),
 }
 
+type CachedOAuthProvider = Arc<Mutex<Option<(Did, Arc<SessionAuth>)>>>;
+
 /// Strategy backing [`AuthManager`].
 #[derive(Clone)]
 enum ActiveStrategy {
@@ -44,7 +46,7 @@ enum ActiveStrategy {
     Legacy(Arc<LegacyPasswordStrategy>),
     OAuth {
         client: Arc<OAuthClient>,
-        provider: Arc<Mutex<Option<Arc<SessionAuth>>>>,
+        provider: CachedOAuthProvider,
     },
     Gateway {
         #[expect(dead_code)]
@@ -184,7 +186,7 @@ impl AuthManager {
         let inner = self.state.lock().await;
         if let ActiveStrategy::OAuth { client, provider } = &inner.strategy {
             let auth = Arc::new(client.session_auth(did.clone()));
-            *provider.lock().await = Some(auth);
+            *provider.lock().await = Some((did.clone(), auth));
         }
         Ok(())
     }
@@ -330,12 +332,18 @@ impl AuthManager {
             ActiveStrategy::None | ActiveStrategy::Gateway { .. } => None,
             ActiveStrategy::Legacy(legacy) => Some(Arc::new(legacy)),
             ActiveStrategy::OAuth { client, provider } => {
-                if let Some(existing) = provider.lock().await.clone() {
-                    return Some(existing);
+                let mut guard = provider.lock().await;
+                let Some(did) = self.account_manager.current_did().await.ok().flatten() else {
+                    *guard = None;
+                    return None;
+                };
+                if let Some((cached_did, existing)) = guard.as_ref()
+                    && *cached_did == did
+                {
+                    return Some(Arc::clone(existing) as Arc<dyn AuthProvider>);
                 }
-                let did = self.account_manager.current_did().await.ok().flatten()?;
-                let auth = Arc::new(client.session_auth(did));
-                *provider.lock().await = Some(Arc::clone(&auth));
+                let auth = Arc::new(client.session_auth(did.clone()));
+                *guard = Some((did, Arc::clone(&auth)));
                 Some(auth)
             }
         }

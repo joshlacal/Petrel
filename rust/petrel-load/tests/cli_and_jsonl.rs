@@ -11,9 +11,10 @@ use petrel_core::Did;
 use petrel_load::{
     ArgumentError, AuthEventJsonlWriter, AuthEventRecorderHandle, CallbackReadError,
     CliOAuthConfig, OAuthMetadataError, OAuthMetadataResponse, PetrelLoadCli, ScenarioPlan,
+    open_session_store, open_session_store_in,
 };
 use serde_json::Value as JsonValue;
-use tempfile::NamedTempFile;
+use tempfile::{NamedTempFile, TempDir};
 use url::Url;
 
 #[test]
@@ -263,4 +264,59 @@ fn cli_binary_rejects_incomplete_oauth_with_exit_2() {
     assert_eq!(out.status.code(), Some(2));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(stderr.contains("--client-id") && stderr.contains("--redirect-uri"));
+}
+
+struct TempDirCleanup(std::path::PathBuf);
+
+impl Drop for TempDirCleanup {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+#[tokio::test]
+async fn open_session_store_first_run_creates_private_dir_and_persists_accounts() {
+    let base = TempDir::new().unwrap();
+    let store = open_session_store_in(base.path(), "load-first-run").unwrap();
+    let expected_dir = std::fs::canonicalize(base.path())
+        .unwrap()
+        .join("petrel-load-store-load-first-run");
+    assert!(expected_dir.is_dir());
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(&expected_dir)
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(mode, 0o700);
+    }
+
+    let did: Did = "did:plc:load-store-test".parse().unwrap();
+    let account = Account {
+        did: did.clone(),
+        handle: None,
+        pds: "https://bsky.social".to_owned(),
+        authorization_server: None,
+        expected_issuer: None,
+    };
+    store.save_account(&account).await.unwrap();
+    store.save_current_did(&did).await.unwrap();
+    drop(store);
+
+    let reopened = open_session_store_in(base.path(), "load-first-run").unwrap();
+    assert_eq!(reopened.get_current_did().await.unwrap(), Some(did));
+
+    // Also exercise the real temp_dir entrypoint (resolving OS temp symlinks before open).
+    let unique_ns = format!("load-first-run-{}", std::process::id());
+    let temp_store_dir = std::fs::canonicalize(std::env::temp_dir())
+        .unwrap()
+        .join(format!("petrel-load-store-{unique_ns}"));
+    let _ = std::fs::remove_dir_all(&temp_store_dir);
+    let _cleanup = TempDirCleanup(temp_store_dir.clone());
+    let temp_store = open_session_store(&unique_ns).unwrap();
+    assert!(temp_store_dir.is_dir());
+    drop(temp_store);
 }

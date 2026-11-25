@@ -786,14 +786,27 @@ struct RunOptions<'a> {
     oauth_cfg: Option<&'a CliOAuthConfig>,
 }
 
-fn open_session_store(
+/// Opens (creating securely with `0700` permissions on Unix if absent) the file-backed
+/// [`SessionStore`] under the system temporary directory for `namespace`.
+pub fn open_session_store(
     namespace: &str,
 ) -> Result<SessionStore, Box<dyn std::error::Error + Send + Sync>> {
-    let store_dir = std::env::temp_dir().join(format!("petrel-load-store-{namespace}"));
-    std::fs::create_dir_all(&store_dir)?;
-    let canon_dir = std::fs::canonicalize(&store_dir)?;
+    open_session_store_in(&std::env::temp_dir(), namespace)
+}
+
+/// Opens (creating securely with `0700` permissions on Unix if absent) the file-backed
+/// [`SessionStore`] under `base_dir` for `namespace`.
+pub fn open_session_store_in(
+    base_dir: &Path,
+    namespace: &str,
+) -> Result<SessionStore, Box<dyn std::error::Error + Send + Sync>> {
+    if namespace.is_empty() || namespace.contains(['.', '/', '\\', '\0']) {
+        return Err(Box::new(petrel::storage::StoreError::InvalidNamespace));
+    }
+    let canon_base = std::fs::canonicalize(base_dir)?;
+    let store_dir = canon_base.join(format!("petrel-load-store-{namespace}"));
     let key: [u8; 32] = Sha256::digest(namespace.as_bytes()).into();
-    let secret_store = Arc::new(FileSecretStore::open(&canon_dir, &key)?);
+    let secret_store = Arc::new(FileSecretStore::open(&store_dir, &key)?);
     Ok(SessionStore::new(secret_store, namespace.to_owned())?)
 }
 

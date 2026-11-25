@@ -1130,3 +1130,185 @@ async fn legacy_password_inflight_refresh_rejects_commit_after_logout_or_relogin
         latest_access
     );
 }
+
+async fn seed_oauth_session(
+    store: &SessionStore,
+    did: &Did,
+    pds: &Url,
+    key_id: &str,
+    access_token: &str,
+    now: u64,
+) {
+    use petrel::crypto::{DpopSigner, SoftwareDpopSigner};
+    use petrel::oauth::{Session, SessionRecord};
+
+    let signer = SoftwareDpopSigner::generate().unwrap();
+    let jkt = signer.public_jwk().thumbprint().unwrap();
+    store
+        .save_dpop_key(key_id, &signer.to_bytes())
+        .await
+        .unwrap();
+    let account = Account {
+        did: did.clone(),
+        handle: None,
+        pds: pds.origin().ascii_serialization(),
+        authorization_server: None,
+        expected_issuer: None,
+    };
+    let session: Session = serde_json::from_value(serde_json::json!({
+        "did": did,
+        "access_token": access_token,
+        "refresh_token": "refresh-tok",
+        "created_at": now,
+        "expires_in": 3600,
+        "scope": "atproto transition:generic"
+    }))
+    .unwrap();
+    store.save_account(&account).await.unwrap();
+    store
+        .save_session(&SessionRecord {
+            account,
+            session,
+            dpop_key_id: key_id.to_owned(),
+            dpop_jkt: jkt,
+        })
+        .await
+        .unwrap();
+}
+
+async fn prepare_oauth_get(
+    client: &AtProtoClient,
+    uri: &str,
+) -> Result<(Option<Did>, String), petrel::xrpc::AuthError> {
+    let req = Request::builder().uri(uri).body(Bytes::new()).unwrap();
+    let (prepared, ctx) = client.auth_manager().prepare(req).await?;
+    let auth = prepared
+        .headers()
+        .get(http::header::AUTHORIZATION)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    Ok((ctx.did, auth))
+}
+
+#[tokio::test]
+async fn oauth_remove_account_auto_switch_rebinds_auth_manager_provider() {
+    use petrel::oauth::{ClientAuth, OAuthClient, OAuthConfig};
+    use petrel::xrpc::AuthError;
+
+    let pds_a = Url::parse("https://pds-oauth-a.test").unwrap();
+    let pds_b = Url::parse("https://pds-oauth-b.test").unwrap();
+    let net = Arc::new(FakePdsNetwork::new(vec![
+        FakePdsState::new("https://pds-oauth-a.test"),
+        FakePdsState::new("https://pds-oauth-b.test"),
+    ]));
+    let resolver = Arc::new(FakeResolver::new());
+
+    let store = SessionStore::new(Arc::new(MemorySecretStore::new()), "oauth-remove").unwrap();
+    let oauth_cfg = OAuthConfig::new(
+        "https://client.example/oauth-client-metadata.json",
+        Url::parse("example.client:/callback").unwrap(),
+        "atproto transition:generic",
+        ClientAuth::Public,
+    )
+    .unwrap();
+    let oauth_client = Arc::new(
+        OAuthClient::new(net.clone(), resolver.clone(), store.clone(), oauth_cfg).unwrap(),
+    );
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let alice_did: Did = ALICE_DID.parse().unwrap();
+    let bob_did: Did = "did:plc:oauthbob".parse().unwrap();
+
+    seed_oauth_session(&store, &alice_did, &pds_a, "dpop-a", "jwt-alice", now).await;
+    seed_oauth_session(&store, &bob_did, &pds_b, "dpop-b", "jwt-bob", now).await;
+    store.save_current_did(&alice_did).await.unwrap();
+
+    let client = AtProtoClient::new(
+        pds_a.clone(),
+        net.clone(),
+        store,
+        resolver,
+        Some(oauth_client),
+        AuthMode::PublicOAuth,
+        false,
+    )
+    .unwrap();
+
+    // Warm AuthManager's cached OAuth SessionAuth provider for Alice.
+    assert_eq!(
+        prepare_oauth_get(
+            &client,
+            "https://pds-oauth-a.test/xrpc/app.bsky.actor.getProfile?actor=alice",
+        )
+        .await
+        .unwrap(),
+        (Some(alice_did.clone()), "DPoP jwt-alice".to_owned())
+    );
+
+    let stale_xrpc = client.xrpc().await;
+
+    // Removing Alice via AccountManager auto-selects Bob without calling select_oauth_account.
+    client
+        .account_manager()
+        .remove_account(&alice_did)
+        .await
+        .unwrap();
+    assert_eq!(client.get_did().await.unwrap(), Some(bob_did.clone()));
+
+    // Bound snapshot captured before removal must still fail closed.
+    let err = stale_xrpc
+        .query(
+            "app.bsky.actor.getProfile",
+            [("actor", bob_did.as_str())],
+            &CallOptions::default(),
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(err, petrel::xrpc::Error::Auth(_)));
+    assert_eq!(net.calls("https://pds-oauth-a.test", "getProfile").len(), 0);
+
+    // AuthManager and new XRPC calls must rebind to Bob instead of returning cached Alice SessionAuth.
+    assert_eq!(
+        prepare_oauth_get(
+            &client,
+            "https://pds-oauth-b.test/xrpc/app.bsky.actor.getProfile?actor=bob",
+        )
+        .await
+        .unwrap(),
+        (Some(bob_did.clone()), "DPoP jwt-bob".to_owned())
+    );
+
+    client.set_base_url(pds_b).await.unwrap();
+    let _ = client
+        .query(
+            "app.bsky.actor.getProfile",
+            [("actor", bob_did.as_str())],
+            &CallOptions::default(),
+        )
+        .await;
+    let bob_calls = net.calls("https://pds-oauth-b.test", "getProfile");
+    assert_eq!(bob_calls.len(), 1);
+    assert_eq!(bob_calls[0].auth.as_deref(), Some("DPoP jwt-bob"));
+    assert!(bob_calls[0].dpop.is_some());
+
+    // Removing the last remaining account clears current_did and invalidates the cached provider.
+    client
+        .account_manager()
+        .remove_account(&bob_did)
+        .await
+        .unwrap();
+    assert_eq!(client.get_did().await.unwrap(), None);
+    assert!(matches!(
+        prepare_oauth_get(
+            &client,
+            "https://pds-oauth-b.test/xrpc/app.bsky.actor.getProfile?actor=bob",
+        )
+        .await,
+        Err(AuthError::NoSession)
+    ));
+}
