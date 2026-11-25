@@ -1,0 +1,63 @@
+[package]
+name = "petrel-jetstream"
+description = "AT Protocol Jetstream consumer with JSON and custom-dictionary zstd decoding."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["native"]
+native = [
+    "petrel/native",
+    "petrel-firehose/native",
+    "dep:tokio",
+]
+wasm = [
+    "petrel/wasm",
+    "petrel-core/wasm",
+    "petrel-api/wasm",
+    "petrel-firehose/wasm",
+    "dep:wasm-bindgen",
+    "dep:wasm-bindgen-futures",
+]
+
+[dependencies]
+petrel-core = { workspace = true }
+petrel-api = { workspace = true, features = ["com_atproto", "network_bsky"] }
+petrel = { workspace = true }
+petrel-firehose = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+bytes = { workspace = true }
+http = { workspace = true }
+url = { workspace = true }
+async-lock = { workspace = true }
+futures-util = { workspace = true }
+ruzstd = { workspace = true }
+getrandom = { workspace = true }
+web-time = { workspace = true }
+tracing = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, optional = true, features = ["rt", "time", "sync", "fs", "io-util"] }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { workspace = true, optional = true }
+
+[dev-dependencies]
+base64 = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "net", "sync"] }
+tokio-tungstenite = { workspace = true, features = ["handshake"] }
+tempfile = { workspace = true }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
+[lints]
+workspace = true
