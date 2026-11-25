@@ -268,6 +268,26 @@ mod file_store {
 
     const WRITE_BUFFER_THRESHOLD: usize = 1 << 20;
 
+    trait FileStoreWriter: Write + Send + Sync + std::fmt::Debug {
+        fn sync_all_data(&self) -> std::io::Result<()>;
+        fn current_len(&self) -> std::io::Result<u64>;
+        fn set_file_len(&self, len: u64) -> std::io::Result<()>;
+    }
+
+    impl FileStoreWriter for File {
+        fn sync_all_data(&self) -> std::io::Result<()> {
+            self.sync_all()
+        }
+
+        fn current_len(&self) -> std::io::Result<u64> {
+            Ok(self.metadata()?.len())
+        }
+
+        fn set_file_len(&self, len: u64) -> std::io::Result<()> {
+            self.set_len(len)
+        }
+    }
+
     #[derive(Debug, Clone, Copy)]
     struct DiskEntry {
         payload_offset: u64,
@@ -278,7 +298,7 @@ mod file_store {
     struct FileState {
         path: PathBuf,
         reader: File,
-        writer: File,
+        writer: Box<dyn FileStoreWriter>,
         index: HashMap<Cid, DiskEntry>,
         disk_bytes: usize,
         pending_puts: HashMap<Cid, Vec<u8>>,
@@ -309,7 +329,7 @@ mod file_store {
 
             // Persist tombstones (`varint(0) || varint(cid_len) || cid_bytes`) first so any
             // subsequent put for the same CID supersedes the tombstone on replay.
-            let mut deleted_cids: Vec<Cid> = self.pending_deletes.drain().collect();
+            let mut deleted_cids: Vec<&Cid> = self.pending_deletes.iter().collect();
             deleted_cids.sort();
             for cid in deleted_cids {
                 let cid_bytes = cid.as_bytes();
@@ -321,13 +341,14 @@ mod file_store {
                 self.write_buffer.extend_from_slice(cid_bytes);
             }
 
-            let put_order = std::mem::take(&mut self.pending_put_order);
-            let mut written_entries: Vec<(Cid, DiskEntry)> = Vec::with_capacity(put_order.len());
-            for cid in put_order {
-                let Some(bytes) = self.pending_puts.remove(&cid) else {
+            let mut written_entries: Vec<(Cid, DiskEntry)> =
+                Vec::with_capacity(self.pending_put_order.len());
+            let mut staged_put_bytes = 0_usize;
+            for cid in &self.pending_put_order {
+                let Some(bytes) = self.pending_puts.get(cid) else {
                     continue;
                 };
-                self.pending_bytes = self.pending_bytes.saturating_sub(bytes.len());
+                staged_put_bytes = staged_put_bytes.saturating_add(bytes.len());
                 let cid_bytes = cid.as_bytes();
                 let frame_len = cid_bytes.len() + bytes.len();
                 let mut header = [0_u8; 9];
@@ -342,9 +363,9 @@ mod file_store {
 
                 self.write_buffer.extend_from_slice(&header[..header_len]);
                 self.write_buffer.extend_from_slice(cid_bytes);
-                self.write_buffer.extend_from_slice(&bytes);
+                self.write_buffer.extend_from_slice(bytes);
                 written_entries.push((
-                    cid,
+                    cid.clone(),
                     DiskEntry {
                         payload_offset,
                         payload_len: bytes.len(),
@@ -353,17 +374,37 @@ mod file_store {
             }
 
             if self.write_buffer.is_empty() {
+                self.pending_put_order.clear();
                 return Ok(());
             }
 
-            self.writer
+            let disk_len = self
+                .writer
+                .current_len()
+                .map_err(|err| BlockStoreError::Io(err.to_string()))?;
+            if disk_len != self.file_len {
+                self.writer
+                    .set_file_len(self.file_len)
+                    .map_err(|err| BlockStoreError::Io(err.to_string()))?;
+            }
+
+            if let Err(err) = self
+                .writer
                 .write_all(&self.write_buffer)
-                .map_err(|err| BlockStoreError::Io(err.to_string()))?;
-            self.writer
-                .flush()
-                .map_err(|err| BlockStoreError::Io(err.to_string()))?;
+                .and_then(|()| self.writer.flush())
+            {
+                // Roll back any partially appended frame bytes so retry and reopen stay clean.
+                let _ = self.writer.set_file_len(self.file_len);
+                self.write_buffer.clear();
+                return Err(BlockStoreError::Io(err.to_string()));
+            }
+
             self.file_len = self.file_len.saturating_add(self.write_buffer.len() as u64);
             self.write_buffer.clear();
+            self.pending_deletes.clear();
+            self.pending_put_order.clear();
+            self.pending_puts.clear();
+            self.pending_bytes = self.pending_bytes.saturating_sub(staged_put_bytes);
 
             for (cid, entry) in written_entries {
                 if self.index.insert(cid, entry).is_none() {
@@ -429,7 +470,7 @@ mod file_store {
                 state: Arc::new(RwLock::new(FileState {
                     path,
                     reader,
-                    writer,
+                    writer: Box::new(writer),
                     index,
                     disk_bytes,
                     pending_puts: HashMap::new(),
@@ -450,7 +491,7 @@ mod file_store {
             guard.flush()?;
             guard
                 .writer
-                .sync_all()
+                .sync_all_data()
                 .map_err(|err| BlockStoreError::Io(err.to_string()))?;
             Ok(())
         }
@@ -739,6 +780,111 @@ mod file_store {
                 cids.dedup();
                 Ok(cids)
             })
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        use super::*;
+
+        #[derive(Debug)]
+        struct PartialFailWriter {
+            inner: File,
+            fail_next: Arc<AtomicBool>,
+        }
+
+        impl Write for PartialFailWriter {
+            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                if self.fail_next.load(Ordering::SeqCst) {
+                    let partial = (buf.len() / 2).max(1).min(buf.len());
+                    self.inner.write_all(&buf[..partial])?;
+                    return Err(std::io::Error::other(
+                        "simulated disk full after partial write",
+                    ));
+                }
+                self.inner.write(buf)
+            }
+
+            fn flush(&mut self) -> std::io::Result<()> {
+                if self.fail_next.load(Ordering::SeqCst) {
+                    return Err(std::io::Error::other("simulated flush failure"));
+                }
+                self.inner.flush()
+            }
+        }
+
+        impl FileStoreWriter for PartialFailWriter {
+            fn sync_all_data(&self) -> std::io::Result<()> {
+                self.inner.sync_all()
+            }
+
+            fn current_len(&self) -> std::io::Result<u64> {
+                Ok(self.inner.metadata()?.len())
+            }
+
+            fn set_file_len(&self, len: u64) -> std::io::Result<()> {
+                self.inner.set_len(len)
+            }
+        }
+
+        #[tokio::test]
+        async fn flush_failure_retains_pending_ops_truncates_partial_tail_and_retries() {
+            let dir = tempfile::tempdir().unwrap();
+            let store_path = dir.path().join("blocks.carframes");
+            let store = FileBlockStore::open(&store_path).unwrap();
+
+            let blk_a = b"\xa1\x61a\x01".to_vec();
+            let cid_a = Cid::for_dag_cbor(&blk_a);
+            let blk_b = b"\xa1\x61b\x02".to_vec();
+            let cid_b = Cid::for_dag_cbor(&blk_b);
+
+            store.put_block(&cid_a, &blk_a).await.unwrap();
+            store.synchronize().await.unwrap();
+            let baseline_len = std::fs::metadata(&store_path).unwrap().len();
+
+            // Inject partial-write failure, then delete A and put B.
+            let fail_flag = Arc::new(AtomicBool::new(true));
+            {
+                let mut guard = store.state.write().await;
+                let writer_file = OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&store_path)
+                    .unwrap();
+                guard.writer = Box::new(PartialFailWriter {
+                    inner: writer_file,
+                    fail_next: Arc::clone(&fail_flag),
+                });
+            }
+
+            assert!(store.delete_block(&cid_a).await.unwrap());
+            store.put_block(&cid_b, &blk_b).await.unwrap();
+            let err = store.synchronize().await.unwrap_err();
+            assert!(matches!(err, BlockStoreError::Io(_)));
+
+            // Partial write must have been truncated back to `baseline_len`, and in-memory pending
+            // state must retain both the deletion of A and buffered put of B.
+            assert_eq!(std::fs::metadata(&store_path).unwrap().len(), baseline_len);
+            assert_eq!(store.get_block(&cid_a).await.unwrap(), None);
+            assert_eq!(store.get_block(&cid_b).await.unwrap(), Some(blk_b.clone()));
+            assert_eq!(store.len().await.unwrap(), 1);
+            assert_eq!(store.total_bytes().await.unwrap(), blk_b.len());
+
+            // Clear failure and retry synchronize: pending tombstone + put persist cleanly.
+            fail_flag.store(false, Ordering::SeqCst);
+            store.synchronize().await.unwrap();
+            drop(store);
+
+            let reopened = FileBlockStore::open(&store_path).unwrap();
+            assert_eq!(reopened.get_block(&cid_a).await.unwrap(), None);
+            assert_eq!(
+                reopened.get_block(&cid_b).await.unwrap(),
+                Some(blk_b.clone())
+            );
+            assert_eq!(reopened.len().await.unwrap(), 1);
+            assert_eq!(reopened.total_bytes().await.unwrap(), blk_b.len());
         }
     }
 }
