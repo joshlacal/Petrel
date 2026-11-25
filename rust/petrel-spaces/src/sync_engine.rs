@@ -379,6 +379,9 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
         let mut cursor: Option<String> = None;
         let mut collected_ops = Vec::new();
         let mut final_commit: Option<Commit> = None;
+        let mut staged_records = local_records.clone();
+        let mut staged_hash = set_hash.clone();
+        let mut completed = false;
 
         for _ in 0..MAX_LIST_PAGES {
             let mut url = pds_url.clone();
@@ -416,8 +419,8 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
 
             for op in &page.ops {
                 let path = format!("{}/{}", op.collection, op.rkey);
-                if let Some(prev_cid) = local_records.remove(&path) {
-                    set_hash.remove(&path, &prev_cid.to_string());
+                if let Some(prev_cid) = staged_records.remove(&path) {
+                    staged_hash.remove(&path, &prev_cid.to_string());
                 }
                 if let Some(new_cid_str) = &op.cid {
                     let new_cid = Cid::parse(new_cid_str.as_str())
@@ -433,8 +436,8 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
                             });
                         }
                     }
-                    set_hash.add(&path, &new_cid.to_string());
-                    local_records.insert(path, new_cid);
+                    staged_hash.add(&path, &new_cid.to_string());
+                    staged_records.insert(path, new_cid);
                 }
             }
 
@@ -442,19 +445,29 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
             final_commit = Some(page.commit);
             match page.cursor {
                 Some(next) if cursor.as_deref() != Some(next.as_str()) => cursor = Some(next),
-                _ => break,
+                _ => {
+                    completed = true;
+                    break;
+                }
             }
         }
 
+        if !completed {
+            return Err(SpaceError::MalformedPayload(format!(
+                "listRepoOps exceeded {MAX_LIST_PAGES} pages"
+            )));
+        }
         let commit = final_commit
             .ok_or_else(|| SpaceError::MalformedPayload("listRepoOps returned no commit".into()))?;
-        let digest = set_hash.digest();
+        let digest = staged_hash.digest();
         if digest.as_slice() != commit.data.0.as_slice() {
             return Err(SpaceError::DataHashMismatch {
                 expected: petrel_crypto::Hex::encode(&commit.data.0),
                 actual: petrel_crypto::Hex::encode(&digest),
             });
         }
+        *local_records = staged_records;
+        *set_hash = staged_hash;
         Ok(SyncedWriterOps {
             commit,
             ops: collected_ops,

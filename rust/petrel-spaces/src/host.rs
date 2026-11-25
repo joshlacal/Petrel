@@ -119,6 +119,7 @@ pub trait SpaceHostBackend: MaybeSend + MaybeSync {
         user: &'a Did,
     ) -> BoxFuture<'a, Result<Vec<String>>>;
 
+    /// Record or update an active writer state and return the previous space-wide `space_rev`.
     fn upsert_writer<'a>(
         &'a self,
         space: &'a SpaceRef,
@@ -128,6 +129,7 @@ pub trait SpaceHostBackend: MaybeSend + MaybeSync {
         space_rev: &'a Tid,
     ) -> BoxFuture<'a, Result<Option<Tid>>>;
 
+    /// Mark a writer as removed and return the previous space-wide `space_rev`.
     fn remove_writer<'a>(
         &'a self,
         space: &'a SpaceRef,
@@ -158,6 +160,7 @@ pub trait SpaceHostBackend: MaybeSend + MaybeSync {
 struct InMemoryHostState {
     spaces: HashMap<SpaceRef, HostedSpace>,
     writers: HashMap<SpaceRef, BTreeMap<Did, WriterState>>,
+    latest_space_rev: HashMap<SpaceRef, Tid>,
     issued_creds: HashMap<(SpaceRef, Did), Vec<(String, i64)>>,
     revoked_jtis: HashMap<SpaceRef, HashSet<String>>,
     registrations: HashMap<(SpaceRef, String), NotifyRegistration>,
@@ -319,8 +322,10 @@ impl SpaceHostBackend for InMemorySpaceHostBackend {
                 .state
                 .lock()
                 .map_err(|_| SpaceError::Storage("host backend mutex poisoned".into()))?;
+            let prev = guard
+                .latest_space_rev
+                .insert(space.clone(), space_rev.clone());
             let map = guard.writers.entry(space.clone()).or_default();
-            let prev = map.get(repo).map(|w| w.space_rev().clone());
             map.insert(
                 repo.clone(),
                 WriterState::Active {
@@ -346,8 +351,10 @@ impl SpaceHostBackend for InMemorySpaceHostBackend {
                 .state
                 .lock()
                 .map_err(|_| SpaceError::Storage("host backend mutex poisoned".into()))?;
+            let prev = guard
+                .latest_space_rev
+                .insert(space.clone(), space_rev.clone());
             let map = guard.writers.entry(space.clone()).or_default();
-            let prev = map.get(repo).map(|w| w.space_rev().clone());
             map.insert(
                 repo.clone(),
                 WriterState::Removed {

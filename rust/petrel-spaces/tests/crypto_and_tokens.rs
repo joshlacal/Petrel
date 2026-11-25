@@ -457,3 +457,64 @@ fn star_archive_errors_limits_and_json_safe_integer_checks() {
     // Silence unused Bytes / PublicKey import if optimized
     let _ = (Bytes::default(), PublicKey::from_did_key("did:key:invalid"));
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[test]
+fn credential_rejects_issuer_not_matching_space_authority() {
+    let victim_space =
+        parse_space_ref("at:space/did:web:victim.example.com/blue.catbird.mlsChat/3l2aaaaaaaaaa")
+            .unwrap();
+    let victim_did = Did::parse("did:web:victim.example.com").unwrap();
+    let attacker_did = Did::parse("did:plc:attacker1111111111111111").unwrap();
+
+    let victim_p256 = SigningKeyPair::generate_p256().unwrap();
+    let attacker_p256 = SigningKeyPair::generate_p256().unwrap();
+    let proof_p256 = SigningKeyPair::generate_p256().unwrap();
+    let proof_kid = proof_p256.did_key().unwrap();
+
+    let mut resolver = StaticDidResolver::new();
+    resolver.insert_keypair(&victim_did, &victim_p256, None);
+    resolver.insert_keypair(&attacker_did, &attacker_p256, None);
+
+    let now = 1_800_000_000i64;
+    let forged = mint_credential_token(
+        &attacker_p256,
+        &attacker_did,
+        &victim_space,
+        &proof_kid,
+        now,
+        now + 900,
+        Some("jti-attacker"),
+        None,
+    )
+    .unwrap();
+
+    assert!(matches!(
+        petrel_spaces::inspect_credential_token_unverified(&forged),
+        Err(SpaceError::Unauthorized(_))
+    ));
+    assert!(matches!(
+        block_on(verify_credential_token(&forged, now + 10, &resolver)),
+        Err(SpaceError::Unauthorized(_))
+    ));
+
+    let req_headers = sign_credential_request(
+        &forged,
+        &proof_p256,
+        "did:plc:targetpds",
+        now + 10,
+        Some("n-forged"),
+    )
+    .unwrap();
+    let mut hmap = HeaderMap::new();
+    req_headers.apply_to_header_map(&mut hmap).unwrap();
+    assert!(matches!(
+        block_on(verify_credential_request(
+            &hmap,
+            "did:plc:targetpds",
+            now + 15,
+            &resolver
+        )),
+        Err(SpaceError::Unauthorized(_))
+    ));
+}

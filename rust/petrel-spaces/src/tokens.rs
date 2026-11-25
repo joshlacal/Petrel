@@ -370,8 +370,14 @@ pub fn inspect_credential_token_unverified(token: &str) -> Result<(JwtHeader, Cr
         return Err(SpaceError::UnsupportedTokenType(header.typ));
     }
     let _ = JwtAlgorithm::parse(&header.alg)?;
-    let _ = parse_space_ref(&claims.sub)?;
-    let _ = Did::parse(&claims.iss).map_err(|e| SpaceError::InvalidDid(e.to_string()))?;
+    let space_ref = parse_space_ref(&claims.sub)?;
+    let iss = Did::parse(&claims.iss).map_err(|e| SpaceError::InvalidDid(e.to_string()))?;
+    if &iss != space_ref.space_did() {
+        return Err(SpaceError::Unauthorized(format!(
+            "credential issuer '{iss}' does not match space authority '{}'",
+            space_ref.space_did()
+        )));
+    }
     validate_did_key(&claims.cnf.kid)?;
     if claims.jti.is_empty() {
         return Err(SpaceError::MalformedPayload("empty jti claim".into()));
@@ -449,10 +455,16 @@ pub async fn verify_credential_token<R: SigningKeyResolver + ?Sized>(
     }
     let _ = JwtAlgorithm::parse(&header.alg)?;
     let iss = claims.issuer_did()?;
-    let _ = claims.space_ref().map_err(|e| match e {
+    let space_ref = claims.space_ref().map_err(|e| match e {
         SpaceError::LegacySpaceUriRejected(_) => e,
         other => SpaceError::InvalidSubject(other.to_string()),
     })?;
+    if &iss != space_ref.space_did() {
+        return Err(SpaceError::Unauthorized(format!(
+            "credential issuer '{iss}' does not match space authority '{}'",
+            space_ref.space_did()
+        )));
+    }
     if claims.jti.is_empty() {
         return Err(SpaceError::MalformedPayload("empty jti claim".into()));
     }

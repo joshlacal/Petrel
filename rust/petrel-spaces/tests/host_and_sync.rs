@@ -797,3 +797,374 @@ fn end_to_end_space_host_and_sync_engine_full_lifecycle() {
         .expect("issued credential should be revoked");
     assert_ne!(notice.credentials.len(), 0);
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+#[test]
+fn host_tracks_space_wide_prev_space_rev_across_writers_and_removals() {
+    use petrel_api::generated::com::atproto::space::notify_space_update::InputUpdate;
+
+    let now = 1_800_000_000_i64;
+    let space =
+        parse_space_ref("at:space/did:web:host.example.com/blue.catbird.mlsChat/3l2aaaaaaaaab")
+            .unwrap();
+    let host_did = Did::parse("did:web:host.example.com").unwrap();
+    let writer_a = Did::parse("did:plc:writera11111111111111111").unwrap();
+    let writer_b = Did::parse("did:plc:writerb11111111111111111").unwrap();
+    let host_kp = SigningKeyPair::generate_p256().unwrap();
+
+    let mut resolver = StaticDidResolver::new();
+    resolver.insert_keypair(&host_did, &host_kp, Some("https://host.example.com"));
+
+    let backend = Arc::new(InMemorySpaceHostBackend::new());
+    let mut writers = HashSet::new();
+    writers.insert(writer_a.clone());
+    writers.insert(writer_b.clone());
+    backend
+        .put_space(petrel_spaces::HostedSpace {
+            space: space.clone(),
+            policy: OutputPolicy::MemberspacePolicy(Box::new(MemberspacePolicy::new())),
+            allowed_readers: HashSet::new(),
+            allowed_writers: writers,
+            deleted: false,
+        })
+        .unwrap();
+
+    let host =
+        SpaceHost::with_in_memory_replay(host_did, host_kp, backend.clone(), Arc::new(resolver));
+
+    let r1 = backend.next_space_rev(1_800_000_000_000_001).unwrap();
+    let r2 = backend.next_space_rev(1_800_000_000_000_002).unwrap();
+    let r3 = backend.next_space_rev(1_800_000_000_000_003).unwrap();
+    let r4 = backend.next_space_rev(1_800_000_000_000_004).unwrap();
+    let r5 = backend.next_space_rev(1_800_000_000_000_005).unwrap();
+    let writer_rev = Tid::parse("3l2aaaaaaaaac").unwrap();
+    let empty_hash = vec![0_u8; 32];
+
+    let u1 = block_on(host.handle_notify_repo_update(
+        &NotifyRepoUpdateInput::new(
+            space.clone(),
+            writer_a.clone(),
+            writer_rev.clone(),
+            AtBytes(empty_hash.clone()),
+        ),
+        r1.clone(),
+    ))
+    .unwrap();
+    match u1 {
+        InputUpdate::RepoWrite(w) => assert_eq!(w.prev_space_rev, None),
+        other => panic!("unexpected update: {other:?}"),
+    }
+
+    let u2 = block_on(host.handle_notify_repo_update(
+        &NotifyRepoUpdateInput::new(
+            space.clone(),
+            writer_b.clone(),
+            writer_rev.clone(),
+            AtBytes(empty_hash.clone()),
+        ),
+        r2.clone(),
+    ))
+    .unwrap();
+    match u2 {
+        InputUpdate::RepoWrite(w) => assert_eq!(w.prev_space_rev.as_ref(), Some(&r1)),
+        other => panic!("unexpected update: {other:?}"),
+    }
+
+    let u3 = block_on(host.handle_notify_repo_update(
+        &NotifyRepoUpdateInput::new(
+            space.clone(),
+            writer_a.clone(),
+            writer_rev.clone(),
+            AtBytes(empty_hash.clone()),
+        ),
+        r3.clone(),
+    ))
+    .unwrap();
+    match u3 {
+        InputUpdate::RepoWrite(w) => assert_eq!(w.prev_space_rev.as_ref(), Some(&r2)),
+        other => panic!("unexpected update: {other:?}"),
+    }
+
+    let u4 = block_on(host.handle_remove_writer(
+        &RemoveWriterInput::new(space.clone(), writer_b),
+        r4.clone(),
+        now,
+    ))
+    .unwrap();
+    match u4 {
+        InputUpdate::RepoRemoved(rem) => assert_eq!(rem.prev_space_rev.as_ref(), Some(&r3)),
+        other => panic!("unexpected update: {other:?}"),
+    }
+
+    let u5 = block_on(host.handle_notify_repo_update(
+        &NotifyRepoUpdateInput::new(space, writer_a, writer_rev, AtBytes(empty_hash)),
+        r5,
+    ))
+    .unwrap();
+    match u5 {
+        InputUpdate::RepoWrite(w) => assert_eq!(w.prev_space_rev.as_ref(), Some(&r4)),
+        other => panic!("unexpected update: {other:?}"),
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+#[allow(clippy::too_many_lines)]
+#[test]
+fn sync_writer_ops_verified_rolls_back_on_later_page_failure() {
+    let now = 1_800_000_000_i64;
+    let space =
+        parse_space_ref("at:space/did:web:host.example.com/blue.catbird.mlsChat/3l2aaaaaaaaac")
+            .unwrap();
+    let host_did = Did::parse("did:web:host.example.com").unwrap();
+    let writer_did = Did::parse("did:plc:writer222222222222222222").unwrap();
+    let reader_did = Did::parse("did:plc:reader222222222222222222").unwrap();
+    let pds_did = Did::parse("did:web:pds.example.com").unwrap();
+
+    let host_kp = SigningKeyPair::generate_p256().unwrap();
+    let reader_kp = SigningKeyPair::generate_p256().unwrap();
+    let (pds_kem_sk, pds_kem_did_key) = generate_p256_keypair().unwrap();
+
+    let col = Nsid::parse("blue.catbird.mlsChat.message").unwrap();
+    let seed_rkey = RecordKey::parse("3l2aaaaaaaaaa").unwrap();
+    let page1_rkey = RecordKey::parse("3l2aaaaaaaaab").unwrap();
+    let page2_rkey = RecordKey::parse("3l2aaaaaaaaac").unwrap();
+
+    let mut seed_map = BTreeMap::new();
+    seed_map.insert("text".to_owned(), Value::String("seed".to_owned()));
+    let seed_cid = Cid::for_dag_cbor(&encode(&Value::Object(seed_map)));
+    let seed_path = format!("{col}/{seed_rkey}");
+
+    let mut page1_map = BTreeMap::new();
+    page1_map.insert("text".to_owned(), Value::String("page1".to_owned()));
+    let page1_val = Value::Object(page1_map);
+    let page1_cid = Cid::for_dag_cbor(&encode(&page1_val));
+
+    let mut page2_map = BTreeMap::new();
+    page2_map.insert("text".to_owned(), Value::String("page2".to_owned()));
+    let page2_val = Value::Object(page2_map);
+    let page2_cid = Cid::for_dag_cbor(&encode(&page2_val));
+
+    let mut initial_records = BTreeMap::new();
+    initial_records.insert(seed_path.clone(), seed_cid.clone());
+    let mut initial_hash = SpaceSetHash::new();
+    initial_hash.add(&seed_path, &seed_cid.to_string());
+    let initial_digest = initial_hash.digest();
+
+    let rev_p1 = Tid::parse("3l2aaaaaaaaad").unwrap();
+    let rev_p2 = Tid::parse("3l2aaaaaaaaae").unwrap();
+    let bogus_data = [0xEE_u8; 32];
+
+    let transport_impl = Arc::new(ScriptedTransport::default());
+    let host_doc_json = serde_json::json!({
+        "id": host_did.as_str(),
+        "service": [{
+            "id": "#atproto_space",
+            "type": "AtprotoSpaceHost",
+            "serviceEndpoint": "https://host.example.com"
+        }],
+        "verificationMethod": [{
+            "id": format!("{host_did}#atproto"),
+            "type": "Multikey",
+            "controller": host_did.as_str(),
+            "publicKeyMultibase": host_kp.did_key().unwrap().strip_prefix("did:key:").unwrap()
+        }]
+    });
+    let pds_doc_json = serde_json::json!({
+        "id": pds_did.as_str(),
+        "service": [{
+            "id": "#atproto_pds",
+            "type": "AtprotoPersonalDataServer",
+            "serviceEndpoint": "https://pds.example.com"
+        }],
+        "verificationMethod": [{
+            "id": format!("{pds_did}#atproto_kem"),
+            "type": "P256KeyAgreement",
+            "controller": pds_did.as_str(),
+            "publicKeyMultibase": pds_kem_did_key.strip_prefix("did:key:").unwrap()
+        }]
+    });
+
+    let space_c = space.clone();
+    let host_did_c = host_did.clone();
+    let host_kp_c = host_kp.clone();
+    let writer_did_c = writer_did.clone();
+    let col_c = col.clone();
+    let fail_with_bad_mac = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let fail_with_bad_mac_c = fail_with_bad_mac.clone();
+
+    transport_impl.push(move |req| {
+        let uri_str = req.uri().to_string();
+        if uri_str == "https://host.example.com/.well-known/did.json" {
+            return Some(json_resp(200, &host_doc_json));
+        }
+        if uri_str == "https://pds.example.com/.well-known/did.json" {
+            return Some(json_resp(200, &pds_doc_json));
+        }
+        if uri_str.contains("/xrpc/com.atproto.space.authorizeSpaceSync") {
+            let input: AuthorizeSpaceSyncInput = serde_json::from_slice(req.body()).unwrap();
+            let jwt = mint_credential_token(
+                &host_kp_c,
+                &host_did_c,
+                &space_c,
+                &input.credential_key,
+                now,
+                now + 600,
+                Some("jti-sync-rollback"),
+                None,
+            )
+            .unwrap();
+            return Some(json_resp(
+                200,
+                &petrel_api::generated::com::atproto::space::authorize_space_sync::Output::new(jwt),
+            ));
+        }
+        if uri_str.contains("/xrpc/com.atproto.space.listRepoOps") {
+            let accept = parse_accept_signature(
+                req.headers()
+                    .get("accept-signature")
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
+            )
+            .unwrap();
+            let secret = decapsulate_p256(&pds_kem_sk, &accept.keyid).unwrap();
+            if uri_str.contains("cursor=p2") {
+                if fail_with_bad_mac_c.load(std::sync::atomic::Ordering::SeqCst) {
+                    return Some(
+                        Response::builder()
+                            .status(200)
+                            .header("content-type", "application/json")
+                            .body(Bytes::from_static(b"{}"))
+                            .unwrap(),
+                    );
+                }
+                let mac = sign_commit_mac(
+                    &secret,
+                    &space_c,
+                    &writer_did_c,
+                    &rev_p2,
+                    &bogus_data,
+                    &accept.keyid,
+                )
+                .unwrap();
+                let mut op = OpEntry::new(
+                    rev_p2.clone(),
+                    col_c.clone(),
+                    page2_rkey.clone(),
+                    Some(CidString::parse(page2_cid.to_string()).unwrap()),
+                    None,
+                );
+                op.value = Some(page2_val.clone());
+                let commit = Commit::new(
+                    1,
+                    writer_did_c.clone(),
+                    space_c.clone(),
+                    rev_p2.clone(),
+                    AtBytes(bogus_data.to_vec()),
+                );
+                let out = ListRepoOpsOutput::new(vec![op], commit);
+                return Some(
+                    Response::builder()
+                        .status(200)
+                        .header("content-type", "application/json")
+                        .header("atproto-space-commit", mac.covered_signature)
+                        .header("signature-input", mac.signature_input)
+                        .header("signature", mac.signature)
+                        .body(Bytes::from(serde_json::to_vec(&out).unwrap()))
+                        .unwrap(),
+                );
+            }
+            let mac = sign_commit_mac(
+                &secret,
+                &space_c,
+                &writer_did_c,
+                &rev_p1,
+                &bogus_data,
+                &accept.keyid,
+            )
+            .unwrap();
+            let mut op = OpEntry::new(
+                rev_p1.clone(),
+                col_c.clone(),
+                page1_rkey.clone(),
+                Some(CidString::parse(page1_cid.to_string()).unwrap()),
+                None,
+            );
+            op.value = Some(page1_val.clone());
+            let commit = Commit::new(
+                1,
+                writer_did_c.clone(),
+                space_c.clone(),
+                rev_p1.clone(),
+                AtBytes(bogus_data.to_vec()),
+            );
+            let mut out = ListRepoOpsOutput::new(vec![op], commit);
+            out.cursor = Some("p2".to_owned());
+            return Some(
+                Response::builder()
+                    .status(200)
+                    .header("content-type", "application/json")
+                    .header("atproto-space-commit", mac.covered_signature)
+                    .header("signature-input", mac.signature_input)
+                    .header("signature", mac.signature)
+                    .body(Bytes::from(serde_json::to_vec(&out).unwrap()))
+                    .unwrap(),
+            );
+        }
+        None
+    });
+
+    let transport: SharedTransport = transport_impl;
+    let host_resolver = Arc::new(SpaceHostResolver::new(transport.clone()));
+    let minter = Arc::new(LocalMinter {
+        reader_did,
+        reader_kp,
+        host_did,
+        now,
+    });
+    let exchanger = Arc::new(HttpCredentialExchanger::new(
+        transport.clone(),
+        host_resolver.clone(),
+        minter,
+    ));
+    let cred_mgr = Arc::new(SpaceCredentialManager::new(exchanger));
+    let engine = SpaceSyncEngine::new(transport, cred_mgr, host_resolver);
+    let pds_url = Url::parse("https://pds.example.com").unwrap();
+
+    // Case 1: Page 1 mutates staged state; Page 2 fails final commit.data hash check.
+    let mut records = initial_records.clone();
+    let mut hash = initial_hash.clone();
+    let err = block_on(engine.sync_writer_ops_verified(
+        &space,
+        &writer_did,
+        &pds_url,
+        Some(&pds_did),
+        None,
+        &mut records,
+        &mut hash,
+        now,
+    ))
+    .unwrap_err();
+    assert!(matches!(err, SpaceError::DataHashMismatch { .. }));
+    assert_eq!(records, initial_records);
+    assert_eq!(hash.digest(), initial_digest);
+
+    // Case 2: Page 1 mutates staged state; Page 2 fails mid-pagination header/MAC check.
+    fail_with_bad_mac.store(true, std::sync::atomic::Ordering::SeqCst);
+    let err2 = block_on(engine.sync_writer_ops_verified(
+        &space,
+        &writer_did,
+        &pds_url,
+        Some(&pds_did),
+        None,
+        &mut records,
+        &mut hash,
+        now,
+    ))
+    .unwrap_err();
+    assert!(matches!(err2, SpaceError::MissingHeader(_)));
+    assert_eq!(records, initial_records);
+    assert_eq!(hash.digest(), initial_digest);
+}
