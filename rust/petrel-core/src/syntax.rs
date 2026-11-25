@@ -13,7 +13,13 @@ use crate::xrpc::QueryValue;
 
 // The string conversions for identifiers all use the same checked parse path.
 macro_rules! wire_string {
+    ($name:ident, $query:ident, decode = $decode:ident) => {
+        wire_string!(@impl $name, $query, $decode);
+    };
     ($name:ident, $query:ident $(, $check:ident)?) => {
+        wire_string!(@impl $name, $query, parse_owned $(, $check)?);
+    };
+    (@impl $name:ident, $query:ident, $decode:ident $(, $check:ident)?) => {
         impl $name {
             /// Validates and wraps a string.
             pub fn parse(value: impl Into<String>) -> Result<Self, SyntaxError> {
@@ -58,7 +64,7 @@ macro_rules! wire_string {
 
         impl FromValue for $name {
             fn from_value(value: Value) -> Result<Self, DecodeError> {
-                Ok(Self::parse_owned(String::from_value(value)?)?)
+                Ok(Self::$decode(String::from_value(value)?)?)
             }
         }
 
@@ -585,17 +591,34 @@ comparable_by!(Tid, value);
 /// Which path forms an AT URI parser accepts.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Grammar {
-    /// Only the standard authority, collection and record key.
+    /// Only the standard authority, collection and record key:
+    /// `at://AUTHORITY[/COLLECTION[/RKEY]]`.
     Restricted,
-    /// Standard AT URIs and Petrel's space-specific extension.
+    /// Standard AT URIs plus the permissioned-data space grammar
+    /// `at:space/SPACE-DID/SPACE-TYPE/SKEY[/AUTHOR-DID/COLLECTION/RKEY]`.
     #[default]
     RestrictedOrSpace,
 }
 
-/// An AT Protocol URI, including the space forms used by Petrel.
+/// The prefix of every space URI.
+pub const SPACE_URI_PREFIX: &str = "at:space/";
+
+/// An AT Protocol URI: the Lexicon `at-uri` string format, including the
+/// permissioned-data space form
+/// `at:space/SPACE-DID/SPACE-TYPE/SKEY[/AUTHOR-DID/COLLECTION/RKEY]`.
+///
+/// Both the space and the author must be DIDs. Parsing ([`AtUri::parse`],
+/// [`FromStr`]) rejects the spaces alpha form `at://SPACE-DID/space/…`.
+/// Decoding a record value still accepts it, because records written during
+/// the alpha may embed it and their CIDs cover those bytes: the decoded value
+/// keeps the string as written, while [`AtUri::normalized`] and query values
+/// use the `at:space/` form. See [`AtUri::from_legacy_space_uri`].
 #[derive(Clone, Debug)]
 pub struct AtUri {
     wire: String,
+    /// The `at:space/` spelling of a URI decoded from the spaces alpha form.
+    // TODO: remove before beta, with `from_legacy_space_uri`.
+    current: Option<String>,
     authority: AtIdentifier,
     collection: Option<Nsid>,
     key: Option<RecordKey>,
@@ -619,6 +642,44 @@ impl AtUri {
         Self::parse_owned_with_grammar(wire, Grammar::default())
     }
 
+    /// Decodes a wire value. Unlike parsing, this also accepts the spaces
+    /// alpha form `at://SPACE-DID/space/…`, keeping the string as written.
+    // TODO: remove the legacy branch before beta, with `from_legacy_space_uri`.
+    fn decode_owned(wire: String) -> Result<Self, SyntaxError> {
+        if wire.len() <= 8192
+            && let Some(current) = Self::from_legacy_space_uri(&wire)
+        {
+            let parsed = Self::parse_space(&current[SPACE_URI_PREFIX.len()..])?;
+            return Ok(Self {
+                wire,
+                current: Some(current),
+                ..parsed
+            });
+        }
+        Self::parse_owned(wire)
+    }
+
+    /// Rewrites a space URI in its spaces alpha form,
+    /// `at://{spaceDid}/space/{rest}`, as `at:space/{spaceDid}/{rest}`.
+    /// Returns `None` for any other input. The result is not validated.
+    ///
+    /// Only for record values read back from storage or the network, which may
+    /// embed the old form; requests, space refs, credentials and MAC headers
+    /// take the current form only.
+    // TODO: remove before beta, along with support for the old form.
+    pub fn from_legacy_space_uri(wire: &str) -> Option<String> {
+        // Mirrors `^at:\/\/([^/?#\s]+)\/space\/` upstream.
+        let rest = wire.strip_prefix("at://")?;
+        let (authority, after) = rest.split_once('/')?;
+        let excluded =
+            |c: char| matches!(c, '?' | '#' | ' ' | '\t' | '\n' | '\u{b}' | '\u{c}' | '\r');
+        if authority.is_empty() || authority.contains(excluded) {
+            return None;
+        }
+        let tail = after.strip_prefix("space/")?;
+        Some(format!("{SPACE_URI_PREFIX}{authority}/{tail}"))
+    }
+
     /// Parses with an explicit choice of AT URI grammar.
     pub fn parse_with_grammar(wire: &str, grammar: Grammar) -> Result<Self, SyntaxError> {
         Self::parse_owned_with_grammar(wire.to_owned(), grammar)
@@ -629,21 +690,68 @@ impl AtUri {
         if wire.len() > 8192 {
             return Err(failure("longer than 8192 bytes"));
         }
-        let rest = wire
-            .strip_prefix("at://")
-            .ok_or_else(|| failure("must start with at://"))?;
+        if grammar == Grammar::RestrictedOrSpace {
+            if let Some(body) = wire.strip_prefix(SPACE_URI_PREFIX) {
+                let parsed = Self::parse_space(body)?;
+                return Ok(Self { wire, ..parsed });
+            }
+            // TODO: remove before beta, with `from_legacy_space_uri`.
+            if Self::from_legacy_space_uri(&wire).is_some() {
+                return Err(failure("a space URI must start with at:space/"));
+            }
+        }
+        let rest = wire.strip_prefix("at://").ok_or_else(|| {
+            failure(match grammar {
+                Grammar::Restricted => "must start with at://",
+                Grammar::RestrictedOrSpace => "must start with at:// or at:space/",
+            })
+        })?;
         let (authority, path) = rest
             .split_once('/')
             .map_or((rest, None), |(a, p)| (a, Some(p)));
         let authority = authority
             .parse()
             .map_err(|_| failure("authority is neither a DID nor a handle"))?;
-        // A seventh segment always makes the path invalid.
+        // A third segment always makes the path invalid.
         let segments: Vec<_> = path
             .into_iter()
             .flat_map(|path| path.split('/'))
-            .take(7)
+            .take(3)
             .collect();
+        let nsid = |text: &str| {
+            text.parse::<Nsid>()
+                .map_err(|_| failure("collection is not an NSID"))
+        };
+        let key = |text: &str| {
+            text.parse::<RecordKey>()
+                .map_err(|_| failure("invalid record key"))
+        };
+        let (collection, key) = match segments.as_slice() {
+            [] => (None, None),
+            [collection] => (Some(nsid(collection)?), None),
+            [collection, record_key] => (Some(nsid(collection)?), Some(key(record_key)?)),
+            _ => return Err(failure("invalid path for the selected grammar")),
+        };
+        Ok(Self {
+            wire,
+            current: None,
+            authority,
+            collection,
+            key,
+            space: None,
+        })
+    }
+
+    /// Validates the part of a space URI after `at:space/`:
+    /// `{spaceDid}/{spaceType}/{skey}[/{authorDid}/{collection}/{rkey}]`.
+    /// The returned value's wire string is empty; the caller sets it.
+    fn parse_space(body: &str) -> Result<Self, SyntaxError> {
+        let failure = |reason| SyntaxError::new(SyntaxKind::AtUri, reason);
+        let segments: Vec<_> = body.split('/').take(7).collect();
+        let did = |text: &str| {
+            text.parse::<Did>()
+                .map_err(|_| failure("the authority of a space URI must be a DID"))
+        };
         let nsid = |text: &str| {
             text.parse::<Nsid>()
                 .map_err(|_| failure("collection or space type is not an NSID"))
@@ -652,44 +760,48 @@ impl AtUri {
             text.parse::<RecordKey>()
                 .map_err(|_| failure("invalid record or space key"))
         };
-        let space_path = |space_type, skey, author| {
-            if !matches!(authority, AtIdentifier::Did(_)) {
-                return Err(failure("space authority must be a DID"));
-            }
-            Ok(SpacePath {
-                space_type: nsid(space_type)?,
-                key: key(skey)?,
-                author,
-            })
-        };
-
-        let (collection, key, space) = match segments.as_slice() {
-            [] => (None, None, None),
-            [collection] => (Some(nsid(collection)?), None, None),
-            [collection, record_key] => (Some(nsid(collection)?), Some(key(record_key)?), None),
-            ["space", space_type, skey] if grammar == Grammar::RestrictedOrSpace => {
-                (None, None, Some(space_path(space_type, skey, None)?))
-            }
-            ["space", space_type, skey, author, collection, record_key]
-                if grammar == Grammar::RestrictedOrSpace =>
-            {
-                let author = author
-                    .parse()
-                    .map_err(|_| failure("space record author is not a DID"))?;
+        let (owner, collection, record_key, space) = match segments.as_slice() {
+            [owner, space_type, skey] => (
+                did(owner)?,
+                None,
+                None,
+                SpacePath {
+                    space_type: nsid(space_type)?,
+                    key: key(skey)?,
+                    author: None,
+                },
+            ),
+            [owner, space_type, skey, author, collection, record_key] => {
+                let owner = did(owner)?;
+                let space = SpacePath {
+                    space_type: nsid(space_type)?,
+                    key: key(skey)?,
+                    author: Some(
+                        author
+                            .parse()
+                            .map_err(|_| failure("space record author is not a DID"))?,
+                    ),
+                };
                 (
+                    owner,
                     Some(nsid(collection)?),
                     Some(key(record_key)?),
-                    Some(space_path(space_type, skey, Some(author))?),
+                    space,
                 )
             }
-            _ => return Err(failure("invalid path for the selected grammar")),
+            _ => {
+                return Err(failure(
+                    "a space URI is at:space/{spaceDid}/{type}/{skey}, optionally followed by /{authorDid}/{collection}/{rkey}",
+                ));
+            }
         };
         Ok(Self {
-            wire,
-            authority,
+            wire: String::new(),
+            current: None,
+            authority: AtIdentifier::Did(owner),
             collection,
-            key,
-            space,
+            key: record_key,
+            space: Some(space),
         })
     }
 
@@ -728,7 +840,20 @@ impl AtUri {
         self.as_str()
     }
 
-    /// The URI authority.
+    /// The spelling to send in a request: the wire spelling, except that a
+    /// value decoded from the spaces alpha form is sent as `at:space/…`.
+    // TODO: return `as_str` before beta, with `from_legacy_space_uri`.
+    pub fn request_value(&self) -> &str {
+        self.current.as_deref().unwrap_or(&self.wire)
+    }
+
+    /// Whether the value was decoded from the spaces alpha form
+    /// `at://SPACE-DID/space/…`.
+    pub fn is_legacy_space_form(&self) -> bool {
+        self.current.is_some()
+    }
+
+    /// The URI authority. On a space URI this is the DID that owns the space.
     pub fn authority(&self) -> &AtIdentifier {
         &self.authority
     }
@@ -782,23 +907,27 @@ impl AtUri {
         SpaceRef::from_parts(self.space_did()?, self.space_type()?, self.skey()?).ok()
     }
 
-    /// The wire form with handle and NSID authorities lowercased.
+    /// The wire form with handle and NSID authorities lowercased. A space URI
+    /// always comes out in the `at:space/` form, also when it was decoded from
+    /// the spaces alpha form.
     #[must_use]
     pub fn normalized(&self) -> Self {
         use std::fmt::Write as _;
 
-        let mut wire = format!("at://{}", self.authority.normalized());
-        if let Some(space) = &self.space {
-            let _ = write!(
-                wire,
-                "/space/{}/{}",
+        let mut wire = if let Some(space) = &self.space {
+            let mut wire = format!(
+                "{SPACE_URI_PREFIX}{}/{}/{}",
+                self.authority.normalized(),
                 space.space_type.normalized(),
                 space.key
             );
             if let Some(author) = &space.author {
                 let _ = write!(wire, "/{author}");
             }
-        }
+            wire
+        } else {
+            format!("at://{}", self.authority.normalized())
+        };
         if let Some(collection) = &self.collection {
             let _ = write!(wire, "/{}", collection.normalized());
         }
@@ -810,10 +939,15 @@ impl AtUri {
     }
 }
 
-wire_string!(AtUri, as_str);
+wire_string!(AtUri, request_value, decode = decode_owned);
 comparable_by!(AtUri, as_str);
 
-/// A reference to a space itself.
+/// A reference to a permissioned-data space itself, as distinct from a record
+/// within one: `at:space/{spaceDid}/{spaceType}/{skey}`.
+///
+/// This is the lexicon string format `space-ref`. Parsing is strict: the
+/// spaces alpha form `at://{spaceDid}/space/…` is rejected, as by
+/// `SpaceRef.parse` upstream.
 #[derive(Clone, Debug)]
 pub struct SpaceRef {
     wire: String,
@@ -824,15 +958,17 @@ pub struct SpaceRef {
 
 impl SpaceRef {
     fn parse_owned(wire: String) -> Result<Self, SyntaxError> {
-        let failure = || SyntaxError::new(SyntaxKind::SpaceRef, "requires at://DID/space/NSID/key");
-        let mut parts = wire.strip_prefix("at://").ok_or_else(failure)?.split('/');
-        let (Some(did), Some("space"), Some(space_type), Some(key), None) = (
-            parts.next(),
-            parts.next(),
-            parts.next(),
-            parts.next(),
-            parts.next(),
-        ) else {
+        let failure = || SyntaxError::new(SyntaxKind::SpaceRef, "requires at:space/DID/NSID/key");
+        if wire.len() > 8192 {
+            return Err(failure());
+        }
+        let mut parts = wire
+            .strip_prefix(SPACE_URI_PREFIX)
+            .ok_or_else(failure)?
+            .split('/');
+        let (Some(did), Some(space_type), Some(key), None) =
+            (parts.next(), parts.next(), parts.next(), parts.next())
+        else {
             return Err(failure());
         };
         let did = Did::parse(did)
@@ -851,7 +987,7 @@ impl SpaceRef {
 
     /// Constructs a space reference from its owner DID, type and key.
     pub fn from_parts(did: &Did, space_type: &Nsid, key: &RecordKey) -> Result<Self, SyntaxError> {
-        Self::parse_owned(format!("at://{did}/space/{space_type}/{key}"))
+        Self::parse_owned(format!("{SPACE_URI_PREFIX}{did}/{space_type}/{key}"))
     }
 
     /// The original wire spelling.

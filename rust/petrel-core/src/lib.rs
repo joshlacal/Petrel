@@ -43,7 +43,8 @@ pub use serde_bridge::{
 };
 pub use service_ref::{ServiceRef, ServiceRefError};
 pub use syntax::{
-    AtIdentifier, AtUri, AtprotoMethod, CidString, Did, Handle, Nsid, RecordKey, SpaceRef, Tid, Uri,
+    AtIdentifier, AtUri, AtprotoMethod, CidString, Did, Handle, Nsid, RecordKey, SPACE_URI_PREFIX,
+    SpaceRef, Tid, Uri,
 };
 pub use tid::TidGenerator;
 pub use value::{Blob, Bytes, CidLink, Nullable, Value};

@@ -140,7 +140,7 @@ fn identifier_semantics() {
         public.normalized().as_str(),
         "at://alice.bsky.social/app.bsky.FeedPost/Case"
     );
-    let space: SpaceRef = "at://did:plc:space/space/Com.Catbird.Type/One"
+    let space: SpaceRef = "at:space/did:plc:space/Com.Catbird.Type/One"
         .parse()
         .unwrap();
     let record = space
@@ -152,7 +152,7 @@ fn identifier_semantics() {
     assert!(AtUri::parse_with_grammar(record.as_str(), Grammar::Restricted).is_err());
     assert_eq!(
         record.normalized().as_str(),
-        "at://did:plc:space/space/com.catbird.Type/One/did:plc:abcdefghijklmnopqrstuvwx/com.atproto.PublishPost/Key"
+        "at:space/did:plc:space/com.catbird.Type/One/did:plc:abcdefghijklmnopqrstuvwx/com.atproto.PublishPost/Key"
     );
 
     let high: Tid = "c222222222222".parse().unwrap();
