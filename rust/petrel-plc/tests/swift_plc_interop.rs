@@ -211,7 +211,7 @@ func run() async throws {
 do {
     try await run()
 } catch {
-    fputs("SwiftPlcInterop error: \(error)\n", stderr)
+    FileHandle.standardError.write(Data("SwiftPlcInterop error: \(error)\n".utf8))
     exit(1)
 }
 "#;
