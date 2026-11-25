@@ -638,3 +638,135 @@ fn star_record_over_10000_nodes_roundtrips() {
     assert_eq!(decoded.records.len(), 1);
     assert_eq!(decoded.records[0].value, val);
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[allow(clippy::too_many_lines)]
+#[test]
+fn credential_restricts_signing_kid_to_authority_atproto_key() {
+    struct KidCountingResolver {
+        authority_did: Did,
+        atproto_key: ATProtoJWTVerificationKey,
+        label_key: ATProtoJWTVerificationKey,
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl SigningKeyResolver for KidCountingResolver {
+        fn resolve_signing_key<'a>(
+            &'a self,
+            did: &'a Did,
+            kid: &'a str,
+            _force_refresh: bool,
+        ) -> BoxFuture<'a, petrel_spaces::Result<ATProtoJWTVerificationKey>> {
+            Box::pin(async move {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                let full_atproto = format!("{}#atproto", self.authority_did);
+                if did == &self.authority_did && (kid == "#atproto" || kid == full_atproto) {
+                    return Ok(self.atproto_key.clone());
+                }
+                if kid == "#atproto_label" {
+                    return Ok(self.label_key.clone());
+                }
+                Err(SpaceError::SigningKeyNotFound(kid.to_owned()))
+            })
+        }
+    }
+
+    let space = sample_space();
+    let authority = Did::parse("did:web:ds.catbird.blue").unwrap();
+    let atproto_kp = SigningKeyPair::generate_p256().unwrap();
+    let label_kp = SigningKeyPair::generate_p256().unwrap();
+    let proof_kp = SigningKeyPair::generate_p256().unwrap();
+    let proof_kid = proof_kp.did_key().unwrap();
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let resolver = KidCountingResolver {
+        authority_did: authority.clone(),
+        atproto_key: ATProtoJWTVerificationKey::from_public_key(&atproto_kp.public_key()),
+        label_key: ATProtoJWTVerificationKey::from_public_key(&label_kp.public_key()),
+        calls: calls.clone(),
+    };
+
+    let now = 1_800_000_000_i64;
+    let label_cred = mint_credential_token(
+        &label_kp,
+        &authority,
+        &space,
+        &proof_kid,
+        now,
+        now + 900,
+        Some("jti-label-kid"),
+        Some("#atproto_label"),
+    )
+    .unwrap();
+    assert!(matches!(
+        petrel_spaces::inspect_credential_token_unverified(&label_cred),
+        Err(SpaceError::Unauthorized(_))
+    ));
+    assert!(matches!(
+        block_on(verify_credential_token(&label_cred, now + 5, &resolver)),
+        Err(SpaceError::Unauthorized(_))
+    ));
+    let kem_cred = mint_credential_token(
+        &label_kp,
+        &authority,
+        &space,
+        &proof_kid,
+        now,
+        now + 900,
+        Some("jti-kem-kid"),
+        Some("did:web:ds.catbird.blue#atproto_kem"),
+    )
+    .unwrap();
+    assert!(matches!(
+        block_on(verify_credential_token(&kem_cred, now + 5, &resolver)),
+        Err(SpaceError::Unauthorized(_))
+    ));
+    // Resolver must not even be queried for disallowed kid values.
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+    // Missing kid in JWT header is also rejected before resolver lookup.
+    let no_kid_hdr = petrel_crypto::JWTBase64URL::encode(
+        br#"{"alg":"ES256","typ":"atproto-space-credential+jwt"}"#,
+    );
+    let parts: Vec<&str> = label_cred.split('.').collect();
+    let sig_input = format!("{no_kid_hdr}.{}", parts[1]);
+    let raw_sig = atproto_kp.sign(sig_input.as_bytes()).unwrap();
+    let no_kid_jwt = format!(
+        "{sig_input}.{}",
+        petrel_crypto::JWTBase64URL::encode(&raw_sig)
+    );
+    assert!(matches!(
+        block_on(verify_credential_token(&no_kid_jwt, now + 5, &resolver)),
+        Err(SpaceError::MalformedHeader(_))
+    ));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+    // Both `#atproto` and `<authorityDID>#atproto` succeed.
+    let short_cred = mint_credential_token(
+        &atproto_kp,
+        &authority,
+        &space,
+        &proof_kid,
+        now,
+        now + 900,
+        Some("jti-short"),
+        Some("#atproto"),
+    )
+    .unwrap();
+    assert!(block_on(verify_credential_token(&short_cred, now + 5, &resolver)).is_ok());
+
+    let full_kid = format!("{authority}#atproto");
+    let full_cred = mint_credential_token(
+        &atproto_kp,
+        &authority,
+        &space,
+        &proof_kid,
+        now,
+        now + 900,
+        Some("jti-full"),
+        Some(&full_kid),
+    )
+    .unwrap();
+    assert!(block_on(verify_credential_token(&full_cred, now + 5, &resolver)).is_ok());
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+}

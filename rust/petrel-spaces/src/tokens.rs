@@ -363,6 +363,24 @@ pub fn mint_client_attestation_token(
     encode_jwt(&header, &claims, signing_key)
 }
 
+fn validate_authority_credential_kid<'a>(
+    kid: Option<&'a str>,
+    authority_did: &Did,
+) -> Result<&'a str> {
+    let Some(kid) = kid else {
+        return Err(SpaceError::MalformedHeader(
+            "credential header missing required kid (#atproto)".into(),
+        ));
+    };
+    let full_kid = format!("{authority_did}#atproto");
+    if kid != "#atproto" && kid != full_kid {
+        return Err(SpaceError::Unauthorized(format!(
+            "credential kid '{kid}' is not the space authority signing key ('#atproto' or '{full_kid}')"
+        )));
+    }
+    Ok(kid)
+}
+
 /// Inspect the unverified claims and header of a space credential JWT.
 pub fn inspect_credential_token_unverified(token: &str) -> Result<(JwtHeader, CredentialClaims)> {
     let (header, claims, _, _) = parse_jwt_parts::<CredentialClaims>(token)?;
@@ -378,6 +396,7 @@ pub fn inspect_credential_token_unverified(token: &str) -> Result<(JwtHeader, Cr
             space_ref.space_did()
         )));
     }
+    let _ = validate_authority_credential_kid(header.kid.as_deref(), &iss)?;
     validate_did_key(&claims.cnf.kid)?;
     if claims.jti.is_empty() {
         return Err(SpaceError::MalformedPayload("empty jti claim".into()));
@@ -476,7 +495,7 @@ pub async fn verify_credential_token<R: SigningKeyResolver + ?Sized>(
         MAX_CREDENTIAL_LIFETIME_SECS,
     )?;
 
-    let kid = header.kid.as_deref().unwrap_or("#atproto");
+    let kid = validate_authority_credential_kid(header.kid.as_deref(), &iss)?;
     verify_with_single_refresh(resolver, &iss, kid, &header.alg, &signing_input, &sig).await?;
     Ok(claims)
 }
