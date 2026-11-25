@@ -84,5 +84,11 @@ jobs:
           "$PETREL_PYTHON" run.py --manifest generator/manifests/petrel-core.json --language rust
           "$PETREL_PYTHON" run.py --manifest generator/manifests/petrel-core.json --language rust
           "$PETREL_PYTHON" run.py --manifest Tests/LexiconFixture/lexgen.json --language rust
-          git diff --exit-code -- rust/petrel-api/src/generated rust/petrel-lexicon-fixture/src/generated
-          test -z "$(git status --porcelain --untracked-files=all -- rust/petrel-api/src/generated rust/petrel-lexicon-fixture/src/generated)"
+          "$PETREL_PYTHON" run.py --manifest Tests/LexiconFixture/lexgen.json --language rust
+          "$PETREL_PYTHON" run.py --manifest generator/manifests/petrel-ozone.json --language rust
+          "$PETREL_PYTHON" run.py --manifest generator/manifests/petrel-ozone.json --language rust
+          PYTHONPATH=generator "$PETREL_PYTHON" -m cli generate --manifest generator/manifests/petrel-core.json --language rust --check
+          PYTHONPATH=generator "$PETREL_PYTHON" -m cli generate --manifest Tests/LexiconFixture/lexgen.json --language rust --check
+          PYTHONPATH=generator "$PETREL_PYTHON" -m cli generate --manifest generator/manifests/petrel-ozone.json --language rust --check
+          git diff --exit-code -- rust/petrel-api/src/generated rust/petrel-lexicon/src/generated rust/petrel-ozone/src/generated rust/petrel-lexicon-fixture/src/generated
+          test -z "$(git status --porcelain --untracked-files=all -- rust/petrel-api/src/generated rust/petrel-lexicon/src/generated rust/petrel-ozone/src/generated rust/petrel-lexicon-fixture/src/generated)"

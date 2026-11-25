@@ -928,11 +928,62 @@ def _staged_manifest_outputs(
             and language in ("rust", "all")
         ):
             actual_rust = Path(rust_cfg["output"]).resolve()
-            staged_rust = temp_root / "rust-out"
-            staged_manifest["rust"]["output"] = str(staged_rust)
-            targets.append(
-                ("Rust", "rust", actual_rust, staged_rust, ".rs", GENERATED_RUST_HEADER)
-            )
+            actual_rust_lex_docs: Path | None = None
+            rust_lex_docs = staged_manifest["rust"].get("lexicon_documents")
+            if (
+                isinstance(rust_lex_docs, dict)
+                and isinstance(rust_lex_docs.get("output"), str)
+                and rust_lex_docs["output"]
+            ):
+                actual_rust_lex_docs = Path(rust_lex_docs["output"]).resolve()
+
+            if actual_rust_lex_docs is None:
+                staged_rust = temp_root / "rust-out"
+                staged_manifest["rust"]["output"] = str(staged_rust)
+                targets.append(
+                    ("Rust", "rust", actual_rust, staged_rust, ".rs", GENERATED_RUST_HEADER)
+                )
+            elif actual_rust_lex_docs.is_relative_to(actual_rust):
+                staged_rust = temp_root / "rust-out"
+                staged_lex_docs = staged_rust / actual_rust_lex_docs.relative_to(actual_rust)
+                staged_manifest["rust"]["output"] = str(staged_rust)
+                staged_manifest["rust"]["lexicon_documents"]["output"] = str(staged_lex_docs)
+                targets.append(
+                    ("Rust", "rust", actual_rust, staged_rust, ".rs", GENERATED_RUST_HEADER)
+                )
+            elif actual_rust.is_relative_to(actual_rust_lex_docs):
+                staged_lex_docs = temp_root / "rust-lexicon-documents-out"
+                staged_rust = staged_lex_docs / actual_rust.relative_to(actual_rust_lex_docs)
+                staged_manifest["rust"]["output"] = str(staged_rust)
+                staged_manifest["rust"]["lexicon_documents"]["output"] = str(staged_lex_docs)
+                targets.append(
+                    (
+                        "Rust",
+                        "rust",
+                        actual_rust_lex_docs,
+                        staged_lex_docs,
+                        ".rs",
+                        GENERATED_RUST_HEADER,
+                    )
+                )
+            else:
+                staged_rust = temp_root / "rust-out"
+                staged_lex_docs = temp_root / "rust-lexicon-documents-out"
+                staged_manifest["rust"]["output"] = str(staged_rust)
+                staged_manifest["rust"]["lexicon_documents"]["output"] = str(staged_lex_docs)
+                targets.append(
+                    ("Rust", "rust", actual_rust, staged_rust, ".rs", GENERATED_RUST_HEADER)
+                )
+                targets.append(
+                    (
+                        "Rust (lexicon_documents)",
+                        "rust",
+                        actual_rust_lex_docs,
+                        staged_lex_docs,
+                        ".rs",
+                        GENERATED_RUST_HEADER,
+                    )
+                )
 
         swiftformat_runner = (
             _find_pinned_swiftformat(require=require_swiftformat)

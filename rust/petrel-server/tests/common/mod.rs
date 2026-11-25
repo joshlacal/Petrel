@@ -229,6 +229,22 @@ impl TestServer {
         issuer: &str,
         access_token_format: OAuthAccessTokenFormat,
     ) -> Self {
+        Self::new_with_dependencies(issuer, access_token_format, true, None).await
+    }
+
+    pub async fn new_with_scope_resolver(
+        access_token_format: OAuthAccessTokenFormat,
+        scope_resolver: Option<Arc<dyn OAuthLexiconScopeResolution>>,
+    ) -> Self {
+        Self::new_with_dependencies(TEST_ISSUER, access_token_format, false, scope_resolver).await
+    }
+
+    async fn new_with_dependencies(
+        issuer: &str,
+        access_token_format: OAuthAccessTokenFormat,
+        default_lexicons: bool,
+        custom_scope_resolver: Option<Arc<dyn OAuthLexiconScopeResolution>>,
+    ) -> Self {
         let clock = Arc::new(TestClock::new(1_700_000_000));
         let random = Arc::new(TestRandom::new());
         let store = Arc::new(InMemoryOAuthStore::new());
@@ -298,15 +314,20 @@ impl TestServer {
         .expect("config");
         let normalized_issuer = cfg.issuer.clone();
         cfg.access_token_format = access_token_format;
-        let scope_resolver: Arc<dyn OAuthLexiconScopeResolution> =
-            Arc::new(PetrelOAuthScopeResolver::new(lexicons.clone()));
+        let scope_resolver = custom_scope_resolver.or_else(|| {
+            default_lexicons.then(|| {
+                let r: Arc<dyn OAuthLexiconScopeResolution> =
+                    Arc::new(PetrelOAuthScopeResolver::new(lexicons.clone()));
+                r
+            })
+        });
 
         let server = OAuthAuthorizationServer::with_dependencies(
             cfg,
             OAuthServerStores::from_unified(store.clone()),
             Arc::new(TestAccounts::with_alice_and_bob()),
             clients.clone(),
-            Some(scope_resolver),
+            scope_resolver,
             Arc::new(DefaultOAuthHtmlRenderer),
             clock.clone(),
             random.clone(),

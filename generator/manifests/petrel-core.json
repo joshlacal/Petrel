@@ -33,6 +33,10 @@
     "output": "rust/petrel-api/src/generated",
     "crate": "petrel_api",
     "crate_path": "crate::generated",
-    "features": true
+    "features": true,
+    "lexicon_documents": {
+      "output": "rust/petrel-lexicon/src/generated",
+      "module": "bundled_lexicon_documents"
+    }
   }
 }

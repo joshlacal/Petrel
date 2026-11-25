@@ -95,6 +95,19 @@ _PRIMARY_HELPER_TYPE_NAMES: FrozenSet[str] = frozenset({
     "Error",
 })
 
+_PRELUDE_RESERVED_TYPE_NAMES: FrozenSet[str] = frozenset({
+    "Option",
+    "Result",
+    "Vec",
+    "String",
+    "Box",
+    "Default",
+    "Some",
+    "None",
+    "Ok",
+    "Err",
+})
+
 
 def rust_pascal_case(value: str) -> str:
     """Convert an identifier, NSID segment, or def name to Rust PascalCase."""
@@ -208,7 +221,7 @@ def _extract_module_defs_from_registry(
 
 def _resolve_module_def_names(lexicon_id: str, defs: Dict[str, Any]) -> Dict[str, str]:
     main_def = defs.get("main")
-    reserved = _reserved_names_for_main(lexicon_id, main_def)
+    reserved = _reserved_names_for_main(lexicon_id, main_def) | _PRELUDE_RESERVED_TYPE_NAMES
     mapping: Dict[str, str] = {}
     if "main" in defs:
         mapping["main"] = rust_pascal_case(lexicon_id.rsplit(".", 1)[-1])
@@ -274,7 +287,7 @@ def resolve_rust_def_type_name(
 
     base_name = rust_pascal_case(def_name)
     main_def = registry.get(lexicon_id) if registry is not None else None
-    reserved = _reserved_names_for_main(lexicon_id, main_def)
+    reserved = _reserved_names_for_main(lexicon_id, main_def) | _PRELUDE_RESERVED_TYPE_NAMES
     if base_name not in reserved:
         return base_name
     return f"{base_name}Def"

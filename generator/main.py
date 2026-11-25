@@ -913,6 +913,7 @@ async def generate_rust_from_lexicons_recursive(
     reference_crate='petrel_api',
     property_type_overrides=None,
     features=False,
+    lexicon_documents=None,
 ):
     """Generate Rust module tree from AT Protocol lexicons."""
     property_type_overrides = dict(property_type_overrides or {})
@@ -1010,7 +1011,77 @@ async def generate_rust_from_lexicons_recursive(
         mod_rel_path = "/".join((*dir_parts, "mod.rs")) if dir_parts else "mod.rs"
         add_expected_file(mod_rel_path, mod_content)
 
+    if lexicon_documents:
+        from pathlib import Path
+        out_abs = Path(output_folder).resolve()
+        docs_abs = Path(lexicon_documents['output']).resolve()
+        if (
+            docs_abs == out_abs
+            or out_abs.is_relative_to(docs_abs)
+            or docs_abs.is_relative_to(out_abs)
+        ):
+            raise ValueError(
+                "rust.lexicon_documents.output must not overlap with rust.output"
+            )
+        module_name = lexicon_documents.get('module', 'bundled_lexicon_documents')
+        access = lexicon_documents.get('access', 'internal')
+        doc_source = render_rust_lexicon_documents(
+            [lexicon for _, lexicon in lexicons],
+            module_name=module_name,
+            access=access,
+        )
+        vis = 'pub ' if access == 'public' else 'pub(crate) '
+
     await write_rust_projection(output_folder, expected_files)
+
+    if lexicon_documents:
+        await write_rust_projection(
+            lexicon_documents['output'],
+            {
+                'mod.rs': f'{vis}mod {module_name};\n',
+                f'{module_name}.rs': doc_source,
+            },
+        )
+
+
+def render_rust_lexicon_documents(
+    lexicons,
+    module_name='bundled_lexicon_documents',
+    access='internal',
+):
+    """Rust source holding Lexicon documents as minified JSON `&str` literals."""
+    if access not in ('internal', 'public'):
+        raise ValueError(
+            f"rust.lexicon_documents.access must be 'internal' or 'public', not {access!r}"
+        )
+    if not re.fullmatch(r'[a-z_][a-z0-9_]*', module_name):
+        raise ValueError(
+            f"rust.lexicon_documents.module must be a snake_case Rust module name, not {module_name!r}"
+        )
+    from rust_enum_generator import rust_string_literal
+
+    vis = 'pub ' if access == 'public' else 'pub(crate) '
+    ordered = sorted(lexicons, key=lambda lexicon: lexicon.get('id', ''))
+    literals = [
+        rust_string_literal(orjson.dumps(lexicon).decode('utf-8'))
+        for lexicon in ordered
+    ]
+    lines = [
+        '//! Bundled AT Protocol lexicon documents as minified JSON strings.',
+        '',
+        '/// The number of bundled lexicon documents.',
+        f'{vis}const COUNT: usize = {len(literals)};',
+        '',
+        '/// Every bundled lexicon document as minified JSON, ordered by NSID.',
+    ]
+    if literals:
+        lines.append(f'{vis}const ALL: &[&str] = &[')
+        lines.extend(f'    {literal},' for literal in literals)
+        lines.append('];')
+    else:
+        lines.append(f'{vis}const ALL: &[&str] = &[];')
+    lines.append('')
+    return '\n'.join(lines)
 
 
 def _split_rust_module_preamble(body: str) -> tuple[str, str]:
@@ -1142,6 +1213,7 @@ async def run_manifest(
             reference_crate=rust_cfg.get('reference_crate', 'petrel_api'),
             property_type_overrides=rust_cfg.get('property_type_overrides'),
             features=bool(rust_cfg.get('features', False)),
+            lexicon_documents=rust_cfg.get('lexicon_documents'),
         ))
     await asyncio.gather(*tasks)
 

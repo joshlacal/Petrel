@@ -87,17 +87,17 @@ jobs:
       - name: Build the SDK crates for wasm32
         run: |
           cargo build --locked --target wasm32-unknown-unknown --no-default-features --features wasm \
-            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel-api -p petrel -p petrel-repo -p petrel-server -p petrel-plc
+            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel-api -p petrel-ozone -p petrel-lexicon -p petrel -p petrel-repo -p petrel-server -p petrel-plc
       - name: Check wasm32 with the minimum supported Rust version
         run: |
           rustup toolchain install 1.88.0 --profile minimal --target wasm32-unknown-unknown
           cargo +1.88.0 check --locked --target wasm32-unknown-unknown --no-default-features --features wasm \
-            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel-api -p petrel -p petrel-repo -p petrel-server -p petrel-plc
+            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel-api -p petrel-ozone -p petrel-lexicon -p petrel -p petrel-repo -p petrel-server -p petrel-plc
       - name: Keep native-only dependencies out of the wasm SDK
         run: |
           set -euo pipefail
           tree=$(cargo tree --locked --target wasm32-unknown-unknown --no-default-features --features wasm \
-            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel-api -p petrel -p petrel-repo -p petrel-server -p petrel-plc --edges normal --prefix none)
+            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel-api -p petrel-ozone -p petrel-lexicon -p petrel -p petrel-repo -p petrel-server -p petrel-plc --edges normal --prefix none)
           if grep -E '^(tokio|mio|socket2|hickory-[^ ]+|aws-lc[^ ]*|axum[^ ]*|reqwest[^ ]*|rusqlite[^ ]*) v' <<< "$tree"; then
             echo 'Native-only dependencies found in the wasm SDK' >&2
             exit 1
@@ -124,7 +124,7 @@ jobs:
         run: |
           test "$(node --version)" = "$NODE_VERSION"
           cargo test --locked --target wasm32-unknown-unknown --no-default-features --features wasm \
-            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel -p petrel-repo -p petrel-server -p petrel-plc
+            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel-ozone -p petrel-lexicon -p petrel -p petrel-repo -p petrel-server -p petrel-plc
 
   e2e:
     name: Rust client against the Swift OAuth and CAB servers
