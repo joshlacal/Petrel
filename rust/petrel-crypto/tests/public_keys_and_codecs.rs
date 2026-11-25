@@ -313,3 +313,48 @@ fn base58btc_and_hex_and_base64url_and_strict_json() {
     );
     assert!(StrictJSON::validate_top_level_integer_members(&["exp"], br#"{"exp":1e5}"#).is_err());
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+fn invalid_hand_built_plc_keys_propagate_errors_without_panicking() {
+    let sig = [0_u8; 64];
+    for bad in [
+        PLCDIDVerificationKey::P256([0_u8; 33]),
+        PLCDIDVerificationKey::Secp256k1(vec![0_u8; 33]),
+    ] {
+        assert!(bad.public_key().is_err());
+        assert!(ATProtoJWTVerificationKey::from_plc_key(&bad).is_err());
+        assert!(ATProtoJWTVerificationKey::try_from(&bad).is_err());
+        assert!(ATProtoJWTVerificationKey::try_from(bad.clone()).is_err());
+        assert!(bad.verify(&sig, b"msg", "ES256").is_err());
+        assert!(bad.verify(&sig, b"msg", "ES256K").is_err());
+
+        let kp = P256Keypair::generate().unwrap();
+        let mut opts = petrel_crypto::ServiceJWTMintOptions::new(
+            "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
+            "did:web:api.example.com#svc",
+            Some("app.bsky.feed.getTimeline"),
+        );
+        opts.nonce = Some("plc-bad-key");
+        let token = petrel_crypto::ServiceJWT::mint_sync(
+            &opts,
+            petrel_crypto::ServiceJWTSigningKey::P256(&kp),
+        )
+        .unwrap();
+
+        assert!(
+            petrel_crypto::ServiceJWT::verify_with_plc_key(
+                &token,
+                &bad,
+                &petrel_crypto::ServiceJWTVerifyOptions::default(),
+            )
+            .is_err()
+        );
+        assert!(
+            petrel_crypto::SpaceServiceJWT::verify_with_plc_key(
+                &token, &bad, None, None, None, opts.now,
+            )
+            .is_err()
+        );
+    }
+}

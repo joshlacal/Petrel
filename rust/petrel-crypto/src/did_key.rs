@@ -110,7 +110,7 @@ impl PLCDIDVerificationKey {
         signing_input: &[u8],
         algorithm: &str,
     ) -> Result<bool, PetrelCryptoError> {
-        ATProtoJWTVerificationKey::from_plc_key(self).verify(signature, signing_input, algorithm)
+        ATProtoJWTVerificationKey::from_plc_key(self)?.verify(signature, signing_input, algorithm)
     }
 }
 

@@ -168,14 +168,6 @@ impl PublicKey {
         &self.compressed
     }
 
-    /// Creates a `PublicKey` from bytes already proven to be a canonical compressed point.
-    pub(crate) const fn from_validated_compressed(
-        curve: ATProtoKeyCurve,
-        compressed: [u8; 33],
-    ) -> Self {
-        Self { curve, compressed }
-    }
-
     /// The 65-byte uncompressed SEC1 point (`0x04 || X || Y`).
     ///
     /// # Panics

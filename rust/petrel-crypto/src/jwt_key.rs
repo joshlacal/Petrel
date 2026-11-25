@@ -28,13 +28,14 @@ impl ATProtoJWTVerificationKey {
         Ok(Self::Secp256k1(key.compressed_representation().to_vec()))
     }
 
-    /// Wraps a [`PLCDIDVerificationKey`].
-    pub fn from_plc_key(key: &PLCDIDVerificationKey) -> Self {
+    /// Wraps a [`PLCDIDVerificationKey`] after validating its SEC1 curve point.
+    pub fn from_plc_key(key: &PLCDIDVerificationKey) -> Result<Self, PetrelCryptoError> {
         match key {
-            PLCDIDVerificationKey::P256(compressed) => Self::P256(
-                PublicKey::from_validated_compressed(ATProtoKeyCurve::P256, *compressed),
-            ),
-            PLCDIDVerificationKey::Secp256k1(bytes) => Self::Secp256k1(bytes.clone()),
+            PLCDIDVerificationKey::P256(compressed) => Ok(Self::P256(PublicKey::from_sec1(
+                ATProtoKeyCurve::P256,
+                compressed,
+            )?)),
+            PLCDIDVerificationKey::Secp256k1(bytes) => Self::from_secp256k1_public_key(bytes),
         }
     }
 
@@ -188,8 +189,18 @@ impl From<&PublicKey> for ATProtoJWTVerificationKey {
     }
 }
 
-impl From<PLCDIDVerificationKey> for ATProtoJWTVerificationKey {
-    fn from(value: PLCDIDVerificationKey) -> Self {
+impl TryFrom<PLCDIDVerificationKey> for ATProtoJWTVerificationKey {
+    type Error = PetrelCryptoError;
+
+    fn try_from(value: PLCDIDVerificationKey) -> Result<Self, Self::Error> {
         Self::from_plc_key(&value)
+    }
+}
+
+impl TryFrom<&PLCDIDVerificationKey> for ATProtoJWTVerificationKey {
+    type Error = PetrelCryptoError;
+
+    fn try_from(value: &PLCDIDVerificationKey) -> Result<Self, Self::Error> {
+        Self::from_plc_key(value)
     }
 }

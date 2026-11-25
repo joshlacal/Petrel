@@ -483,7 +483,7 @@ impl ServiceJWT {
     ) -> Result<ServiceJWTClaims, PetrelCryptoError> {
         Self::verify_with_options(
             compact,
-            &ATProtoJWTVerificationKey::from_plc_key(public_key),
+            &ATProtoJWTVerificationKey::from_plc_key(public_key)?,
             options,
         )
     }
@@ -859,7 +859,7 @@ impl SpaceServiceJWT {
     ) -> Result<ServiceJWTClaims, PetrelCryptoError> {
         Self::verify(
             compact,
-            &ATProtoJWTVerificationKey::from_plc_key(public_key),
+            &ATProtoJWTVerificationKey::from_plc_key(public_key)?,
             expected_audience,
             expected_method,
             expected_request_body_digest,
