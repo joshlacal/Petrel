@@ -1524,4 +1524,106 @@ async fn data_model_open_store_validates_record_cbor_and_streaming_export_avoids
         })
     ));
     assert_eq!(split_store.len().await.unwrap(), 0);
+
+    // 5. GenesisCodec::create and Repository::create_in_store enforce the 2-block genesis
+    // footprint (commit + empty MST root) before signing or persisting on unbounded stores.
+    let one_block_limits = RepositoryLimits {
+        max_block_count: 1,
+        max_record_count: 1,
+        max_mst_node_count: 1,
+        ..RepositoryLimits::standard()
+    };
+    let genesis_store = Arc::new(InMemoryBlockStore::new());
+    let gen_err = GenesisCodec::create(
+        &did,
+        &signer,
+        RepositoryTid::parse("3jzfcijpj2z2a").unwrap(),
+        1,
+        genesis_store.as_ref(),
+        &one_block_limits,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        gen_err,
+        petrel_repo::error::GenesisStoreError::Limit(LimitError::Exceeded {
+            kind: LimitKind::BlockCount,
+            observed: 2,
+            limit: 1,
+        })
+    ));
+    assert_eq!(genesis_store.len().await.unwrap(), 0);
+
+    let repo_create_err = Repository::create_in_store(
+        did.clone(),
+        &signer,
+        Arc::clone(&genesis_store),
+        one_block_limits,
+        strict,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        repo_create_err,
+        RepositoryError::Limit(LimitError::Exceeded {
+            kind: LimitKind::BlockCount,
+            observed: 2,
+            limit: 1,
+        })
+    ));
+    assert_eq!(genesis_store.len().await.unwrap(), 0);
+
+    let small_relevant_limits = RepositoryLimits {
+        max_block_count: 2,
+        max_record_count: 1,
+        max_mst_node_count: 1,
+        max_relevant_block_bytes: 50,
+        ..RepositoryLimits::standard()
+    };
+    let budget_err = GenesisCodec::create(
+        &did,
+        &signer,
+        RepositoryTid::parse("3jzfcijpj2z2a").unwrap(),
+        1,
+        genesis_store.as_ref(),
+        &small_relevant_limits,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        budget_err,
+        petrel_repo::error::GenesisStoreError::Limit(LimitError::Exceeded {
+            kind: LimitKind::RelevantBlockBytes,
+            limit: 50,
+            ..
+        })
+    ));
+    assert_eq!(genesis_store.len().await.unwrap(), 0);
+
+    let tiny_single_limits = RepositoryLimits {
+        max_block_count: 2,
+        max_record_count: 1,
+        max_mst_node_count: 1,
+        max_single_block_bytes: 5,
+        ..RepositoryLimits::standard()
+    };
+    let single_err = GenesisCodec::create(
+        &did,
+        &signer,
+        RepositoryTid::parse("3jzfcijpj2z2a").unwrap(),
+        1,
+        genesis_store.as_ref(),
+        &tiny_single_limits,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        single_err,
+        petrel_repo::error::GenesisStoreError::Limit(LimitError::Exceeded {
+            kind: LimitKind::SingleBlockBytes,
+            limit: 5,
+            ..
+        })
+    ));
+    assert_eq!(genesis_store.len().await.unwrap(), 0);
 }

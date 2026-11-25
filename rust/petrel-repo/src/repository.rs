@@ -337,7 +337,13 @@ impl<B: BlockStore + 'static> Repository<B> {
         let rev = RepositoryTid::now(0)?;
         let installed = GenesisCodec::create(&did, signer, rev, 1, store.as_ref(), &limits)
             .await
-            .map_err(|err| RepositoryError::ProofFailure(err.to_string()))?;
+            .map_err(|err| match err {
+                crate::error::GenesisStoreError::Limit(e) => RepositoryError::Limit(e),
+                crate::error::GenesisStoreError::Commit(e) => RepositoryError::Commit(e),
+                crate::error::GenesisStoreError::BlockStore(e) => RepositoryError::BlockStore(e),
+                crate::error::GenesisStoreError::Domain(e) => RepositoryError::Domain(e),
+                other => RepositoryError::ProofFailure(other.to_string()),
+            })?;
         let commit = VerifiedSignedCommit::from_prepared(&installed.commit);
         let statistics = Some(RepositoryStatistics {
             record_count: 0,

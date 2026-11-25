@@ -344,6 +344,8 @@ pub enum GenesisStoreError {
     VerificationFailed(String),
     #[error("domain error: {0}")]
     Domain(#[from] DomainError),
+    #[error("limit error: {0}")]
+    Limit(#[from] LimitError),
     #[error("commit error: {0}")]
     Commit(#[from] CommitError),
     #[error("block store error: {0}")]

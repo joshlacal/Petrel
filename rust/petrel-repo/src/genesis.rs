@@ -8,7 +8,7 @@ use petrel_core::{Cid, Did};
 use crate::block_store::{BlockStore, RepositoryBlock};
 use crate::commit::{CommitCodec, CommitDescriptor, PreparedSignedCommit};
 use crate::crypto::{CommitSigner, FixedSigningKey, SigningPublicKey};
-use crate::error::GenesisStoreError;
+use crate::error::{GenesisStoreError, LimitError, LimitKind};
 use crate::limits::RepositoryLimits;
 use crate::types::{RepositoryReadPolicy, RepositoryState, RepositoryTid};
 
@@ -109,6 +109,7 @@ impl GenesisCodec {
         block_store: &B,
         limits: &RepositoryLimits,
     ) -> Result<GenesisInstallation, GenesisStoreError> {
+        limits.validate()?;
         if signing_key_generation == 0 {
             return Err(GenesisStoreError::VerificationFailed(
                 "signing_key_generation must be positive".into(),
@@ -118,13 +119,56 @@ impl GenesisCodec {
         let empty_mst_bytes = CANONICAL_EMPTY_MST_BYTES.to_vec();
         debug_assert_eq!(Cid::for_dag_cbor(&empty_mst_bytes), empty_mst_cid);
 
+        if limits.max_block_count < 2 {
+            return Err(GenesisStoreError::Limit(LimitError::Exceeded {
+                kind: LimitKind::BlockCount,
+                observed: 2,
+                limit: limits.max_block_count,
+            }));
+        }
+        if limits.max_mst_node_count < 1 {
+            return Err(GenesisStoreError::Limit(LimitError::Exceeded {
+                kind: LimitKind::MstNodeCount,
+                observed: 1,
+                limit: limits.max_mst_node_count,
+            }));
+        }
+        if empty_mst_bytes.len() > limits.max_single_block_bytes {
+            return Err(GenesisStoreError::Limit(LimitError::Exceeded {
+                kind: LimitKind::SingleBlockBytes,
+                observed: empty_mst_bytes.len(),
+                limit: limits.max_single_block_bytes,
+            }));
+        }
+
         let descriptor = CommitDescriptor {
             did: did.clone(),
             rev: rev.clone(),
             data_cid: empty_mst_cid.clone(),
             prev_cid: None,
         };
+        let estimated_commit_bytes =
+            CommitCodec::preflight_signed_commit_byte_count(&descriptor, limits)?;
+        let estimated_genesis_bytes = empty_mst_bytes.len().saturating_add(estimated_commit_bytes);
+        if estimated_genesis_bytes > limits.max_relevant_block_bytes {
+            return Err(GenesisStoreError::Limit(LimitError::Exceeded {
+                kind: LimitKind::RelevantBlockBytes,
+                observed: estimated_genesis_bytes,
+                limit: limits.max_relevant_block_bytes,
+            }));
+        }
+
         let commit = CommitCodec::prepare(&descriptor, signer, limits).await?;
+        let actual_genesis_bytes = empty_mst_bytes
+            .len()
+            .saturating_add(commit.signed_commit_bytes.len());
+        if actual_genesis_bytes > limits.max_relevant_block_bytes {
+            return Err(GenesisStoreError::Limit(LimitError::Exceeded {
+                kind: LimitKind::RelevantBlockBytes,
+                observed: actual_genesis_bytes,
+                limit: limits.max_relevant_block_bytes,
+            }));
+        }
 
         block_store
             .put_blocks(&[
