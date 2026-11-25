@@ -101,14 +101,19 @@ impl SpaceDidDocument {
             .find(|vm| self.matches_fragment(&vm.id, fragment))
     }
 
-    fn matches_fragment(&self, raw_id: &str, fragment: &str) -> bool {
-        if raw_id == fragment {
-            return true;
+    fn normalize_id_against_doc<'a>(&self, raw: &'a str) -> Option<&'a str> {
+        let stripped = raw.strip_prefix(self.id.as_str()).unwrap_or(raw);
+        stripped.starts_with('#').then_some(stripped)
+    }
+
+    fn matches_fragment(&self, raw_id: &str, target_id: &str) -> bool {
+        match (
+            self.normalize_id_against_doc(raw_id),
+            self.normalize_id_against_doc(target_id),
+        ) {
+            (Some(a), Some(b)) => a == b,
+            _ => raw_id == target_id,
         }
-        if let Some(rest) = raw_id.strip_prefix(self.id.as_str()) {
-            return rest == fragment;
-        }
-        false
     }
 }
 

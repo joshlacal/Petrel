@@ -135,6 +135,7 @@ fn json_resp(status: u16, body: &impl serde::Serialize) -> Response<Bytes> {
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[allow(clippy::too_many_lines)]
 #[test]
 fn host_resolver_did_document_urls_and_jwk_kem_extraction() {
     let plc_base = Url::parse("https://plc.directory").unwrap();
@@ -196,6 +197,68 @@ fn host_resolver_did_document_urls_and_jwk_kem_extraction() {
     assert_eq!(endpoints.service_type, "AtprotoSpaceHost");
     assert_eq!(endpoints.kem_key.as_deref(), Some(kem_did_key.as_str()));
     assert!(endpoints.signing_key.is_some());
+    assert!(
+        doc.service(
+            "did:web:space.example.com#atproto_space",
+            Some("AtprotoSpaceHost")
+        )
+        .is_some()
+    );
+
+    // Interchangeable relative (`#atproto`) vs absolute (`<did>#atproto`) matching
+    assert!(petrel_spaces::extract_signing_key(&doc, "#atproto").is_ok());
+    assert!(petrel_spaces::extract_signing_key(&doc, "did:web:space.example.com#atproto").is_ok());
+    assert!(matches!(
+        petrel_spaces::extract_signing_key(&doc, "did:web:other.example.com#atproto"),
+        Err(SpaceError::SigningKeyNotFound(_))
+    ));
+
+    let rel_doc_json = serde_json::json!({
+        "id": "did:web:space.example.com",
+        "service": [
+            { "id": "#atproto_space", "type": "AtprotoSpaceHost", "serviceEndpoint": "https://space.example.com" }
+        ],
+        "verificationMethod": [
+            {
+                "id": "#atproto",
+                "type": "JsonWebKey2020",
+                "controller": "did:web:space.example.com",
+                "publicKeyJwk": { "kty": "EC", "crv": "P-256", "x": x_b64, "y": y_b64 }
+            }
+        ]
+    });
+    let rel_doc =
+        SpaceDidDocument::from_json_bytes(&serde_json::to_vec(&rel_doc_json).unwrap()).unwrap();
+    assert!(petrel_spaces::extract_signing_key(&rel_doc, "#atproto").is_ok());
+    assert!(
+        petrel_spaces::extract_signing_key(&rel_doc, "did:web:space.example.com#atproto").is_ok()
+    );
+    assert!(matches!(
+        petrel_spaces::extract_signing_key(&rel_doc, "did:web:other.example.com#atproto"),
+        Err(SpaceError::SigningKeyNotFound(_))
+    ));
+
+    let foreign_doc_json = serde_json::json!({
+        "id": "did:web:space.example.com",
+        "verificationMethod": [
+            {
+                "id": "did:web:other.example.com#atproto",
+                "type": "JsonWebKey2020",
+                "controller": "did:web:other.example.com",
+                "publicKeyJwk": { "kty": "EC", "crv": "P-256", "x": x_b64, "y": y_b64 }
+            }
+        ]
+    });
+    let foreign_doc =
+        SpaceDidDocument::from_json_bytes(&serde_json::to_vec(&foreign_doc_json).unwrap()).unwrap();
+    assert!(matches!(
+        petrel_spaces::extract_signing_key(&foreign_doc, "#atproto"),
+        Err(SpaceError::SigningKeyNotFound(_))
+    ));
+    assert!(matches!(
+        petrel_spaces::extract_signing_key(&foreign_doc, "did:web:space.example.com#atproto"),
+        Err(SpaceError::SigningKeyNotFound(_))
+    ));
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
