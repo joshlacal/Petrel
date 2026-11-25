@@ -11,11 +11,11 @@ Petrel's Spaces support has two layers:
 
 ## Space identifiers
 
-A space is named by an AT-URI with a `space` path segment:
+A space is named by an AT-URI in the `at:space/` form, whose space and author must both be DIDs:
 
 ```text
-at://SPACE-DID/space/SPACE-TYPE/SKEY
-at://SPACE-DID/space/SPACE-TYPE/SKEY/AUTHOR-DID/COLLECTION/RKEY
+at:space/SPACE-DID/SPACE-TYPE/SKEY
+at:space/SPACE-DID/SPACE-TYPE/SKEY/AUTHOR-DID/COLLECTION/RKEY
 ```
 
 The first form names the space itself and is modelled by `SpaceRef` (`spaceDID`, `spaceType`, `skey`, `uriString()`). `SpaceRef(uriString:)` accepts only that three-part form. The second form names a record inside the space, written by one of its members; `SpaceRef.recordURI(authorDID:collection:recordKey:)` builds it.
@@ -42,7 +42,7 @@ func classify(_ string: String) throws -> String {
 }
 ```
 
-The URI syntax is one of the parts of the alpha most likely to change: upstream has discussed moving space URIs to an `at:space/` form before the beta. If that happens, Petrel's parsers will change with it.
+This URI syntax follows the November 24 alpha (`bluesky-social/atproto` `permissioned-data-alpha` at `1f510f8e36a973f6fd055da349b586918805ae66`), which replaced the earlier `at://SPACE-DID/space/...` form. Petrel sends and parses only `at:space/` URIs: `SpaceRef(uriString:)`, `ATProtocolURI(uriString:)` and `isValidATURI(_:)` reject the old form, as reference hosts do. The one exception is decoding an `ATProtocolURI`, which still reads the old form because records written during the alpha may embed it; the decoded value keeps the string as written (its CID covers those bytes), `normalized()` returns the `at:space/` form, and it is sent in the new form as a query parameter. `ATProtocolURI.fromLegacySpaceURI(_:)` does the rewrite. Support for the old form will be removed before the beta.
 
 ## Generated bindings
 

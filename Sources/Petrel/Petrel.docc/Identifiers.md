@@ -209,8 +209,11 @@ func parseAndBuildATURIs() throws {
 
 The AT Protocol Spaces alpha (permissioned data) adds a second form that
 addresses a space and the records inside it:
-`at://SPACE-DID/space/SPACE-TYPE/SKEY[/AUTHOR-DID/COLLECTION/RKEY]`. It is not
-part of the published AT-URI specification.
+`at:space/SPACE-DID/SPACE-TYPE/SKEY[/AUTHOR-DID/COLLECTION/RKEY]`. It is not
+part of the published AT-URI specification. The earlier alpha form,
+`at://SPACE-DID/space/...`, is rejected everywhere except when decoding an
+``ATProtocolURI`` from a record written during the alpha (see
+``ATProtocolURI/fromLegacySpaceURI(_:)``).
 
 ``ATProtocolURI/init(uriString:)``, ``ATProtocolURI/isValidATURI(_:grammar:)``
 and decoding accept both forms by default (``ATProtocolURI/Grammar/restrictedOrSpace``).

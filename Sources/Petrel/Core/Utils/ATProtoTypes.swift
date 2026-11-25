@@ -102,7 +102,8 @@ extension ATProtocolError: LocalizedError {
 
 // MARK: URIs
 
-/// An AT-URI (`at://…`), the Lexicon `at-uri` string format.
+/// An AT-URI (`at://…` or, for space data, `at:space/…`), the Lexicon `at-uri`
+/// string format.
 ///
 /// Parsing is strict. The public grammar is the "Restricted AT URI Syntax" of
 /// https://atproto.com/specs/at-uri-scheme:
@@ -116,21 +117,29 @@ extension ATProtocolError: LocalizedError {
 /// A second, equally strict grammar addresses permissioned-data spaces and the
 /// records inside them (see ``SpaceRef``):
 ///
-///     at://SPACE-DID/space/SPACE-TYPE/SKEY[/AUTHOR-DID/COLLECTION/RKEY]
+///     at:space/SPACE-DID/SPACE-TYPE/SKEY[/AUTHOR-DID/COLLECTION/RKEY]
 ///
-/// It is not part of the published AT-URI specification. ``init(uriString:)``
-/// accepts both; pass ``Grammar/restricted`` to ``init(uriString:grammar:)`` or
+/// Both the space and the author must be DIDs; handles are rejected. It is not
+/// part of the published AT-URI specification. ``init(uriString:)`` accepts
+/// both; pass ``Grammar/restricted`` to ``init(uriString:grammar:)`` or
 /// ``isValidATURI(_:grammar:)`` to accept the specification grammar only.
 ///
 /// Accepting both by default follows the Spaces reference implementation:
-/// `@atproto/syntax` `parseAtUriString` hands a URI whose first path segment is
-/// `space` to a separate, equally strict space parser, and Lexicon `at-uri`
+/// `@atproto/syntax` `parseAtUriString` hands a URI that starts with
+/// `at:space/` to a separate, equally strict space parser, and Lexicon `at-uri`
 /// validation uses that same check, so a `format: at-uri` field may hold a space
 /// URI. The Spaces endpoints rely on it: `com.atproto.space.createRecord` and its
 /// siblings return the URI of a record inside a space in an `at-uri` field.
 /// Decoding (``init(from:)``) therefore uses the default grammar too. To hold a
 /// decoded value to the specification grammar, check ``isSpace``, or re-validate
 /// with `ATProtocolURI.isValidATURI(uri.uriString(), grammar: .restricted)`.
+///
+/// The spaces alpha wrote space URIs as `at://SPACE-DID/space/…`. Parsing
+/// (``init(uriString:)``, ``isValidATURI(_:grammar:)``) rejects that form.
+/// Decoding (``init(from:)``) still accepts it, because records written during
+/// the alpha may embed it and their CIDs cover those bytes: the decoded value
+/// keeps the string as written, and ``normalized()`` returns the `at:space/`
+/// form. See ``fromLegacySpaceURI(_:)``.
 ///
 /// The string is kept exactly as written; ``normalized()`` returns the
 /// normalized form the specification describes.
@@ -148,8 +157,37 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
         /// `at://AUTHORITY[/COLLECTION[/RKEY]]`.
         case restricted
         /// The specification grammar, plus the permissioned-data space grammar
-        /// `at://SPACE-DID/space/SPACE-TYPE/SKEY[/AUTHOR-DID/COLLECTION/RKEY]`.
+        /// `at:space/SPACE-DID/SPACE-TYPE/SKEY[/AUTHOR-DID/COLLECTION/RKEY]`.
         case restrictedOrSpace
+    }
+
+    /// The prefix of every space URI: `at:space/`.
+    public static let spaceURIPrefix = "at:space/"
+
+    /// Rewrites a space URI in its spaces alpha form,
+    /// `at://{spaceDid}/space/{rest}`, as `at:space/{spaceDid}/{rest}`. Returns
+    /// `nil` for any other input. The result is not validated.
+    ///
+    /// Only for record values read back from storage or the network, which may
+    /// embed the old form; requests, space refs, credentials and MAC headers take
+    /// the current form only.
+    ///
+    /// TODO: remove before beta, along with support for the old form.
+    public static func fromLegacySpaceURI(_ string: String) -> String? {
+        // Mirrors `^at:\/\/([^/?#\s]+)\/space\/` upstream.
+        let utf8 = string.utf8
+        guard utf8.starts(with: "at://".utf8) else { return nil }
+        let rest = utf8.dropFirst(5)
+        guard let slash = rest.firstIndex(of: SyntaxByte.slash) else { return nil }
+        let authority = rest[rest.startIndex ..< slash]
+        // "?", "#", " " and the ASCII whitespace controls end the authority.
+        let excluded: Set<UInt8> = [0x3F, 0x23, 0x20, 0x09, 0x0A, 0x0B, 0x0C, 0x0D]
+        guard !authority.isEmpty, !authority.contains(where: { excluded.contains($0) }) else { return nil }
+        let afterAuthority = rest[slash...]
+        guard afterAuthority.starts(with: "/space/".utf8) else { return nil }
+        let tail = afterAuthority.dropFirst(7)
+        return spaceURIPrefix + String(decoding: authority, as: UTF8.self) + "/"
+            + String(decoding: tail, as: UTF8.self)
     }
 
     /// The authority exactly as written: a DID or a handle. On a space URI this
@@ -194,7 +232,10 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let uriString = try container.decode(String.self)
-        try self.init(uriString: uriString)
+        // Decoded values may be record values written during the spaces alpha,
+        // so the old space URI form is accepted here, and only here.
+        // TODO: remove before beta, with fromLegacySpaceURI(_:).
+        try self.init(uriString: uriString, grammar: .restrictedOrSpace, acceptingLegacySpaceForm: true)
     }
 
     /// Parses an AT-URI, accepting the specification grammar and the space
@@ -206,7 +247,15 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
     /// Parses an AT-URI under the given grammar. Throws
     /// ``ATProtocolError/invalidURI(_:)`` with the reason.
     public init(uriString: String, grammar: Grammar) throws {
-        switch ATProtocolURI.parse(uriString, grammar: grammar) {
+        try self.init(uriString: uriString, grammar: grammar, acceptingLegacySpaceForm: false)
+    }
+
+    private init(uriString: String, grammar: Grammar, acceptingLegacySpaceForm: Bool) throws {
+        switch ATProtocolURI.parse(
+            uriString,
+            grammar: grammar,
+            acceptingLegacySpaceForm: acceptingLegacySpaceForm
+        ) {
         case let .success(parsed):
             originalString = uriString
             authority = parsed.authority
@@ -258,17 +307,41 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
         let authorDID: String?
     }
 
-    /// Splits and validates an AT-URI. Two grammars share the `at://` scheme:
+    /// Splits and validates an AT-URI. Two grammars share the `at` scheme:
     ///
     ///     at://{authority}[/{collection}[/{rkey}]]                                    public
-    ///     at://{spaceDid}/space/{spaceType}/{skey}[/{authorDid}/{collection}/{rkey}]  space
+    ///     at:space/{spaceDid}/{spaceType}/{skey}[/{authorDid}/{collection}/{rkey}]    space
     ///
-    /// `space` is not a valid NSID, so the first path segment tells them apart
-    /// without ambiguity.
-    private static func parse(_ uriString: String, grammar: Grammar) -> Result<ParsedURI, SyntaxFailure> {
+    /// The spaces alpha form `at://{spaceDid}/space/…` is rejected unless
+    /// `acceptingLegacySpaceForm` is set (decoding only), in which case it is
+    /// read as the `at:space/` form it maps to.
+    private static func parse(
+        _ uriString: String,
+        grammar: Grammar,
+        acceptingLegacySpaceForm: Bool = false
+    ) -> Result<ParsedURI, SyntaxFailure> {
         let utf8 = uriString.utf8
         guard utf8.count <= 8192 else { return .failure("longer than 8192 bytes") }
-        guard utf8.starts(with: "at://".utf8) else { return .failure("must start with \"at://\"") }
+
+        if grammar == .restrictedOrSpace {
+            if utf8.starts(with: spaceURIPrefix.utf8) {
+                return parseSpace(String(decoding: utf8.dropFirst(spaceURIPrefix.utf8.count), as: UTF8.self))
+            }
+            // TODO: remove before beta, with fromLegacySpaceURI(_:).
+            if let current = fromLegacySpaceURI(uriString) {
+                guard acceptingLegacySpaceForm else {
+                    return .failure("a space URI must start with \"at:space/\"")
+                }
+                return parseSpace(String(decoding: current.utf8.dropFirst(spaceURIPrefix.utf8.count), as: UTF8.self))
+            }
+        }
+
+        guard utf8.starts(with: "at://".utf8) else {
+            if grammar == .restricted {
+                return .failure("must start with \"at://\"")
+            }
+            return .failure("must start with \"at://\" or \"at:space/\"")
+        }
 
         // Split on the "/" byte. Splitting by Character would let a slash hide
         // inside a grapheme cluster.
@@ -290,45 +363,6 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
         let path = Array(segments.dropFirst())
         guard !path.contains(where: \.isEmpty) else {
             return .failure("trailing slash or empty path segment")
-        }
-
-        if grammar == .restrictedOrSpace, path.first == "space" {
-            guard case .did = parsedAuthority else {
-                return .failure("the authority of a space URI must be a DID")
-            }
-            guard path.count == 3 || path.count == 6 else {
-                return .failure(
-                    "a space URI is /space/{type}/{skey}, optionally followed by /{authorDid}/{collection}/{rkey}"
-                )
-            }
-            if let reason = ATProtoSyntax.nsidFailure(path[1]) {
-                return .failure("space type is not an NSID (\(reason))")
-            }
-            if let reason = ATProtoSyntax.recordKeyFailure(path[2]) {
-                return .failure("space key is not a record key (\(reason))")
-            }
-            if path.count == 6 {
-                if let reason = ATProtoSyntax.didFailure(path[3]) {
-                    return .failure("record author is not a DID (\(reason))")
-                }
-                if let reason = ATProtoSyntax.nsidFailure(path[4]) {
-                    return .failure("collection is not an NSID (\(reason))")
-                }
-                if let reason = ATProtoSyntax.recordKeyFailure(path[5]) {
-                    return .failure("record key is not valid (\(reason))")
-                }
-            }
-            return .success(ParsedURI(
-                authority: authority,
-                parsedAuthority: parsedAuthority,
-                collection: path.count == 6 ? path[4] : nil,
-                recordKey: path.count == 6 ? path[5] : nil,
-                isSpace: true,
-                spaceDID: authority,
-                spaceType: path[1],
-                skey: path[2],
-                authorDID: path.count == 6 ? path[3] : nil
-            ))
         }
 
         guard path.count <= 2 else { return .failure("too many path segments") }
@@ -355,6 +389,58 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
             spaceType: nil,
             skey: nil,
             authorDID: authorDID
+        ))
+    }
+
+    /// Validates the part of a space URI after `at:space/`:
+    /// `{spaceDid}/{spaceType}/{skey}[/{authorDid}/{collection}/{rkey}]`. Both the
+    /// space and the author must be DIDs.
+    private static func parseSpace(_ body: String) -> Result<ParsedURI, SyntaxFailure> {
+        let segments = body.utf8
+            .split(separator: SyntaxByte.slash, omittingEmptySubsequences: false)
+            .map { String(decoding: $0, as: UTF8.self) }
+
+        let authority = segments[0]
+        guard !authority.isEmpty else { return .failure("authority is missing") }
+        guard let did = try? DID(didString: authority) else {
+            return .failure("the authority of a space URI must be a DID")
+        }
+        let path = Array(segments.dropFirst())
+        guard !path.contains(where: \.isEmpty) else {
+            return .failure("trailing slash or empty path segment")
+        }
+        guard path.count == 2 || path.count == 5 else {
+            return .failure(
+                "a space URI is at:space/{spaceDid}/{type}/{skey}, optionally followed by /{authorDid}/{collection}/{rkey}"
+            )
+        }
+        if let reason = ATProtoSyntax.nsidFailure(path[0]) {
+            return .failure("space type is not an NSID (\(reason))")
+        }
+        if let reason = ATProtoSyntax.recordKeyFailure(path[1]) {
+            return .failure("space key is not a record key (\(reason))")
+        }
+        if path.count == 5 {
+            if let reason = ATProtoSyntax.didFailure(path[2]) {
+                return .failure("record author is not a DID (\(reason))")
+            }
+            if let reason = ATProtoSyntax.nsidFailure(path[3]) {
+                return .failure("collection is not an NSID (\(reason))")
+            }
+            if let reason = ATProtoSyntax.recordKeyFailure(path[4]) {
+                return .failure("record key is not valid (\(reason))")
+            }
+        }
+        return .success(ParsedURI(
+            authority: authority,
+            parsedAuthority: .did(did),
+            collection: path.count == 5 ? path[3] : nil,
+            recordKey: path.count == 5 ? path[4] : nil,
+            isSpace: true,
+            spaceDID: authority,
+            spaceType: path[0],
+            skey: path[1],
+            authorDID: path.count == 5 ? path[2] : nil
         ))
     }
 
@@ -390,16 +476,21 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
             (try? NSID(nsidString: nsid).normalized.nsidString()) ?? nsid
         }
 
-        var string = "at://\(parsedAuthority.stringValue())"
+        var string: String
         if isSpace, let spaceType, let skey {
-            string += "/space/\(normalizedNSID(spaceType))/\(skey)"
+            // Always the `at:space/` form, also for a value decoded from the
+            // spaces alpha form.
+            string = "\(ATProtocolURI.spaceURIPrefix)\(parsedAuthority.stringValue())/\(normalizedNSID(spaceType))/\(skey)"
             if let authorDID, let collection, let recordKey {
                 string += "/\(authorDID)/\(normalizedNSID(collection))/\(recordKey)"
             }
-        } else if let collection {
-            string += "/\(normalizedNSID(collection))"
-            if let recordKey {
-                string += "/\(recordKey)"
+        } else {
+            string = "at://\(parsedAuthority.stringValue())"
+            if let collection {
+                string += "/\(normalizedNSID(collection))"
+                if let recordKey {
+                    string += "/\(recordKey)"
+                }
             }
         }
         // Lower-casing cannot invalidate a URI that has already parsed.
@@ -435,7 +526,10 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
     }
 
     func asQueryItem(name: String) -> URLQueryItem? {
-        return URLQueryItem(name: name, value: uriString())
+        // Request parameters take the current space URI form only, so a value
+        // decoded from the spaces alpha form is sent as `at:space/…`.
+        // TODO: remove the rewrite before beta, with fromLegacySpaceURI(_:).
+        return URLQueryItem(name: name, value: ATProtocolURI.fromLegacySpaceURI(uriString()) ?? uriString())
     }
 
     public func toCBORValue() throws -> Any {
@@ -447,12 +541,13 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
 
 /// A reference to a permissioned-data space, as distinct from a record within one:
 ///
-///     at://{spaceDid}/space/{spaceType}/{skey}
+///     at:space/{spaceDid}/{spaceType}/{skey}
 ///
 /// This is the lexicon string format `space-ref`. It is not a narrower `at-uri`:
-/// the public AT-URI grammar admits at most two path segments, so a space ref
-/// does not parse as one, and its authority must be a DID rather than any AT
-/// identifier — a space's identity and membership are keyed on DIDs.
+/// it does not parse under the public AT-URI grammar, and its authority must be
+/// a DID rather than any AT identifier — a space's identity and membership are
+/// keyed on DIDs. Parsing is strict: the spaces alpha form
+/// `at://{spaceDid}/space/…` is rejected, as by `SpaceRef.parse` upstream.
 public struct SpaceRef: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
     /// The DID of the account that is the space's authority.
     public let spaceDID: String
@@ -469,7 +564,7 @@ public struct SpaceRef: ATProtocolValue, CustomStringConvertible, QueryParameter
     }
 
     public init(spaceDID: String, spaceType: String, skey: String) throws {
-        try self.init(uriString: "at://\(spaceDID)/space/\(spaceType)/\(skey)")
+        try self.init(uriString: "\(ATProtocolURI.spaceURIPrefix)\(spaceDID)/\(spaceType)/\(skey)")
     }
 
     /// Parses the three-part form only. A URI naming a record *within* a space
@@ -478,20 +573,21 @@ public struct SpaceRef: ATProtocolValue, CustomStringConvertible, QueryParameter
     /// canonical serialisation.
     public init(uriString: String) throws {
         let utf8 = uriString.utf8
-        guard utf8.starts(with: "at://".utf8), utf8.count <= 8192 else {
+        let prefix = ATProtocolURI.spaceURIPrefix.utf8
+        guard utf8.starts(with: prefix), utf8.count <= 8192 else {
             throw ATProtocolError.invalidURI("Invalid space ref format or length")
         }
 
-        let segments = utf8.dropFirst(5)
+        let segments = utf8.dropFirst(prefix.count)
             .split(separator: SyntaxByte.slash, omittingEmptySubsequences: false)
             .map { String(decoding: $0, as: UTF8.self) }
-        guard segments.count == 4, segments[1] == "space" else {
+        guard segments.count == 3 else {
             throw ATProtocolError.invalidURI("Invalid space ref: \(syntaxExcerpt(uriString))")
         }
 
         let did = try DID(didString: segments[0])
-        let nsid = try NSID(nsidString: segments[2])
-        let rkey = try RecordKey(keyString: segments[3])
+        let nsid = try NSID(nsidString: segments[1])
+        let rkey = try RecordKey(keyString: segments[2])
 
         self.spaceDID = did.didString()
         self.spaceType = nsid.nsidString()
@@ -503,7 +599,7 @@ public struct SpaceRef: ATProtocolValue, CustomStringConvertible, QueryParameter
     }
 
     public func uriString() -> String {
-        return "at://\(spaceDID)/space/\(spaceType)/\(skey)"
+        return "\(ATProtocolURI.spaceURIPrefix)\(spaceDID)/\(spaceType)/\(skey)"
     }
 
     /// The URI of a record published inside this space by one of its members.
