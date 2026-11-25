@@ -126,11 +126,15 @@ impl ServiceAuthVerifier {
         if trimmed.is_empty() {
             return Err(ServiceAuthError::MissingAuthorization);
         }
-        let scheme = "bearer ";
-        if trimmed.len() <= scheme.len() || !trimmed[..scheme.len()].eq_ignore_ascii_case(scheme) {
+        let Some(rest) = trimmed
+            .as_bytes()
+            .get(..7)
+            .filter(|prefix| prefix.eq_ignore_ascii_case(b"bearer "))
+            .and_then(|_| trimmed.get(7..))
+        else {
             return Err(ServiceAuthError::UnsupportedAuthorizationScheme);
-        }
-        let token = trimmed[scheme.len()..].trim_matches(|c| c == ' ' || c == '\t');
+        };
+        let token = rest.trim_matches(|c| c == ' ' || c == '\t');
         if token.is_empty() || token.bytes().any(|b| b <= 0x20 || b >= 0x7F) {
             return Err(ServiceAuthError::UnsupportedAuthorizationScheme);
         }

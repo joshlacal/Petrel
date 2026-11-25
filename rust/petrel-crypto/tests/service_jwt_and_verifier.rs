@@ -798,3 +798,25 @@ async fn swift_petrel_minted_tokens_verify_in_rust() {
         .is_err()
     );
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+fn bearer_header_rejects_multibyte_utf8_at_scheme_boundary_without_panicking() {
+    for bad in [
+        "aaaaaaé token",
+        "éBearer token",
+        "Bearer",
+        "Bearer   ",
+        "Bearer aaaaaaé",
+    ] {
+        assert_eq!(
+            ServiceAuthVerifier::bearer_token_from_authorization_header(Some(bad)),
+            Err(ServiceAuthError::UnsupportedAuthorizationScheme),
+            "unexpected result for {bad:?}"
+        );
+    }
+    assert_eq!(
+        ServiceAuthVerifier::bearer_token_from_authorization_header(Some("  bEaReR  abc.def.ghi ")),
+        Ok("abc.def.ghi".to_owned())
+    );
+}
