@@ -2211,3 +2211,128 @@ async fn open_car_source_rolls_back_file_block_store_on_error() {
     let reopened = petrel_repo::FileBlockStore::open(&store_path).unwrap();
     assert_eq!(reopened.all_cids().await.unwrap(), vec![pre_cid]);
 }
+
+#[allow(clippy::too_many_lines)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn commit_diff_verify_rejects_deep_wrapper_merge_trees_without_stack_overflow() {
+    use petrel_repo::block_store::BlockStore as _;
+    use petrel_repo::error::{CommitDiffError, MstError};
+    use petrel_repo::mst::codec::{MstNodeEntryView, MstNodeView, encode_mst_node};
+
+    let did = common::test_did();
+    let signer = P256Keypair::generate().unwrap();
+    let mut limits = RepositoryLimits::standard();
+    limits.max_mst_depth = 6;
+    let policy = RepositoryReadPolicy::strict();
+
+    let mut rec_map = BTreeMap::new();
+    rec_map.insert(
+        "$type".to_owned(),
+        Value::String("app.bsky.feed.post".into()),
+    );
+    rec_map.insert("text".to_owned(), Value::String("deep-merge".into()));
+    let rec_bytes = dagcbor::encode(&Value::Object(rec_map));
+    let rec_cid = Cid::for_dag_cbor(&rec_bytes);
+
+    let key_mid = (0..200_usize)
+        .map(|i| format!("app.bsky.feed.post/m{i}"))
+        .find(|k| petrel_repo::mst::key_depth(k.as_bytes()) >= 1)
+        .unwrap();
+
+    let store = Arc::new(InMemoryBlockStore::new());
+    store.put_block(&rec_cid, &rec_bytes).await.unwrap();
+
+    let (mut left_cid, left_bytes) = encode_mst_node(&MstNodeView {
+        left: None,
+        entries: vec![MstNodeEntryView {
+            key: "app.bsky.feed.post/a0".into(),
+            value: rec_cid.clone(),
+            tree: None,
+        }],
+    })
+    .unwrap();
+    store.put_block(&left_cid, &left_bytes).await.unwrap();
+    let (mut right_cid, right_bytes) = encode_mst_node(&MstNodeView {
+        left: None,
+        entries: vec![MstNodeEntryView {
+            key: "app.bsky.feed.post/z0".into(),
+            value: rec_cid.clone(),
+            tree: None,
+        }],
+    })
+    .unwrap();
+    store.put_block(&right_cid, &right_bytes).await.unwrap();
+
+    for _ in 0..8 {
+        let (wrap_left_cid, wrap_left_bytes) = encode_mst_node(&MstNodeView {
+            left: Some(left_cid),
+            entries: vec![],
+        })
+        .unwrap();
+        store
+            .put_block(&wrap_left_cid, &wrap_left_bytes)
+            .await
+            .unwrap();
+        left_cid = wrap_left_cid;
+
+        let (wrap_right_cid, wrap_right_bytes) = encode_mst_node(&MstNodeView {
+            left: Some(right_cid),
+            entries: vec![],
+        })
+        .unwrap();
+        store
+            .put_block(&wrap_right_cid, &wrap_right_bytes)
+            .await
+            .unwrap();
+        right_cid = wrap_right_cid;
+    }
+
+    let (root_cid, root_bytes) = encode_mst_node(&MstNodeView {
+        left: Some(left_cid),
+        entries: vec![MstNodeEntryView {
+            key: key_mid.clone(),
+            value: rec_cid.clone(),
+            tree: Some(right_cid),
+        }],
+    })
+    .unwrap();
+    store.put_block(&root_cid, &root_bytes).await.unwrap();
+
+    let commit = CommitCodec::prepare(
+        &CommitDescriptor {
+            did: did.clone(),
+            rev: RepositoryTid::parse("3jzfcijpj2z2c").unwrap(),
+            data_cid: root_cid,
+            prev_cid: None,
+        },
+        &signer,
+        &limits,
+    )
+    .await
+    .unwrap();
+    store
+        .put_block(&commit.cid, &commit.signed_commit_bytes)
+        .await
+        .unwrap();
+
+    let resolver = FixedSigningKey::from_public_key(signer.public_key().clone());
+    let path =
+        RepositoryPath::new("app.bsky.feed.post", key_mid.split_once('/').unwrap().1).unwrap();
+    let err = CommitDiff::verify(
+        &commit.cid,
+        &[CommitOperation::Create { path, cid: rec_cid }],
+        None,
+        store,
+        &resolver,
+        Some(&did),
+        &limits,
+        &policy,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        err,
+        CommitDiffError::Mst(MstError::DepthExceeded { .. })
+    ));
+}

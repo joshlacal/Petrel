@@ -444,3 +444,118 @@ async fn mst_proof_and_validation_reject_empty_left_anomalies_and_non_sha256_cid
         ));
     }
 }
+
+#[allow(clippy::too_many_lines)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn mst_mutation_and_bulk_builder_enforce_depth_and_dag_cbor_leaf_links() {
+    let options = MstOptions {
+        policy: RepositoryReadPolicy::strict(),
+        max_depth: 6,
+        ..MstOptions::default()
+    };
+
+    // 1. `Cid::for_raw` must be rejected by `build_mst_from_entries`, `insert`, `upsert`, and `update`
+    //    under strict policy (`Codex 4697754782`).
+    let raw_leaf = Cid::for_raw(b"not-dag-cbor");
+    let err_bulk = build_mst_from_entries(
+        vec![("com.example.item/r0".to_owned(), raw_leaf.clone())],
+        options,
+    )
+    .unwrap_err();
+    assert!(matches!(err_bulk, MstError::UnblessedLink(_)));
+
+    let mut strict_tree = RepositoryMst::empty_with_options(options);
+    assert!(matches!(
+        strict_tree
+            .insert("com.example.item/r0", raw_leaf.clone())
+            .await,
+        Err(MstError::UnblessedLink(_))
+    ));
+    assert!(matches!(
+        strict_tree
+            .upsert("com.example.item/r0", raw_leaf.clone())
+            .await,
+        Err(MstError::UnblessedLink(_))
+    ));
+    strict_tree
+        .insert("com.example.item/r0", synthetic_val(1))
+        .await
+        .unwrap();
+    assert!(matches!(
+        strict_tree.update("com.example.item/r0", raw_leaf).await,
+        Err(MstError::UnblessedLink(_))
+    ));
+
+    // 2. Sibling empty-wrapper chains deeper than `max_depth` trigger `MstError::DepthExceeded`
+    //    during `delete` / `merge_trees` instead of overflowing the stack (`Codex 4697754761`).
+    let store = InMemoryBlockStore::new();
+    let val_a = synthetic_val(10);
+    let val_m = synthetic_val(20);
+    let val_z = synthetic_val(30);
+    let key_mid = (0..200_usize)
+        .map(|i| format!("com.example.item/m{i}"))
+        .find(|k| petrel_repo::mst::key_depth(k.as_bytes()) >= 1)
+        .unwrap();
+
+    let (mut left_cid, left_bytes) = encode_mst_node(&MstNodeView {
+        left: None,
+        entries: vec![MstNodeEntryView {
+            key: "com.example.item/a0".into(),
+            value: val_a,
+            tree: None,
+        }],
+    })
+    .unwrap();
+    store.put_block(&left_cid, &left_bytes).await.unwrap();
+    let (mut right_cid, right_bytes) = encode_mst_node(&MstNodeView {
+        left: None,
+        entries: vec![MstNodeEntryView {
+            key: "com.example.item/z0".into(),
+            value: val_z,
+            tree: None,
+        }],
+    })
+    .unwrap();
+    store.put_block(&right_cid, &right_bytes).await.unwrap();
+
+    for _ in 0..8 {
+        let (wrap_left_cid, wrap_left_bytes) = encode_mst_node(&MstNodeView {
+            left: Some(left_cid),
+            entries: vec![],
+        })
+        .unwrap();
+        store
+            .put_block(&wrap_left_cid, &wrap_left_bytes)
+            .await
+            .unwrap();
+        left_cid = wrap_left_cid;
+
+        let (wrap_right_cid, wrap_right_bytes) = encode_mst_node(&MstNodeView {
+            left: Some(right_cid),
+            entries: vec![],
+        })
+        .unwrap();
+        store
+            .put_block(&wrap_right_cid, &wrap_right_bytes)
+            .await
+            .unwrap();
+        right_cid = wrap_right_cid;
+    }
+
+    let (root_cid, root_bytes) = encode_mst_node(&MstNodeView {
+        left: Some(left_cid),
+        entries: vec![MstNodeEntryView {
+            key: key_mid.clone(),
+            value: val_m,
+            tree: Some(right_cid),
+        }],
+    })
+    .unwrap();
+    store.put_block(&root_cid, &root_bytes).await.unwrap();
+
+    let mut deep_tree = RepositoryMst::open_with_options(root_cid, Arc::new(store), options);
+    assert!(deep_tree.get(&key_mid).await.unwrap().is_some());
+    let err_merge = deep_tree.delete(&key_mid).await.unwrap_err();
+    assert!(matches!(err_merge, MstError::DepthExceeded { .. }));
+}

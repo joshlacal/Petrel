@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use petrel::rt::BoxFuture;
 use petrel_core::Cid;
+use petrel_core::cid::BlessedKind;
 
 use crate::block_store::{BlockMap, BlockSource, RepositoryBlock};
 use crate::error::MstError;
@@ -247,23 +248,33 @@ impl RepositoryMst {
     }
 
     /// Computes the MST layer height of a loaded non-empty node or `0` if empty.
-    fn node_layer<'a>(
-        &'a mut self,
-        node_cid: &'a Cid,
-    ) -> BoxFuture<'a, Result<Option<usize>, MstError>> {
-        Box::pin(async move {
-            let view = self.load_node(node_cid).await?;
+    fn check_depth(&self, depth: usize) -> Result<(), MstError> {
+        if depth > self.options.max_depth {
+            return Err(MstError::DepthExceeded {
+                depth,
+                limit: self.options.max_depth,
+            });
+        }
+        Ok(())
+    }
+
+    async fn node_layer(&mut self, node_cid: &Cid) -> Result<Option<usize>, MstError> {
+        let mut cur = node_cid.clone();
+        let mut depth = 0_usize;
+        loop {
+            self.check_depth(depth)?;
+            let view = self.load_node(&cur).await?;
             if let Some(first) = view.entries.first() {
-                return Ok(Some(key_depth(first.key.as_bytes())));
+                return Ok(Some(key_depth(first.key.as_bytes()).saturating_add(depth)));
             }
             match view.left {
-                Some(left_cid) => match self.node_layer(&left_cid).await? {
-                    Some(h) => Ok(Some(h + 1)),
-                    None => Ok(None),
-                },
-                None => Ok(None),
+                Some(left_cid) => {
+                    cur = left_cid;
+                    depth = depth.saturating_add(1);
+                }
+                None => return Ok(None),
             }
-        })
+        }
     }
 
     /// Looks up a key's value CID in the MST.
@@ -455,7 +466,7 @@ impl RepositoryMst {
         let target_layer = key_depth(key.as_bytes());
         let root = self.root_cid.clone();
         let new_root = self
-            .insert_at(&root, key, value, target_layer, false)
+            .insert_at(&root, key, value, target_layer, false, 0)
             .await?;
         let trimmed = self.trim_top(new_root).await?;
         self.root_cid = trimmed.clone();
@@ -468,7 +479,7 @@ impl RepositoryMst {
         let target_layer = key_depth(key.as_bytes());
         let root = self.root_cid.clone();
         let new_root = self
-            .insert_at(&root, key, value, target_layer, true)
+            .insert_at(&root, key, value, target_layer, true, 0)
             .await?;
         let trimmed = self.trim_top(new_root).await?;
         self.root_cid = trimmed.clone();
@@ -479,7 +490,7 @@ impl RepositoryMst {
     pub async fn update(&mut self, key: &str, value: Cid) -> Result<Cid, MstError> {
         self.validate_insert_args(key, &value)?;
         let root = self.root_cid.clone();
-        let new_root = self.update_existing(&root, key, value).await?;
+        let new_root = self.update_existing(&root, key, value, 0).await?;
         self.root_cid = new_root.clone();
         Ok(new_root)
     }
@@ -488,7 +499,7 @@ impl RepositoryMst {
     pub async fn delete(&mut self, key: &str) -> Result<Cid, MstError> {
         validate_mst_key(key, self.options.key_syntax)?;
         let root = self.root_cid.clone();
-        let new_root = self.delete_at(&root, key).await?;
+        let new_root = self.delete_at(&root, key, 0).await?;
         let trimmed = match new_root {
             Some(cid) => self.trim_top(cid).await?,
             None => self.store_empty()?,
@@ -768,7 +779,9 @@ impl RepositoryMst {
 
     fn validate_insert_args(&self, key: &str, value: &Cid) -> Result<(), MstError> {
         validate_mst_key(key, self.options.key_syntax)?;
-        if self.options.policy.requires_blessed_record_links_in_mst && !value.is_blessed() {
+        if self.options.policy.requires_blessed_record_links_in_mst
+            && value.blessed_kind() != Some(BlessedKind::DagCbor)
+        {
             return Err(MstError::UnblessedLink(value.to_string()));
         }
         Ok(())
@@ -786,8 +799,10 @@ impl RepositoryMst {
         node_cid: &'a Cid,
         key: &'a str,
         value: Cid,
+        depth: usize,
     ) -> BoxFuture<'a, Result<Cid, MstError>> {
         Box::pin(async move {
+            self.check_depth(depth)?;
             let mut view = self.load_node(node_cid).await?;
             let key_bytes = key.as_bytes();
             let pos = view
@@ -801,13 +816,17 @@ impl RepositoryMst {
                 let Some(left_cid) = view.left.take() else {
                     return Err(MstError::MissingKey(key.to_owned()));
                 };
-                let updated_left = self.update_existing(&left_cid, key, value).await?;
+                let updated_left = self
+                    .update_existing(&left_cid, key, value, depth + 1)
+                    .await?;
                 view.left = Some(updated_left);
             } else {
                 let Some(right_cid) = view.entries[pos - 1].tree.take() else {
                     return Err(MstError::MissingKey(key.to_owned()));
                 };
-                let updated_right = self.update_existing(&right_cid, key, value).await?;
+                let updated_right = self
+                    .update_existing(&right_cid, key, value, depth + 1)
+                    .await?;
                 view.entries[pos - 1].tree = Some(updated_right);
             }
             self.store_node(view)
@@ -822,8 +841,10 @@ impl RepositoryMst {
         value: Cid,
         target_layer: usize,
         allow_overwrite: bool,
+        depth: usize,
     ) -> BoxFuture<'a, Result<Cid, MstError>> {
         Box::pin(async move {
+            self.check_depth(depth)?;
             let layer_opt = self.node_layer(node_cid).await?;
             let Some(current_layer) = layer_opt else {
                 // Empty tree: materialize directly at `target_layer` (or height 0 wrapper)
@@ -841,8 +862,9 @@ impl RepositoryMst {
             if target_layer > current_layer {
                 // New root sits above `current_layer`!
                 // Pad intermediate empty wrapper layers above split subtrees if gap > 1.
-                let (left_sub, right_sub) =
-                    self.split_around(node_cid, key, allow_overwrite).await?;
+                let (left_sub, right_sub) = self
+                    .split_around(node_cid, key, allow_overwrite, depth)
+                    .await?;
                 let wrapped_left = self
                     .pad_to_layer(left_sub, current_layer, target_layer - 1)
                     .await?;
@@ -880,7 +902,10 @@ impl RepositoryMst {
                     view.entries[pos - 1].tree.take()
                 };
                 let (new_left_child, new_right_child) = match child_to_split {
-                    Some(child_cid) => self.split_around(&child_cid, key, allow_overwrite).await?,
+                    Some(child_cid) => {
+                        self.split_around(&child_cid, key, allow_overwrite, depth + 1)
+                            .await?
+                    }
                     None => (None, None),
                 };
 
@@ -920,8 +945,15 @@ impl RepositoryMst {
                 view.entries[pos - 1].tree.take()
             };
             let next_child = if let Some(child_cid) = existing_child {
-                self.insert_at(&child_cid, key, value, target_layer, allow_overwrite)
-                    .await?
+                self.insert_at(
+                    &child_cid,
+                    key,
+                    value,
+                    target_layer,
+                    allow_overwrite,
+                    depth + 1,
+                )
+                .await?
             } else {
                 // Create leaf entry and wrap up to `current_layer - 1`.
                 let leaf = self.store_node(MstNodeView {
@@ -959,6 +991,8 @@ impl RepositoryMst {
                 return Ok(None);
             };
             let actual_layer = self.node_layer(&cur).await?.unwrap_or(from_layer);
+            let gap = to_layer.saturating_sub(actual_layer);
+            self.check_depth(gap)?;
             for _ in actual_layer..to_layer {
                 cur = self.store_node(MstNodeView {
                     left: Some(cur),
@@ -975,13 +1009,17 @@ impl RepositoryMst {
         node_cid: &'a Cid,
         key: &'a str,
         allow_overwrite: bool,
+        depth: usize,
     ) -> BoxFuture<'a, Result<SplitPair, MstError>> {
         Box::pin(async move {
+            self.check_depth(depth)?;
             let view = self.load_node(node_cid).await?;
             if view.entries.is_empty() {
                 return match view.left {
                     Some(left_cid) => {
-                        let (l, r) = self.split_around(&left_cid, key, allow_overwrite).await?;
+                        let (l, r) = self
+                            .split_around(&left_cid, key, allow_overwrite, depth + 1)
+                            .await?;
                         let wrapped_l = match l {
                             Some(lc) => Some(self.store_node(MstNodeView {
                                 left: Some(lc),
@@ -1024,7 +1062,10 @@ impl RepositoryMst {
             };
 
             let (mid_left, mid_right) = match mid_child {
-                Some(child) => self.split_around(&child, key, allow_overwrite).await?,
+                Some(child) => {
+                    self.split_around(&child, key, allow_overwrite, depth + 1)
+                        .await?
+                }
                 None => (None, None),
             };
 
@@ -1068,7 +1109,7 @@ impl RepositoryMst {
                     (None, None) => None,
                     (Some(a), None) => Some(a),
                     (None, Some(b)) => Some(b),
-                    (Some(a), Some(b)) => Some(self.merge_trees(a, b).await?),
+                    (Some(a), Some(b)) => Some(self.merge_trees(a, b, depth + 1).await?),
                 };
                 let node = MstNodeView {
                     left: merged,
@@ -1091,14 +1132,16 @@ impl RepositoryMst {
         &'a mut self,
         node_cid: &'a Cid,
         key: &'a str,
+        depth: usize,
     ) -> BoxFuture<'a, Result<Option<Cid>, MstError>> {
         Box::pin(async move {
+            self.check_depth(depth)?;
             let mut view = self.load_node(node_cid).await?;
             if view.entries.is_empty() {
                 let Some(left_cid) = view.left else {
                     return Err(MstError::MissingKey(key.to_owned()));
                 };
-                let updated = self.delete_at(&left_cid, key).await?;
+                let updated = self.delete_at(&left_cid, key, depth + 1).await?;
                 return match updated {
                     Some(cid) => Ok(Some(self.store_node(MstNodeView {
                         left: Some(cid),
@@ -1123,7 +1166,7 @@ impl RepositoryMst {
                     (None, None) => None,
                     (Some(a), None) => Some(a),
                     (None, Some(b)) => Some(b),
-                    (Some(a), Some(b)) => Some(self.merge_trees(a, b).await?),
+                    (Some(a), Some(b)) => Some(self.merge_trees(a, b, depth + 1).await?),
                 };
                 if pos == 0 {
                     view.left = merged;
@@ -1144,7 +1187,7 @@ impl RepositoryMst {
             let Some(child_cid) = target_child else {
                 return Err(MstError::MissingKey(key.to_owned()));
             };
-            let updated_child = self.delete_at(&child_cid, key).await?;
+            let updated_child = self.delete_at(&child_cid, key, depth + 1).await?;
             if pos == 0 {
                 view.left = updated_child;
             } else {
@@ -1162,8 +1205,10 @@ impl RepositoryMst {
         &mut self,
         left_cid: Cid,
         right_cid: Cid,
+        depth: usize,
     ) -> BoxFuture<'_, Result<Cid, MstError>> {
         Box::pin(async move {
+            self.check_depth(depth)?;
             let mut left_view = self.load_node(&left_cid).await?;
             let right_view = self.load_node(&right_cid).await?;
 
@@ -1176,7 +1221,7 @@ impl RepositoryMst {
                 (None, None) => None,
                 (Some(a), None) => Some(a),
                 (None, Some(b)) => Some(b),
-                (Some(a), Some(b)) => Some(self.merge_trees(a, b).await?),
+                (Some(a), Some(b)) => Some(self.merge_trees(a, b, depth + 1).await?),
             };
 
             if let Some(last) = left_view.entries.last_mut() {
@@ -1187,7 +1232,7 @@ impl RepositoryMst {
                 let merged_left = match (left_view.left, merged_middle) {
                     (None, m) => m,
                     (Some(l), None) => Some(l),
-                    (Some(l), Some(m)) => Some(self.merge_trees(l, m).await?),
+                    (Some(l), Some(m)) => Some(self.merge_trees(l, m, depth + 1).await?),
                 };
                 self.store_node(MstNodeView {
                     left: merged_left,
@@ -1199,12 +1244,15 @@ impl RepositoryMst {
 
     fn trim_top(&mut self, mut root: Cid) -> BoxFuture<'_, Result<Cid, MstError>> {
         Box::pin(async move {
+            let mut depth = 0_usize;
             loop {
+                self.check_depth(depth)?;
                 let view = self.load_node(&root).await?;
                 if view.entries.is_empty()
                     && let Some(left) = view.left
                 {
                     root = left;
+                    depth = depth.saturating_add(1);
                     continue;
                 }
                 return Ok(root);
@@ -1225,7 +1273,9 @@ where
     let mut map: HashMap<String, Cid> = HashMap::new();
     for (k, v) in entries {
         validate_mst_key(&k, options.key_syntax)?;
-        if options.policy.requires_blessed_record_links_in_mst && !v.is_blessed() {
+        if options.policy.requires_blessed_record_links_in_mst
+            && v.blessed_kind() != Some(BlessedKind::DagCbor)
+        {
             return Err(MstError::UnblessedLink(v.to_string()));
         }
         map.insert(k, v);
@@ -1245,7 +1295,8 @@ where
     sorted.sort_by(|a, b| a.0.cmp(&b.0));
 
     let mut out_blocks: BTreeMap<Cid, Vec<u8>> = BTreeMap::new();
-    let Some((root_cid, _)) = build_bulk_slice(&sorted, &mut out_blocks)? else {
+    let Some((root_cid, _)) = build_bulk_slice(&sorted, &mut out_blocks, 0, options.max_depth)?
+    else {
         let tree = RepositoryMst::empty_with_options(options);
         let blocks = tree.new_blocks();
         return Ok((tree, blocks));
@@ -1264,11 +1315,25 @@ where
 fn build_bulk_slice(
     entries: &[(String, Cid, usize)],
     out: &mut BTreeMap<Cid, Vec<u8>>,
+    depth: usize,
+    max_depth: usize,
 ) -> Result<Option<(Cid, usize)>, MstError> {
     if entries.is_empty() {
         return Ok(None);
     }
+    if depth > max_depth {
+        return Err(MstError::DepthExceeded {
+            depth,
+            limit: max_depth,
+        });
+    }
     let layer = entries.iter().map(|e| e.2).max().unwrap_or(0);
+    if layer > max_depth {
+        return Err(MstError::DepthExceeded {
+            depth: layer,
+            limit: max_depth,
+        });
+    }
     let positions: Vec<usize> = entries
         .iter()
         .enumerate()
@@ -1276,8 +1341,8 @@ fn build_bulk_slice(
         .collect();
 
     let first_pos = positions[0];
-    let left_child = build_bulk_slice(&entries[..first_pos], out)?;
-    let left = pad_bulk_child(left_child, layer, out)?;
+    let left_child = build_bulk_slice(&entries[..first_pos], out, depth + 1, max_depth)?;
+    let left = pad_bulk_child(left_child, layer, out, max_depth)?;
 
     let mut node_entries = Vec::with_capacity(positions.len());
     for idx in 0..positions.len() {
@@ -1287,8 +1352,8 @@ fn build_bulk_slice(
         } else {
             entries.len()
         };
-        let right_child = build_bulk_slice(&entries[cur + 1..next], out)?;
-        let right = pad_bulk_child(right_child, layer, out)?;
+        let right_child = build_bulk_slice(&entries[cur + 1..next], out, depth + 1, max_depth)?;
+        let right = pad_bulk_child(right_child, layer, out, max_depth)?;
         node_entries.push(MstNodeEntryView {
             key: entries[cur].0.clone(),
             value: entries[cur].1.clone(),
@@ -1308,10 +1373,18 @@ fn pad_bulk_child(
     child: Option<(Cid, usize)>,
     parent_layer: usize,
     out: &mut BTreeMap<Cid, Vec<u8>>,
+    max_depth: usize,
 ) -> Result<Option<Cid>, MstError> {
     let Some((mut cid, mut layer)) = child else {
         return Ok(None);
     };
+    let gap = parent_layer.saturating_sub(layer.saturating_add(1));
+    if gap > max_depth {
+        return Err(MstError::DepthExceeded {
+            depth: gap,
+            limit: max_depth,
+        });
+    }
     while layer + 1 < parent_layer {
         layer += 1;
         let (wrapped_cid, wrapped_bytes) = encode_mst_node(&MstNodeView {

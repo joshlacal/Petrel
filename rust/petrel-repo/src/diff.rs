@@ -133,7 +133,9 @@ impl CommitDiff {
                             "update op key {key} resolved to {current:?}, expected {cid}"
                         )));
                     }
-                    if policy.requires_blessed_record_links_in_mst && !prev.is_blessed() {
+                    if policy.requires_blessed_record_links_in_mst
+                        && prev.blessed_kind() != Some(petrel_core::cid::BlessedKind::DagCbor)
+                    {
                         return Err(CommitDiffError::Mst(crate::error::MstError::UnblessedLink(
                             prev.to_string(),
                         )));
@@ -147,7 +149,9 @@ impl CommitDiff {
                             "delete op key {key} unexpectedly present in new MST: {current:?}"
                         )));
                     }
-                    if policy.requires_blessed_record_links_in_mst && !prev.is_blessed() {
+                    if policy.requires_blessed_record_links_in_mst
+                        && prev.blessed_kind() != Some(petrel_core::cid::BlessedKind::DagCbor)
+                    {
                         return Err(CommitDiffError::Mst(crate::error::MstError::UnblessedLink(
                             prev.to_string(),
                         )));
