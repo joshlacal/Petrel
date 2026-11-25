@@ -452,6 +452,38 @@ struct ManagerState {
     generations: HashMap<SpaceRef, u64>,
     global_generation: u64,
     locks: HashMap<SpaceRef, Arc<AsyncMutex<()>>>,
+    in_flight: HashMap<SpaceRef, usize>,
+}
+
+struct InFlightGuard<'a> {
+    state: &'a Mutex<ManagerState>,
+    space: SpaceRef,
+}
+
+impl Drop for InFlightGuard<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut guard) = self.state.lock()
+            && let Some(count) = guard.in_flight.get_mut(&self.space)
+        {
+            if *count <= 1 {
+                guard.in_flight.remove(&self.space);
+            } else {
+                *count -= 1;
+            }
+        }
+    }
+}
+
+fn is_credential_revoked_response(status: StatusCode, body: &[u8]) -> bool {
+    if status != StatusCode::UNAUTHORIZED {
+        return false;
+    }
+    let parsed: Option<XrpcErrorPayload> = serde_json::from_slice(body).ok();
+    parsed.as_ref().and_then(|p| p.error.as_deref()) == Some(CREDENTIAL_REVOKED_ERROR_NAME)
+}
+
+fn credentials_match(a: &SpaceCredential, b: &SpaceCredential) -> bool {
+    a.jwt == b.jwt && a.jti == b.jti && a.cnf_kid == b.cnf_kid
 }
 
 /// Manages proof-of-possession space credentials with single-flight coalescing,
@@ -531,8 +563,8 @@ impl<E: CredentialExchanger> SpaceCredentialManager<E> {
 
         let _flight = space_lock.lock().await;
 
-        let (start_gen, start_global) = {
-            let guard = self
+        let (start_gen, start_global, _in_flight_guard) = {
+            let mut guard = self
                 .state
                 .lock()
                 .map_err(|_| SpaceError::Storage("credential manager mutex poisoned".into()))?;
@@ -542,9 +574,14 @@ impl<E: CredentialExchanger> SpaceCredentialManager<E> {
             {
                 return Ok(cached.clone());
             }
+            *guard.in_flight.entry(space.clone()).or_insert(0) += 1;
             (
                 guard.generations.get(space).copied().unwrap_or(0),
                 guard.global_generation,
+                InFlightGuard {
+                    state: &self.state,
+                    space: space.clone(),
+                },
             )
         };
 
@@ -572,6 +609,28 @@ impl<E: CredentialExchanger> SpaceCredentialManager<E> {
         }
     }
 
+    /// Evict `cred`'s space entry only if `cred` is still the currently cached credential.
+    ///
+    /// Unlike [`Self::invalidate`], stale or already-replaced credentials never evict a newer
+    /// cached credential and never abort an already in-flight refresh with
+    /// [`SpaceError::InvalidationDuringExchange`]. Returns `true` if `cred` was removed.
+    pub fn invalidate_if_credential_matches(&self, cred: &SpaceCredential) -> bool {
+        if let Ok(mut guard) = self.state.lock()
+            && guard
+                .cache
+                .get(&cred.space)
+                .is_some_and(|cached| credentials_match(cached, cred))
+        {
+            guard.cache.remove(&cred.space);
+            if guard.in_flight.get(&cred.space).copied().unwrap_or(0) == 0 {
+                let gen_ref = guard.generations.entry(cred.space.clone()).or_insert(0);
+                *gen_ref = gen_ref.saturating_add(1);
+            }
+            return true;
+        }
+        false
+    }
+
     /// Immediately evict all cached credentials and invalidate all in-flight exchanges.
     pub fn invalidate_all(&self) {
         if let Ok(mut guard) = self.state.lock() {
@@ -583,15 +642,30 @@ impl<E: CredentialExchanger> SpaceCredentialManager<E> {
     /// Evict `space`'s cached credential when a response reports `401 CredentialRevoked`.
     /// Returns `true` if eviction occurred.
     pub fn evict_if_revoked(&self, space: &SpaceRef, status: StatusCode, body: &[u8]) -> bool {
-        if status != StatusCode::UNAUTHORIZED {
-            return false;
-        }
-        let parsed: Option<XrpcErrorPayload> = serde_json::from_slice(body).ok();
-        if parsed.as_ref().and_then(|p| p.error.as_deref()) == Some(CREDENTIAL_REVOKED_ERROR_NAME) {
+        if is_credential_revoked_response(status, body) {
             self.invalidate(space);
             return true;
         }
         false
+    }
+
+    /// Handle a `401 CredentialRevoked` response for a specific `cred`.
+    ///
+    /// Evicts the cached credential only when `cred` still matches the cached entry, preserving
+    /// any replacement credential or in-flight refresh started by another concurrent request.
+    /// Returns `true` whenever the response represents `401 CredentialRevoked` so the caller
+    /// knows it may retry with the current/refreshed credential.
+    pub fn evict_credential_if_revoked(
+        &self,
+        cred: &SpaceCredential,
+        status: StatusCode,
+        body: &[u8],
+    ) -> bool {
+        if !is_credential_revoked_response(status, body) {
+            return false;
+        }
+        let _ = self.invalidate_if_credential_matches(cred);
+        true
     }
 
     /// Build RFC 9421 signed request headers for a target `request_url`.
@@ -627,17 +701,16 @@ impl<E: CredentialExchanger> SpaceCredentialManager<E> {
         nonce: Option<&str>,
     ) -> Result<Response<Bytes>> {
         for attempt in 0..2 {
-            let force_refresh = attempt > 0;
             let fresh_nonce = match nonce {
                 Some(_) => None,
                 None => Some(generate_jti()?),
             };
-            let (_cred, sig_headers) = self
+            let (cred, sig_headers) = self
                 .sign_request(
                     space,
                     url,
                     explicit_server_did,
-                    force_refresh,
+                    false,
                     now,
                     nonce.or(fresh_nonce.as_deref()),
                 )
@@ -662,7 +735,7 @@ impl<E: CredentialExchanger> SpaceCredentialManager<E> {
             .await
             .map_err(|e| SpaceError::Transport(e.to_string()))?;
 
-            if attempt == 0 && self.evict_if_revoked(space, resp.status(), resp.body()) {
+            if attempt == 0 && self.evict_credential_if_revoked(&cred, resp.status(), resp.body()) {
                 continue;
             }
             return Ok(resp);

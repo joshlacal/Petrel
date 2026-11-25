@@ -355,6 +355,17 @@ impl SpaceHostBackend for InMemorySpaceHostBackend {
                     )),
                 });
             }
+            if let Some(latest_space_rev) = guard.latest_space_rev.get(space)
+                && space_rev.as_str() <= latest_space_rev.as_str()
+            {
+                return Err(SpaceError::Xrpc {
+                    status: 409,
+                    error: "StaleSpaceRev".to_owned(),
+                    message: Some(format!(
+                        "space_rev '{space_rev}' is not newer than current '{latest_space_rev}' for space '{space}'"
+                    )),
+                });
+            }
             let prev = guard
                 .latest_space_rev
                 .insert(space.clone(), space_rev.clone());
@@ -384,6 +395,17 @@ impl SpaceHostBackend for InMemorySpaceHostBackend {
                 .state
                 .lock()
                 .map_err(|_| SpaceError::Storage("host backend mutex poisoned".into()))?;
+            if let Some(latest_space_rev) = guard.latest_space_rev.get(space)
+                && space_rev.as_str() <= latest_space_rev.as_str()
+            {
+                return Err(SpaceError::Xrpc {
+                    status: 409,
+                    error: "StaleSpaceRev".to_owned(),
+                    message: Some(format!(
+                        "space_rev '{space_rev}' is not newer than current '{latest_space_rev}' for space '{space}'"
+                    )),
+                });
+            }
             let prev = guard
                 .latest_space_rev
                 .insert(space.clone(), space_rev.clone());

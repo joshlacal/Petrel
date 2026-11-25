@@ -322,7 +322,8 @@ fn verification_method_to_jwt_key(
         if vm.kind == "Multikey" {
             let decoded = PLCDIDKeyCodec::decode_multikey(mb)
                 .map_err(|e| SpaceError::InvalidKeyMaterial(e.to_string()))?;
-            return Ok(ATProtoJWTVerificationKey::from_plc_key(&decoded));
+            return ATProtoJWTVerificationKey::from_plc_key(&decoded)
+                .map_err(|e| SpaceError::InvalidKeyMaterial(e.to_string()));
         }
         let legacy_curve = match vm.kind.as_str() {
             "EcdsaSecp256r1VerificationKey2019" => {
@@ -336,11 +337,13 @@ fn verification_method_to_jwt_key(
         if let Some(curve) = legacy_curve {
             let decoded = PLCDIDKeyCodec::decode_legacy_multibase(mb, curve)
                 .map_err(|e| SpaceError::InvalidKeyMaterial(e.to_string()))?;
-            return Ok(ATProtoJWTVerificationKey::from_plc_key(&decoded));
+            return ATProtoJWTVerificationKey::from_plc_key(&decoded)
+                .map_err(|e| SpaceError::InvalidKeyMaterial(e.to_string()));
         }
         let decoded = PLCDIDKeyCodec::decode(mb)
             .map_err(|e| SpaceError::InvalidKeyMaterial(e.to_string()))?;
-        return Ok(ATProtoJWTVerificationKey::from_plc_key(&decoded));
+        return ATProtoJWTVerificationKey::from_plc_key(&decoded)
+            .map_err(|e| SpaceError::InvalidKeyMaterial(e.to_string()));
     }
     if let Some(jwk) = &vm.public_key_jwk {
         let key = jwk_to_public_key(jwk)?;

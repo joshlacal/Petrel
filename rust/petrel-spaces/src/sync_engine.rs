@@ -515,13 +515,10 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
         let mut kem_refreshed = false;
         let mut refresh_kem_next = false;
         let mut cred_refreshed = false;
-        let mut refresh_cred_next = false;
 
         for attempt in 0..3 {
             let do_kem_refresh = refresh_kem_next;
             refresh_kem_next = false;
-            let do_cred_refresh = refresh_cred_next;
-            refresh_cred_next = false;
 
             let recipient_kem_key = self
                 .resolver
@@ -532,10 +529,7 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
             let accept_sig = format_accept_signature(profile, &encap.key_share)?;
             let shared_secret = encap.shared_secret;
 
-            let cred = self
-                .credentials
-                .credential(space, do_cred_refresh, now_secs)
-                .await?;
+            let cred = self.credentials.credential(space, false, now_secs).await?;
             let nonce = crate::tokens::generate_jti()?;
             let sig_headers = sign_credential_request(
                 &cred.jwt,
@@ -576,12 +570,13 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
 
             if attempt < 2 {
                 if !cred_refreshed
-                    && self
-                        .credentials
-                        .evict_if_revoked(space, resp.status(), resp.body())
+                    && self.credentials.evict_credential_if_revoked(
+                        &cred,
+                        resp.status(),
+                        resp.body(),
+                    )
                 {
                     cred_refreshed = true;
-                    refresh_cred_next = true;
                     continue;
                 }
                 if !kem_refreshed && is_invalid_space_mac(resp.status(), resp.body()) {

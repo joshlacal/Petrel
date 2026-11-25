@@ -400,6 +400,7 @@ fn credential_manager_single_flight_and_invalidation_during_exchange() {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(clippy::too_many_lines)]
 #[tokio::test]
 async fn credential_manager_true_concurrent_single_flight_coalescing() {
     struct YieldingExchanger {
@@ -2287,4 +2288,355 @@ fn resolver_throttles_force_refresh_caches_negative_and_bounds_entries() {
     assert_eq!(hits.load(Ordering::SeqCst), before);
     block_on(resolver.resolve_did_document(&did_1, false)).unwrap();
     assert_eq!(hits.load(Ordering::SeqCst), before + 1);
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[allow(clippy::too_many_lines)]
+#[test]
+fn host_rejects_non_increasing_space_rev_in_upsert_and_remove_writer() {
+    let now = 1_800_000_000_i64;
+    let host_did = Did::parse("did:web:host.example.com").unwrap();
+    let writer_a = Did::parse("did:plc:writeraaaaaaaaaaaaaaaaaa").unwrap();
+    let writer_b = Did::parse("did:plc:writerbbbbbbbbbbbbbbbbbb").unwrap();
+    let space =
+        parse_space_ref("at:space/did:web:host.example.com/blue.catbird.mlsChat/3l2spacerevord")
+            .unwrap();
+
+    let mut allowed_writers = HashSet::new();
+    allowed_writers.insert(writer_a.clone());
+    allowed_writers.insert(writer_b.clone());
+
+    let backend = Arc::new(InMemorySpaceHostBackend::new());
+    backend
+        .put_space(petrel_spaces::HostedSpace {
+            space: space.clone(),
+            policy: OutputPolicy::MemberspacePolicy(Box::new(MemberspacePolicy::new())),
+            allowed_readers: HashSet::new(),
+            allowed_writers,
+            deleted: false,
+        })
+        .unwrap();
+
+    let host = SpaceHost::with_in_memory_replay(
+        host_did.clone(),
+        SigningKeyPair::generate_p256().unwrap(),
+        backend.clone(),
+        Arc::new(StaticDidResolver::new()),
+    );
+
+    let s1 = backend.next_space_rev(1_800_000_000_000_200).unwrap();
+    let s2 = backend.next_space_rev(1_800_000_000_000_201).unwrap();
+    let s3 = backend.next_space_rev(1_800_000_000_000_202).unwrap();
+    let s4 = backend.next_space_rev(1_800_000_000_000_203).unwrap();
+    let r_a = Tid::parse("3l2aaaaaaaaaa").unwrap();
+    let r_b = Tid::parse("3l2aaaaaaaaab").unwrap();
+
+    // Writer A commits at higher space_rev s2.
+    block_on(host.handle_notify_repo_update(
+        &writer_a,
+        &NotifyRepoUpdateInput::new(
+            space.clone(),
+            writer_a.clone(),
+            r_a,
+            AtBytes(vec![1_u8; 32]),
+        ),
+        s2.clone(),
+    ))
+    .unwrap();
+
+    // Out-of-order writer B commit at older s1 or equal s2 must fail with 409 StaleSpaceRev.
+    for stale in [&s1, &s2] {
+        let err = block_on(host.handle_notify_repo_update(
+            &writer_b,
+            &NotifyRepoUpdateInput::new(
+                space.clone(),
+                writer_b.clone(),
+                r_b.clone(),
+                AtBytes(vec![2_u8; 32]),
+            ),
+            stale.clone(),
+        ))
+        .unwrap_err();
+        assert!(
+            matches!(err, SpaceError::Xrpc { status: 409, ref error, .. } if error == "StaleSpaceRev"),
+            "unexpected error for stale upsert: {err:?}"
+        );
+    }
+
+    // Out-of-order remove_writer at s1 or s2 must also fail with 409 StaleSpaceRev and leave writer A intact.
+    for stale in [&s1, &s2] {
+        let err = block_on(host.handle_remove_writer(
+            &host_did,
+            &RemoveWriterInput::new(space.clone(), writer_a.clone()),
+            stale.clone(),
+            now,
+        ))
+        .unwrap_err();
+        assert!(
+            matches!(err, SpaceError::Xrpc { status: 409, ref error, .. } if error == "StaleSpaceRev"),
+            "unexpected error for stale remove: {err:?}"
+        );
+    }
+
+    let initial_list = block_on(host.handle_list_writers(&space, None, 50)).unwrap();
+    assert_eq!(initial_list.repos.len(), 1);
+    assert!(matches!(
+        &initial_list.repos[0],
+        petrel_api::generated::com::atproto::space::list_writers::OutputRepos::RepoWrite(w)
+            if w.repo == writer_a
+    ));
+    let after_s2 = block_on(host.handle_list_writers(&space, Some(s2.as_str()), 50)).unwrap();
+    assert_eq!(after_s2.repos.len(), 0);
+
+    // Newer space_rev s3 succeeds for writer B and is visible after cursor s2.
+    let u_b = block_on(host.handle_notify_repo_update(
+        &writer_b,
+        &NotifyRepoUpdateInput::new(
+            space.clone(),
+            writer_b.clone(),
+            r_b,
+            AtBytes(vec![2_u8; 32]),
+        ),
+        s3.clone(),
+    ))
+    .unwrap();
+    assert!(matches!(
+        u_b,
+        petrel_api::generated::com::atproto::space::notify_space_update::InputUpdate::RepoWrite(w)
+            if w.prev_space_rev.as_ref() == Some(&s2)
+    ));
+    let delta_after_s2 = block_on(host.handle_list_writers(&space, Some(s2.as_str()), 50)).unwrap();
+    assert_eq!(delta_after_s2.repos.len(), 1);
+
+    // Newer space_rev s4 removes writer A with prev_space_rev == Some(s3).
+    let rem_a = block_on(host.handle_remove_writer(
+        &host_did,
+        &RemoveWriterInput::new(space.clone(), writer_a),
+        s4,
+        now,
+    ))
+    .unwrap();
+    assert!(matches!(
+        rem_a,
+        petrel_api::generated::com::atproto::space::notify_space_update::InputUpdate::RepoRemoved(
+            r
+        ) if r.prev_space_rev.as_ref() == Some(&s3)
+    ));
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[allow(clippy::too_many_lines)]
+#[tokio::test]
+async fn credential_manager_concurrent_401_revocation_preserves_in_flight_refresh_and_replacement()
+{
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tokio::sync::Notify;
+
+    struct BlockingExchanger {
+        host_did: Did,
+        host_kp: SigningKeyPair,
+        calls: AtomicUsize,
+        second_started: Arc<Notify>,
+        allow_second_finish: Arc<Notify>,
+    }
+
+    impl CredentialExchanger for BlockingExchanger {
+        fn exchange<'a>(
+            &'a self,
+            space: &'a SpaceRef,
+            proof_key: &'a SigningKeyPair,
+            now: i64,
+        ) -> petrel_spaces::BoxFuture<'a, petrel_spaces::Result<SpaceCredential>> {
+            Box::pin(async move {
+                let n = self.calls.fetch_add(1, Ordering::SeqCst) + 1;
+                if n == 2 {
+                    self.second_started.notify_one();
+                    self.allow_second_finish.notified().await;
+                }
+                let jwt = mint_credential_token(
+                    &self.host_kp,
+                    &self.host_did,
+                    space,
+                    &proof_key.did_key()?,
+                    now,
+                    now + 600,
+                    None,
+                    None,
+                )?;
+                SpaceCredential::from_issued_jwt(jwt, proof_key.clone(), space, None)
+            })
+        }
+    }
+
+    struct ConcurrentRevokeTransport {
+        revoked_cred_jwt: String,
+        both_sent_cred0: Arc<tokio::sync::Barrier>,
+        release_second_401: Arc<Notify>,
+        second_401_sent: Arc<Notify>,
+        first_401_sent: AtomicUsize,
+        hits: AtomicUsize,
+    }
+
+    impl HttpTransport for ConcurrentRevokeTransport {
+        fn send(
+            &self,
+            request: Request<Bytes>,
+            _options: &SendOptions,
+        ) -> impl Future<Output = Result<Response<Bytes>, TransportError>> + petrel::rt::MaybeSend
+        {
+            self.hits.fetch_add(1, Ordering::SeqCst);
+            let auth_hdr = request
+                .headers()
+                .get(http::header::AUTHORIZATION)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or_default()
+                .to_owned();
+            let is_revoked = auth_hdr.contains(&self.revoked_cred_jwt);
+            let both_sent = self.both_sent_cred0.clone();
+            let release_second = self.release_second_401.clone();
+            let second_sent = self.second_401_sent.clone();
+            let which = if is_revoked {
+                Some(self.first_401_sent.fetch_add(1, Ordering::SeqCst))
+            } else {
+                None
+            };
+            async move {
+                if let Some(idx) = which {
+                    // Wait until BOTH concurrent requests have signed with cred_0 and reached HTTP send.
+                    both_sent.wait().await;
+                    if idx == 1 {
+                        // Hold Request 2's 401 until Request 1 has already started exchange #2.
+                        release_second.notified().await;
+                        second_sent.notify_one();
+                    }
+                    return Ok(Response::builder()
+                        .status(401)
+                        .header("content-type", "application/json")
+                        .body(Bytes::from_static(br#"{"error":"CredentialRevoked"}"#))
+                        .unwrap());
+                }
+                Ok(Response::builder()
+                    .status(200)
+                    .body(Bytes::from_static(b"ok"))
+                    .unwrap())
+            }
+        }
+    }
+
+    let now = 1_800_000_000_i64;
+    let space =
+        parse_space_ref("at:space/did:web:ds.catbird.blue/blue.catbird.mlsChat/3l2conc401rev")
+            .unwrap();
+    let second_started = Arc::new(Notify::new());
+    let allow_second_finish = Arc::new(Notify::new());
+    let release_second_401 = Arc::new(Notify::new());
+    let second_401_sent = Arc::new(Notify::new());
+    let exchanger = Arc::new(BlockingExchanger {
+        host_did: Did::parse("did:web:ds.catbird.blue").unwrap(),
+        host_kp: SigningKeyPair::generate_p256().unwrap(),
+        calls: AtomicUsize::new(0),
+        second_started: second_started.clone(),
+        allow_second_finish: allow_second_finish.clone(),
+    });
+    let mgr = Arc::new(SpaceCredentialManager::new(exchanger.clone()));
+    let cred_0 = mgr.credential(&space, false, now).await.unwrap();
+
+    let transport: SharedTransport = Arc::new(ConcurrentRevokeTransport {
+        revoked_cred_jwt: cred_0.jwt.clone(),
+        both_sent_cred0: Arc::new(tokio::sync::Barrier::new(2)),
+        release_second_401: release_second_401.clone(),
+        second_401_sent: second_401_sent.clone(),
+        first_401_sent: AtomicUsize::new(0),
+        hits: AtomicUsize::new(0),
+    });
+    let url = Url::parse("https://ds.catbird.blue/xrpc/com.atproto.space.getSpace").unwrap();
+    let empty_headers = http::HeaderMap::new();
+
+    // Launch two concurrent requests both using cached cred_0.
+    let mgr_1 = mgr.clone();
+    let tr_1 = transport.clone();
+    let sp_1 = space.clone();
+    let url_1 = url.clone();
+    let hdr_1 = empty_headers.clone();
+    let h1 = tokio::spawn(async move {
+        mgr_1
+            .send_signed_request(
+                &tr_1,
+                &sp_1,
+                http::Method::GET,
+                &url_1,
+                None,
+                &hdr_1,
+                Bytes::new(),
+                now,
+                None,
+            )
+            .await
+    });
+    let mgr_2 = mgr.clone();
+    let tr_2 = transport.clone();
+    let sp_2 = space.clone();
+    let url_2 = url.clone();
+    let h2 = tokio::spawn(async move {
+        mgr_2
+            .send_signed_request(
+                &tr_2,
+                &sp_2,
+                http::Method::GET,
+                &url_2,
+                None,
+                &empty_headers,
+                Bytes::new(),
+                now,
+                None,
+            )
+            .await
+    });
+
+    // Wait until Request 1 gets 401, evicts cred_0, and suspends mid-flight inside exchange #2.
+    tokio::time::timeout(std::time::Duration::from_secs(2), second_started.notified())
+        .await
+        .expect("timed out waiting for exchange #2 to start");
+    // Now deliver Request 2's delayed 401 for cred_0 while exchange #2 is in flight.
+    release_second_401.notify_one();
+    tokio::time::timeout(
+        std::time::Duration::from_secs(2),
+        second_401_sent.notified(),
+    )
+    .await
+    .expect("timed out waiting for Request 2 401 to be delivered");
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    allow_second_finish.notify_one();
+
+    let (r1, r2) = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        tokio::join!(h1, h2)
+    })
+    .await
+    .expect("timed out waiting for h1/h2 completion");
+    assert_eq!(r1.unwrap().unwrap().status(), StatusCode::OK);
+    assert_eq!(r2.unwrap().unwrap().status(), StatusCode::OK);
+    // Both requests share the single replacement credential cred_1 (2 exchanges total, zero InvalidationDuringExchange).
+    assert_eq!(exchanger.calls.load(Ordering::SeqCst), 2);
+
+    // Late 401 notification referencing stale cred_0 must NOT evict cached cred_1.
+    let cred_1 = mgr.credential(&space, false, now).await.unwrap();
+    assert_ne!(cred_1.jwt, cred_0.jwt);
+    assert!(mgr.evict_credential_if_revoked(
+        &cred_0,
+        StatusCode::UNAUTHORIZED,
+        br#"{"error":"CredentialRevoked"}"#,
+    ));
+    let still_cred_1 = mgr.credential(&space, false, now).await.unwrap();
+    assert_eq!(still_cred_1.jwt, cred_1.jwt);
+    assert_eq!(exchanger.calls.load(Ordering::SeqCst), 2);
+
+    // Matching cred_1 eviction DOES evict cred_1 and trigger exchange #3.
+    assert!(mgr.evict_credential_if_revoked(
+        &cred_1,
+        StatusCode::UNAUTHORIZED,
+        br#"{"error":"CredentialRevoked"}"#,
+    ));
+    let cred_2 = mgr.credential(&space, false, now).await.unwrap();
+    assert_ne!(cred_2.jwt, cred_1.jwt);
+    assert_eq!(exchanger.calls.load(Ordering::SeqCst), 3);
 }
