@@ -32,12 +32,23 @@ pub const MAX_HTTP_SIGNATURE_SKEW_SECS: i64 = 60;
 pub const MAX_NONCE_BYTES: usize = 512;
 
 /// Signed HTTP headers required to present a space credential under RFC 9421.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct SpaceRequestHeaders {
     pub authorization: String,
     pub atproto_space_audience: String,
     pub signature_input: String,
     pub signature: String,
+}
+
+impl core::fmt::Debug for SpaceRequestHeaders {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SpaceRequestHeaders")
+            .field("authorization", &"[REDACTED]")
+            .field("atproto_space_audience", &self.atproto_space_audience)
+            .field("signature_input", &self.signature_input)
+            .field("signature", &"[REDACTED]")
+            .finish()
+    }
 }
 
 impl SpaceRequestHeaders {
@@ -65,7 +76,7 @@ impl SpaceRequestHeaders {
 }
 
 /// Verified RFC 9421 HTTP signature metadata (without JWT claims).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct VerifiedHttpSignature {
     pub credential_jwt: String,
     pub audience: String,
@@ -75,8 +86,21 @@ pub struct VerifiedHttpSignature {
     pub sig_params_line: String,
 }
 
+impl core::fmt::Debug for VerifiedHttpSignature {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("VerifiedHttpSignature")
+            .field("credential_jwt", &"[REDACTED]")
+            .field("audience", &self.audience)
+            .field("created", &self.created)
+            .field("expires", &self.expires)
+            .field("nonce", &self.nonce)
+            .field("sig_params_line", &self.sig_params_line)
+            .finish()
+    }
+}
+
 /// Verified space credential presentation (both RFC 9421 PoP signature and JWT claims).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct VerifiedSpaceHeaders {
     pub credential_jwt: String,
     pub claims: CredentialClaims,
@@ -85,6 +109,20 @@ pub struct VerifiedSpaceHeaders {
     pub created: Option<i64>,
     pub expires: Option<i64>,
     pub sig_params_line: String,
+}
+
+impl core::fmt::Debug for VerifiedSpaceHeaders {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("VerifiedSpaceHeaders")
+            .field("credential_jwt", &"[REDACTED]")
+            .field("claims", &self.claims)
+            .field("audience", &self.audience)
+            .field("nonce", &self.nonce)
+            .field("created", &self.created)
+            .field("expires", &self.expires)
+            .field("sig_params_line", &self.sig_params_line)
+            .finish()
+    }
 }
 
 /// Derive a `did:web:` DID from an HTTP(S) request URL.

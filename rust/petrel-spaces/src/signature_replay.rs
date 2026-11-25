@@ -95,6 +95,12 @@ pub fn replay_key(iss: &str, nonce: &str) -> String {
     format!("{iss}\0{nonce}")
 }
 
+/// Compute the signer-scoped replay cache key for a credential presentation (`(iss, cnf.kid, nonce)`),
+/// preventing cross-client nonce collisions under a shared space authority `iss`.
+pub fn replay_key_for_signer(iss: &str, signer_kid: &str, nonce: &str) -> String {
+    format!("{iss}\0{signer_kid}\0{nonce}")
+}
+
 /// Compute the timestamp until which a presentation's nonce remains valid and must be remembered:
 /// `min(created + max_signature_age_secs, expires + max_clock_skew_secs, credential_exp + credential_expiry_skew_secs)`.
 pub fn replay_window_end(
@@ -115,7 +121,7 @@ pub fn replay_window_end(
     bound
 }
 
-/// Check and record a verified credential presentation in `store`.
+/// Check and record a verified credential presentation in `store` keyed by `(iss, nonce)`.
 ///
 /// Presentations without a `nonce` are untracked (returns `Ok(())`).
 #[allow(clippy::too_many_arguments)]
@@ -135,6 +141,67 @@ pub async fn check_presentation_replay<S: SignatureReplayStore + ?Sized>(
         return Ok(());
     };
     let key = replay_key(iss, nonce);
+    check_presentation_replay_key(
+        store,
+        &key,
+        created,
+        expires,
+        credential_exp,
+        max_signature_age_secs,
+        max_clock_skew_secs,
+        credential_expiry_skew_secs,
+        now,
+    )
+    .await
+}
+
+/// Check and record a verified credential presentation in `store` scoped by `(iss, signer_kid, nonce)`.
+///
+/// Presentations without a `nonce` are untracked (returns `Ok(())`).
+#[allow(clippy::too_many_arguments)]
+pub async fn check_presentation_replay_for_signer<S: SignatureReplayStore + ?Sized>(
+    store: &S,
+    iss: &str,
+    signer_kid: &str,
+    nonce: Option<&str>,
+    created: Option<i64>,
+    expires: Option<i64>,
+    credential_exp: i64,
+    max_signature_age_secs: i64,
+    max_clock_skew_secs: i64,
+    credential_expiry_skew_secs: i64,
+    now: i64,
+) -> Result<()> {
+    let Some(nonce) = nonce else {
+        return Ok(());
+    };
+    let key = replay_key_for_signer(iss, signer_kid, nonce);
+    check_presentation_replay_key(
+        store,
+        &key,
+        created,
+        expires,
+        credential_exp,
+        max_signature_age_secs,
+        max_clock_skew_secs,
+        credential_expiry_skew_secs,
+        now,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn check_presentation_replay_key<S: SignatureReplayStore + ?Sized>(
+    store: &S,
+    key: &str,
+    created: Option<i64>,
+    expires: Option<i64>,
+    credential_exp: i64,
+    max_signature_age_secs: i64,
+    max_clock_skew_secs: i64,
+    credential_expiry_skew_secs: i64,
+    now: i64,
+) -> Result<()> {
     let expires_at = replay_window_end(
         created,
         expires,
@@ -143,7 +210,7 @@ pub async fn check_presentation_replay<S: SignatureReplayStore + ?Sized>(
         max_clock_skew_secs,
         credential_expiry_skew_secs,
     );
-    let fresh = store.check_and_record(&key, expires_at, now).await?;
+    let fresh = store.check_and_record(key, expires_at, now).await?;
     if !fresh {
         return Err(SpaceError::SignatureReplay);
     }

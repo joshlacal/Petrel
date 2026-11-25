@@ -48,7 +48,8 @@ pub use mac_header::{
     verify_commit_mac, verify_record_mac,
 };
 pub use resolver::{
-    DEFAULT_DID_CACHE_TTL_SECS, DEFAULT_PLC_DIRECTORY_URL, SpaceAuthorityEndpoints,
+    DEFAULT_DID_CACHE_MAX_ENTRIES, DEFAULT_DID_CACHE_TTL_SECS, DEFAULT_DID_NEGATIVE_CACHE_TTL_SECS,
+    DEFAULT_FORCE_REFRESH_COOLDOWN_SECS, DEFAULT_PLC_DIRECTORY_URL, SpaceAuthorityEndpoints,
     SpaceDidDocument, SpaceDidResolver, SpaceDidService, SpaceHostResolver,
     SpaceVerificationMethod, StaticDidResolver, did_document_url, extract_authority_endpoints,
     extract_kem_key, extract_service_endpoint, extract_signing_key,
@@ -59,7 +60,8 @@ pub use set_hash::{
 };
 pub use signature_replay::{
     DEFAULT_REPLAY_CLOCK_SKEW_SECS, InMemorySignatureReplayCache, SignatureReplayStore,
-    check_presentation_replay, replay_key, replay_window_end,
+    check_presentation_replay, check_presentation_replay_for_signer, replay_key,
+    replay_key_for_signer, replay_window_end,
 };
 pub use star::{
     DEFAULT_MAX_ARCHIVE_BYTES, SAFE_INT_MAX, SAFE_INT_MIN, STAR_MAGIC, STAR_VERSION,
@@ -77,7 +79,8 @@ pub use tokens::{
     MAX_DELEGATION_LIFETIME_SECS, SigningKeyPair, SigningKeyResolver, generate_jti,
     inspect_credential_token_unverified, inspect_delegation_token_unverified,
     mint_client_attestation_token, mint_credential_token, mint_delegation_token,
-    verify_client_attestation_token, verify_credential_token, verify_delegation_token,
+    mint_delegation_token_with_cnf, verify_client_attestation_token, verify_credential_token,
+    verify_delegation_token,
 };
 
 pub use petrel_core::{AtUri, Cid, Did, Nsid, RecordKey, SpaceRef, Tid, Value};

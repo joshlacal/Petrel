@@ -526,6 +526,7 @@ fn end_to_end_space_host_and_sync_engine_full_lifecycle() {
     // Host processes notifyRepoUpdate
     let space_rev_1 = backend.next_space_rev(1_800_000_000_000_000).unwrap();
     block_on(host.handle_notify_repo_update(
+        &writer_did,
         &NotifyRepoUpdateInput::new(
             space.clone(),
             writer_did.clone(),
@@ -607,8 +608,9 @@ fn end_to_end_space_host_and_sync_engine_full_lifecycle() {
         }
         if uri_str.contains("/xrpc/com.atproto.space.listWriters") {
             let verified =
-                block_on(host_c.verify_presentation(req.headers(), Some(&space_c), now)).unwrap();
+                block_on(host_c.verify_presentation(req.headers(), &space_c, now)).unwrap();
             assert_eq!(verified.claims.iss, host_did_c.as_str());
+            assert!(verified.nonce.is_some());
             let out = block_on(host_c.handle_list_writers(&space_c, None, 100)).unwrap();
             return Some(json_resp(200, &out));
         }
@@ -782,7 +784,7 @@ fn end_to_end_space_host_and_sync_engine_full_lifecycle() {
             .unwrap(),
     );
     let cred_mgr = Arc::new(SpaceCredentialManager::new(exchanger));
-    let engine = SpaceSyncEngine::new(transport, cred_mgr, host_resolver);
+    let engine = SpaceSyncEngine::new(transport.clone(), cred_mgr.clone(), host_resolver);
 
     let host_url = Url::parse("https://host.example.com").unwrap();
     let pds_url = Url::parse("https://pds.example.com").unwrap();
@@ -851,6 +853,7 @@ fn end_to_end_space_host_and_sync_engine_full_lifecycle() {
     // 6. removeWriter & revokeCredentials notice
     let space_rev_2 = backend.next_space_rev(1_800_000_000_000_000).unwrap();
     let removed_update = block_on(host.handle_remove_writer(
+        &host_did,
         &RemoveWriterInput::new(space.clone(), writer_did.clone()),
         space_rev_2,
         now,
@@ -871,6 +874,7 @@ fn end_to_end_space_host_and_sync_engine_full_lifecycle() {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+#[allow(clippy::too_many_lines)]
 #[test]
 fn host_tracks_space_wide_prev_space_rev_across_writers_and_removals() {
     use petrel_api::generated::com::atproto::space::notify_space_update::InputUpdate;
@@ -901,8 +905,12 @@ fn host_tracks_space_wide_prev_space_rev_across_writers_and_removals() {
         })
         .unwrap();
 
-    let host =
-        SpaceHost::with_in_memory_replay(host_did, host_kp, backend.clone(), Arc::new(resolver));
+    let host = SpaceHost::with_in_memory_replay(
+        host_did.clone(),
+        host_kp,
+        backend.clone(),
+        Arc::new(resolver),
+    );
 
     let r1 = backend.next_space_rev(1_800_000_000_000_001).unwrap();
     let r2 = backend.next_space_rev(1_800_000_000_000_002).unwrap();
@@ -915,6 +923,7 @@ fn host_tracks_space_wide_prev_space_rev_across_writers_and_removals() {
     let empty_hash = vec![0_u8; 32];
 
     let u1 = block_on(host.handle_notify_repo_update(
+        &writer_a,
         &NotifyRepoUpdateInput::new(
             space.clone(),
             writer_a.clone(),
@@ -930,6 +939,7 @@ fn host_tracks_space_wide_prev_space_rev_across_writers_and_removals() {
     }
 
     let u2 = block_on(host.handle_notify_repo_update(
+        &writer_b,
         &NotifyRepoUpdateInput::new(
             space.clone(),
             writer_b.clone(),
@@ -945,6 +955,7 @@ fn host_tracks_space_wide_prev_space_rev_across_writers_and_removals() {
     }
 
     let u3 = block_on(host.handle_notify_repo_update(
+        &writer_a,
         &NotifyRepoUpdateInput::new(
             space.clone(),
             writer_a.clone(),
@@ -960,6 +971,7 @@ fn host_tracks_space_wide_prev_space_rev_across_writers_and_removals() {
     }
 
     let u4 = block_on(host.handle_remove_writer(
+        &host_did,
         &RemoveWriterInput::new(space.clone(), writer_b),
         r4.clone(),
         now,
@@ -971,6 +983,7 @@ fn host_tracks_space_wide_prev_space_rev_across_writers_and_removals() {
     }
 
     let u5 = block_on(host.handle_notify_repo_update(
+        &writer_a.clone(),
         &NotifyRepoUpdateInput::new(space, writer_a, writer_rev_3, AtBytes(empty_hash)),
         r5,
     ))
@@ -1203,7 +1216,7 @@ fn sync_writer_ops_verified_rolls_back_on_later_page_failure() {
         minter,
     ));
     let cred_mgr = Arc::new(SpaceCredentialManager::new(exchanger));
-    let engine = SpaceSyncEngine::new(transport, cred_mgr, host_resolver);
+    let engine = SpaceSyncEngine::new(transport.clone(), cred_mgr.clone(), host_resolver);
     let pds_url = Url::parse("https://pds.example.com").unwrap();
 
     // Case 1: Page 1 mutates staged state; Page 2 fails final commit.data hash check.
@@ -1340,7 +1353,7 @@ fn list_active_writers_errors_when_pagination_hits_page_limit() {
         minter,
     ));
     let cred_mgr = Arc::new(SpaceCredentialManager::new(exchanger));
-    let engine = SpaceSyncEngine::new(transport, cred_mgr, host_resolver);
+    let engine = SpaceSyncEngine::new(transport.clone(), cred_mgr.clone(), host_resolver);
     let host_url = Url::parse("https://host.example.com").unwrap();
 
     let err = block_on(engine.list_active_writers(&space, &host_url, Some(&host_did), None, now))
@@ -1351,6 +1364,7 @@ fn list_active_writers_errors_when_pagination_hits_page_limit() {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+#[allow(clippy::too_many_lines)]
 #[test]
 fn host_rejects_stale_and_duplicate_notify_repo_update() {
     use petrel_api::generated::com::atproto::space::{
@@ -1398,6 +1412,7 @@ fn host_rejects_stale_and_duplicate_notify_repo_update() {
     let data_new = vec![0x33_u8; 32];
 
     let ok1 = block_on(host.handle_notify_repo_update(
+        &writer,
         &NotifyRepoUpdateInput::new(
             space.clone(),
             writer.clone(),
@@ -1414,6 +1429,7 @@ fn host_rejects_stale_and_duplicate_notify_repo_update() {
 
     // Stale (older) repo_rev must fail without mutating state or advancing latest_space_rev.
     let stale_err = block_on(host.handle_notify_repo_update(
+        &writer,
         &NotifyRepoUpdateInput::new(space.clone(), writer.clone(), rev_old, AtBytes(data_stale)),
         s2,
     ))
@@ -1429,6 +1445,7 @@ fn host_rejects_stale_and_duplicate_notify_repo_update() {
 
     // Duplicate repo_rev must also be rejected without publishing a new space_rev.
     let dup_err = block_on(host.handle_notify_repo_update(
+        &writer,
         &NotifyRepoUpdateInput::new(
             space.clone(),
             writer.clone(),
@@ -1460,6 +1477,7 @@ fn host_rejects_stale_and_duplicate_notify_repo_update() {
 
     // Subsequent newer repo_rev still links prev_space_rev directly to s1.
     let ok2 = block_on(host.handle_notify_repo_update(
+        &writer.clone(),
         &NotifyRepoUpdateInput::new(space, writer, rev_new, AtBytes(data_new)),
         s4,
     ))
@@ -1627,7 +1645,7 @@ fn recover_writer_repo_via_star_propagates_max_archive_bytes_above_10mib() {
     ));
     let cred_mgr =
         Arc::new(SpaceCredentialManager::new(exchanger).with_max_archive_bytes(16 * 1024 * 1024));
-    let engine = SpaceSyncEngine::new(transport, cred_mgr, host_resolver);
+    let engine = SpaceSyncEngine::new(transport.clone(), cred_mgr.clone(), host_resolver);
     let pds_url = Url::parse("https://pds.example.com").unwrap();
 
     let recovered = block_on(engine.recover_writer_repo_via_star(
@@ -1844,7 +1862,7 @@ fn sync_engine_uses_writer_did_for_audience_and_kem_and_retries_once_on_mac_mism
         minter,
     ));
     let cred_mgr = Arc::new(SpaceCredentialManager::new(exchanger));
-    let engine = SpaceSyncEngine::new(transport, cred_mgr, host_resolver);
+    let engine = SpaceSyncEngine::new(transport.clone(), cred_mgr.clone(), host_resolver);
     let pds_url = Url::parse("https://pds.example.com").unwrap();
 
     // First attempt uses cached old_kem_did_key -> HTTP 200 MacMismatch -> refreshes writer_did KEM once -> succeeds.
@@ -1861,7 +1879,8 @@ fn sync_engine_uses_writer_did_for_audience_and_kem_and_retries_once_on_mac_mism
     assert_eq!(writer_doc_fetches.load(Ordering::SeqCst), 2);
     assert_eq!(get_latest_hits.load(Ordering::SeqCst), 2);
 
-    // When server signs with an unrelated key, MacMismatch refreshes writer_did KEM at most once and errors.
+    // When server signs with an unrelated key immediately after a forced refresh, resolver cooldown
+    // prevents DID fetch amplification (stays at 2) and sync fails with MacMismatch after retrying once.
     use_rogue_kem.store(true, Ordering::SeqCst);
     let err = block_on(engine.get_latest_commit_verified(
         &space,
@@ -1873,6 +1892,399 @@ fn sync_engine_uses_writer_did_for_audience_and_kem_and_retries_once_on_mac_mism
     .unwrap_err();
     assert!(matches!(err, SpaceError::MacMismatch));
     assert_eq!(pds_doc_fetches.load(Ordering::SeqCst), 0);
-    assert_eq!(writer_doc_fetches.load(Ordering::SeqCst), 3);
+    assert_eq!(writer_doc_fetches.load(Ordering::SeqCst), 2);
     assert_eq!(get_latest_hits.load(Ordering::SeqCst), 4);
+
+    // Without force-refresh cooldown (e.g. after cooldown window elapses), MacMismatch refreshes
+    // writer_did KEM at most once per call and still stops with MacMismatch.
+    let unthrottled_resolver = Arc::new(
+        SpaceHostResolver::new(transport.clone())
+            .with_force_refresh_cooldown(std::time::Duration::ZERO),
+    );
+    let unthrottled_engine = SpaceSyncEngine::new(transport, cred_mgr, unthrottled_resolver);
+    let err2 = block_on(unthrottled_engine.get_latest_commit_verified(
+        &space,
+        &writer_did,
+        &pds_url,
+        Some(&pds_did),
+        now,
+    ))
+    .unwrap_err();
+    assert!(matches!(err2, SpaceError::MacMismatch));
+    assert_eq!(pds_doc_fetches.load(Ordering::SeqCst), 0);
+    assert_eq!(writer_doc_fetches.load(Ordering::SeqCst), 4); // 1 initial cache fill + 1 forced refresh
+    assert_eq!(get_latest_hits.load(Ordering::SeqCst), 6);
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+#[allow(clippy::too_many_lines)]
+#[test]
+fn host_enforces_delegation_replay_cnf_binding_presentation_nonce_and_caller_authz() {
+    use http::HeaderMap;
+    use petrel_spaces::{
+        NotifyRegistration, mint_delegation_token_with_cnf, sign_credential_request,
+        sign_credential_request_minimal,
+    };
+
+    let now = 1_800_000_000_i64;
+    let host_did = Did::parse("did:web:host.example.com").unwrap();
+    let other_host = Did::parse("did:web:other.example.com").unwrap();
+    let space_a =
+        parse_space_ref("at:space/did:web:host.example.com/blue.catbird.mlsChat/3l2aaaaaaaaaa")
+            .unwrap();
+    let space_b =
+        parse_space_ref("at:space/did:web:host.example.com/blue.catbird.mlsChat/3l2aaaaaaaaab")
+            .unwrap();
+    let foreign_space =
+        parse_space_ref("at:space/did:web:other.example.com/blue.catbird.mlsChat/3l2aaaaaaaaac")
+            .unwrap();
+
+    let writer = Did::parse("did:plc:writer777777777777777777").unwrap();
+    let reader = Did::parse("did:plc:reader777777777777777777").unwrap();
+    let outsider = Did::parse("did:plc:outsider7777777777777777").unwrap();
+
+    let host_kp = SigningKeyPair::generate_p256().unwrap();
+    let reader_kp = SigningKeyPair::generate_p256().unwrap();
+    let holder_kp_1 = SigningKeyPair::generate_p256().unwrap();
+    let holder_kp_2 = SigningKeyPair::generate_p256().unwrap();
+    let holder_kid_1 = holder_kp_1.did_key().unwrap();
+    let holder_kid_2 = holder_kp_2.did_key().unwrap();
+
+    let mut resolver = StaticDidResolver::new();
+    resolver.insert_keypair(&host_did, &host_kp, Some("https://host.example.com"));
+    resolver.insert_keypair(&reader, &reader_kp, None);
+    let resolver = Arc::new(resolver);
+
+    let backend = Arc::new(InMemorySpaceHostBackend::new());
+    let mut readers = HashSet::new();
+    readers.insert(reader.clone());
+    let mut writers = HashSet::new();
+    writers.insert(writer.clone());
+    for space in [&space_a, &space_b] {
+        backend
+            .put_space(petrel_spaces::HostedSpace {
+                space: space.clone(),
+                policy: OutputPolicy::MemberspacePolicy(Box::new(MemberspacePolicy::new())),
+                allowed_readers: readers.clone(),
+                allowed_writers: writers.clone(),
+                deleted: false,
+            })
+            .unwrap();
+    }
+
+    let host =
+        SpaceHost::with_in_memory_replay(host_did.clone(), host_kp, backend.clone(), resolver);
+
+    // 1. Foreign space authority rejected on authorizeSpaceSync / verify_presentation / notify / remove.
+    let foreign_del = mint_delegation_token(
+        &reader_kp,
+        &reader,
+        &other_host,
+        &foreign_space,
+        now,
+        now + 60,
+        None,
+        None,
+    )
+    .unwrap();
+    assert!(matches!(
+        block_on(host.handle_authorize_space_sync(
+            &AuthorizeSpaceSyncInput::new(foreign_space.clone(), holder_kid_1.clone()),
+            Some(&foreign_del),
+            now,
+        )),
+        Err(SpaceError::InvalidSubject(_))
+    ));
+
+    // 2. Delegation cnf.kid binding mismatch rejected; matching cnf.kid succeeds once and cannot replay.
+    let bound_del = mint_delegation_token_with_cnf(
+        &reader_kp,
+        &reader,
+        &host_did,
+        &space_a,
+        Some(&holder_kid_1),
+        now,
+        now + 60,
+        Some("del-jti-once"),
+        None,
+    )
+    .unwrap();
+    assert!(matches!(
+        block_on(host.handle_authorize_space_sync(
+            &AuthorizeSpaceSyncInput::new(space_a.clone(), holder_kid_2.clone()),
+            Some(&bound_del),
+            now,
+        )),
+        Err(SpaceError::TokenRejected { .. })
+    ));
+
+    let (auth_out_1, _) = block_on(host.handle_authorize_space_sync(
+        &AuthorizeSpaceSyncInput::new(space_a.clone(), holder_kid_1.clone()),
+        Some(&bound_del),
+        now,
+    ))
+    .unwrap();
+    assert!(matches!(
+        block_on(host.handle_authorize_space_sync(
+            &AuthorizeSpaceSyncInput::new(space_a.clone(), holder_kid_1.clone()),
+            Some(&bound_del),
+            now,
+        )),
+        Err(SpaceError::TokenRejected { .. })
+    ));
+
+    // Mint second credential under holder_kp_2 for cross-holder nonce scoping test.
+    let del_2 = mint_delegation_token_with_cnf(
+        &reader_kp,
+        &reader,
+        &host_did,
+        &space_a,
+        Some(&holder_kid_2),
+        now,
+        now + 60,
+        Some("del-jti-2"),
+        None,
+    )
+    .unwrap();
+    let (auth_out_2, _) = block_on(host.handle_authorize_space_sync(
+        &AuthorizeSpaceSyncInput::new(space_a.clone(), holder_kid_2.clone()),
+        Some(&del_2),
+        now,
+    ))
+    .unwrap();
+
+    // 3. Presentation requires nonce by default, rejects wrong target space, and scopes nonces per holder key.
+    let min_hdrs =
+        sign_credential_request_minimal(&auth_out_1.credential, &holder_kp_1, host_did.as_str())
+            .unwrap();
+    let mut min_map = HeaderMap::new();
+    min_hdrs.apply_to_header_map(&mut min_map).unwrap();
+    assert!(matches!(
+        block_on(host.verify_presentation(&min_map, &space_a, now)),
+        Err(SpaceError::MissingHeader(_))
+    ));
+
+    let hdrs_1 = sign_credential_request(
+        &auth_out_1.credential,
+        &holder_kp_1,
+        host_did.as_str(),
+        now,
+        Some("shared-nonce-1"),
+    )
+    .unwrap();
+    let mut map_1 = HeaderMap::new();
+    hdrs_1.apply_to_header_map(&mut map_1).unwrap();
+    assert!(matches!(
+        block_on(host.verify_presentation(&map_1, &space_b, now)),
+        Err(SpaceError::InvalidSubject(_))
+    ));
+    block_on(host.verify_presentation(&map_1, &space_a, now)).unwrap();
+    assert!(matches!(
+        block_on(host.verify_presentation(&map_1, &space_a, now)),
+        Err(SpaceError::SignatureReplay)
+    ));
+
+    // Different holder key using the same nonce string succeeds once, then replays.
+    let hdrs_2 = sign_credential_request(
+        &auth_out_2.credential,
+        &holder_kp_2,
+        host_did.as_str(),
+        now,
+        Some("shared-nonce-1"),
+    )
+    .unwrap();
+    let mut map_2 = HeaderMap::new();
+    hdrs_2.apply_to_header_map(&mut map_2).unwrap();
+    block_on(host.verify_presentation(&map_2, &space_a, now)).unwrap();
+    assert!(matches!(
+        block_on(host.verify_presentation(&map_2, &space_a, now)),
+        Err(SpaceError::SignatureReplay)
+    ));
+
+    // 4. notifyRepoUpdate and removeWriter enforce caller identity, 32B commitment, and deleted-space guard.
+    let s1 = backend.next_space_rev(1_800_000_000_000_100).unwrap();
+    let s2 = backend.next_space_rev(1_800_000_000_000_101).unwrap();
+    let r_rev = Tid::parse("3l2aaaaaaaaaa").unwrap();
+    assert!(matches!(
+        block_on(host.handle_notify_repo_update(
+            &outsider,
+            &NotifyRepoUpdateInput::new(
+                space_a.clone(),
+                writer.clone(),
+                r_rev.clone(),
+                AtBytes(vec![0_u8; 32]),
+            ),
+            s1.clone(),
+        )),
+        Err(SpaceError::Forbidden(_))
+    ));
+    assert!(matches!(
+        block_on(host.handle_notify_repo_update(
+            &writer,
+            &NotifyRepoUpdateInput::new(
+                space_a.clone(),
+                writer.clone(),
+                r_rev.clone(),
+                AtBytes(vec![0_u8; 31]),
+            ),
+            s1.clone(),
+        )),
+        Err(SpaceError::MalformedPayload(_))
+    ));
+    assert!(matches!(
+        block_on(host.handle_remove_writer(
+            &outsider,
+            &RemoveWriterInput::new(space_a.clone(), writer.clone()),
+            s1.clone(),
+            now,
+        )),
+        Err(SpaceError::Forbidden(_))
+    ));
+    // Self-removal by writer succeeds on active space.
+    block_on(host.handle_remove_writer(
+        &writer,
+        &RemoveWriterInput::new(space_a.clone(), writer.clone()),
+        s1,
+        now,
+    ))
+    .unwrap();
+
+    // Deleted space rejects both notifyRepoUpdate and removeWriter.
+    backend
+        .put_space(petrel_spaces::HostedSpace {
+            space: space_a.clone(),
+            policy: OutputPolicy::MemberspacePolicy(Box::new(MemberspacePolicy::new())),
+            allowed_readers: readers,
+            allowed_writers: writers,
+            deleted: true,
+        })
+        .unwrap();
+    assert!(matches!(
+        block_on(host.handle_notify_repo_update(
+            &writer,
+            &NotifyRepoUpdateInput::new(
+                space_a.clone(),
+                writer.clone(),
+                r_rev,
+                AtBytes(vec![0_u8; 32]),
+            ),
+            s2.clone(),
+        )),
+        Err(SpaceError::SpaceDeleted(_))
+    ));
+    assert!(matches!(
+        block_on(host.handle_remove_writer(
+            &host_did,
+            &RemoveWriterInput::new(space_a.clone(), writer),
+            s2,
+            now,
+        )),
+        Err(SpaceError::SpaceDeleted(_))
+    ));
+
+    // 5. Redacted Debug impls on SpaceCredential and NotifyRegistration hide secret tokens.
+    let cred = SpaceCredential::from_issued_jwt(
+        auth_out_1.credential.clone(),
+        holder_kp_1,
+        &space_a,
+        None,
+    )
+    .unwrap();
+    let cred_dbg = format!("{cred:?}");
+    assert!(!cred_dbg.contains(&auth_out_1.credential));
+    assert!(cred_dbg.contains("[REDACTED]"));
+
+    let reg = NotifyRegistration {
+        space: space_a,
+        endpoint: "https://syncer.example.com/notify".to_owned(),
+        token: "secret-notify-token".to_owned(),
+        challenge: "secret-notify-challenge".to_owned(),
+        confirmed: false,
+        created_at: now,
+    };
+    let reg_dbg = format!("{reg:?}");
+    assert!(!reg_dbg.contains("secret-notify-token"));
+    assert!(!reg_dbg.contains("secret-notify-challenge"));
+    assert!(reg_dbg.contains("[REDACTED]"));
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+#[test]
+fn resolver_throttles_force_refresh_caches_negative_and_bounds_entries() {
+    use petrel_spaces::SpaceDidResolver;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
+
+    let did_1 = Did::parse("did:plc:cache1111111111111111111").unwrap();
+    let did_2 = Did::parse("did:plc:cache2222222222222222222").unwrap();
+    let did_3 = Did::parse("did:plc:cache3333333333333333333").unwrap();
+    let did_404 = Did::parse("did:plc:missing40444444444444444").unwrap();
+
+    let hits = Arc::new(AtomicUsize::new(0));
+    let hits_c = hits.clone();
+    let transport_impl = Arc::new(ScriptedTransport::default());
+    transport_impl.push(move |req| {
+        hits_c.fetch_add(1, Ordering::SeqCst);
+        let uri_str = req.uri().to_string();
+        if let Some(did_str) = uri_str.strip_prefix("https://plc.directory/") {
+            if did_str == "did:plc:missing40444444444444444" {
+                return Some(Response::builder().status(404).body(Bytes::new()).unwrap());
+            }
+            return Some(json_resp(
+                200,
+                &serde_json::json!({
+                    "id": did_str,
+                    "service": [{
+                        "id": "#atproto_space",
+                        "type": "AtprotoSpaceHost",
+                        "serviceEndpoint": "https://space.example.com"
+                    }]
+                }),
+            ));
+        }
+        None
+    });
+
+    let transport: SharedTransport = transport_impl;
+    let resolver = SpaceHostResolver::new(transport)
+        .with_max_cache_entries(2)
+        .with_negative_cache_ttl(Duration::from_secs(60))
+        .with_force_refresh_cooldown(Duration::from_secs(60));
+
+    // Negative cache: 404 fetched once, second !force_refresh hits negative cache, first force_refresh retries once,
+    // second force_refresh within cooldown is throttled.
+    assert!(matches!(
+        block_on(resolver.resolve_did_document(&did_404, false)),
+        Err(SpaceError::DidDocumentNotFound(_))
+    ));
+    assert_eq!(hits.load(Ordering::SeqCst), 1);
+    assert!(matches!(
+        block_on(resolver.resolve_did_document(&did_404, false)),
+        Err(SpaceError::DidDocumentNotFound(_))
+    ));
+    assert_eq!(hits.load(Ordering::SeqCst), 1);
+    assert!(matches!(
+        block_on(resolver.resolve_did_document(&did_404, true)),
+        Err(SpaceError::DidDocumentNotFound(_))
+    ));
+    assert_eq!(hits.load(Ordering::SeqCst), 2);
+    assert!(matches!(
+        block_on(resolver.resolve_did_document(&did_404, true)),
+        Err(SpaceError::DidDocumentNotFound(_))
+    ));
+    assert_eq!(hits.load(Ordering::SeqCst), 2);
+
+    // Cache bounding (max_cache_entries = 2): loading did_1, did_2, did_3 evicts oldest entries cleanly.
+    block_on(resolver.resolve_did_document(&did_1, false)).unwrap();
+    block_on(resolver.resolve_did_document(&did_2, false)).unwrap();
+    block_on(resolver.resolve_did_document(&did_3, false)).unwrap();
+    let before = hits.load(Ordering::SeqCst);
+    // did_2 and did_3 are cached (0 network hits); did_1 was evicted so resolving it hits network once.
+    block_on(resolver.resolve_did_document(&did_3, false)).unwrap();
+    block_on(resolver.resolve_did_document(&did_2, false)).unwrap();
+    assert_eq!(hits.load(Ordering::SeqCst), before);
+    block_on(resolver.resolve_did_document(&did_1, false)).unwrap();
+    assert_eq!(hits.load(Ordering::SeqCst), before + 1);
 }

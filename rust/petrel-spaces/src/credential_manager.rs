@@ -34,7 +34,7 @@ pub const CREDENTIAL_REFRESH_MARGIN_SECS: i64 = 30;
 pub const CREDENTIAL_REVOKED_ERROR_NAME: &str = "CredentialRevoked";
 
 /// Active proof-of-possession space credential and its bound P-256 `cnf` signing keypair.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SpaceCredential {
     pub jwt: String,
     pub space: SpaceRef,
@@ -45,6 +45,21 @@ pub struct SpaceCredential {
     pub issued_at: i64,
     pub expires_at: i64,
     pub pds_did: Option<Did>,
+}
+
+impl core::fmt::Debug for SpaceCredential {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SpaceCredential")
+            .field("jwt", &"[REDACTED]")
+            .field("space", &self.space)
+            .field("issuer", &self.issuer)
+            .field("jti", &self.jti)
+            .field("cnf_kid", &self.cnf_kid)
+            .field("issued_at", &self.issued_at)
+            .field("expires_at", &self.expires_at)
+            .field("pds_did", &self.pds_did)
+            .finish_non_exhaustive()
+    }
 }
 
 impl SpaceCredential {
@@ -613,8 +628,19 @@ impl<E: CredentialExchanger> SpaceCredentialManager<E> {
     ) -> Result<Response<Bytes>> {
         for attempt in 0..2 {
             let force_refresh = attempt > 0;
+            let fresh_nonce = match nonce {
+                Some(_) => None,
+                None => Some(generate_jti()?),
+            };
             let (_cred, sig_headers) = self
-                .sign_request(space, url, explicit_server_did, force_refresh, now, nonce)
+                .sign_request(
+                    space,
+                    url,
+                    explicit_server_did,
+                    force_refresh,
+                    now,
+                    nonce.or(fresh_nonce.as_deref()),
+                )
                 .await?;
             let mut merged = extra_headers.clone();
             sig_headers.apply_to_header_map(&mut merged)?;

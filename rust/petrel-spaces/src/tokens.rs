@@ -187,6 +187,8 @@ pub struct DelegationClaims {
     pub iat: i64,
     pub exp: i64,
     pub jti: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cnf: Option<CnfClaim>,
 }
 
 impl DelegationClaims {
@@ -262,7 +264,26 @@ pub fn mint_delegation_token(
     jti: Option<&str>,
     kid: Option<&str>,
 ) -> Result<String> {
+    mint_delegation_token_with_cnf(signing_key, iss, aud, sub, None, iat, exp, jti, kid)
+}
+
+/// Mint and sign a space delegation JWT optionally bound to a holder `cnf.kid` P-256 `did:key:`.
+#[allow(clippy::too_many_arguments)]
+pub fn mint_delegation_token_with_cnf(
+    signing_key: &SigningKeyPair,
+    iss: &Did,
+    aud: &Did,
+    sub: &SpaceRef,
+    cnf_kid: Option<&str>,
+    iat: i64,
+    exp: i64,
+    jti: Option<&str>,
+    kid: Option<&str>,
+) -> Result<String> {
     validate_lifetime(iat, exp, MAX_DELEGATION_LIFETIME_SECS)?;
+    if let Some(cnf) = cnf_kid {
+        validate_did_key(cnf)?;
+    }
     let jti_owned = match jti {
         Some(s) => s.to_owned(),
         None => generate_jti()?,
@@ -279,6 +300,7 @@ pub fn mint_delegation_token(
         iat,
         exp,
         jti: jti_owned,
+        cnf: cnf_kid.map(|k| CnfClaim { kid: k.to_owned() }),
     };
     encode_jwt(&header, &claims, signing_key)
 }
@@ -416,6 +438,9 @@ pub fn inspect_delegation_token_unverified(token: &str) -> Result<(JwtHeader, De
     let iss = Did::parse(&claims.iss).map_err(|e| SpaceError::InvalidDid(e.to_string()))?;
     let _ = Did::parse(&claims.aud).map_err(|e| SpaceError::InvalidDid(e.to_string()))?;
     let _ = validate_atproto_signing_kid(header.kid.as_deref(), &iss, "delegation")?;
+    if let Some(cnf) = &claims.cnf {
+        validate_did_key(&cnf.kid)?;
+    }
     if claims.jti.is_empty() {
         return Err(SpaceError::MalformedPayload("empty jti claim".into()));
     }
@@ -448,6 +473,9 @@ pub async fn verify_delegation_token<R: SigningKeyResolver + ?Sized>(
         SpaceError::LegacySpaceUriRejected(_) => e,
         other => SpaceError::InvalidSubject(other.to_string()),
     })?;
+    if let Some(cnf) = &claims.cnf {
+        validate_did_key(&cnf.kid)?;
+    }
     if claims.jti.is_empty() {
         return Err(SpaceError::MalformedPayload("empty jti claim".into()));
     }
@@ -551,6 +579,11 @@ pub async fn verify_client_attestation_token<R: SigningKeyResolver + ?Sized>(
             "invalid client attestation JOSE kid".into(),
         ));
     }
+    if kid == "#atproto_kem" || kid.ends_with("#atproto_kem") {
+        return Err(SpaceError::Unauthorized(
+            "client attestation cannot verify with #atproto_kem key-agreement method".into(),
+        ));
+    }
     verify_with_single_refresh(resolver, &iss, kid, &header.alg, &signing_input, &sig).await?;
     Ok(claims)
 }
@@ -637,6 +670,16 @@ fn parse_jwt_parts<C: for<'de> Deserialize<'de>>(
         .map_err(|e| SpaceError::MalformedPayload(e.to_string()))?;
     let sig = JWTBase64URL::decode(sig_b64, 256).map_err(|_| SpaceError::InvalidSignature)?;
 
+    let header_fields: std::collections::BTreeMap<String, serde_json::Value> =
+        StrictJSON::decode(&header_bytes)
+            .map_err(|e| SpaceError::MalformedHeader(e.to_string()))?;
+    for forbidden in ["crit", "jwk", "b64", "x5c", "jku"] {
+        if header_fields.contains_key(forbidden) {
+            return Err(SpaceError::MalformedHeader(format!(
+                "unsupported JOSE header parameter '{forbidden}'"
+            )));
+        }
+    }
     let header: JwtHeader = StrictJSON::decode(&header_bytes)
         .map_err(|e| SpaceError::MalformedHeader(e.to_string()))?;
     let claims: C = StrictJSON::decode(&claims_bytes)
@@ -699,5 +742,13 @@ fn audience_matches(claims_aud: &str, claims_did: &Did, expected: &str) -> bool 
     if claims_aud == expected {
         return true;
     }
-    !expected.contains('#') && claims_did.as_str() == expected
+    if expected.contains('#') {
+        return false;
+    }
+    let Some((did_part, frag)) = claims_aud.split_once('#') else {
+        return false;
+    };
+    did_part == expected
+        && claims_did.as_str() == expected
+        && matches!(frag, "atproto_pds" | "atproto_space")
 }

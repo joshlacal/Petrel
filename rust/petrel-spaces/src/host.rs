@@ -28,7 +28,7 @@ use crate::error::{Result, SpaceError, parse_space_ref};
 use crate::http_signature::{VerifiedSpaceHeaders, verify_credential_request};
 use crate::signature_replay::{
     DEFAULT_REPLAY_CLOCK_SKEW_SECS, InMemorySignatureReplayCache, SignatureReplayStore,
-    check_presentation_replay,
+    check_presentation_replay_for_signer,
 };
 use crate::tokens::{
     MAX_CREDENTIAL_LIFETIME_SECS, SigningKeyPair, SigningKeyResolver, generate_jti,
@@ -39,7 +39,7 @@ use crate::tokens::{
 pub const DEFAULT_CREDENTIAL_TTL_SECS: i64 = MAX_CREDENTIAL_LIFETIME_SECS;
 
 /// Registered notification callback for a space syncer.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct NotifyRegistration {
     pub space: SpaceRef,
     pub endpoint: String,
@@ -47,6 +47,19 @@ pub struct NotifyRegistration {
     pub challenge: String,
     pub confirmed: bool,
     pub created_at: i64,
+}
+
+impl core::fmt::Debug for NotifyRegistration {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("NotifyRegistration")
+            .field("space", &self.space)
+            .field("endpoint", &self.endpoint)
+            .field("token", &"[REDACTED]")
+            .field("challenge", &"[REDACTED]")
+            .field("confirmed", &self.confirmed)
+            .field("created_at", &self.created_at)
+            .finish()
+    }
 }
 
 /// Persisted writer entry stored by a space host.
@@ -464,6 +477,7 @@ pub struct SpaceHost<
     did_resolver: Arc<R>,
     replay_store: Arc<S>,
     credential_ttl_secs: i64,
+    require_presentation_nonce: bool,
 }
 
 impl<B: SpaceHostBackend, R: SigningKeyResolver, S: SignatureReplayStore> core::fmt::Debug
@@ -473,6 +487,10 @@ impl<B: SpaceHostBackend, R: SigningKeyResolver, S: SignatureReplayStore> core::
         f.debug_struct("SpaceHost")
             .field("host_did", &self.host_did)
             .field("credential_ttl_secs", &self.credential_ttl_secs)
+            .field(
+                "require_presentation_nonce",
+                &self.require_presentation_nonce,
+            )
             .finish_non_exhaustive()
     }
 }
@@ -509,6 +527,7 @@ impl<B: SpaceHostBackend, R: SigningKeyResolver, S: SignatureReplayStore> SpaceH
             did_resolver,
             replay_store,
             credential_ttl_secs: DEFAULT_CREDENTIAL_TTL_SECS,
+            require_presentation_nonce: true,
         }
     }
 
@@ -518,8 +537,27 @@ impl<B: SpaceHostBackend, R: SigningKeyResolver, S: SignatureReplayStore> SpaceH
         self
     }
 
+    /// Require (`true`, default) or allow omitting RFC 9421 `nonce` on incoming credential
+    /// presentations verified by [`SpaceHost::verify_presentation`].
+    #[must_use]
+    pub fn with_require_presentation_nonce(mut self, require: bool) -> Self {
+        self.require_presentation_nonce = require;
+        self
+    }
+
     pub fn host_did(&self) -> &Did {
         &self.host_did
+    }
+
+    fn ensure_hosted_by_self(&self, space: &SpaceRef) -> Result<()> {
+        if space.space_did() != &self.host_did {
+            return Err(SpaceError::InvalidSubject(format!(
+                "space authority '{}' does not match host '{}'",
+                space.space_did(),
+                self.host_did
+            )));
+        }
+        Ok(())
     }
 
     /// Handle `com.atproto.space.authorizeSpaceSync`.
@@ -535,6 +573,7 @@ impl<B: SpaceHostBackend, R: SigningKeyResolver, S: SignatureReplayStore> SpaceH
         now_secs: i64,
     ) -> Result<(AuthorizeSpaceSyncOutput, Option<NotifyRegistration>)> {
         let space = parse_space_ref(input.space.as_str())?;
+        self.ensure_hosted_by_self(&space)?;
         let _ = P256DIDKey::parse(&input.credential_key)
             .map_err(|e| SpaceError::InvalidKemKey(e.to_string()))?;
 
@@ -555,6 +594,16 @@ impl<B: SpaceHostBackend, R: SigningKeyResolver, S: SignatureReplayStore> SpaceH
                 "delegation sub '{claimed_space}' does not match requested space '{space}'"
             )));
         }
+        if claims
+            .cnf
+            .as_ref()
+            .is_some_and(|cnf| cnf.kid != input.credential_key)
+        {
+            return Err(SpaceError::TokenRejected {
+                space: space.as_str().to_owned(),
+                detail: Some("delegation cnf.kid does not match credentialKey".to_owned()),
+            });
+        }
 
         let hosted = self
             .backend
@@ -570,6 +619,20 @@ impl<B: SpaceHostBackend, R: SigningKeyResolver, S: SignatureReplayStore> SpaceH
             return Err(SpaceError::AuthorizationRefused {
                 space: space.as_str().to_owned(),
                 detail: Some(format!("{user} is not authorized to sync space")),
+            });
+        }
+
+        // Single-use delegation jti replay claim scoped to the delegating issuer DID.
+        let delegation_replay_key = format!("delegation\0{}\0{}", user.as_str(), claims.jti);
+        let delegation_exp = claims.exp.saturating_add(DEFAULT_REPLAY_CLOCK_SKEW_SECS);
+        if !self
+            .replay_store
+            .check_and_record(&delegation_replay_key, delegation_exp, now_secs)
+            .await?
+        {
+            return Err(SpaceError::TokenRejected {
+                space: space.as_str().to_owned(),
+                detail: Some("replayed delegation jti".to_owned()),
             });
         }
 
@@ -636,14 +699,15 @@ impl<B: SpaceHostBackend, R: SigningKeyResolver, S: SignatureReplayStore> SpaceH
         Ok(())
     }
 
-    /// Verify an incoming RFC 9421 space credential presentation, enforcing replay protection
-    /// and credential revocation status.
+    /// Verify an incoming RFC 9421 space credential presentation for `expected_space`,
+    /// enforcing host authority matching, replay protection, and revocation status.
     pub async fn verify_presentation(
         &self,
         headers: &HeaderMap,
-        expected_space: Option<&SpaceRef>,
+        expected_space: &SpaceRef,
         now_secs: i64,
     ) -> Result<VerifiedSpaceHeaders> {
+        self.ensure_hosted_by_self(expected_space)?;
         let verified = verify_credential_request(
             headers,
             self.host_did.as_str(),
@@ -653,11 +717,10 @@ impl<B: SpaceHostBackend, R: SigningKeyResolver, S: SignatureReplayStore> SpaceH
         .await?;
 
         let space = verified.claims.space_ref()?;
-        if let Some(exp_space) = expected_space
-            && &space != exp_space
-        {
+        self.ensure_hosted_by_self(&space)?;
+        if &space != expected_space {
             return Err(SpaceError::InvalidSubject(format!(
-                "credential sub '{space}' does not match '{exp_space}'"
+                "credential sub '{space}' does not match '{expected_space}'"
             )));
         }
 
@@ -673,9 +736,14 @@ impl<B: SpaceHostBackend, R: SigningKeyResolver, S: SignatureReplayStore> SpaceH
             });
         }
 
-        check_presentation_replay(
+        if self.require_presentation_nonce && verified.nonce.is_none() {
+            return Err(SpaceError::MissingHeader("Signature-Input nonce".into()));
+        }
+
+        check_presentation_replay_for_signer(
             self.replay_store.as_ref(),
             &verified.claims.iss,
+            &verified.claims.cnf.kid,
             verified.nonce.as_deref(),
             verified.created,
             verified.expires,
@@ -697,6 +765,7 @@ impl<B: SpaceHostBackend, R: SigningKeyResolver, S: SignatureReplayStore> SpaceH
         cursor: Option<&str>,
         limit: usize,
     ) -> Result<ListWritersOutput> {
+        self.ensure_hosted_by_self(space)?;
         let hosted = self
             .backend
             .get_space(space)
@@ -735,14 +804,29 @@ impl<B: SpaceHostBackend, R: SigningKeyResolver, S: SignatureReplayStore> SpaceH
         })
     }
 
-    /// Handle `com.atproto.space.notifyRepoUpdate`, returning an outbound `NotifySpaceUpdate`
-    /// update variant (`RepoWrite` with `prev_space_rev`).
+    /// Handle `com.atproto.space.notifyRepoUpdate`, enforcing authenticated writer identity (`caller == input.repo`),
+    /// non-deleted space authorization, 32-byte commitment length, and monotonic `repo_rev`,
+    /// returning an outbound `NotifySpaceUpdate` update variant (`RepoWrite` with `prev_space_rev`).
     pub async fn handle_notify_repo_update(
         &self,
+        caller: &Did,
         input: &NotifyRepoUpdateInput,
         space_rev: Tid,
     ) -> Result<InputUpdate> {
         let space = parse_space_ref(input.space.as_str())?;
+        self.ensure_hosted_by_self(&space)?;
+        if caller != &input.repo {
+            return Err(SpaceError::Forbidden(format!(
+                "notifyRepoUpdate caller '{caller}' must match repo DID '{}'",
+                input.repo
+            )));
+        }
+        if input.data.0.len() != 32 {
+            return Err(SpaceError::MalformedPayload(format!(
+                "notifyRepoUpdate data must be 32 bytes, got {}",
+                input.data.0.len()
+            )));
+        }
         let hosted = self
             .backend
             .get_space(&space)
@@ -777,19 +861,33 @@ impl<B: SpaceHostBackend, R: SigningKeyResolver, S: SignatureReplayStore> SpaceH
         Ok(InputUpdate::RepoWrite(Box::new(write)))
     }
 
-    /// Handle `com.atproto.space.removeWriter`, returning `RepoRemoved`.
+    /// Handle `com.atproto.space.removeWriter`, enforcing authenticated space authority or self-removal
+    /// (`caller == space.space_did() || caller == input.repo`) on an active non-deleted space,
+    /// returning `RepoRemoved`.
     pub async fn handle_remove_writer(
         &self,
+        caller: &Did,
         input: &RemoveWriterInput,
         space_rev: Tid,
         now_secs: i64,
     ) -> Result<InputUpdate> {
         let space = parse_space_ref(input.space.as_str())?;
-        let _ = self
+        self.ensure_hosted_by_self(&space)?;
+        let hosted = self
             .backend
             .get_space(&space)
             .await?
             .ok_or_else(|| SpaceError::SpaceNotFound(space.as_str().to_owned()))?;
+        if hosted.deleted {
+            return Err(SpaceError::SpaceDeleted(space.as_str().to_owned()));
+        }
+        if caller != space.space_did() && caller != &input.repo {
+            return Err(SpaceError::Forbidden(format!(
+                "removeWriter caller '{caller}' must be space authority '{}' or target repo '{}'",
+                space.space_did(),
+                input.repo
+            )));
+        }
         let prev = self
             .backend
             .remove_writer(&space, &input.repo, &space_rev, now_secs)
@@ -801,6 +899,7 @@ impl<B: SpaceHostBackend, R: SigningKeyResolver, S: SignatureReplayStore> SpaceH
 
     /// Handle `com.atproto.space.getSpace`.
     pub async fn handle_get_space(&self, space: &SpaceRef) -> Result<GetSpaceOutput> {
+        self.ensure_hosted_by_self(space)?;
         let hosted = self
             .backend
             .get_space(space)

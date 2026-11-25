@@ -26,6 +26,12 @@ use crate::tokens::{SigningKeyPair, SigningKeyResolver};
 pub const DEFAULT_PLC_DIRECTORY_URL: &str = "https://plc.directory";
 /// Default cache TTL for DID documents resolved over HTTP (5 minutes).
 pub const DEFAULT_DID_CACHE_TTL_SECS: u64 = 300;
+/// Default negative-cache TTL for failed/missing DID document lookups (15 seconds).
+pub const DEFAULT_DID_NEGATIVE_CACHE_TTL_SECS: u64 = 15;
+/// Default per-DID cooldown between forced DID refreshes (10 seconds).
+pub const DEFAULT_FORCE_REFRESH_COOLDOWN_SECS: u64 = 10;
+/// Default maximum number of cached DID entries held in memory.
+pub const DEFAULT_DID_CACHE_MAX_ENTRIES: usize = 4_096;
 
 /// Resolved service endpoints and keys for a space's authority DID.
 #[derive(Debug, Clone)]
@@ -201,11 +207,23 @@ pub fn extract_kem_key(doc: &SpaceDidDocument) -> Result<(String, String)> {
     Ok((vm.id.clone(), did_key))
 }
 
-/// Extract an ATProto JWT verification key (`#atproto` by default) from a DID document.
+/// Extract an ATProto JWT verification key (`#atproto` by default) from a DID document,
+/// rejecting `#atproto_kem` and key-agreement verification methods.
 pub fn extract_signing_key(doc: &SpaceDidDocument, kid: &str) -> Result<ATProtoJWTVerificationKey> {
+    if doc.normalize_id_against_doc(kid) == Some("#atproto_kem") || kid.ends_with("#atproto_kem") {
+        return Err(SpaceError::Unauthorized(format!(
+            "cannot verify JWT signature with key-agreement method '{kid}'"
+        )));
+    }
     let vm = doc.verification_method(kid).ok_or_else(|| {
         SpaceError::SigningKeyNotFound(format!("{} missing {kid} verificationMethod", doc.id))
     })?;
+    if doc.normalize_id_against_doc(&vm.id) == Some("#atproto_kem") {
+        return Err(SpaceError::Unauthorized(format!(
+            "cannot verify JWT signature with key-agreement method '{}'",
+            vm.id
+        )));
+    }
     verification_method_to_jwt_key(vm)
 }
 
@@ -294,6 +312,12 @@ fn verification_method_to_p256_kem_did_key(vm: &SpaceVerificationMethod) -> Resu
 fn verification_method_to_jwt_key(
     vm: &SpaceVerificationMethod,
 ) -> Result<ATProtoJWTVerificationKey> {
+    if vm.kind == "P256KeyAgreement" || vm.kind.contains("KeyAgreement") {
+        return Err(SpaceError::Unauthorized(format!(
+            "cannot verify JWT signature with key-agreement verificationMethod '{}' ({})",
+            vm.id, vm.kind
+        )));
+    }
     if let Some(mb) = vm.public_key_multibase.as_deref().filter(|s| !s.is_empty()) {
         if vm.kind == "Multikey" {
             let decoded = PLCDIDKeyCodec::decode_multikey(mb)
@@ -481,10 +505,17 @@ impl SigningKeyResolver for StaticDidResolver {
     }
 }
 
-#[derive(Debug, Clone)]
-struct CachedDidDoc {
-    doc: SpaceDidDocument,
-    fetched_at: Instant,
+#[derive(Clone)]
+enum CachedEntryState {
+    Doc(SpaceDidDocument),
+    Negative { message: String, not_found: bool },
+}
+
+#[derive(Clone)]
+struct CacheEntry {
+    state: CachedEntryState,
+    cached_at: Instant,
+    last_forced_refresh: Option<Instant>,
 }
 
 /// HTTP-backed DID resolver + Space host endpoint resolver built on `petrel::net::SharedTransport`.
@@ -493,7 +524,10 @@ pub struct SpaceHostResolver {
     plc_directory_base: Url,
     allow_http_localhost: bool,
     cache_ttl: Duration,
-    cache: Arc<Mutex<HashMap<Did, CachedDidDoc>>>,
+    negative_cache_ttl: Duration,
+    force_refresh_cooldown: Duration,
+    max_cache_entries: usize,
+    cache: Arc<Mutex<HashMap<Did, CacheEntry>>>,
 }
 
 impl core::fmt::Debug for SpaceHostResolver {
@@ -502,6 +536,9 @@ impl core::fmt::Debug for SpaceHostResolver {
             .field("plc_directory_base", &self.plc_directory_base)
             .field("allow_http_localhost", &self.allow_http_localhost)
             .field("cache_ttl", &self.cache_ttl)
+            .field("negative_cache_ttl", &self.negative_cache_ttl)
+            .field("force_refresh_cooldown", &self.force_refresh_cooldown)
+            .field("max_cache_entries", &self.max_cache_entries)
             .finish_non_exhaustive()
     }
 }
@@ -518,6 +555,9 @@ impl SpaceHostResolver {
             plc_directory_base: Url::parse(DEFAULT_PLC_DIRECTORY_URL).expect("valid PLC URL"),
             allow_http_localhost: false,
             cache_ttl: Duration::from_secs(DEFAULT_DID_CACHE_TTL_SECS),
+            negative_cache_ttl: Duration::from_secs(DEFAULT_DID_NEGATIVE_CACHE_TTL_SECS),
+            force_refresh_cooldown: Duration::from_secs(DEFAULT_FORCE_REFRESH_COOLDOWN_SECS),
+            max_cache_entries: DEFAULT_DID_CACHE_MAX_ENTRIES,
             cache: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -536,10 +576,31 @@ impl SpaceHostResolver {
         self
     }
 
-    /// Override the DID document cache TTL.
+    /// Override the positive DID document cache TTL.
     #[must_use]
     pub fn with_cache_ttl(mut self, ttl: Duration) -> Self {
         self.cache_ttl = ttl;
+        self
+    }
+
+    /// Override the negative-cache TTL for failed/missing DID document lookups.
+    #[must_use]
+    pub fn with_negative_cache_ttl(mut self, ttl: Duration) -> Self {
+        self.negative_cache_ttl = ttl;
+        self
+    }
+
+    /// Override the per-DID minimum cooldown between consecutive `force_refresh` fetches.
+    #[must_use]
+    pub fn with_force_refresh_cooldown(mut self, cooldown: Duration) -> Self {
+        self.force_refresh_cooldown = cooldown;
+        self
+    }
+
+    /// Override the maximum number of cached DID entries retained in memory.
+    #[must_use]
+    pub fn with_max_cache_entries(mut self, max_entries: usize) -> Self {
+        self.max_cache_entries = max_entries.max(1);
         self
     }
 
@@ -570,6 +631,78 @@ impl SpaceHostResolver {
         let doc = self.resolve_did_document(did, force_refresh).await?;
         extract_kem_key(&doc).map(|(_, key)| key)
     }
+
+    fn is_entry_fresh(&self, entry: &CacheEntry) -> bool {
+        let ttl = match entry.state {
+            CachedEntryState::Doc(_) => self.cache_ttl,
+            CachedEntryState::Negative { .. } => self.negative_cache_ttl,
+        };
+        entry.cached_at.elapsed() < ttl
+    }
+
+    fn entry_to_result(did: &Did, state: &CachedEntryState) -> Result<SpaceDidDocument> {
+        match state {
+            CachedEntryState::Doc(doc) => Ok(doc.clone()),
+            CachedEntryState::Negative { message, not_found } => {
+                if *not_found {
+                    Err(SpaceError::DidDocumentNotFound(did.to_string()))
+                } else {
+                    Err(SpaceError::DidResolutionFailed(message.clone()))
+                }
+            }
+        }
+    }
+
+    fn lookup_cached(&self, did: &Did, force_refresh: bool) -> Option<Result<SpaceDidDocument>> {
+        let guard = self.cache.lock().ok()?;
+        let entry = guard.get(did)?;
+        if !force_refresh {
+            return self
+                .is_entry_fresh(entry)
+                .then(|| Self::entry_to_result(did, &entry.state));
+        }
+        let throttled = entry
+            .last_forced_refresh
+            .is_some_and(|t| t.elapsed() < self.force_refresh_cooldown);
+        if throttled && self.is_entry_fresh(entry) {
+            return Some(Self::entry_to_result(did, &entry.state));
+        }
+        None
+    }
+
+    fn store_cache_entry(&self, did: &Did, state: CachedEntryState, forced: bool) {
+        if let Ok(mut guard) = self.cache.lock() {
+            let prev_forced = guard.get(did).and_then(|e| e.last_forced_refresh);
+            if !guard.contains_key(did) && guard.len() >= self.max_cache_entries {
+                guard.retain(|_, entry| {
+                    let ttl = match entry.state {
+                        CachedEntryState::Doc(_) => self.cache_ttl,
+                        CachedEntryState::Negative { .. } => self.negative_cache_ttl,
+                    };
+                    entry.cached_at.elapsed() < ttl
+                });
+                while guard.len() >= self.max_cache_entries {
+                    let Some(oldest_did) = guard
+                        .iter()
+                        .min_by_key(|(_, entry)| entry.cached_at)
+                        .map(|(k, _)| k.clone())
+                    else {
+                        break;
+                    };
+                    guard.remove(&oldest_did);
+                }
+            }
+            let now = Instant::now();
+            guard.insert(
+                did.clone(),
+                CacheEntry {
+                    state,
+                    cached_at: now,
+                    last_forced_refresh: if forced { Some(now) } else { prev_forced },
+                },
+            );
+        }
+    }
 }
 
 impl SpaceDidResolver for SpaceHostResolver {
@@ -579,12 +712,8 @@ impl SpaceDidResolver for SpaceHostResolver {
         force_refresh: bool,
     ) -> BoxFuture<'a, Result<SpaceDidDocument>> {
         Box::pin(async move {
-            if !force_refresh
-                && let Ok(guard) = self.cache.lock()
-                && let Some(entry) = guard.get(did)
-                && entry.fetched_at.elapsed() < self.cache_ttl
-            {
-                return Ok(entry.doc.clone());
+            if let Some(cached) = self.lookup_cached(did, force_refresh) {
+                return cached;
             }
 
             let url = self.did_document_url(did)?;
@@ -596,41 +725,81 @@ impl SpaceDidResolver for SpaceHostResolver {
                 .map_err(|e| SpaceError::DidResolutionFailed(e.to_string()))?;
             let _ = &mut req;
 
-            let resp = send_with_redirects(
+            let resp = match send_with_redirects(
                 self.transport.as_ref(),
                 req,
                 &SendOptions::new(),
                 RedirectPolicy::Follow,
             )
             .await
-            .map_err(|e| SpaceError::Transport(e.to_string()))?;
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    let msg = e.to_string();
+                    self.store_cache_entry(
+                        did,
+                        CachedEntryState::Negative {
+                            message: msg.clone(),
+                            not_found: false,
+                        },
+                        force_refresh,
+                    );
+                    return Err(SpaceError::Transport(msg));
+                }
+            };
 
             let status = resp.status().as_u16();
             if status == 404 {
+                self.store_cache_entry(
+                    did,
+                    CachedEntryState::Negative {
+                        message: format!("HTTP 404 for {did}"),
+                        not_found: true,
+                    },
+                    force_refresh,
+                );
                 return Err(SpaceError::DidDocumentNotFound(did.to_string()));
             }
             if !(200..300).contains(&status) {
-                return Err(SpaceError::DidResolutionFailed(format!(
-                    "HTTP {status} fetching DID document for {did}"
-                )));
+                let msg = format!("HTTP {status} fetching DID document for {did}");
+                self.store_cache_entry(
+                    did,
+                    CachedEntryState::Negative {
+                        message: msg.clone(),
+                        not_found: false,
+                    },
+                    force_refresh,
+                );
+                return Err(SpaceError::DidResolutionFailed(msg));
             }
 
-            let doc = SpaceDidDocument::from_json_bytes(resp.body())?;
+            let doc = match SpaceDidDocument::from_json_bytes(resp.body()) {
+                Ok(d) => d,
+                Err(err) => {
+                    self.store_cache_entry(
+                        did,
+                        CachedEntryState::Negative {
+                            message: err.to_string(),
+                            not_found: false,
+                        },
+                        force_refresh,
+                    );
+                    return Err(err);
+                }
+            };
             if &doc.id != did {
-                return Err(SpaceError::DidResolutionFailed(format!(
-                    "DID document id mismatch: expected {did}, got {}",
-                    doc.id
-                )));
-            }
-            if let Ok(mut guard) = self.cache.lock() {
-                guard.insert(
-                    did.clone(),
-                    CachedDidDoc {
-                        doc: doc.clone(),
-                        fetched_at: Instant::now(),
+                let msg = format!("DID document id mismatch: expected {did}, got {}", doc.id);
+                self.store_cache_entry(
+                    did,
+                    CachedEntryState::Negative {
+                        message: msg.clone(),
+                        not_found: false,
                     },
+                    force_refresh,
                 );
+                return Err(SpaceError::DidResolutionFailed(msg));
             }
+            self.store_cache_entry(did, CachedEntryState::Doc(doc.clone()), force_refresh);
             Ok(doc)
         })
     }

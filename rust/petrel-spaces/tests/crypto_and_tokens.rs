@@ -991,3 +991,226 @@ fn delegation_restricts_signing_kid_to_issuer_atproto_key_and_attestation_allows
     ));
     assert_eq!(calls.load(Ordering::SeqCst), 3);
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[allow(clippy::too_many_lines)]
+#[test]
+fn security_hardening_tokens_replay_scoping_and_redacted_debug() {
+    use petrel_spaces::{
+        SpaceDidDocument, check_presentation_replay_for_signer, extract_signing_key,
+    };
+
+    let space = sample_space();
+    let user = Did::parse("did:plc:ewvi7nxzyoun6zhxrhs64oiz").unwrap();
+    let host = Did::parse("did:web:ds.catbird.blue").unwrap();
+    let user_kp = SigningKeyPair::generate_k256().unwrap();
+    let host_kp = SigningKeyPair::generate_p256().unwrap();
+
+    let mut resolver = StaticDidResolver::new();
+    resolver.insert_keypair(&user, &user_kp, None);
+    resolver.insert_keypair(&host, &host_kp, None);
+
+    let now = 1_800_000_000_i64;
+
+    // 1. Forbidden JOSE header parameters (`crit`, `jwk`, `b64`, `x5c`, `jku`) must be rejected.
+    let valid_del =
+        mint_delegation_token(&user_kp, &user, &host, &space, now, now + 60, None, None).unwrap();
+    let parts: Vec<&str> = valid_del.split('.').collect();
+    for bad_hdr in [
+        r##"{"alg":"ES256K","typ":"atproto-space-delegation+jwt","kid":"#atproto","crit":["exp"]}"##,
+        r##"{"alg":"ES256K","typ":"atproto-space-delegation+jwt","kid":"#atproto","jwk":{"kty":"EC"}}"##,
+        r##"{"alg":"ES256K","typ":"atproto-space-delegation+jwt","kid":"#atproto","b64":false}"##,
+        r##"{"alg":"ES256K","typ":"atproto-space-delegation+jwt","kid":"#atproto","x5c":["AQID"]}"##,
+        r##"{"alg":"ES256K","typ":"atproto-space-delegation+jwt","kid":"#atproto","jku":"https://evil.example/jwks"}"##,
+    ] {
+        let hdr_b64 = petrel_crypto::JWTBase64URL::encode(bad_hdr.as_bytes());
+        let signing_input = format!("{hdr_b64}.{}", parts[1]);
+        let sig = user_kp.sign(signing_input.as_bytes()).unwrap();
+        let bad_jwt = format!(
+            "{signing_input}.{}",
+            petrel_crypto::JWTBase64URL::encode(&sig)
+        );
+        assert!(matches!(
+            block_on(verify_delegation_token(
+                &bad_jwt,
+                host.as_str(),
+                now + 5,
+                &resolver
+            )),
+            Err(SpaceError::MalformedHeader(_))
+        ));
+    }
+
+    // 2. Arbitrary audience #fragment rejected (only #atproto_pds / #atproto_space accepted for bare host DID).
+    let mint_del_with_raw_aud = |aud_str: &str| -> String {
+        let header_b64 = petrel_crypto::JWTBase64URL::encode(
+            br##"{"alg":"ES256K","typ":"atproto-space-delegation+jwt","kid":"#atproto"}"##,
+        );
+        let claims = petrel_spaces::DelegationClaims {
+            iss: user.as_str().to_owned(),
+            aud: aud_str.to_owned(),
+            sub: space.as_str().to_owned(),
+            iat: now,
+            exp: now + 60,
+            jti: "raw-aud-test".to_owned(),
+            cnf: None,
+        };
+        let payload_b64 =
+            petrel_crypto::JWTBase64URL::encode(&serde_json::to_vec(&claims).unwrap());
+        let signing_input = format!("{header_b64}.{payload_b64}");
+        let sig = user_kp.sign(signing_input.as_bytes()).unwrap();
+        let sig_b64 = petrel_crypto::JWTBase64URL::encode(&sig);
+        format!("{signing_input}.{sig_b64}")
+    };
+    let bad_aud_del = mint_del_with_raw_aud("did:web:ds.catbird.blue#arbitrary");
+    assert!(matches!(
+        block_on(verify_delegation_token(
+            &bad_aud_del,
+            host.as_str(),
+            now + 5,
+            &resolver
+        )),
+        Err(SpaceError::InvalidAudience { .. })
+    ));
+    let good_aud_del = mint_del_with_raw_aud("did:web:ds.catbird.blue#atproto_pds");
+    assert!(
+        block_on(verify_delegation_token(
+            &good_aud_del,
+            host.as_str(),
+            now + 5,
+            &resolver
+        ))
+        .is_ok()
+    );
+
+    // 3. Reject #atproto_kem and key-agreement verification methods for JWT verification.
+    let (_, kem_did_key) = generate_p256_keypair().unwrap();
+    let kem_doc_json = serde_json::json!({
+        "id": host.as_str(),
+        "verificationMethod": [
+            {
+                "id": format!("{host}#atproto_kem"),
+                "type": "P256KeyAgreement",
+                "controller": host.as_str(),
+                "publicKeyMultibase": kem_did_key.strip_prefix("did:key:").unwrap()
+            },
+            {
+                "id": format!("{host}#agreement_alias"),
+                "type": "P256KeyAgreement",
+                "controller": host.as_str(),
+                "publicKeyMultibase": kem_did_key.strip_prefix("did:key:").unwrap()
+            }
+        ]
+    });
+    let kem_doc =
+        SpaceDidDocument::from_json_bytes(&serde_json::to_vec(&kem_doc_json).unwrap()).unwrap();
+    assert!(matches!(
+        extract_signing_key(&kem_doc, "#atproto_kem"),
+        Err(SpaceError::Unauthorized(_))
+    ));
+    assert!(matches!(
+        extract_signing_key(&kem_doc, "#agreement_alias"),
+        Err(SpaceError::Unauthorized(_))
+    ));
+    let att_kem = mint_client_attestation_token(
+        &host_kp,
+        &host,
+        &host,
+        None,
+        None,
+        now,
+        now + 60,
+        None,
+        Some("#atproto_kem"),
+    )
+    .unwrap();
+    assert!(matches!(
+        block_on(verify_client_attestation_token(
+            &att_kem,
+            host.as_str(),
+            now + 5,
+            &resolver
+        )),
+        Err(SpaceError::Unauthorized(_))
+    ));
+
+    // 4. Signer-scoped replay prevents cross-client nonce collision under shared authority iss.
+    let cache = petrel_spaces::InMemorySignatureReplayCache::new(16);
+    block_on(check_presentation_replay_for_signer(
+        &cache,
+        host.as_str(),
+        "did:key:zDnaeClientA",
+        Some("shared-nonce"),
+        Some(now),
+        Some(now + 60),
+        now + 600,
+        300,
+        60,
+        60,
+        now,
+    ))
+    .unwrap();
+    block_on(check_presentation_replay_for_signer(
+        &cache,
+        host.as_str(),
+        "did:key:zDnaeClientB",
+        Some("shared-nonce"),
+        Some(now),
+        Some(now + 60),
+        now + 600,
+        300,
+        60,
+        60,
+        now,
+    ))
+    .unwrap();
+    assert!(matches!(
+        block_on(check_presentation_replay_for_signer(
+            &cache,
+            host.as_str(),
+            "did:key:zDnaeClientA",
+            Some("shared-nonce"),
+            Some(now),
+            Some(now + 60),
+            now + 600,
+            300,
+            60,
+            60,
+            now,
+        )),
+        Err(SpaceError::SignatureReplay)
+    ));
+
+    // 5. Redacted Debug impls never expose raw credential JWTs or signatures.
+    let proof_kp = SigningKeyPair::generate_p256().unwrap();
+    let proof_kid = proof_kp.did_key().unwrap();
+    let cred_jwt = mint_credential_token(
+        &host_kp,
+        &host,
+        &space,
+        &proof_kid,
+        now,
+        now + 900,
+        Some("jti-redact"),
+        None,
+    )
+    .unwrap();
+    let hdrs = sign_credential_request(&cred_jwt, &proof_kp, host.as_str(), now, Some("n-redact"))
+        .unwrap();
+    let dbg_hdrs = format!("{hdrs:?}");
+    assert!(!dbg_hdrs.contains(&cred_jwt));
+    assert!(dbg_hdrs.contains("[REDACTED]"));
+
+    let mut hmap = HeaderMap::new();
+    hdrs.apply_to_header_map(&mut hmap).unwrap();
+    let verified = block_on(verify_credential_request(
+        &hmap,
+        host.as_str(),
+        now,
+        &resolver,
+    ))
+    .unwrap();
+    let dbg_verified = format!("{verified:?}");
+    assert!(!dbg_verified.contains(&cred_jwt));
+    assert!(dbg_verified.contains("[REDACTED]"));
+}

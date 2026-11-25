@@ -536,12 +536,13 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
                 .credentials
                 .credential(space, do_cred_refresh, now_secs)
                 .await?;
+            let nonce = crate::tokens::generate_jti()?;
             let sig_headers = sign_credential_request(
                 &cred.jwt,
                 &cred.proof_key,
                 writer_did.as_str(),
                 now_secs,
-                None,
+                Some(&nonce),
             )?;
 
             let mut headers = HeaderMap::new();
