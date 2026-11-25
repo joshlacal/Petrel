@@ -1,0 +1,36 @@
+[package]
+name = "petrel-bsky"
+description = "Bluesky application helpers for Petrel: BskyAgent, RichText facet detection/editing, moderation decision engine, LabelSet, BskyAppURL, and preferences."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["native"]
+native = ["petrel/native"]
+wasm = ["petrel/wasm", "petrel-core/wasm"]
+
+[dependencies]
+petrel-core = { workspace = true }
+petrel-api = { workspace = true, features = ["app_bsky", "chat_bsky", "com_atproto"] }
+petrel = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+http = { workspace = true }
+bytes = { workspace = true }
+url = { workspace = true }
+async-lock = { workspace = true }
+futures-util = { workspace = true }
+web-time = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
+[lints]
+workspace = true

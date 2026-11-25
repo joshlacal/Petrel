@@ -41,8 +41,12 @@
 //! [`rt::BoxFuture`]. Both are `Send` on native targets and not on `wasm32`,
 //! where browser futures cannot be.
 
+pub mod account;
+pub mod auth;
+pub mod client;
 pub mod crypto;
 pub mod identity;
+pub mod media;
 pub mod net;
 pub mod oauth;
 pub mod rt;

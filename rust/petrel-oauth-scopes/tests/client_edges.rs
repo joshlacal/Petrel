@@ -270,3 +270,47 @@ fn requested_scope_subset_and_raw_set_membership_remain_distinct() {
         Some(&ScopeParseError::UnknownPrefix)
     );
 }
+
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+fn granting_scope_and_multi_action_account_match_swift_parity() {
+    use petrel_oauth_scopes::IdentityPermission;
+
+    assert_eq!(
+        RepoPermission::granting_scope("app.bsky.feed.post", "create").unwrap(),
+        "repo:app.bsky.feed.post?action=create"
+    );
+    assert!(RepoPermission::granting_scope("bad", "create").is_err());
+
+    assert_eq!(
+        RpcPermission::granting_scope("com.example.method", "did:web:example.com#svc").unwrap(),
+        "rpc:com.example.method?aud=did:web:example.com%23svc"
+    );
+    assert!(RpcPermission::granting_scope("*", "*").is_err());
+
+    assert_eq!(
+        BlobPermission::granting_scope("image/svg+xml").unwrap(),
+        "blob:image/svg+xml"
+    );
+    assert_eq!(
+        BlobPermission::granting_scope("image/*"),
+        Err(ScopeParseError::ForbiddenCombination { prefix: "blob" })
+    );
+
+    assert_eq!(
+        AccountPermission::granting_scope("email", "manage").unwrap(),
+        "account:email?action=manage"
+    );
+    assert_eq!(
+        IdentityPermission::granting_scope("handle").unwrap(),
+        "identity:handle"
+    );
+
+    let multi = AccountPermission::with_actions("email", &["manage", "read"]).unwrap();
+    assert_eq!(
+        multi.canonical_scope_string().unwrap(),
+        "account:email?action=manage&action=read"
+    );
+    assert!(multi.matches("email", "read"));
+    assert!(multi.matches("email", "manage"));
+}

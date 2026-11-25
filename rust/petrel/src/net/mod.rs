@@ -122,17 +122,25 @@ pub type SharedTransport = Arc<dyn DynHttpTransport>;
 mod body;
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
 mod browser;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod debug_fixture;
+pub mod dedup;
 #[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
 mod native;
 pub mod policy;
+pub mod rate_limit;
 mod redirect;
+pub mod sse;
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
 pub use browser::FetchTransport;
+pub use dedup::{RequestDeduplicator, RequestKey};
 #[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
 pub use native::ReqwestTransport;
 pub use policy::Origin;
+pub use rate_limit::{BackoffPolicy, RateLimitStatus, parse_http_date, parse_retry_after};
 pub use redirect::{RedirectPolicy, ResponseOrigin, send_with_redirects};
+pub use sse::{ServerSentEvent, ServerSentEventParser, SseError};
 
 #[cfg(all(test, not(target_arch = "wasm32"), feature = "native"))]
 pub(crate) mod test_support;

@@ -15,6 +15,8 @@ members = [
     "petrel-lexicon",
     "petrel-oauth-scopes",
     "petrel",
+    "petrel-bsky",
+    "petrel-load",
     "petrel-repo",
     "petrel-server",
     "petrel-plc",
