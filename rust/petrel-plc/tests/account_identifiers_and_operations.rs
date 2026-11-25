@@ -517,3 +517,93 @@ async fn verification_method_keys_link_and_bytes_canonical_json_roundtrip() {
         PlcOperationCodec::verify_genesis(&decoded, &did).unwrap();
     }
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn read_path_bounds_rotation_keys_and_pds_endpoint_requires_https() {
+    let k = K256Keypair::generate().unwrap();
+    let valid = PlcOperationCodec::sign(
+        &UnsignedPlcOperation::Regular(
+            PlcAtProfile::genesis_operation(
+                "alice.example.com",
+                &k.did_key(),
+                &[k.did_key()],
+                "https://pds.example.com",
+            )
+            .unwrap(),
+        ),
+        &k,
+    )
+    .await
+    .unwrap();
+    let sig = valid.signature().to_owned();
+
+    // > MAXIMUM_READ_ROTATION_KEYS rejected in decode_signed_json, audit_log::decode, and verify
+    let too_many_keys: Vec<String> =
+        vec![k.did_key(); PlcOperationCodec::MAXIMUM_READ_ROTATION_KEYS + 1];
+    let oversized_op_json = serde_json::to_vec(&json!({
+        "type": "plc_operation",
+        "rotationKeys": too_many_keys,
+        "verificationMethods": { "atproto": k.did_key() },
+        "alsoKnownAs": ["at://alice.example.com"],
+        "services": {
+            "atproto_pds": { "type": "AtprotoPersonalDataServer", "endpoint": "https://pds.example.com" }
+        },
+        "prev": Json::Null,
+        "sig": sig
+    }))
+    .unwrap();
+    assert!(matches!(
+        PlcOperationCodec::decode_signed_json(&oversized_op_json),
+        Err(PlcError::Malformed(_))
+    ));
+    let did = PlcOperationCodec::genesis_did(&valid).unwrap();
+    let op_val: Json = serde_json::from_slice(&oversized_op_json).unwrap();
+    let audit_bytes = serde_json::to_vec(&json!([{
+        "did": did,
+        "operation": op_val,
+        "cid": valid.cid_string().unwrap(),
+        "nullified": false,
+        "createdAt": "2026-01-01T00:00:00.000Z"
+    }]))
+    .unwrap();
+    assert!(matches!(
+        petrel_plc::PlcAuditLogVerifier::decode(&audit_bytes, &did),
+        Err(PlcError::Malformed(_))
+    ));
+    assert!(matches!(
+        PlcOperationCodec::verify(&valid, &too_many_keys),
+        Err(PlcError::Malformed(_))
+    ));
+
+    // pds_endpoint() on both PlcDocumentData and PlcDidDocument requires a valid https:// URL
+    for unsafe_endpoint in [
+        "http://169.254.169.254/latest/meta-data",
+        "http://pds.example.com",
+        "javascript:alert(1)",
+        "file:///etc/passwd",
+        "https://user:pass@pds.example.com",
+        "https://pds.example.com/#frag",
+        " https://pds.example.com",
+        "not-a-url",
+    ] {
+        let mut services = BTreeMap::new();
+        services.insert(
+            "atproto_pds".to_owned(),
+            PlcService {
+                kind: "AtprotoPersonalDataServer".to_owned(),
+                endpoint: unsafe_endpoint.to_owned(),
+            },
+        );
+        let data = PlcDocumentData {
+            did: did.clone(),
+            rotation_keys: vec![k.did_key()],
+            verification_methods: BTreeMap::from([("atproto".to_owned(), k.did_key())]),
+            also_known_as: vec!["at://alice.example.com".to_owned()],
+            services,
+        };
+        assert_eq!(data.pds_endpoint(), None, "{unsafe_endpoint}");
+        let doc = PlcDidDocument::from_data(&data);
+        assert_eq!(doc.pds_endpoint(), None, "{unsafe_endpoint}");
+    }
+}

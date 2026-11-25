@@ -1008,9 +1008,29 @@ impl PlcExportSequence {
         let Some(last) = page.last() else {
             return Ok(None);
         };
-        self.cursor = last.cursor();
+        let next_cursor = last.cursor();
+        if !cursor_strictly_advances(&self.cursor, &next_cursor) {
+            return Err(PlcError::malformed("PLC export cursor did not advance"));
+        }
+        self.cursor = next_cursor;
         self.buffer.extend(page);
         Ok(self.buffer.pop_front())
+    }
+}
+
+fn cursor_strictly_advances(previous: &PlcExportCursor, next: &PlcExportCursor) -> bool {
+    match (previous, next) {
+        (PlcExportCursor::Sequence(prev_seq), PlcExportCursor::Sequence(next_seq)) => {
+            next_seq > prev_seq
+        }
+        (PlcExportCursor::Timestamp(prev_ts), PlcExportCursor::Timestamp(next_ts)) => matches!(
+            (
+                plc_timestamp_milliseconds(prev_ts),
+                plc_timestamp_milliseconds(next_ts)
+            ),
+            (Some(prev_millis), Some(next_millis)) if next_millis > prev_millis
+        ),
+        _ => false,
     }
 }
 

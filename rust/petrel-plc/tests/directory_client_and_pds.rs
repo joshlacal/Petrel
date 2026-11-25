@@ -479,6 +479,85 @@ async fn allowlisted_non_loopback_laboratory_origin_passes_request_policy() {
     ));
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn export_sequence_rejects_stalled_or_regressing_cursors() {
+    let id = PlcTestIdentity::generate();
+    let (did, op) = id.genesis("alice.export.example").await;
+    let cid = op.cid_string().unwrap();
+    let op_json: serde_json::Value = serde_json::from_slice(&op.canonical_json().unwrap()).unwrap();
+
+    // Case 1: sequenced export repeats or regresses `seq`
+    let stalled_seq_line = serde_json::to_vec(&serde_json::json!({
+        "type": "sequenced_op",
+        "did": did,
+        "operation": op_json,
+        "cid": cid,
+        "nullified": false,
+        "seq": 5,
+        "createdAt": "2026-01-01T00:00:05.000Z"
+    }))
+    .unwrap();
+    let stalled_seq_transport = Arc::new(SequenceTransport::new(move |_, _, _| {
+        Ok(Response::builder()
+            .status(200)
+            .header("content-type", "application/jsonl")
+            .body(Bytes::from(stalled_seq_line.clone()))
+            .unwrap())
+    }));
+    let client = PlcDirectoryClient::new(
+        PlcClientConfiguration::production(Some(&Url::parse("https://plc.test").unwrap())).unwrap(),
+        stalled_seq_transport,
+    );
+    let mut seq = client.export_sequence(PlcExportCursor::Sequence(5), 10);
+    assert!(matches!(
+        seq.next_entry().await,
+        Err(PlcError::Malformed(_))
+    ));
+    let mut regressed = client.export_sequence(PlcExportCursor::Sequence(6), 10);
+    assert!(matches!(
+        regressed.next_entry().await,
+        Err(PlcError::Malformed(_))
+    ));
+
+    // Case 2: timestamp export repeats same timestamp
+    let stalled_ts_line = serde_json::to_vec(&serde_json::json!({
+        "did": did,
+        "operation": op_json,
+        "cid": cid,
+        "nullified": false,
+        "createdAt": "2026-01-01T00:00:05.000Z"
+    }))
+    .unwrap();
+    let stalled_ts_transport = Arc::new(SequenceTransport::new(move |_, _, _| {
+        Ok(Response::builder()
+            .status(200)
+            .header("content-type", "application/jsonl")
+            .body(Bytes::from(stalled_ts_line.clone()))
+            .unwrap())
+    }));
+    let ts_client = PlcDirectoryClient::new(
+        PlcClientConfiguration::production(Some(&Url::parse("https://plc.test").unwrap())).unwrap(),
+        stalled_ts_transport,
+    );
+    let mut ts_seq = ts_client.export_sequence(
+        PlcExportCursor::Timestamp("2026-01-01T00:00:05.000Z".to_owned()),
+        10,
+    );
+    assert!(matches!(
+        ts_seq.next_entry().await,
+        Err(PlcError::Malformed(_))
+    ));
+
+    // Case 3: strictly advancing timestamp succeeds
+    let mut advancing_ts_seq = ts_client.export_sequence(
+        PlcExportCursor::Timestamp("2026-01-01T00:00:04.999Z".to_owned()),
+        10,
+    );
+    assert!(advancing_ts_seq.next_entry().await.unwrap().is_some());
+    assert!(advancing_ts_seq.next_entry().await.unwrap().is_none());
+}
+
 // Keep unused imports clean on wasm32
 #[allow(dead_code)]
 fn _use_http_transport_marker<T: HttpTransport>(_: &T) {}

@@ -30,12 +30,14 @@ impl PlcDocumentData {
             .find_map(|alias| alias.strip_prefix("at://"))
     }
 
-    /// Endpoint of the `atproto_pds` service when its type is `AtprotoPersonalDataServer`.
+    /// Endpoint of the `atproto_pds` service when its type is `AtprotoPersonalDataServer`
+    /// and its URL uses a valid `https://` scheme without userinfo or fragments.
     pub fn pds_endpoint(&self) -> Option<&str> {
         self.services
             .get(PlcAtProfile::PDS_SERVICE_ID)
             .filter(|svc| svc.kind == PlcAtProfile::PDS_SERVICE_TYPE)
             .map(|svc| svc.endpoint.as_str())
+            .filter(|endpoint| is_valid_https_pds_endpoint(endpoint))
     }
 
     /// The `atproto` verification method `did:key`.
@@ -365,6 +367,20 @@ impl PlcAuditLogVerifier {
         let lower = candidate.to_ascii_lowercase();
         Cid::parse(&lower).is_ok_and(|cid| cid.to_string() == canonical)
     }
+}
+
+pub(crate) fn is_valid_https_pds_endpoint(endpoint: &str) -> bool {
+    if endpoint != endpoint.trim() {
+        return false;
+    }
+    let Ok(url) = url::Url::parse(endpoint) else {
+        return false;
+    };
+    url.scheme() == "https"
+        && url.host_str().is_some_and(|host| !host.is_empty())
+        && url.username().is_empty()
+        && url.password().is_none()
+        && url.fragment().is_none()
 }
 
 /// Parses an ISO-8601 `YYYY-MM-DDTHH:mm:ss.sssZ` timestamp into Unix epoch milliseconds.

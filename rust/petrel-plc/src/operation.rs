@@ -350,6 +350,8 @@ impl PlcOperationCodec {
         PlcOperationLimits::SPECIFICATION.maximum_dag_cbor_bytes;
     /// Maximum JSON payload decoded by `decode_signed_json`.
     pub const MAXIMUM_OPERATION_JSON_BYTES: usize = 64 * 1024;
+    /// Maximum `rotationKeys` count accepted when decoding or verifying historical operations.
+    pub const MAXIMUM_READ_ROTATION_KEYS: usize = 32;
 
     /// Signs `operation` with any `ATProtoSigner`, rejecting non-canonical signatures.
     pub async fn sign(
@@ -496,6 +498,11 @@ impl PlcOperationCodec {
         operation: &PlcOperation,
         authorized_rotation_keys: &[String],
     ) -> Result<(usize, PublicKey), PlcError> {
+        if authorized_rotation_keys.len() > Self::MAXIMUM_READ_ROTATION_KEYS {
+            return Err(PlcError::malformed(
+                "PLC operation has too many rotation keys",
+            ));
+        }
         let signature = Self::decode_canonical_signature(operation.signature())?;
         let signing_bytes = operation.signing_dag_cbor();
         for (index, key_text) in authorized_rotation_keys.iter().enumerate() {
@@ -626,6 +633,11 @@ impl PlcOperationCodec {
         }
         let rotation_keys = string_vec(obj.get("rotationKeys"))
             .ok_or_else(|| PlcError::malformed("PLC regular operation JSON is malformed"))?;
+        if rotation_keys.len() > Self::MAXIMUM_READ_ROTATION_KEYS {
+            return Err(PlcError::malformed(
+                "PLC operation has too many rotation keys",
+            ));
+        }
         let verification_methods = string_map(obj.get("verificationMethods"))
             .ok_or_else(|| PlcError::malformed("PLC regular operation JSON is malformed"))?;
         let also_known_as = string_vec(obj.get("alsoKnownAs"))

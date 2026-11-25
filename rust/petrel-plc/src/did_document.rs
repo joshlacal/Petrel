@@ -93,7 +93,8 @@ impl PlcDidDocument {
             .find_map(|alias| alias.strip_prefix("at://"))
     }
 
-    /// Endpoint of the `#atproto_pds` service when its type is `AtprotoPersonalDataServer`.
+    /// Endpoint of the `#atproto_pds` service when its type is `AtprotoPersonalDataServer`
+    /// and its URL uses a valid `https://` scheme without userinfo or fragments.
     pub fn pds_endpoint(&self) -> Option<&str> {
         let full_id = format!("{}#{}", self.id, PlcAtProfile::PDS_SERVICE_ID);
         let short_id = format!("#{}", PlcAtProfile::PDS_SERVICE_ID);
@@ -104,5 +105,6 @@ impl PlcDidDocument {
                     && svc.kind == PlcAtProfile::PDS_SERVICE_TYPE
             })
             .map(|svc| svc.service_endpoint.as_str())
+            .filter(|endpoint| crate::audit_log::is_valid_https_pds_endpoint(endpoint))
     }
 }
