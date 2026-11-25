@@ -454,3 +454,24 @@ fn punycode_tlds_have_no_embedded_spaces_and_detect_in_rich_text() {
         ]
     );
 }
+
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+fn indic_conjunct_gb9c_matches_swift_grapheme_counts() {
+    // UAX #29 GB9c: Consonant + [Extend/Linker]* + Linker + [Extend/Linker]* x Consonant
+    assert_eq!(RichText::from_text("क्ष").grapheme_length(), 1);
+    assert_eq!(RichText::from_text("क्ष्त").grapheme_length(), 1);
+    assert_eq!(
+        RichText::from_text("\u{0915}\u{093C}\u{094D}\u{200D}\u{0937}").grapheme_length(),
+        1
+    );
+    assert_eq!(RichText::from_text("\u{094D}\u{0915}").grapheme_length(), 2);
+    assert_eq!(RichText::from_text("काक्ष").grapheme_length(), 2);
+    // Hindi text under 300 graphemes (151 conjuncts, 302 legacy non-GB9c clusters)
+    let conjuncts_151 = "क्ष".repeat(151);
+    let rt_151 = RichText::from_text(conjuncts_151);
+    assert_eq!(rt_151.grapheme_length(), 151);
+    assert!(!rt_151.exceeds_post_limits());
+    assert!(!RichText::from_text("क्ष".repeat(300)).exceeds_post_limits());
+    assert!(RichText::from_text("क्ष".repeat(301)).exceeds_post_limits());
+}

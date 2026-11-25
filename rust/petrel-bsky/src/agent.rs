@@ -795,44 +795,10 @@ impl BskyAgent {
         validate: Option<bool>,
         swap_commit: Option<&CidString>,
     ) -> Result<StrongRef, BskyAgentError> {
-        let nsid = "com.atproto.repo.createRecord";
-        let (json, resolved_collection) = record_json(record, collection)?;
-        let repo = self.did().await?;
-        let mut body = Map::new();
-        body.insert(
-            "repo".to_owned(),
-            JsonValue::String(repo.as_str().to_owned()),
-        );
-        body.insert(
-            "collection".to_owned(),
-            JsonValue::String(resolved_collection),
-        );
-        body.insert("record".to_owned(), json);
-        if let Some(rkey) = rkey {
-            body.insert(
-                "rkey".to_owned(),
-                JsonValue::String(validated_record_key(rkey)?.to_owned()),
-            );
-        }
-        if let Some(validate) = validate {
-            body.insert("validate".to_owned(), JsonValue::Bool(validate));
-        }
-        if let Some(swap) = swap_commit {
-            body.insert(
-                "swapCommit".to_owned(),
-                JsonValue::String(swap.as_str().to_owned()),
-            );
-        }
-        let encoded = serde_json::to_vec(&JsonValue::Object(body))
-            .map_err(|e| BskyAgentError::InvalidInput(e.to_string()))?;
-        let resp = self
-            .xrpc_procedure(
-                nsid,
-                Some(XrpcBody::json(encoded)),
-                &BskyCallOptions::default(),
-            )
-            .await?;
-        decode_response_json(&resp.body, nsid)
+        let session = self.begin_pinned_session().await?;
+        session
+            .create_record(record, collection, rkey, validate, swap_commit)
+            .await
     }
 
     /// Creates or replaces a record at `rkey` in the signed-in account's repository.
@@ -845,41 +811,16 @@ impl BskyAgent {
         swap_record: &RecordSwap,
     ) -> Result<StrongRef, BskyAgentError> {
         let (json, resolved_collection) = record_json(record, collection)?;
-        self.put_record_json(&json, &resolved_collection, rkey, validate, swap_record)
+        let session = self.begin_pinned_session().await?;
+        session
+            .put_record_json(&json, &resolved_collection, rkey, validate, swap_record)
             .await
     }
 
     /// Deletes a record identified by `uri`.
     pub async fn delete_record(&self, uri: &AtUri) -> Result<(), BskyAgentError> {
-        let _ = self.did().await?;
-        let (Some(collection), Some(rkey)) = (uri.collection(), uri.rkey()) else {
-            return Err(BskyAgentError::InvalidInput(format!(
-                "Not a record URI: {}",
-                uri.as_str()
-            )));
-        };
-        let mut body = Map::new();
-        body.insert(
-            "repo".to_owned(),
-            JsonValue::String(uri.authority().as_str().to_owned()),
-        );
-        body.insert(
-            "collection".to_owned(),
-            JsonValue::String(collection.as_str().to_owned()),
-        );
-        body.insert(
-            "rkey".to_owned(),
-            JsonValue::String(rkey.as_str().to_owned()),
-        );
-        let encoded = serde_json::to_vec(&JsonValue::Object(body))
-            .map_err(|e| BskyAgentError::InvalidInput(e.to_string()))?;
-        self.xrpc_procedure(
-            "com.atproto.repo.deleteRecord",
-            Some(XrpcBody::json(encoded)),
-            &BskyCallOptions::default(),
-        )
-        .await?;
-        Ok(())
+        let session = self.begin_pinned_session().await?;
+        session.delete_record(uri).await
     }
 
     /// Reads and decodes a record at `uri`, returning `None` on `RecordNotFound`.
@@ -938,125 +879,22 @@ impl BskyAgent {
             Err(err) if err.xrpc_error_name() == Some("RecordNotFound") => return Ok(None),
             Err(err) => return Err(err),
         };
-        let json: JsonValue = decode_response_json(&resp.body, nsid)?;
-        let Some(uri) = json.get("uri").and_then(JsonValue::as_str) else {
-            return Err(BskyAgentError::InvalidResponse {
-                nsid: nsid.to_owned(),
-                reason: "Missing uri or value".to_owned(),
-            });
-        };
-        let Some(value) = json.get("value") else {
-            return Err(BskyAgentError::InvalidResponse {
-                nsid: nsid.to_owned(),
-                reason: "Missing uri or value".to_owned(),
-            });
-        };
-        if !value.is_object() {
-            return Err(BskyAgentError::InvalidResponse {
-                nsid: nsid.to_owned(),
-                reason: "Missing uri or value".to_owned(),
-            });
-        }
-        Ok(Some(RawRecord {
-            uri: uri.to_owned(),
-            cid: json
-                .get("cid")
-                .and_then(JsonValue::as_str)
-                .map(ToOwned::to_owned),
-            value: value.clone(),
-        }))
-    }
-
-    async fn put_record_json(
-        &self,
-        record: &JsonValue,
-        collection: &str,
-        rkey: &str,
-        validate: Option<bool>,
-        swap_record: &RecordSwap,
-    ) -> Result<StrongRef, BskyAgentError> {
-        let nsid = "com.atproto.repo.putRecord";
-        let repo = self.did().await?;
-        let mut body = Map::new();
-        body.insert(
-            "repo".to_owned(),
-            JsonValue::String(repo.as_str().to_owned()),
-        );
-        body.insert(
-            "collection".to_owned(),
-            JsonValue::String(collection.to_owned()),
-        );
-        body.insert(
-            "rkey".to_owned(),
-            JsonValue::String(validated_record_key(rkey)?.to_owned()),
-        );
-        body.insert("record".to_owned(), record.clone());
-        if let Some(validate) = validate {
-            body.insert("validate".to_owned(), JsonValue::Bool(validate));
-        }
-        match swap_record {
-            RecordSwap::Any => {}
-            RecordSwap::MustNotExist => {
-                body.insert("swapRecord".to_owned(), JsonValue::Null);
-            }
-            RecordSwap::Matches(cid) => {
-                body.insert(
-                    "swapRecord".to_owned(),
-                    JsonValue::String(cid.as_str().to_owned()),
-                );
-            }
-        }
-        let encoded = serde_json::to_vec(&JsonValue::Object(body))
-            .map_err(|e| BskyAgentError::InvalidInput(e.to_string()))?;
-        let resp = self
-            .xrpc_procedure(
-                nsid,
-                Some(XrpcBody::json(encoded)),
-                &BskyCallOptions::default(),
-            )
-            .await?;
-        decode_response_json(&resp.body, nsid)
+        decode_raw_record(&resp.body, nsid).map(Some)
     }
 
     async fn upsert_record_json<F>(
         &self,
         collection: &str,
         rkey: &str,
-        mut transform: F,
+        transform: F,
     ) -> Result<StrongRef, BskyAgentError>
     where
         F: FnMut(Option<&RawRecord>) -> Result<JsonValue, BskyAgentError>,
     {
-        const MAX_ATTEMPTS: usize = 6;
-        let repo = self.did().await?;
-        for _ in 0..MAX_ATTEMPTS {
-            let existing = self
-                .get_record_json(repo.as_str(), collection, rkey)
-                .await?;
-            let record = transform(existing.as_ref())?;
-            let swap = if let Some(existing) = &existing {
-                let Some(strong_ref) = existing.strong_ref() else {
-                    return Err(BskyAgentError::InvalidResponse {
-                        nsid: "com.atproto.repo.getRecord".to_owned(),
-                        reason: "Missing or malformed record CID".to_owned(),
-                    });
-                };
-                RecordSwap::Matches(strong_ref.cid)
-            } else {
-                RecordSwap::MustNotExist
-            };
-            match self
-                .put_record_json(&record, collection, rkey, None, &swap)
-                .await
-            {
-                Ok(strong) => return Ok(strong),
-                Err(err) if err.xrpc_error_name() == Some("InvalidSwap") => {}
-                Err(err) => return Err(err),
-            }
-        }
-        Err(BskyAgentError::SwapRetriesExhausted {
-            attempts: MAX_ATTEMPTS,
-        })
+        let session = self.begin_pinned_session().await?;
+        session
+            .upsert_record_json(collection, rkey, transform)
+            .await
     }
 
     // MARK: Posts, Replies, Gates, Blobs, Handles
@@ -1073,10 +911,31 @@ impl BskyAgent {
         tags: Option<Vec<String>>,
         created_at: Option<Datetime>,
     ) -> Result<StrongRef, BskyAgentError> {
+        let session = self.begin_pinned_session().await?;
+        self.post_text_on_session(
+            &session, text, reply, embed, langs, labels, tags, created_at,
+        )
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn post_text_on_session(
+        &self,
+        session: &PinnedAgentSession<'_>,
+        text: &str,
+        reply: Option<ReplyRef>,
+        embed: Option<PostEmbedBuilder>,
+        langs: Option<Vec<String>>,
+        labels: Option<Vec<String>>,
+        tags: Option<Vec<String>>,
+        created_at: Option<Datetime>,
+    ) -> Result<StrongRef, BskyAgentError> {
         let mut rt = RichText::from_text(text);
         rt.detect_facets(|handle| async move { self.resolve_handle(&handle).await.ok().flatten() })
             .await;
-        self.post_rich_text(&rt, reply, embed, langs, labels, tags, created_at)
+        let record = build_post_record(&rt, reply, embed, langs, labels, tags, created_at)?;
+        session
+            .create_record(&record, Some(Post::TYPE_IDENTIFIER), None, None, None)
             .await
     }
 
@@ -1092,54 +951,7 @@ impl BskyAgent {
         tags: Option<Vec<String>>,
         created_at: Option<Datetime>,
     ) -> Result<StrongRef, BskyAgentError> {
-        if rich_text.exceeds_post_limits() {
-            return Err(BskyAgentError::InvalidInput(format!(
-                "Post text is {} graphemes / {} bytes; the limit is {} graphemes / {} bytes",
-                rich_text.grapheme_length(),
-                rich_text.utf8_length(),
-                RichText::MAX_POST_GRAPHEMES,
-                RichText::MAX_POST_UTF8_BYTES
-            )));
-        }
-        let parsed_langs = if let Some(langs) = langs {
-            if langs.len() > 3 {
-                return Err(BskyAgentError::InvalidInput(format!(
-                    "A post declares at most 3 languages, got {}",
-                    langs.len()
-                )));
-            }
-            let mut out = Vec::with_capacity(langs.len());
-            for tag in langs {
-                let lang = tag.parse::<Language>().map_err(|_| {
-                    BskyAgentError::InvalidInput(format!("Invalid language tag: {tag}"))
-                })?;
-                out.push(lang);
-            }
-            Some(out)
-        } else {
-            None
-        };
-
-        let post_labels = labels.and_then(|values| {
-            if values.is_empty() {
-                None
-            } else {
-                Some(PostLabels::SelfLabels(Box::new(SelfLabels::new(
-                    values.into_iter().map(SelfLabel::new).collect(),
-                ))))
-            }
-        });
-
-        let mut record = Post::new(
-            rich_text.text.clone(),
-            created_at.unwrap_or_else(now_datetime),
-        );
-        record.facets = rich_text.record_facets();
-        record.reply = reply;
-        record.embed = embed.and_then(PostEmbedBuilder::into_post_embed);
-        record.langs = parsed_langs;
-        record.labels = post_labels;
-        record.tags = tags;
+        let record = build_post_record(rich_text, reply, embed, langs, labels, tags, created_at)?;
         self.post_record(&record).await
     }
 
@@ -1326,7 +1138,7 @@ impl BskyAgent {
                 images.len()
             )));
         }
-        let _ = self.did().await?;
+        let session = self.begin_pinned_session().await?;
         let mut prepared = Vec::with_capacity(images.len());
         for image in images {
             prepared.push(prepared_image(
@@ -1337,7 +1149,7 @@ impl BskyAgent {
         }
         let mut uploaded = Vec::with_capacity(images.len());
         for (image, payload) in images.iter().zip(prepared) {
-            let blob = self.upload_blob(payload, &image.mime_type).await?;
+            let blob = session.upload_blob(payload, &image.mime_type).await?;
             let mut img = EmbedImage::new(blob, image.alt.clone());
             img.aspect_ratio.clone_from(&image.aspect_ratio);
             uploaded.push(img);
@@ -1347,8 +1159,40 @@ impl BskyAgent {
             Some(q) => embed.quoting(q),
             None => embed,
         };
-        self.post_text(text, reply, Some(embed), langs, labels, tags, created_at)
-            .await
+        self.post_text_on_session(
+            &session,
+            text,
+            reply,
+            Some(embed),
+            langs,
+            labels,
+            tags,
+            created_at,
+        )
+        .await
+    }
+
+    async fn set_profile_image(
+        &self,
+        data: Bytes,
+        mime_type: &str,
+        strip_metadata: bool,
+        is_avatar: bool,
+    ) -> Result<StrongRef, BskyAgentError> {
+        let session = self.begin_pinned_session().await?;
+        let blob = session
+            .upload_image(data, mime_type, strip_metadata)
+            .await?;
+        Self::upsert_profile_on_session(&session, |existing| {
+            let mut profile = ProfileUpdate::from_existing(existing);
+            if is_avatar {
+                profile.avatar = Some(blob.clone());
+            } else {
+                profile.banner = Some(blob.clone());
+            }
+            Ok(profile.into_record())
+        })
+        .await
     }
 
     /// Uploads and sets the account avatar image.
@@ -1358,14 +1202,8 @@ impl BskyAgent {
         mime_type: &str,
         strip_metadata: bool,
     ) -> Result<StrongRef, BskyAgentError> {
-        let _ = self.did().await?;
-        let blob = self.upload_image(data, mime_type, strip_metadata).await?;
-        self.upsert_profile(|existing| {
-            let mut profile = ProfileUpdate::from_existing(existing);
-            profile.avatar = Some(blob.clone());
-            Ok(profile.into_record())
-        })
-        .await
+        self.set_profile_image(data, mime_type, strip_metadata, true)
+            .await
     }
 
     /// Uploads and sets the account banner image.
@@ -1375,30 +1213,14 @@ impl BskyAgent {
         mime_type: &str,
         strip_metadata: bool,
     ) -> Result<StrongRef, BskyAgentError> {
-        let _ = self.did().await?;
-        let blob = self.upload_image(data, mime_type, strip_metadata).await?;
-        self.upsert_profile(|existing| {
-            let mut profile = ProfileUpdate::from_existing(existing);
-            profile.banner = Some(blob.clone());
-            Ok(profile.into_record())
-        })
-        .await
+        self.set_profile_image(data, mime_type, strip_metadata, false)
+            .await
     }
 
     /// Uploads raw blob bytes via `com.atproto.repo.uploadBlob`.
     pub async fn upload_blob(&self, data: Bytes, mime_type: &str) -> Result<Blob, BskyAgentError> {
-        let nsid = "com.atproto.repo.uploadBlob";
-        if mime_type.is_empty() || mime_type.contains(['\r', '\n']) {
-            return Err(BskyAgentError::InvalidInput(
-                "A blob needs a media type such as image/png".to_owned(),
-            ));
-        }
-        let xrpc = self.xrpc_snapshot().await;
-        let out = xrpc
-            .upload_blob(data, mime_type, None, &CallOptions::default())
-            .await
-            .map_err(|e| map_xrpc_error(nsid, e))?;
-        Ok(out.blob)
+        let session = self.begin_pinned_session().await?;
+        session.upload_blob(data, mime_type).await
     }
 
     /// Resolves a handle to its DID (`com.atproto.identity.resolveHandle`), returning `None` on HTTP 400.
@@ -1523,9 +1345,9 @@ impl BskyAgent {
 
     /// Unblocks a moderation list, returning whether a block record was found and removed.
     pub async fn unblock_mod_list(&self, list: &AtUri) -> Result<bool, BskyAgentError> {
-        let _ = self.did().await?;
+        let session = self.begin_pinned_session().await?;
         let nsid = "app.bsky.graph.getList";
-        let resp = self
+        let resp = session
             .xrpc_query(
                 nsid,
                 &[
@@ -1551,7 +1373,7 @@ impl BskyAgent {
                 reason: "viewer.blocked is not an at:// URI".to_owned(),
             })?;
         let _ = record_location(&block_uri, GraphListblock::TYPE_IDENTIFIER)?;
-        self.delete_record(&block_uri).await?;
+        session.delete_record(&block_uri).await?;
         Ok(true)
     }
 
@@ -1637,34 +1459,46 @@ impl BskyAgent {
     }
 
     /// Creates or updates `app.bsky.actor.profile/self` via compare-and-swap, carrying over unmodeled fields.
-    pub async fn upsert_profile<F>(&self, mut update: F) -> Result<StrongRef, BskyAgentError>
+    pub async fn upsert_profile<F>(&self, update: F) -> Result<StrongRef, BskyAgentError>
+    where
+        F: FnMut(Option<&Profile>) -> Result<Profile, BskyAgentError>,
+    {
+        let session = self.begin_pinned_session().await?;
+        Self::upsert_profile_on_session(&session, update).await
+    }
+
+    async fn upsert_profile_on_session<F>(
+        session: &PinnedAgentSession<'_>,
+        mut update: F,
+    ) -> Result<StrongRef, BskyAgentError>
     where
         F: FnMut(Option<&Profile>) -> Result<Profile, BskyAgentError>,
     {
         let collection = Profile::TYPE_IDENTIFIER;
-        self.upsert_record_json(collection, "self", |existing| {
-            let existing_profile =
-                existing.and_then(|raw| serde_json::from_value::<Profile>(raw.value.clone()).ok());
-            let updated = update(existing_profile.as_ref())?;
-            let mut record = record_json(&updated, Some(collection))?.0;
-            if let (Some(existing), Some(existing_profile)) = (existing, existing_profile)
-                && let (Some(stored), Some(modeled), Some(record_obj)) = (
-                    existing.value.as_object(),
-                    serde_json::to_value(&existing_profile)
-                        .ok()
-                        .and_then(|v| v.as_object().cloned()),
-                    record.as_object_mut(),
-                )
-            {
-                for (k, v) in stored {
-                    if !modeled.contains_key(k) && !record_obj.contains_key(k) {
-                        record_obj.insert(k.clone(), v.clone());
+        session
+            .upsert_record_json(collection, "self", |existing| {
+                let existing_profile = existing
+                    .and_then(|raw| serde_json::from_value::<Profile>(raw.value.clone()).ok());
+                let updated = update(existing_profile.as_ref())?;
+                let mut record = record_json(&updated, Some(collection))?.0;
+                if let (Some(existing), Some(existing_profile)) = (existing, existing_profile)
+                    && let (Some(stored), Some(modeled), Some(record_obj)) = (
+                        existing.value.as_object(),
+                        serde_json::to_value(&existing_profile)
+                            .ok()
+                            .and_then(|v| v.as_object().cloned()),
+                        record.as_object_mut(),
+                    )
+                {
+                    for (k, v) in stored {
+                        if !modeled.contains_key(k) && !record_obj.contains_key(k) {
+                            record_obj.insert(k.clone(), v.clone());
+                        }
                     }
                 }
-            }
-            Ok(record)
-        })
-        .await
+                Ok(record)
+            })
+            .await
     }
 
     // MARK: Video
@@ -2148,23 +1982,354 @@ struct NetworkPreferencesSession {
     expected_did: Option<Did>,
 }
 
+impl BskyAgent {
+    async fn begin_pinned_session(&self) -> Result<PinnedAgentSession<'_>, BskyAgentError> {
+        match &self.transport {
+            AgentTransport::Client(client) => {
+                let continuity = client.auth_continuity_snapshot().await;
+                let did = client
+                    .get_did()
+                    .await
+                    .map_err(|e| BskyAgentError::Transport(e.to_string()))?
+                    .ok_or(BskyAgentError::NotAuthenticated)?;
+                let xrpc = client.xrpc().await;
+                verify_continuity_binding(&self.transport, Some(&continuity), Some(&did)).await?;
+                Ok(PinnedAgentSession {
+                    agent: self,
+                    did,
+                    xrpc,
+                    expected_continuity: Some(continuity),
+                })
+            }
+            AgentTransport::Xrpc { xrpc, did } => {
+                let did = did.clone().ok_or(BskyAgentError::NotAuthenticated)?;
+                Ok(PinnedAgentSession {
+                    agent: self,
+                    did,
+                    xrpc: xrpc.read().await.clone(),
+                    expected_continuity: None,
+                })
+            }
+        }
+    }
+}
+
+struct PinnedAgentSession<'a> {
+    agent: &'a BskyAgent,
+    did: Did,
+    xrpc: XrpcClient,
+    expected_continuity: Option<AuthContinuitySnapshot>,
+}
+
+impl PinnedAgentSession<'_> {
+    async fn verify_continuity(&self) -> Result<(), BskyAgentError> {
+        verify_continuity_binding(
+            &self.agent.transport,
+            self.expected_continuity.as_ref(),
+            Some(&self.did),
+        )
+        .await
+    }
+
+    async fn xrpc_query(
+        &self,
+        nsid: &str,
+        params: &[(&str, String)],
+        options: &BskyCallOptions,
+    ) -> Result<XrpcResponse, BskyAgentError> {
+        self.verify_continuity().await?;
+        let call = BskyAgent::build_call_options(options);
+        let pairs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        let resp = match self.xrpc.query(nsid, pairs, &call).await {
+            Ok(resp) => resp,
+            Err(err) => {
+                self.verify_continuity().await?;
+                return Err(map_xrpc_error(nsid, err));
+            }
+        };
+        self.verify_continuity().await?;
+        Ok(resp)
+    }
+
+    async fn xrpc_procedure(
+        &self,
+        nsid: &str,
+        body: Option<XrpcBody>,
+        options: &BskyCallOptions,
+    ) -> Result<XrpcResponse, BskyAgentError> {
+        self.verify_continuity().await?;
+        let call = BskyAgent::build_call_options(options);
+        let empty: [(&str, &str); 0] = [];
+        let resp = match self.xrpc.procedure(nsid, empty, body, &call).await {
+            Ok(resp) => resp,
+            Err(err) => {
+                self.verify_continuity().await?;
+                return Err(map_xrpc_error(nsid, err));
+            }
+        };
+        self.verify_continuity().await?;
+        Ok(resp)
+    }
+
+    async fn upload_blob(&self, data: Bytes, mime_type: &str) -> Result<Blob, BskyAgentError> {
+        let nsid = "com.atproto.repo.uploadBlob";
+        if mime_type.is_empty() || mime_type.contains(['\r', '\n']) {
+            return Err(BskyAgentError::InvalidInput(
+                "A blob needs a media type such as image/png".to_owned(),
+            ));
+        }
+        self.verify_continuity().await?;
+        let out = match self
+            .xrpc
+            .upload_blob(data, mime_type, None, &CallOptions::default())
+            .await
+        {
+            Ok(out) => out,
+            Err(err) => {
+                self.verify_continuity().await?;
+                return Err(map_xrpc_error(nsid, err));
+            }
+        };
+        self.verify_continuity().await?;
+        Ok(out.blob)
+    }
+
+    async fn upload_image(
+        &self,
+        data: Bytes,
+        mime_type: &str,
+        strip_metadata: bool,
+    ) -> Result<Blob, BskyAgentError> {
+        let prepared = prepared_image(&data, mime_type, strip_metadata)?;
+        self.upload_blob(prepared, mime_type).await
+    }
+
+    async fn create_record<Record: Serialize>(
+        &self,
+        record: &Record,
+        collection: Option<&str>,
+        rkey: Option<&str>,
+        validate: Option<bool>,
+        swap_commit: Option<&CidString>,
+    ) -> Result<StrongRef, BskyAgentError> {
+        let nsid = "com.atproto.repo.createRecord";
+        let (json, resolved_collection) = record_json(record, collection)?;
+        let mut body = Map::new();
+        body.insert(
+            "repo".to_owned(),
+            JsonValue::String(self.did.as_str().to_owned()),
+        );
+        body.insert(
+            "collection".to_owned(),
+            JsonValue::String(resolved_collection),
+        );
+        body.insert("record".to_owned(), json);
+        if let Some(rkey) = rkey {
+            body.insert(
+                "rkey".to_owned(),
+                JsonValue::String(validated_record_key(rkey)?.to_owned()),
+            );
+        }
+        if let Some(validate) = validate {
+            body.insert("validate".to_owned(), JsonValue::Bool(validate));
+        }
+        if let Some(swap) = swap_commit {
+            body.insert(
+                "swapCommit".to_owned(),
+                JsonValue::String(swap.as_str().to_owned()),
+            );
+        }
+        let encoded = serde_json::to_vec(&JsonValue::Object(body))
+            .map_err(|e| BskyAgentError::InvalidInput(e.to_string()))?;
+        let resp = self
+            .xrpc_procedure(
+                nsid,
+                Some(XrpcBody::json(encoded)),
+                &BskyCallOptions::default(),
+            )
+            .await?;
+        decode_response_json(&resp.body, nsid)
+    }
+
+    async fn delete_record(&self, uri: &AtUri) -> Result<(), BskyAgentError> {
+        let (Some(collection), Some(rkey)) = (uri.collection(), uri.rkey()) else {
+            return Err(BskyAgentError::InvalidInput(format!(
+                "Not a record URI: {}",
+                uri.as_str()
+            )));
+        };
+        let mut body = Map::new();
+        body.insert(
+            "repo".to_owned(),
+            JsonValue::String(uri.authority().as_str().to_owned()),
+        );
+        body.insert(
+            "collection".to_owned(),
+            JsonValue::String(collection.as_str().to_owned()),
+        );
+        body.insert(
+            "rkey".to_owned(),
+            JsonValue::String(rkey.as_str().to_owned()),
+        );
+        let encoded = serde_json::to_vec(&JsonValue::Object(body))
+            .map_err(|e| BskyAgentError::InvalidInput(e.to_string()))?;
+        self.xrpc_procedure(
+            "com.atproto.repo.deleteRecord",
+            Some(XrpcBody::json(encoded)),
+            &BskyCallOptions::default(),
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn get_record_json(
+        &self,
+        repo: &str,
+        collection: &str,
+        rkey: &str,
+    ) -> Result<Option<RawRecord>, BskyAgentError> {
+        let nsid = "com.atproto.repo.getRecord";
+        let resp = match self
+            .xrpc_query(
+                nsid,
+                &[
+                    ("repo", repo.to_owned()),
+                    ("collection", collection.to_owned()),
+                    ("rkey", rkey.to_owned()),
+                ],
+                &BskyCallOptions::default(),
+            )
+            .await
+        {
+            Ok(resp) => resp,
+            Err(err) if err.xrpc_error_name() == Some("RecordNotFound") => return Ok(None),
+            Err(err) => return Err(err),
+        };
+        decode_raw_record(&resp.body, nsid).map(Some)
+    }
+
+    async fn put_record_json(
+        &self,
+        record: &JsonValue,
+        collection: &str,
+        rkey: &str,
+        validate: Option<bool>,
+        swap_record: &RecordSwap,
+    ) -> Result<StrongRef, BskyAgentError> {
+        let nsid = "com.atproto.repo.putRecord";
+        let mut body = Map::new();
+        body.insert(
+            "repo".to_owned(),
+            JsonValue::String(self.did.as_str().to_owned()),
+        );
+        body.insert(
+            "collection".to_owned(),
+            JsonValue::String(collection.to_owned()),
+        );
+        body.insert(
+            "rkey".to_owned(),
+            JsonValue::String(validated_record_key(rkey)?.to_owned()),
+        );
+        body.insert("record".to_owned(), record.clone());
+        if let Some(validate) = validate {
+            body.insert("validate".to_owned(), JsonValue::Bool(validate));
+        }
+        match swap_record {
+            RecordSwap::Any => {}
+            RecordSwap::MustNotExist => {
+                body.insert("swapRecord".to_owned(), JsonValue::Null);
+            }
+            RecordSwap::Matches(cid) => {
+                body.insert(
+                    "swapRecord".to_owned(),
+                    JsonValue::String(cid.as_str().to_owned()),
+                );
+            }
+        }
+        let encoded = serde_json::to_vec(&JsonValue::Object(body))
+            .map_err(|e| BskyAgentError::InvalidInput(e.to_string()))?;
+        let resp = self
+            .xrpc_procedure(
+                nsid,
+                Some(XrpcBody::json(encoded)),
+                &BskyCallOptions::default(),
+            )
+            .await?;
+        decode_response_json(&resp.body, nsid)
+    }
+
+    async fn upsert_record_json<F>(
+        &self,
+        collection: &str,
+        rkey: &str,
+        mut transform: F,
+    ) -> Result<StrongRef, BskyAgentError>
+    where
+        F: FnMut(Option<&RawRecord>) -> Result<JsonValue, BskyAgentError>,
+    {
+        const MAX_ATTEMPTS: usize = 6;
+        for _ in 0..MAX_ATTEMPTS {
+            self.verify_continuity().await?;
+            let existing = self
+                .get_record_json(self.did.as_str(), collection, rkey)
+                .await?;
+            let record = transform(existing.as_ref())?;
+            let swap = if let Some(existing) = &existing {
+                let Some(strong_ref) = existing.strong_ref() else {
+                    return Err(BskyAgentError::InvalidResponse {
+                        nsid: "com.atproto.repo.getRecord".to_owned(),
+                        reason: "Missing or malformed record CID".to_owned(),
+                    });
+                };
+                RecordSwap::Matches(strong_ref.cid)
+            } else {
+                RecordSwap::MustNotExist
+            };
+            match self
+                .put_record_json(&record, collection, rkey, None, &swap)
+                .await
+            {
+                Ok(strong) => return Ok(strong),
+                Err(err) if err.xrpc_error_name() == Some("InvalidSwap") => {}
+                Err(err) => return Err(err),
+            }
+        }
+        Err(BskyAgentError::SwapRetriesExhausted {
+            attempts: MAX_ATTEMPTS,
+        })
+    }
+}
+
+async fn verify_continuity_binding(
+    transport: &AgentTransport,
+    expected_continuity: Option<&AuthContinuitySnapshot>,
+    expected_did: Option<&Did>,
+) -> Result<(), BskyAgentError> {
+    let Some(expected) = expected_continuity else {
+        return Ok(());
+    };
+    let AgentTransport::Client(client) = transport else {
+        return Ok(());
+    };
+    let current_continuity = client.auth_continuity_snapshot().await;
+    let current_did = client
+        .get_did()
+        .await
+        .map_err(|e| BskyAgentError::Transport(e.to_string()))?;
+    if current_continuity != *expected || current_did.as_ref() != expected_did {
+        return Err(BskyAgentError::AuthContinuityChanged);
+    }
+    Ok(())
+}
+
 impl NetworkPreferencesSession {
     async fn verify_continuity(&self) -> Result<(), BskyAgentError> {
-        let Some(ref expected) = self.expected_continuity else {
-            return Ok(());
-        };
-        let AgentTransport::Client(ref client) = self.agent.transport else {
-            return Ok(());
-        };
-        let current_continuity = client.auth_continuity_snapshot().await;
-        let current_did = client
-            .get_did()
-            .await
-            .map_err(|e| BskyAgentError::Transport(e.to_string()))?;
-        if current_continuity != *expected || current_did != self.expected_did {
-            return Err(BskyAgentError::AuthContinuityChanged);
-        }
-        Ok(())
+        verify_continuity_binding(
+            &self.agent.transport,
+            self.expected_continuity.as_ref(),
+            self.expected_did.as_ref(),
+        )
+        .await
     }
 }
 
@@ -2335,6 +2500,96 @@ fn decode_response_json<T: DeserializeOwned>(body: &[u8], nsid: &str) -> Result<
         nsid: nsid.to_owned(),
         reason: format!("Body does not match expected JSON ({err})"),
     })
+}
+
+fn decode_raw_record(body: &[u8], nsid: &str) -> Result<RawRecord, BskyAgentError> {
+    let json: JsonValue = decode_response_json(body, nsid)?;
+    let Some(uri) = json.get("uri").and_then(JsonValue::as_str) else {
+        return Err(BskyAgentError::InvalidResponse {
+            nsid: nsid.to_owned(),
+            reason: "Missing uri or value".to_owned(),
+        });
+    };
+    let Some(value) = json.get("value") else {
+        return Err(BskyAgentError::InvalidResponse {
+            nsid: nsid.to_owned(),
+            reason: "Missing uri or value".to_owned(),
+        });
+    };
+    if !value.is_object() {
+        return Err(BskyAgentError::InvalidResponse {
+            nsid: nsid.to_owned(),
+            reason: "Missing uri or value".to_owned(),
+        });
+    }
+    Ok(RawRecord {
+        uri: uri.to_owned(),
+        cid: json
+            .get("cid")
+            .and_then(JsonValue::as_str)
+            .map(ToOwned::to_owned),
+        value: value.clone(),
+    })
+}
+
+fn build_post_record(
+    rich_text: &RichText,
+    reply: Option<ReplyRef>,
+    embed: Option<PostEmbedBuilder>,
+    langs: Option<Vec<String>>,
+    labels: Option<Vec<String>>,
+    tags: Option<Vec<String>>,
+    created_at: Option<Datetime>,
+) -> Result<Post, BskyAgentError> {
+    if rich_text.exceeds_post_limits() {
+        return Err(BskyAgentError::InvalidInput(format!(
+            "Post text is {} graphemes / {} bytes; the limit is {} graphemes / {} bytes",
+            rich_text.grapheme_length(),
+            rich_text.utf8_length(),
+            RichText::MAX_POST_GRAPHEMES,
+            RichText::MAX_POST_UTF8_BYTES
+        )));
+    }
+    let parsed_langs = if let Some(langs) = langs {
+        if langs.len() > 3 {
+            return Err(BskyAgentError::InvalidInput(format!(
+                "A post declares at most 3 languages, got {}",
+                langs.len()
+            )));
+        }
+        let mut out = Vec::with_capacity(langs.len());
+        for tag in langs {
+            let lang = tag.parse::<Language>().map_err(|_| {
+                BskyAgentError::InvalidInput(format!("Invalid language tag: {tag}"))
+            })?;
+            out.push(lang);
+        }
+        Some(out)
+    } else {
+        None
+    };
+
+    let post_labels = labels.and_then(|values| {
+        if values.is_empty() {
+            None
+        } else {
+            Some(PostLabels::SelfLabels(Box::new(SelfLabels::new(
+                values.into_iter().map(SelfLabel::new).collect(),
+            ))))
+        }
+    });
+
+    let mut record = Post::new(
+        rich_text.text.clone(),
+        created_at.unwrap_or_else(now_datetime),
+    );
+    record.facets = rich_text.record_facets();
+    record.reply = reply;
+    record.embed = embed.and_then(PostEmbedBuilder::into_post_embed);
+    record.langs = parsed_langs;
+    record.labels = post_labels;
+    record.tags = tags;
+    Ok(record)
 }
 
 fn record_json<Record: Serialize>(

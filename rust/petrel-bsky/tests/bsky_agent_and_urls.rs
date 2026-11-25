@@ -828,4 +828,291 @@ mod agent_tests {
         assert_eq!(err_b, BskyAgentError::AuthContinuityChanged);
         assert!(client.configured_labelers().await.is_none());
     }
+
+    struct GatedRecordTransport {
+        entered: Arc<tokio::sync::Notify>,
+        release: Arc<tokio::sync::Notify>,
+        gate_get: std::sync::atomic::AtomicBool,
+        gate_blob: std::sync::atomic::AtomicBool,
+        gate_put_swap: std::sync::atomic::AtomicBool,
+        fail_swap_once: std::sync::atomic::AtomicBool,
+        writes: Mutex<Vec<RecordedReq>>,
+    }
+
+    #[allow(clippy::needless_pass_by_value)]
+    fn json_resp(status: StatusCode, body: serde_json::Value) -> Response<Bytes> {
+        let bytes = serde_json::to_vec(&body).unwrap();
+        Response::builder()
+            .status(status)
+            .header("content-type", "application/json")
+            .body(Bytes::from(bytes))
+            .unwrap()
+    }
+
+    impl DynHttpTransport for GatedRecordTransport {
+        fn send_dyn<'a>(
+            &'a self,
+            request: Request<Bytes>,
+            _options: &'a SendOptions,
+        ) -> BoxFuture<'a, Result<Response<Bytes>, TransportError>> {
+            Box::pin(async move {
+                let req = RecordedReq {
+                    method: request.method().to_string(),
+                    url: request.uri().to_string(),
+                    headers: request
+                        .headers()
+                        .iter()
+                        .filter_map(|(k, v)| {
+                            v.to_str()
+                                .ok()
+                                .map(|val| (k.as_str().to_owned(), val.to_owned()))
+                        })
+                        .collect(),
+                    body: request.into_body(),
+                };
+                if req.url.contains("/xrpc/com.atproto.server.createSession") {
+                    let body = req.json().unwrap();
+                    let (did, handle, tok) = if body["identifier"].as_str() == Some("alice.test") {
+                        ("did:plc:alice", "alice.test", "tok-alice")
+                    } else {
+                        ("did:plc:bob", "bob.test", "tok-bob")
+                    };
+                    return Ok(json_resp(
+                        StatusCode::OK,
+                        json!({
+                            "accessJwt": tok, "refreshJwt": format!("refresh-{tok}"),
+                            "handle": handle, "did": did, "active": true
+                        }),
+                    ));
+                }
+                if req.url.contains("/xrpc/com.atproto.repo.getRecord") {
+                    if self
+                        .gate_get
+                        .swap(false, std::sync::atomic::Ordering::SeqCst)
+                    {
+                        self.entered.notify_one();
+                        self.release.notified().await;
+                    }
+                    return Ok(json_resp(
+                        StatusCode::OK,
+                        json!({
+                            "uri": "at://did:plc:alice/app.bsky.actor.profile/self",
+                            "cid": super::FAKE_CID,
+                            "value": { "$type": "app.bsky.actor.profile", "displayName": "Existing" }
+                        }),
+                    ));
+                }
+                if req.url.contains("/xrpc/com.atproto.repo.uploadBlob") {
+                    if self
+                        .gate_blob
+                        .swap(false, std::sync::atomic::Ordering::SeqCst)
+                    {
+                        self.entered.notify_one();
+                        self.release.notified().await;
+                    }
+                    return Ok(json_resp(
+                        StatusCode::OK,
+                        json!({
+                            "blob": {
+                                "$type": "blob", "ref": { "$link": RAW_BLOB_CID },
+                                "mimeType": "image/png", "size": 3
+                            }
+                        }),
+                    ));
+                }
+                if req.url.contains("/xrpc/com.atproto.repo.putRecord")
+                    || req.url.contains("/xrpc/com.atproto.repo.createRecord")
+                {
+                    if self
+                        .fail_swap_once
+                        .swap(false, std::sync::atomic::Ordering::SeqCst)
+                    {
+                        if self
+                            .gate_put_swap
+                            .swap(false, std::sync::atomic::Ordering::SeqCst)
+                        {
+                            self.entered.notify_one();
+                            self.release.notified().await;
+                        }
+                        return Ok(json_resp(
+                            StatusCode::BAD_REQUEST,
+                            json!({ "error": "InvalidSwap", "message": "stale" }),
+                        ));
+                    }
+                    self.writes.lock().unwrap().push(req);
+                    return Ok(json_resp(
+                        StatusCode::OK,
+                        json!({
+                            "uri": "at://did:plc:alice/app.bsky.actor.profile/self",
+                            "cid": super::FAKE_CID
+                        }),
+                    ));
+                }
+                Ok(json_resp(StatusCode::NOT_FOUND, json!({})))
+            })
+        }
+    }
+
+    struct SharedPdsIdentityResolver;
+    impl OAuthIdentityResolver for SharedPdsIdentityResolver {
+        fn resolve_identity<'a>(
+            &'a self,
+            identifier: &'a AtIdentifier,
+            _force_refresh: bool,
+        ) -> BoxFuture<'a, Result<OAuthIdentity, OAuthIdentityError>> {
+            let raw = identifier.as_str().to_owned();
+            Box::pin(async move {
+                let (did, handle) = match raw.as_str() {
+                    "alice.test" | "did:plc:alice" => ("did:plc:alice", "alice.test"),
+                    "bob.test" | "did:plc:bob" => ("did:plc:bob", "bob.test"),
+                    _ => return Err(OAuthIdentityError),
+                };
+                Ok(OAuthIdentity {
+                    did: did.parse().unwrap(),
+                    handle: Some(handle.parse().unwrap()),
+                    pds: Url::parse("https://shared-pds.test").unwrap(),
+                })
+            })
+        }
+    }
+
+    async fn setup_switch_client<T: DynHttpTransport + 'static>(
+        transport: Arc<T>,
+        ns: &str,
+    ) -> (Arc<AtProtoClient>, Arc<BskyAgent>, Did, Did) {
+        let store = SessionStore::new(Arc::new(MemorySecretStore::new()), ns).unwrap();
+        let client = Arc::new(
+            AtProtoClient::new(
+                Url::parse("https://shared-pds.test").unwrap(),
+                transport,
+                store,
+                Arc::new(SharedPdsIdentityResolver),
+                None,
+                AuthMode::Legacy,
+                false,
+            )
+            .unwrap(),
+        );
+        let alice_did: Did = "did:plc:alice".parse().unwrap();
+        let bob_did: Did = "did:plc:bob".parse().unwrap();
+        client
+            .login_with_password("bob.test", "pw", None)
+            .await
+            .unwrap();
+        client
+            .login_with_password("alice.test", "pw", None)
+            .await
+            .unwrap();
+        let agent = Arc::new(BskyAgent::from_client(Arc::clone(&client)));
+        (client, agent, alice_did, bob_did)
+    }
+
+    #[tokio::test]
+    async fn bsky_agent_upsert_profile_and_siblings_reject_mid_operation_account_switch() {
+        use petrel_bsky::ProfileUpdate;
+        use tokio::sync::Notify;
+
+        let transport = Arc::new(GatedRecordTransport {
+            entered: Arc::new(Notify::new()),
+            release: Arc::new(Notify::new()),
+            gate_get: std::sync::atomic::AtomicBool::new(false),
+            gate_blob: std::sync::atomic::AtomicBool::new(false),
+            gate_put_swap: std::sync::atomic::AtomicBool::new(false),
+            fail_swap_once: std::sync::atomic::AtomicBool::new(false),
+            writes: Mutex::new(Vec::new()),
+        });
+        let (client, agent, alice_did, bob_did) =
+            setup_switch_client(transport.clone(), "upsert-switch-guard").await;
+
+        // 1. Account switch during getRecord rejects putRecord in upsert_profile.
+        transport
+            .gate_get
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        let a1 = Arc::clone(&agent);
+        let t1 = tokio::spawn(async move {
+            a1.upsert_profile(|_| Ok(ProfileUpdate::default().into_record()))
+                .await
+        });
+        transport.entered.notified().await;
+        client.switch_to_account(&bob_did).await.unwrap();
+        transport.release.notify_one();
+        assert_eq!(
+            t1.await.unwrap().unwrap_err(),
+            BskyAgentError::AuthContinuityChanged
+        );
+
+        // 2. Account switch during InvalidSwap retry rejects next getRecord/putRecord.
+        client.switch_to_account(&alice_did).await.unwrap();
+        transport
+            .fail_swap_once
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        transport
+            .gate_put_swap
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        let a2 = Arc::clone(&agent);
+        let t2 = tokio::spawn(async move {
+            a2.upsert_profile(|_| Ok(ProfileUpdate::default().into_record()))
+                .await
+        });
+        transport.entered.notified().await;
+        client.switch_to_account(&bob_did).await.unwrap();
+        transport.release.notify_one();
+        assert_eq!(
+            t2.await.unwrap().unwrap_err(),
+            BskyAgentError::AuthContinuityChanged
+        );
+
+        // 3. Account switch after uploadBlob in set_avatar fails closed before upsert_profile.
+        client.switch_to_account(&alice_did).await.unwrap();
+        transport
+            .gate_blob
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        let a3 = Arc::clone(&agent);
+        let t3 = tokio::spawn(async move {
+            a3.set_avatar(Bytes::from_static(b"png"), "image/png", false)
+                .await
+        });
+        transport.entered.notified().await;
+        client.switch_to_account(&bob_did).await.unwrap();
+        transport.release.notify_one();
+        assert_eq!(
+            t3.await.unwrap().unwrap_err(),
+            BskyAgentError::AuthContinuityChanged
+        );
+
+        // 4. Account switch after uploadBlob in post_with_images fails closed before createRecord.
+        client.switch_to_account(&alice_did).await.unwrap();
+        transport
+            .gate_blob
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        let a4 = Arc::clone(&agent);
+        let t4 = tokio::spawn(async move {
+            a4.post_with_images(
+                "hi",
+                &[PostImage {
+                    data: Bytes::from_static(b"png"),
+                    mime_type: "image/png".to_owned(),
+                    alt: "alt".to_owned(),
+                    aspect_ratio: None,
+                }],
+                false,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .await
+        });
+        transport.entered.notified().await;
+        client.switch_to_account(&bob_did).await.unwrap();
+        transport.release.notify_one();
+        assert_eq!(
+            t4.await.unwrap().unwrap_err(),
+            BskyAgentError::AuthContinuityChanged
+        );
+
+        assert_eq!(transport.writes.lock().unwrap().len(), 0);
+    }
 }
