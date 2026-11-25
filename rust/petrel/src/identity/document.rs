@@ -378,14 +378,11 @@ impl DidDocument {
         };
 
         let mut readable = self.services.iter();
+        let mut unreadable = self.unreadable_services.iter().peekable();
         let total = self.services.len() + self.unreadable_services.len();
         for position in 0..total {
-            if let Some(unreadable) = self
-                .unreadable_services
-                .iter()
-                .find(|entry| entry.position == position)
-            {
-                if is_match(&unreadable.id, unreadable.kind.as_deref()) {
+            if let Some(unreadable_entry) = unreadable.next_if(|entry| entry.position == position) {
+                if is_match(&unreadable_entry.id, unreadable_entry.kind.as_deref()) {
                     return Some(ServiceEntry::Unreadable);
                 }
             } else if let Some(service) = readable.next()

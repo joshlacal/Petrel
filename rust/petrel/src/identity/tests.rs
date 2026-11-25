@@ -907,3 +907,43 @@ async fn did_resolving_and_did_resolution_service() {
     assert_eq!(handle.normalized(), HANDLE);
     assert_eq!(pds.as_str(), "https://pds.example.com/");
 }
+
+#[test]
+fn large_malformed_services_endpoint_lookup_is_linear_time() {
+    let mut entries: Vec<serde_json::Value> = vec![serde_json::json!({"id": "x"}); 20_000];
+    entries.push(serde_json::json!({
+        "id": "#atproto_pds",
+        "type": "AtprotoPersonalDataServer",
+        "serviceEndpoint": "https://pds.example.com"
+    }));
+    let payload = serde_json::to_vec(&serde_json::json!({
+        "id": DID,
+        "service": entries
+    }))
+    .unwrap();
+    let doc: DidDocument = serde_json::from_slice(&payload).unwrap();
+    assert_eq!(
+        doc.pds_endpoint().unwrap().as_str(),
+        "https://pds.example.com/"
+    );
+
+    // An unreadable first-matching entry at the tail after 20k malformed entries still blocks fallback.
+    let mut blocked_entries: Vec<serde_json::Value> = vec![serde_json::json!({"id": "x"}); 20_000];
+    blocked_entries.push(serde_json::json!({
+        "id": "#atproto_pds",
+        "type": "AtprotoPersonalDataServer",
+        "serviceEndpoint": 42
+    }));
+    blocked_entries.push(serde_json::json!({
+        "id": "#atproto_pds",
+        "type": "AtprotoPersonalDataServer",
+        "serviceEndpoint": "https://fallback.example.com"
+    }));
+    let blocked_payload = serde_json::to_vec(&serde_json::json!({
+        "id": DID,
+        "service": blocked_entries
+    }))
+    .unwrap();
+    let blocked_doc: DidDocument = serde_json::from_slice(&blocked_payload).unwrap();
+    assert_eq!(blocked_doc.pds_endpoint(), None);
+}
