@@ -251,6 +251,33 @@ class RustCodeGenerationTests(unittest.TestCase):
         for retired in ("optional_strict", "optional_nullable_strict"):
             self.assertNotIn(retired, code)
 
+    def test_a_union_input_is_strict_however_it_is_reached(self):
+        proc = {
+            "lexicon": 1,
+            "id": "com.example.unionBody",
+            "defs": {
+                "main": {
+                    "type": "procedure",
+                    "input": {
+                        "encoding": "application/json",
+                        "schema": {"type": "union", "refs": ["#a"]},
+                    },
+                    "output": {
+                        "encoding": "application/json",
+                        "schema": {"type": "union", "refs": ["#a"]},
+                    },
+                },
+                "a": {"type": "object", "properties": {"note": {"type": "string"}}},
+            },
+        }
+        code = RustCodeGenerator(proc).convert()
+        input_start = code.index("impl petrel_core::FromValue for InputUnion")
+        input_impl = code[input_start : code.index("fn from_value_strict", input_start)]
+        self.assertIn("Self::decode_member(value, true)", input_impl)
+        output_start = code.index("impl petrel_core::FromValue for OutputUnion")
+        output_impl = code[output_start : code.index("fn from_value_strict", output_start)]
+        self.assertIn("Self::decode_member(value, false)", output_impl)
+
     def test_petrel_api_cargo_features_match_computed_namespace_graph(self):
         manifest = json.loads((GENERATOR_DIR / "manifests" / "petrel-core.json").read_text(encoding="utf-8"))
         excl = tuple(manifest["lexicons"]["exclude_namespaces"])

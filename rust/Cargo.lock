@@ -1644,6 +1644,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "petrel-lexicon-fixture"
+version = "0.0.0"
+dependencies = [
+ "petrel-api",
+ "petrel-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "petrel-oauth-scopes"
 version = "0.0.0"
 dependencies = [

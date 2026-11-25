@@ -13,6 +13,7 @@ members = [
     "petrel-oauth-scopes",
     "petrel",
     "petrel-e2e",
+    "petrel-lexicon-fixture",
 ]
 
 [workspace.package]

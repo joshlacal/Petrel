@@ -443,6 +443,7 @@ class RustCodeGenerator(BaseCodeGenerator):
                 "InputUnion",
                 input_schema.get("refs", []),
                 closed=bool(input_schema.get("closed", False)),
+                xrpc_input=True,
             )
             alias = self.template_manager.type_alias_template.render(
                 name="Input",
