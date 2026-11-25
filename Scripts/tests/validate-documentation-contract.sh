@@ -5,6 +5,8 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 VALIDATOR="$ROOT/Scripts/validate-documentation.sh"
 EXTRACTOR="$ROOT/Scripts/extract-documentation-examples.sh"
+DOC_COMMENT_EXTRACTOR="$ROOT/Scripts/extract-doc-comment-examples.py"
+DOC_COMMENT_SUPPORT="$ROOT/Scripts/doc-comment-examples"
 README="$ROOT/README.md"
 GUIDE="$ROOT/GETTING_STARTED.md"
 GETTING_STARTED="$ROOT/Sources/Petrel/Petrel.docc/GettingStarted.md"
@@ -19,6 +21,14 @@ trap 'rm -rf "$TMP"' EXIT
 [[ -x $VALIDATOR ]]
 [[ -x $EXTRACTOR ]] || {
     echo "documentation example extractor is missing or not executable" >&2
+    exit 1
+}
+[[ -x $DOC_COMMENT_EXTRACTOR ]] || {
+    echo "documentation-comment example extractor is missing or not executable" >&2
+    exit 1
+}
+[[ -f "$DOC_COMMENT_SUPPORT/contexts.json" && -f "$DOC_COMMENT_SUPPORT/Support.swift" ]] || {
+    echo "documentation-comment example contexts or stand-in types are missing" >&2
     exit 1
 }
 /bin/bash -n "$VALIDATOR"
@@ -46,6 +56,10 @@ done
 /usr/bin/grep -F -- '--build-system native' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F 'swiftlang/swift-package-manager/issues/10285' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F 'Scripts/extract-documentation-examples.sh' "$VALIDATOR" >/dev/null
+/usr/bin/grep -F 'Scripts/extract-doc-comment-examples.py' "$VALIDATOR" >/dev/null
+/usr/bin/grep -F 'Scripts/doc-comment-examples/Support.swift' "$VALIDATOR" >/dev/null
+/usr/bin/grep -F -- '-suppress-warnings' "$VALIDATOR" >/dev/null
+/usr/bin/grep -F 'doc-comment example inventory mismatch' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F 'README.md' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F 'GETTING_STARTED.md' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F 'CONNECTION_POLICY_ADAPTER.md' "$VALIDATOR" >/dev/null
@@ -165,6 +179,57 @@ if [[ $unmarked_status -eq 0 || $unmarked_output != *"unmarked Swift fence"* ]];
         "$unmarked_status" "$unmarked_output" >&2
     exit 1
 fi
+
+# Every Swift fence in a `///` comment is extracted or explicitly skipped.
+"$DOC_COMMENT_EXTRACTOR" "$TMP/doc-comments" >/dev/null
+doc_comment_fences=$(
+    find "$ROOT/Sources" -type f -name '*.swift' -not -path '*/Generated/*' -not -path '*.docc/*' \
+        -exec /usr/bin/grep -hE '^[[:space:]]*///[[:space:]]?```swift[[:space:]]*$' {} + |
+        /usr/bin/wc -l | /usr/bin/tr -d ' '
+)
+doc_comment_files=$(
+    find "$TMP/doc-comments" -type f \( -name '*.swift' -o -name '*.skipped' \) |
+        /usr/bin/wc -l | /usr/bin/tr -d ' '
+)
+[[ $doc_comment_fences -gt 0 && $doc_comment_files == "$doc_comment_fences" ]] || {
+    printf 'extracted %s documentation-comment examples from %s Swift fences\n' \
+        "$doc_comment_files" "$doc_comment_fences" >&2
+    exit 1
+}
+
+# A context must not drift onto a different example, and must not outlive its example.
+mkdir -p "$TMP/drift/Sources/Example"
+# The fenced comment is intentionally literal test data.
+# shellcheck disable=SC2016
+printf '/// ```swift\n/// let value = input\n/// ```\nfunc documented() {}\n' \
+    > "$TMP/drift/Sources/Example/Documented.swift"
+expect_doc_comment_failure() {
+    local label=$1 contexts=$2 expected=$3 output status
+    printf '%s\n' "$contexts" > "$TMP/drift/contexts.json"
+    rm -rf "$TMP/drift/output"
+    set +e
+    output=$("$DOC_COMMENT_EXTRACTOR" "$TMP/drift/output" \
+        --root "$TMP/drift" --contexts "$TMP/drift/contexts.json" 2>&1)
+    status=$?
+    set -e
+    if [[ $status -eq 0 || $output != *"$expected"* ]]; then
+        printf 'doc-comment extractor must reject %s; status=%s output=%s\n' \
+            "$label" "$status" "$output" >&2
+        exit 1
+    fi
+}
+expect_doc_comment_failure 'a context written for a different example' \
+    '{"imports": ["Foundation"], "examples": {"Sources/Example/Documented.swift#1": {"starts": "let other = input", "parameters": "input: Int"}}}' \
+    'was written for an example beginning'
+expect_doc_comment_failure 'a context for an example that does not exist' \
+    '{"imports": ["Foundation"], "examples": {"Sources/Example/Documented.swift#2": {"starts": "let value = input", "parameters": "input: Int"}}}' \
+    'names examples that do not exist'
+printf '%s\n' '{"imports": ["Foundation"], "examples": {"Sources/Example/Documented.swift#1": {"starts": "let value = input", "parameters": "input: Int"}}}' \
+    > "$TMP/drift/contexts.json"
+rm -rf "$TMP/drift/output"
+"$DOC_COMMENT_EXTRACTOR" "$TMP/drift/output" --root "$TMP/drift" --contexts "$TMP/drift/contexts.json" >/dev/null
+/usr/bin/grep -F 'func docCommentExample_example_documented_1(input: Int) async throws {' \
+    "$TMP/drift/output/example-documented-1.swift" >/dev/null
 
 if /usr/bin/grep -Eq '(^|[[:space:]])swift[[:space:]]+package' "$VALIDATOR"; then
     echo "documentation validator must not resolve ambient Swift" >&2

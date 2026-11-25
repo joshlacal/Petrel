@@ -41,6 +41,21 @@ DocC is Petrel's API reference. To check that your doc comments build:
 swift package generate-documentation
 ```
 
+Every Swift example in the documentation is compiled in CI
+(`Scripts/validate-documentation.sh`), so an example that stops matching the API fails the
+build:
+
+- In a guide or a DocC article, put `<!-- compile-example: some-name -->` on the line before
+  the Swift fence. The example is compiled as a file of its own, so it needs its imports and
+  has to be complete.
+- In a `///` comment, a Swift fence is a fragment and may use values the prose introduces
+  (`client`, `post`). If it does, say what they are in
+  `Scripts/doc-comment-examples/contexts.json`: the key is the file and the position of the
+  fence among that file's documentation comments (`Sources/Petrel/X.swift#2` is the second),
+  `starts` is the example's first line, `parameters` declares the values, and `setup` holds
+  any lines to run first. An application type the example refers to goes in `Support.swift`
+  beside it. A fence that uses nothing from outside needs no entry.
+
 To build the full static site, which is what the hosted documentation serves:
 
 ```bash
