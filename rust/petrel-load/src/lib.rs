@@ -778,12 +778,21 @@ struct RunOptions<'a> {
     total: usize,
     concurrency: usize,
     unauth: bool,
+    allow_loopback: bool,
     keep_running: bool,
     oauth_stress: bool,
     oauth_test: Option<&'a str>,
     dpop_test: Option<&'a str>,
     simulate_ambiguous: bool,
     oauth_cfg: Option<&'a CliOAuthConfig>,
+}
+
+fn base_url_allows_loopback(url: &Url) -> bool {
+    url.scheme() == "http"
+        || matches!(
+            url.host_str(),
+            Some("localhost" | "127.0.0.1" | "[::1]" | "::1")
+        )
 }
 
 /// Opens (creating securely with `0700` permissions on Unix if absent) the file-backed
@@ -840,7 +849,7 @@ fn build_client(
     } else {
         AuthMode::PublicOAuth
     };
-    let allow_loopback = base_url.scheme() == "http";
+    let allow_loopback = base_url_allows_loopback(&base_url);
     Ok(Arc::new(AtProtoClient::new(
         base_url,
         transport,
@@ -885,6 +894,7 @@ pub async fn run_cli<S: AsRef<str>>(
         });
 
     let unauth = parsed.get("unauth").map(String::as_str) == Some("true");
+    let allow_loopback = base_url_allows_loopback(&base_url);
     let client = build_client(base_url, session_store, oauth_cfg.as_ref(), unauth)?;
     let opts = RunOptions {
         namespace,
@@ -898,6 +908,7 @@ pub async fn run_cli<S: AsRef<str>>(
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(10),
         unauth,
+        allow_loopback,
         keep_running: parsed.get("keep-running").map(String::as_str) == Some("true"),
         oauth_stress: parsed.get("oauth-stress").map(String::as_str) == Some("true"),
         oauth_test: parsed.get("oauth-test").map(String::as_str),
@@ -941,7 +952,14 @@ async fn execute_mode(
 
     if opts.keep_running {
         loop {
-            run_basic_stress_test(client, opts.endpoint, opts.total, opts.concurrency).await?;
+            run_basic_stress_test(
+                client,
+                opts.endpoint,
+                opts.total,
+                opts.concurrency,
+                opts.allow_loopback,
+            )
+            .await?;
             tokio::select! {
                 _ = tokio::signal::ctrl_c() => break,
                 () = tokio::time::sleep(Duration::from_secs(2)) => {}
@@ -949,7 +967,14 @@ async fn execute_mode(
         }
         Ok(())
     } else {
-        run_basic_stress_test(client, opts.endpoint, opts.total, opts.concurrency).await
+        run_basic_stress_test(
+            client,
+            opts.endpoint,
+            opts.total,
+            opts.concurrency,
+            opts.allow_loopback,
+        )
+        .await
     }
 }
 
@@ -1035,7 +1060,14 @@ async fn run_oauth_diagnostics(
         return Ok(());
     }
     if opts.oauth_stress {
-        return run_basic_stress_test(client, opts.endpoint, opts.total, opts.concurrency).await;
+        return run_basic_stress_test(
+            client,
+            opts.endpoint,
+            opts.total,
+            opts.concurrency,
+            opts.allow_loopback,
+        )
+        .await;
     }
     if let Some(scenario) = opts.oauth_test {
         let plan =
@@ -1046,7 +1078,14 @@ async fn run_oauth_diagnostics(
                 })?;
         return match plan {
             ScenarioPlan::ConcurrentRequests { total, concurrency } => {
-                run_basic_stress_test(client, opts.endpoint, total, concurrency).await
+                run_basic_stress_test(
+                    client,
+                    opts.endpoint,
+                    total,
+                    concurrency,
+                    opts.allow_loopback,
+                )
+                .await
             }
             ScenarioPlan::SerialRefreshes { count } => {
                 for _ in 0..count {
@@ -1071,35 +1110,50 @@ async fn run_oauth_diagnostics(
         };
     }
     if let Some(mode) = opts.dpop_test {
-        let plan = PetrelLoadCli::scenario_plan("dpop-test", mode, opts.total, opts.concurrency)
-            .ok_or_else(|| ArgumentError::InvalidValue {
-                option: "dpop-test".to_owned(),
-                value: mode.to_owned(),
-            })?;
-        return match plan {
-            ScenarioPlan::SessionCheck => {
-                println!(
-                    "✓ Valid OAuth session: {}",
-                    client.has_valid_session().await
-                );
-                Ok(())
-            }
-            ScenarioPlan::ConcurrentRequests { total, concurrency } => {
-                run_basic_stress_test(client, opts.endpoint, total, concurrency).await
-            }
-            ScenarioPlan::SingleRefresh => {
-                client.auth_manager().refresh_if_needed().await?;
-                Ok(())
-            }
-            ScenarioPlan::SerialRefreshes { .. } | ScenarioPlan::SessionSnapshot => {
-                Err(Box::new(ArgumentError::InvalidValue {
-                    option: "dpop-test".to_owned(),
-                    value: mode.to_owned(),
-                }))
-            }
-        };
+        return run_dpop_test_mode(client, mode, opts).await;
     }
     Ok(())
+}
+
+async fn run_dpop_test_mode(
+    client: &Arc<AtProtoClient>,
+    mode: &str,
+    opts: &RunOptions<'_>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let plan = PetrelLoadCli::scenario_plan("dpop-test", mode, opts.total, opts.concurrency)
+        .ok_or_else(|| ArgumentError::InvalidValue {
+            option: "dpop-test".to_owned(),
+            value: mode.to_owned(),
+        })?;
+    match plan {
+        ScenarioPlan::SessionCheck => {
+            println!(
+                "✓ Valid OAuth session: {}",
+                client.has_valid_session().await
+            );
+            Ok(())
+        }
+        ScenarioPlan::ConcurrentRequests { total, concurrency } => {
+            run_basic_stress_test(
+                client,
+                opts.endpoint,
+                total,
+                concurrency,
+                opts.allow_loopback,
+            )
+            .await
+        }
+        ScenarioPlan::SingleRefresh => {
+            client.auth_manager().refresh_if_needed().await?;
+            Ok(())
+        }
+        ScenarioPlan::SerialRefreshes { .. } | ScenarioPlan::SessionSnapshot => {
+            Err(Box::new(ArgumentError::InvalidValue {
+                option: "dpop-test".to_owned(),
+                value: mode.to_owned(),
+            }))
+        }
+    }
 }
 
 async fn run_basic_stress_test(
@@ -1107,6 +1161,7 @@ async fn run_basic_stress_test(
     endpoint: &str,
     iterations: usize,
     concurrency: usize,
+    allow_loopback: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("=== AtProtoClient Stress Test ===");
     println!("Endpoint: {endpoint}");
@@ -1119,7 +1174,9 @@ async fn run_basic_stress_test(
         .map(|worker_iters| {
             let client = Arc::clone(client);
             let endpoint = endpoint.to_owned();
-            tokio::spawn(async move { run_worker(&client, &endpoint, worker_iters).await })
+            tokio::spawn(async move {
+                run_worker(&client, &endpoint, worker_iters, allow_loopback).await
+            })
         })
         .collect();
 
@@ -1150,11 +1207,14 @@ async fn run_worker(
     client: &AtProtoClient,
     endpoint: &str,
     iterations: usize,
+    allow_loopback: bool,
 ) -> (usize, usize, Vec<f64>, Option<String>) {
     let mut successes = 0usize;
     let mut failures = 0usize;
     let mut latencies = Vec::with_capacity(iterations);
     let mut sample_error: Option<String> = None;
+    let mut call_options = CallOptions::default();
+    call_options.transport.allow_loopback = allow_loopback;
 
     for _ in 0..iterations {
         let req_start = Instant::now();
@@ -1169,7 +1229,7 @@ async fn run_worker(
                 .query(
                     "app.bsky.feed.getTimeline",
                     [("limit", "10")],
-                    &CallOptions::default(),
+                    &call_options,
                 )
                 .await
         } else {
@@ -1178,7 +1238,7 @@ async fn run_worker(
                 .query(
                     "app.bsky.actor.getProfile",
                     [("actor", actor)],
-                    &CallOptions::default(),
+                    &call_options,
                 )
                 .await
         };

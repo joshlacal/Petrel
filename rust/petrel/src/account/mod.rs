@@ -7,7 +7,7 @@ use std::{
     fmt,
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
 };
 
@@ -57,6 +57,7 @@ pub struct AccountManager {
     storage: SessionStore,
     cache: Mutex<BTreeMap<Did, Account>>,
     auto_switch_on_removal: AtomicBool,
+    selection_epoch: AtomicU64,
     removal_handler: std::sync::Mutex<Option<Arc<dyn AccountRemovalHandler>>>,
 }
 
@@ -80,8 +81,15 @@ impl AccountManager {
             storage,
             cache: Mutex::new(BTreeMap::new()),
             auto_switch_on_removal: AtomicBool::new(true),
+            selection_epoch: AtomicU64::new(0),
             removal_handler: std::sync::Mutex::new(None),
         }
+    }
+
+    /// Monotonic counter incremented whenever active account selection is updated or cleared.
+    #[must_use]
+    pub fn selection_epoch(&self) -> u64 {
+        self.selection_epoch.load(Ordering::Acquire)
     }
 
     /// Returns the underlying [`SessionStore`].
@@ -180,6 +188,7 @@ impl AccountManager {
         }
         self.cache.lock().await.insert(did.clone(), account);
         self.storage.save_current_did(did).await?;
+        self.selection_epoch.fetch_add(1, Ordering::AcqRel);
         Ok(())
     }
 
@@ -199,6 +208,7 @@ impl AccountManager {
     /// Clears the current account selection without deleting stored accounts or credentials.
     pub async fn clear_current_account(&self) -> Result<(), AccountError> {
         self.storage.delete_current_did().await?;
+        self.selection_epoch.fetch_add(1, Ordering::AcqRel);
         Ok(())
     }
 
@@ -246,10 +256,12 @@ impl AccountManager {
             let remaining = self.storage.list_account_dids().await?;
             if self.auto_switch_on_removal.load(Ordering::Relaxed)
                 && let Some(first) = remaining.first()
+                && self.set_current_account(first).await.is_ok()
             {
-                let _ = self.set_current_account(first).await;
+                // `set_current_account` already persisted the new DID and bumped `selection_epoch`.
             } else {
                 self.storage.delete_current_did().await?;
+                self.selection_epoch.fetch_add(1, Ordering::AcqRel);
             }
         }
         Ok(())

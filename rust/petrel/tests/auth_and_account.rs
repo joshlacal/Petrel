@@ -1282,8 +1282,9 @@ async fn oauth_remove_account_auto_switch_rebinds_auth_manager_provider() {
         .unwrap(),
         (Some(bob_did.clone()), "DPoP jwt-bob".to_owned())
     );
+    assert_eq!(client.base_url().await, pds_b);
 
-    client.set_base_url(pds_b).await.unwrap();
+    // Calling the client facade directly without manual `set_base_url` must target PDS-B with Bob's credentials.
     let _ = client
         .query(
             "app.bsky.actor.getProfile",

@@ -320,3 +320,60 @@ async fn open_session_store_first_run_creates_private_dir_and_persists_accounts(
     assert!(temp_store_dir.is_dir());
     drop(temp_store);
 }
+
+#[tokio::test]
+async fn run_cli_unauth_allows_loopback_targets_for_both_supported_endpoints() {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let seen_paths = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let seen_clone = Arc::clone(&seen_paths);
+
+    let server = std::thread::spawn(move || {
+        for _ in 0..2 {
+            let (mut socket, _) = listener.accept().unwrap();
+            let mut buf = [0u8; 2048];
+            let n = socket.read(&mut buf).unwrap();
+            let req = String::from_utf8_lossy(&buf[..n]);
+            let first_line = req.lines().next().unwrap_or("").to_owned();
+            seen_clone.lock().unwrap().push(first_line);
+            let resp = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}";
+            socket.write_all(resp).unwrap();
+        }
+    });
+
+    let unique_ns = format!("load-loopback-{}", std::process::id());
+    let temp_store_dir = std::fs::canonicalize(std::env::temp_dir())
+        .unwrap()
+        .join(format!("petrel-load-store-{unique_ns}"));
+    let _ = std::fs::remove_dir_all(&temp_store_dir);
+    let _cleanup = TempDirCleanup(temp_store_dir);
+
+    let base_url = format!("http://{addr}");
+    for endpoint in ["app.bsky.actor.getProfile", "app.bsky.feed.getTimeline"] {
+        petrel_load::run_cli(&[
+            "petrel-load",
+            "--namespace",
+            &unique_ns,
+            "--endpoint",
+            endpoint,
+            "--base-url",
+            &base_url,
+            "--requests",
+            "1",
+            "--concurrency",
+            "1",
+            "--unauth",
+        ])
+        .await
+        .unwrap();
+    }
+
+    server.join().unwrap();
+    let recorded = seen_paths.lock().unwrap();
+    assert_eq!(recorded.len(), 2);
+    assert!(recorded[0].starts_with("GET /xrpc/app.bsky.actor.getProfile?"));
+    assert!(recorded[1].starts_with("GET /xrpc/app.bsky.feed.getTimeline?"));
+}

@@ -65,6 +65,7 @@ struct ClientState {
     service_dids: BTreeMap<String, String>,
     request_ids: bool,
     headers: HeaderMap,
+    synced_selection_epoch: u64,
 }
 
 impl fmt::Debug for AtProtoClient {
@@ -106,6 +107,7 @@ impl AtProtoClient {
             None,
             false,
         )?;
+        let synced_selection_epoch = account_manager.selection_epoch();
         Ok(Self {
             transport,
             account_manager,
@@ -119,6 +121,7 @@ impl AtProtoClient {
                 service_dids,
                 request_ids: false,
                 headers: HeaderMap::new(),
+                synced_selection_epoch,
             }),
         })
     }
@@ -143,6 +146,7 @@ impl AtProtoClient {
 
     /// Returns the current base XRPC service URL.
     pub async fn base_url(&self) -> Url {
+        let _ = self.sync_active_account_pipeline_if_needed().await;
         self.state.read().await.base_url.clone()
     }
 
@@ -160,6 +164,7 @@ impl AtProtoClient {
         )?;
         state.base_url = base_url;
         state.xrpc = xrpc;
+        state.synced_selection_epoch = self.account_manager.selection_epoch();
         Ok(())
     }
 
@@ -271,6 +276,7 @@ impl AtProtoClient {
     /// Returns a cloned snapshot of the underlying [`XrpcClient`], bound to the current
     /// authentication continuity and active account DID.
     pub async fn xrpc(&self) -> XrpcClient {
+        let _ = self.sync_active_account_pipeline_if_needed().await;
         let state = self.state.read().await;
         let continuity = self.auth_manager.auth_continuity_snapshot().await;
         let expected_did = self.account_manager.current_did().await.ok().flatten();
@@ -282,6 +288,7 @@ impl AtProtoClient {
 
     /// Returns the current authentication continuity snapshot.
     pub async fn auth_continuity_snapshot(&self) -> AuthContinuitySnapshot {
+        let _ = self.sync_active_account_pipeline_if_needed().await;
         self.auth_manager.auth_continuity_snapshot().await
     }
 
@@ -294,6 +301,7 @@ impl AtProtoClient {
     where
         F: FnOnce() -> T,
     {
+        let _ = self.sync_active_account_pipeline_if_needed().await;
         self.auth_manager
             .perform_with_exact_auth_continuity(expected, operation)
             .await
@@ -302,6 +310,14 @@ impl AtProtoClient {
     /// Switches authentication mode (invalidating continuity).
     pub async fn switch_auth_mode(&self, mode: AuthMode) -> Result<(), ClientError> {
         self.auth_manager.switch_mode(mode).await?;
+        Ok(())
+    }
+
+    /// Removes `did` via [`AccountManager::remove_account`] and synchronizes the client pipeline
+    /// if removal auto-selected or cleared the active account.
+    pub async fn remove_account(&self, did: &Did) -> Result<(), ClientError> {
+        self.account_manager.remove_account(did).await?;
+        self.sync_active_account_pipeline_if_needed().await?;
         Ok(())
     }
 
@@ -318,6 +334,9 @@ impl AtProtoClient {
                 && let Ok(url) = Url::parse(&account.pds)
             {
                 self.set_base_url(url).await?;
+            } else {
+                self.state.write().await.synced_selection_epoch =
+                    self.account_manager.selection_epoch();
             }
             Ok::<(), ClientError>(())
         }
@@ -360,6 +379,9 @@ impl AtProtoClient {
             && let Ok(url) = Url::parse(&pds)
         {
             self.set_base_url(url).await?;
+        } else {
+            self.state.write().await.synced_selection_epoch =
+                self.account_manager.selection_epoch();
         }
         Ok((did, handle))
     }
@@ -499,7 +521,41 @@ impl AtProtoClient {
             .await?)
     }
 
+    async fn sync_active_account_pipeline_if_needed(&self) -> Result<(), ClientError> {
+        let epoch = self.account_manager.selection_epoch();
+        if self.state.read().await.synced_selection_epoch == epoch {
+            return Ok(());
+        }
+        let mut state = self.state.write().await;
+        let epoch = self.account_manager.selection_epoch();
+        if state.synced_selection_epoch == epoch {
+            return Ok(());
+        }
+        self.auth_manager.invalidate_continuity().await;
+        if let Some(did) = self.account_manager.current_did().await? {
+            self.auth_manager.select_oauth_account(&did).await?;
+            if let Some(account) = self.account_manager.get_account(&did).await?
+                && let Ok(url) = Url::parse(&account.pds)
+            {
+                let xrpc = build_xrpc_client(
+                    &url,
+                    &self.transport,
+                    &self.auth_manager,
+                    &state.headers,
+                    &state.service_dids,
+                    state.labelers.as_deref(),
+                    state.request_ids,
+                )?;
+                state.base_url = url;
+                state.xrpc = xrpc;
+            }
+        }
+        state.synced_selection_epoch = epoch;
+        Ok(())
+    }
+
     async fn effective_call(&self, options: &CallOptions) -> (XrpcClient, CallOptions) {
+        let _ = self.sync_active_account_pipeline_if_needed().await;
         let state = self.state.read().await;
         let continuity = self.auth_manager.auth_continuity_snapshot().await;
         let expected_did = self.account_manager.current_did().await.ok().flatten();
