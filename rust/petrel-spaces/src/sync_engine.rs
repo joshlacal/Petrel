@@ -149,6 +149,7 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
         let mut active_map: BTreeMap<Did, RepoWrite> = BTreeMap::new();
         let mut removed_set: HashSet<Did> = HashSet::new();
         let mut latest_space_rev: Option<Tid> = since_space_rev.cloned();
+        let mut completed = false;
 
         for _ in 0..MAX_LIST_PAGES {
             let page = self
@@ -184,8 +185,17 @@ impl<E: CredentialExchanger> SpaceSyncEngine<E> {
                 Some(next) if !empty_page && cursor.as_deref() != Some(next.as_str()) => {
                     cursor = Some(next);
                 }
-                _ => break,
+                _ => {
+                    completed = true;
+                    break;
+                }
             }
+        }
+
+        if !completed {
+            return Err(SpaceError::MalformedPayload(format!(
+                "listWriters exceeded {MAX_LIST_PAGES} pages"
+            )));
         }
 
         let mut removed: Vec<Did> = removed_set.into_iter().collect();

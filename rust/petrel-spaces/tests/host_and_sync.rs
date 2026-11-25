@@ -1168,3 +1168,110 @@ fn sync_writer_ops_verified_rolls_back_on_later_page_failure() {
     assert_eq!(records, initial_records);
     assert_eq!(hash.digest(), initial_digest);
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+#[test]
+fn list_active_writers_errors_when_pagination_hits_page_limit() {
+    use petrel_api::generated::com::atproto::space::{
+        defs::RepoWrite,
+        list_writers::{Output as ListWritersOutput, OutputRepos},
+    };
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let now = 1_800_000_000_i64;
+    let space =
+        parse_space_ref("at:space/did:web:host.example.com/blue.catbird.mlsChat/3l2aaaaaaaaad")
+            .unwrap();
+    let host_did = Did::parse("did:web:host.example.com").unwrap();
+    let writer_did = Did::parse("did:plc:writer333333333333333333").unwrap();
+    let reader_did = Did::parse("did:plc:reader333333333333333333").unwrap();
+
+    let host_kp = SigningKeyPair::generate_p256().unwrap();
+    let reader_kp = SigningKeyPair::generate_p256().unwrap();
+    let host_doc_json = serde_json::json!({
+        "id": host_did.as_str(),
+        "service": [{
+            "id": "#atproto_space",
+            "type": "AtprotoSpaceHost",
+            "serviceEndpoint": "https://host.example.com"
+        }],
+        "verificationMethod": [{
+            "id": format!("{host_did}#atproto"),
+            "type": "Multikey",
+            "controller": host_did.as_str(),
+            "publicKeyMultibase": host_kp.did_key().unwrap().strip_prefix("did:key:").unwrap()
+        }]
+    });
+
+    let page_counter = Arc::new(AtomicUsize::new(0));
+    let page_counter_c = page_counter.clone();
+    let space_c = space.clone();
+    let host_did_c = host_did.clone();
+    let host_kp_c = host_kp.clone();
+    let writer_did_c = writer_did.clone();
+    let writer_rev = Tid::parse("3l2aaaaaaaaae").unwrap();
+    let space_rev = Tid::parse("3l2aaaaaaaaaf").unwrap();
+
+    let transport_impl = Arc::new(ScriptedTransport::default());
+    transport_impl.push(move |req| {
+        let uri_str = req.uri().to_string();
+        if uri_str == "https://host.example.com/.well-known/did.json" {
+            return Some(json_resp(200, &host_doc_json));
+        }
+        if uri_str.contains("/xrpc/com.atproto.space.authorizeSpaceSync") {
+            let input: AuthorizeSpaceSyncInput = serde_json::from_slice(req.body()).unwrap();
+            let jwt = mint_credential_token(
+                &host_kp_c,
+                &host_did_c,
+                &space_c,
+                &input.credential_key,
+                now,
+                now + 600,
+                Some("jti-listwriters-limit"),
+                None,
+            )
+            .unwrap();
+            return Some(json_resp(
+                200,
+                &petrel_api::generated::com::atproto::space::authorize_space_sync::Output::new(jwt),
+            ));
+        }
+        if uri_str.contains("/xrpc/com.atproto.space.listWriters") {
+            let n = page_counter_c.fetch_add(1, Ordering::SeqCst);
+            let out = ListWritersOutput {
+                repos: vec![OutputRepos::RepoWrite(Box::new(RepoWrite::new(
+                    writer_did_c.clone(),
+                    writer_rev.clone(),
+                    AtBytes(vec![0_u8; 32]),
+                    space_rev.clone(),
+                )))],
+                cursor: Some(format!("cur-{n}")),
+            };
+            return Some(json_resp(200, &out));
+        }
+        None
+    });
+
+    let transport: SharedTransport = transport_impl;
+    let host_resolver = Arc::new(SpaceHostResolver::new(transport.clone()));
+    let minter = Arc::new(LocalMinter {
+        reader_did,
+        reader_kp,
+        host_did: host_did.clone(),
+        now,
+    });
+    let exchanger = Arc::new(HttpCredentialExchanger::new(
+        transport.clone(),
+        host_resolver.clone(),
+        minter,
+    ));
+    let cred_mgr = Arc::new(SpaceCredentialManager::new(exchanger));
+    let engine = SpaceSyncEngine::new(transport, cred_mgr, host_resolver);
+    let host_url = Url::parse("https://host.example.com").unwrap();
+
+    let err = block_on(engine.list_active_writers(&space, &host_url, Some(&host_did), None, now))
+        .unwrap_err();
+    assert!(matches!(err, SpaceError::MalformedPayload(_)));
+    assert_eq!(page_counter.load(Ordering::SeqCst), 1000);
+}

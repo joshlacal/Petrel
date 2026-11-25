@@ -518,3 +518,101 @@ fn credential_rejects_issuer_not_matching_space_authority() {
         Err(SpaceError::Unauthorized(_))
     ));
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[test]
+fn replay_cache_fails_closed_when_live_capacity_exhausted() {
+    use petrel_spaces::{InMemorySignatureReplayCache, check_presentation_replay};
+
+    let cache = InMemorySignatureReplayCache::new(2);
+    let iss = "did:web:host.example.com";
+
+    block_on(check_presentation_replay(
+        &cache,
+        iss,
+        Some("nonce-1"),
+        Some(50),
+        Some(100),
+        100,
+        120,
+        60,
+        60,
+        50,
+    ))
+    .unwrap();
+    block_on(check_presentation_replay(
+        &cache,
+        iss,
+        Some("nonce-2"),
+        Some(50),
+        Some(100),
+        100,
+        120,
+        60,
+        60,
+        50,
+    ))
+    .unwrap();
+
+    // Live capacity (2) is full: inserting a 3rd fresh nonce must fail closed.
+    let exhausted = block_on(check_presentation_replay(
+        &cache,
+        iss,
+        Some("nonce-3"),
+        Some(50),
+        Some(100),
+        100,
+        120,
+        60,
+        60,
+        50,
+    ));
+    assert!(matches!(exhausted, Err(SpaceError::Storage(_))));
+
+    // Previously accepted live nonces must NOT have been evicted.
+    assert!(matches!(
+        block_on(check_presentation_replay(
+            &cache,
+            iss,
+            Some("nonce-1"),
+            Some(60),
+            Some(100),
+            100,
+            120,
+            60,
+            60,
+            60,
+        )),
+        Err(SpaceError::SignatureReplay)
+    ));
+    assert!(matches!(
+        block_on(check_presentation_replay(
+            &cache,
+            iss,
+            Some("nonce-2"),
+            Some(60),
+            Some(100),
+            100,
+            120,
+            60,
+            60,
+            60,
+        )),
+        Err(SpaceError::SignatureReplay)
+    ));
+
+    // Once entries expire (exp_window = min(50+120, 100+60, 100+60) = 160), pruning frees space.
+    block_on(check_presentation_replay(
+        &cache,
+        iss,
+        Some("nonce-4"),
+        Some(161),
+        Some(220),
+        220,
+        120,
+        60,
+        60,
+        161,
+    ))
+    .unwrap();
+}

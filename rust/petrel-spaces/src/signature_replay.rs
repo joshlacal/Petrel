@@ -15,7 +15,8 @@ pub trait SignatureReplayStore: MaybeSend + MaybeSync {
     /// Atomically check whether `key` has already been seen (and is still active at `now`)
     /// and record it until `expires_at` if fresh.
     ///
-    /// Returns `Ok(true)` if the presentation is fresh and recorded, or `Ok(false)` on replay.
+    /// Returns `Ok(true)` if the presentation is fresh and recorded, `Ok(false)` on replay,
+    /// or `Err(...)` if the backing store fails or cannot safely record the entry.
     fn check_and_record(&self, key: &str, expires_at: i64, now: i64)
     -> BoxFuture<'_, Result<bool>>;
 }
@@ -75,14 +76,12 @@ impl SignatureReplayStore for InMemorySignatureReplayCache {
 
             if guard.len() >= self.max_entries {
                 guard.retain(|_, &mut exp| exp >= now);
-            }
-            if guard.len() >= self.max_entries
-                && let Some(oldest_key) = guard
-                    .iter()
-                    .min_by_key(|(_, exp)| *exp)
-                    .map(|(k, _)| k.clone())
-            {
-                guard.remove(&oldest_key);
+                if guard.len() >= self.max_entries {
+                    return Err(SpaceError::Storage(format!(
+                        "replay cache capacity exhausted ({} live entries)",
+                        self.max_entries
+                    )));
+                }
             }
 
             guard.insert(key, expires_at);
