@@ -1,6 +1,10 @@
 //! Circuit breaker preventing cascading refresh failures per DID.
 
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::HashMap,
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
 
 use async_lock::Mutex;
 use petrel_core::Did;
@@ -42,6 +46,7 @@ struct FailureInfo {
     last_failure_time: Option<Instant>,
     state: CircuitState,
     half_open_test_in_progress: bool,
+    half_open_probe_id: u64,
     backoff_exponent: u32,
     last_failure_kind: Option<RefreshFailureKind>,
 }
@@ -53,6 +58,7 @@ impl Default for FailureInfo {
             last_failure_time: None,
             state: CircuitState::Closed,
             half_open_test_in_progress: false,
+            half_open_probe_id: 0,
             backoff_exponent: 0,
             last_failure_kind: None,
         }
@@ -65,6 +71,7 @@ pub struct RefreshCircuitBreaker {
     max_consecutive_failures: u32,
     reset_interval: Duration,
     tracking: Mutex<HashMap<Did, FailureInfo>>,
+    next_probe_id: AtomicU64,
 }
 
 impl Default for RefreshCircuitBreaker {
@@ -81,34 +88,69 @@ impl RefreshCircuitBreaker {
             max_consecutive_failures: 3,
             reset_interval: Duration::from_secs(300),
             tracking: Mutex::new(HashMap::new()),
+            next_probe_id: AtomicU64::new(1),
         }
     }
 
     /// Returns `true` if a refresh may be attempted for `did`.
     pub async fn can_attempt_refresh(&self, did: &Did) -> bool {
+        self.try_acquire_refresh_slot(did).await.is_some()
+    }
+
+    /// Attempts to acquire a refresh slot for `did`, returning `Some(Some(probe_id))` when a
+    /// `HalfOpen` probe ownership token was acquired, `Some(None)` when `Closed`, or `None` when
+    /// blocked by an open breaker or an active `HalfOpen` probe.
+    pub(crate) async fn try_acquire_refresh_slot(&self, did: &Did) -> Option<Option<u64>> {
         let mut tracking = self.tracking.lock().await;
         let info = tracking.entry(did.clone()).or_default();
         match info.state {
-            CircuitState::Closed => true,
+            CircuitState::Closed => Some(None),
             CircuitState::Open => {
                 if let Some(last_failure) = info.last_failure_time {
                     let backoff = calculate_backoff(info, self.reset_interval);
                     if last_failure.elapsed() >= backoff {
+                        let probe_id = self.next_probe_id.fetch_add(1, Ordering::Relaxed);
                         info.state = CircuitState::HalfOpen;
-                        info.half_open_test_in_progress = false;
-                        return true;
+                        info.half_open_test_in_progress = true;
+                        info.half_open_probe_id = probe_id;
+                        return Some(Some(probe_id));
                     }
                 }
-                false
+                None
             }
             CircuitState::HalfOpen => {
                 if info.half_open_test_in_progress {
-                    false
+                    None
                 } else {
+                    let probe_id = self.next_probe_id.fetch_add(1, Ordering::Relaxed);
                     info.half_open_test_in_progress = true;
-                    true
+                    info.half_open_probe_id = probe_id;
+                    Some(Some(probe_id))
                 }
             }
+        }
+    }
+
+    /// Releases a `HalfOpen` probe slot owned by `probe_id` when a refresh attempt aborts or
+    /// exits without completing a token exchange.
+    pub(crate) async fn release_half_open_probe(&self, did: &Did, probe_id: u64) {
+        let mut tracking = self.tracking.lock().await;
+        Self::release_probe_locked(&mut tracking, did, probe_id);
+    }
+
+    /// Best-effort synchronous release used during `Drop` when a task holding a probe is cancelled.
+    pub(crate) fn try_release_half_open_probe(&self, did: &Did, probe_id: u64) {
+        if let Some(mut tracking) = self.tracking.try_lock() {
+            Self::release_probe_locked(&mut tracking, did, probe_id);
+        }
+    }
+
+    fn release_probe_locked(tracking: &mut HashMap<Did, FailureInfo>, did: &Did, probe_id: u64) {
+        if let Some(info) = tracking.get_mut(did)
+            && info.state == CircuitState::HalfOpen
+            && info.half_open_probe_id == probe_id
+        {
+            info.half_open_test_in_progress = false;
         }
     }
 

@@ -675,16 +675,14 @@ impl LegacyPasswordStrategy {
         }
 
         let token_hash = sha256_bytes(session.refresh_jwt().as_bytes());
-        if !self.circuit_breaker.can_attempt_refresh(&did).await {
-            return Err(PasswordAuthError::TokenRefreshFailed(
-                "refresh circuit breaker is open".to_owned(),
-            ));
-        }
-
         if !force_refresh
             && let Some(last_success) = self.last_successful_refresh.lock().await.get(&did).copied()
             && last_success.elapsed() < MIN_REFRESH_INTERVAL_AFTER_SUCCESS
         {
+            return Ok(TokenRefreshResult::StillValid);
+        }
+
+        if !force_refresh && !session.is_expiring_soon(unix_now()) {
             return Ok(TokenRefreshResult::StillValid);
         }
 
@@ -705,10 +703,6 @@ impl LegacyPasswordStrategy {
                 all(target_arch = "wasm32", feature = "wasm")
             )))]
             let _ = wait;
-        }
-
-        if !force_refresh && !session.is_expiring_soon(unix_now()) {
-            return Ok(TokenRefreshResult::StillValid);
         }
 
         let (shared, mut waiter) = self.spawn_or_join_refresh(did, token_hash).await?;
@@ -739,10 +733,24 @@ impl LegacyPasswordStrategy {
         }
 
         refreshes.remove(&did);
+        let Some(acquired_probe) = self.circuit_breaker.try_acquire_refresh_slot(&did).await else {
+            return Err(PasswordAuthError::TokenRefreshFailed(
+                "refresh circuit breaker is open".to_owned(),
+            ));
+        };
+        let mut probe_guard = HalfOpenProbeGuard {
+            breaker: &self.circuit_breaker,
+            did: &did,
+            probe_id: acquired_probe,
+        };
         {
             let mut used = self.used_refresh_tokens.lock().await;
             if used.contains(&token_hash) {
                 used.remove(&token_hash);
+                drop(used);
+                if let Some(id) = probe_guard.take() {
+                    self.circuit_breaker.release_half_open_probe(&did, id).await;
+                }
                 return Err(PasswordAuthError::TokenRefreshFailed(
                     "refresh token replay prevented".to_owned(),
                 ));
@@ -750,6 +758,8 @@ impl LegacyPasswordStrategy {
             used.insert(token_hash);
         }
 
+        let probe_id = probe_guard.take();
+        drop(probe_guard);
         let generation = self.next_refresh_generation.fetch_add(1, Ordering::Relaxed);
         let active_waiters = Arc::new(AtomicUsize::new(1));
         let weak_this = Arc::downgrade(self);
@@ -760,6 +770,7 @@ impl LegacyPasswordStrategy {
                 did: did_for_task.clone(),
                 generation,
                 token_hash,
+                probe_id,
                 finished: false,
             };
             let Some(this) = weak_this.upgrade() else {
@@ -1166,11 +1177,32 @@ impl Drop for RefreshWaiterGuard {
     }
 }
 
+struct HalfOpenProbeGuard<'a> {
+    breaker: &'a RefreshCircuitBreaker,
+    did: &'a Did,
+    probe_id: Option<u64>,
+}
+
+impl HalfOpenProbeGuard<'_> {
+    const fn take(&mut self) -> Option<u64> {
+        self.probe_id.take()
+    }
+}
+
+impl Drop for HalfOpenProbeGuard<'_> {
+    fn drop(&mut self) {
+        if let Some(probe_id) = self.probe_id.take() {
+            self.breaker.try_release_half_open_probe(self.did, probe_id);
+        }
+    }
+}
+
 struct RefreshCleanupGuard {
     strategy: Weak<LegacyPasswordStrategy>,
     did: Did,
     generation: u64,
     token_hash: [u8; 32],
+    probe_id: Option<u64>,
     finished: bool,
 }
 
@@ -1178,6 +1210,12 @@ impl RefreshCleanupGuard {
     async fn finish_async(&mut self, keep_token_burned: bool) {
         self.finished = true;
         if let Some(strategy) = self.strategy.upgrade() {
+            if let Some(probe_id) = self.probe_id.take() {
+                strategy
+                    .circuit_breaker
+                    .release_half_open_probe(&self.did, probe_id)
+                    .await;
+            }
             let mut refreshes = strategy.active_refreshes.lock().await;
             if refreshes
                 .get(&self.did)
@@ -1203,6 +1241,11 @@ impl Drop for RefreshCleanupGuard {
             return;
         }
         if let Some(strategy) = self.strategy.upgrade() {
+            if let Some(probe_id) = self.probe_id.take() {
+                strategy
+                    .circuit_breaker
+                    .try_release_half_open_probe(&self.did, probe_id);
+            }
             if let Some(mut refreshes) = strategy.active_refreshes.try_lock()
                 && refreshes
                     .get(&self.did)
@@ -1481,5 +1524,140 @@ mod tests {
         let session_b_after = strategy.get_session(&did_b).await.unwrap().unwrap();
         assert_eq!(session_b_after.access_jwt(), "b-access-1");
         assert_eq!(session_b_after.refresh_jwt(), "b-refresh-1");
+    }
+
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+    #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+    async fn half_open_breaker_not_stuck_when_routine_refresh_sees_still_valid() {
+        use super::super::CircuitState;
+
+        let (strategy, _account_manager, transport) = make_recovery_strategy();
+        let did_a: Did = A_DID.parse().unwrap();
+
+        strategy
+            .login_with_password("alice.example", "pw-a", None)
+            .await
+            .unwrap();
+
+        // Trip breaker open after 3 server failures, then transition to `HalfOpen`.
+        for _ in 0..3 {
+            strategy
+                .circuit_breaker
+                .record_failure(&did_a, RefreshFailureKind::Server)
+                .await;
+        }
+        assert_eq!(
+            strategy.circuit_breaker.state(&did_a).await,
+            CircuitState::Open
+        );
+        assert!(strategy.circuit_breaker.force_half_open(&did_a).await);
+        assert_eq!(
+            strategy.circuit_breaker.state(&did_a).await,
+            CircuitState::HalfOpen
+        );
+
+        // Routine non-forced refresh on a still-valid token returns `StillValid` WITHOUT
+        // consuming or leaking `half_open_test_in_progress`.
+        assert_eq!(
+            strategy.refresh_token_if_needed(false).await.unwrap(),
+            TokenRefreshResult::StillValid
+        );
+        assert_eq!(
+            strategy.refresh_token_if_needed(false).await.unwrap(),
+            TokenRefreshResult::StillValid
+        );
+        assert!(transport.refresh_bearers.lock().unwrap().is_empty());
+        assert_eq!(
+            strategy.circuit_breaker.state(&did_a).await,
+            CircuitState::HalfOpen
+        );
+
+        // Subsequent forced recovery probe succeeds and closes the circuit breaker.
+        assert_eq!(
+            strategy.refresh_token_if_needed(true).await.unwrap(),
+            TokenRefreshResult::RefreshedSuccessfully
+        );
+        assert_eq!(
+            strategy.circuit_breaker.state(&did_a).await,
+            CircuitState::Closed
+        );
+        assert_eq!(
+            transport.refresh_bearers.lock().unwrap().as_slice(),
+            ["Bearer a-refresh-0"]
+        );
+    }
+
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+    #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+    async fn half_open_probe_released_when_refresh_exits_without_exchange() {
+        use super::super::CircuitState;
+
+        let (strategy, account_manager, transport) = make_recovery_strategy();
+        let did_a: Did = A_DID.parse().unwrap();
+
+        strategy
+            .login_with_password("alice.example", "pw-a", None)
+            .await
+            .unwrap();
+
+        // Direct breaker probe exclusivity & release check.
+        for _ in 0..3 {
+            strategy
+                .circuit_breaker
+                .record_failure(&did_a, RefreshFailureKind::Server)
+                .await;
+        }
+        assert!(strategy.circuit_breaker.force_half_open(&did_a).await);
+        let probe = strategy
+            .circuit_breaker
+            .try_acquire_refresh_slot(&did_a)
+            .await
+            .expect("first half-open probe admitted")
+            .expect("half-open slot returns probe id");
+        assert!(
+            strategy
+                .circuit_breaker
+                .try_acquire_refresh_slot(&did_a)
+                .await
+                .is_none()
+        );
+        strategy
+            .circuit_breaker
+            .release_half_open_probe(&did_a, probe)
+            .await;
+
+        // Remove catalog account so `perform_refresh` fails before network exchange without
+        // calling `record_success`/`record_failure`, then restore and retry.
+        let saved_account = account_manager.get_account(&did_a).await.unwrap().unwrap();
+        account_manager
+            .storage()
+            .delete_account(&did_a)
+            .await
+            .unwrap();
+        account_manager.invalidate_cache(Some(&did_a)).await;
+
+        assert!(matches!(
+            strategy.refresh_token_for_did(&did_a, true).await,
+            Err(PasswordAuthError::TokenRefreshFailed(_))
+        ));
+        assert!(transport.refresh_bearers.lock().unwrap().is_empty());
+        assert_eq!(
+            strategy.circuit_breaker.state(&did_a).await,
+            CircuitState::HalfOpen
+        );
+
+        account_manager.add_account(&saved_account).await.unwrap();
+        assert_eq!(
+            strategy.refresh_token_for_did(&did_a, true).await.unwrap(),
+            TokenRefreshResult::RefreshedSuccessfully
+        );
+        assert_eq!(
+            strategy.circuit_breaker.state(&did_a).await,
+            CircuitState::Closed
+        );
+        assert_eq!(
+            transport.refresh_bearers.lock().unwrap().as_slice(),
+            ["Bearer a-refresh-0"]
+        );
     }
 }
