@@ -94,9 +94,18 @@ pub enum FirehoseSubscriptionError {
     /// WebSocket transport is unavailable on this target or runtime.
     #[error("WebSocket transport unavailable: {0}")]
     WebSocketTransportUnavailable(String),
-    /// The server sent a frame larger than `maximum_message_size`.
+    /// The server sent a frame larger than `maximum_message_size`. Subscriptions reconnect
+    /// with backoff on this error (see `oversize_frame_retry_limit`).
     #[error("WebSocket message exceeded maximum frame size")]
     FrameTooLarge,
+    /// The frame following sequence `cursor` (`None`: before any decoded frame) exceeded
+    /// `maximum_message_size` on `attempts` consecutive connections. Raise the limit, or store
+    /// a cursor past the frame, then resubscribe.
+    #[error(
+        "WebSocket message after cursor {} exceeded maximum frame size on {attempts} consecutive attempts",
+        cursor.map_or_else(|| "<none>".to_owned(), |c| c.to_string())
+    )]
+    FrameTooLargeAtCursor { cursor: Option<i64>, attempts: u32 },
     /// The transport does not support sending outgoing text frames.
     #[error("WebSocket transport cannot send frames")]
     SendingUnsupported,
@@ -165,7 +174,7 @@ pub(crate) fn is_loopback_host_str(host: &str) -> bool {
 mod native {
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
     use std::sync::Arc;
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::time::Duration;
 
     use async_lock::Mutex;
@@ -322,32 +331,11 @@ mod native {
             Some(Host::Ipv4(addr)) => vec![IpAddr::V4(addr)],
             Some(Host::Ipv6(addr)) => vec![IpAddr::V6(addr)],
             Some(Host::Domain(domain)) => {
-                if let Ok(resolver) = HickoryResolver::system() {
-                    match resolver.lookup_ip(domain).await {
-                        Ok(addrs) if !addrs.is_empty() => addrs,
-                        _ if is_loopback_host_str(domain) => {
-                            vec![
-                                IpAddr::V4(Ipv4Addr::LOCALHOST),
-                                IpAddr::V6(Ipv6Addr::LOCALHOST),
-                            ]
-                        }
-                        Err(e) => return Err(FirehoseSubscriptionError::Network(e.to_string())),
-                        Ok(_) => {
-                            return Err(FirehoseSubscriptionError::SecurityViolation(
-                                "DNS returned no IP addresses".to_owned(),
-                            ));
-                        }
-                    }
-                } else if is_loopback_host_str(domain) {
-                    vec![
-                        IpAddr::V4(Ipv4Addr::LOCALHOST),
-                        IpAddr::V6(Ipv6Addr::LOCALHOST),
-                    ]
-                } else {
-                    return Err(FirehoseSubscriptionError::Network(
-                        "failed to initialize DNS resolver".to_owned(),
-                    ));
-                }
+                let answer = match HickoryResolver::system() {
+                    Ok(resolver) => resolver.lookup_ip(domain).await.map_err(|e| e.to_string()),
+                    Err(_) => Err("failed to initialize DNS resolver".to_owned()),
+                };
+                classify_dns_answer(domain, answer)?
             }
             None => {
                 return Err(FirehoseSubscriptionError::SecurityViolation(
@@ -361,6 +349,31 @@ mod native {
         Ok(ips)
     }
 
+    /// Maps a DNS answer to the addresses to connect to.
+    ///
+    /// A lookup error or an empty answer (NXDOMAIN and no-records both arrive as an empty set)
+    /// is transient: resolvers flap and records get re-published, so it is reported as
+    /// [`FirehoseSubscriptionError::Network`] and the pump reconnects with backoff. Only a
+    /// policy rejection of the resolved addresses (private, reserved, or loopback IPs for a
+    /// public host) is a [`FirehoseSubscriptionError::SecurityViolation`], applied afterwards by
+    /// `validate_resolved_addresses`.
+    fn classify_dns_answer(
+        domain: &str,
+        answer: Result<Vec<IpAddr>, String>,
+    ) -> Result<Vec<IpAddr>, FirehoseSubscriptionError> {
+        match answer {
+            Ok(addrs) if !addrs.is_empty() => Ok(addrs),
+            _ if is_loopback_host_str(domain) => Ok(vec![
+                IpAddr::V4(Ipv4Addr::LOCALHOST),
+                IpAddr::V6(Ipv6Addr::LOCALHOST),
+            ]),
+            Err(e) => Err(FirehoseSubscriptionError::Network(e)),
+            Ok(_) => Err(FirehoseSubscriptionError::Network(format!(
+                "DNS returned no IP addresses for {domain}"
+            ))),
+        }
+    }
+
     /// Active WebSocket connection backed by `tokio-tungstenite`.
     #[derive(Debug)]
     pub struct TungsteniteWebSocketSession {
@@ -369,7 +382,7 @@ mod native {
         text_frames: TextFrameHandling,
         maximum_message_size: usize,
         closed_tx: watch::Sender<bool>,
-        awaiting_pong: Arc<AtomicBool>,
+        liveness: Arc<Liveness>,
         keep_alive: Mutex<Option<JoinHandle<()>>>,
     }
 
@@ -378,14 +391,14 @@ mod native {
             let (sink, reader) = stream.split();
             let writer = Arc::new(Mutex::new(sink));
             let (closed_tx, closed_rx) = watch::channel(false);
-            let awaiting_pong = Arc::new(AtomicBool::new(false));
+            let liveness = Arc::new(Liveness::default());
             let keep_alive = options
                 .ping_interval
                 .filter(|d| !d.is_zero())
                 .map(|interval| {
                     Self::spawn_keep_alive(
                         Arc::clone(&writer),
-                        Arc::clone(&awaiting_pong),
+                        Arc::clone(&liveness),
                         closed_tx.clone(),
                         closed_rx,
                         interval,
@@ -398,19 +411,31 @@ mod native {
                 text_frames: options.text_frames,
                 maximum_message_size: options.maximum_message_size,
                 closed_tx,
-                awaiting_pong,
+                liveness,
                 keep_alive: Mutex::new(keep_alive),
             }
         }
 
+        /// Pings every `interval` and closes the connection when a ping stays unanswered for a
+        /// full interval *during which the consumer was continuously waiting in
+        /// `receive_message`*.
+        ///
+        /// Pongs (like all frames) are only read while the consumer polls, so an interval in
+        /// which the consumer was not reading says nothing about the peer: it restarts the
+        /// measurement instead of counting against the connection. Pull rate therefore never
+        /// kills a healthy socket, while a consumer blocked on a dead peer is unblocked within
+        /// about two intervals.
         fn spawn_keep_alive(
             writer: Arc<Mutex<SplitSink<WsStream, Message>>>,
-            awaiting_pong: Arc<AtomicBool>,
+            liveness: Arc<Liveness>,
             closed_tx: watch::Sender<bool>,
             mut closed_rx: watch::Receiver<bool>,
             interval: Duration,
         ) -> JoinHandle<()> {
             tokio::spawn(async move {
+                // `Some(n)`: a ping is outstanding and receive call `n` was waiting when the
+                // current measurement window started.
+                let mut window: Option<u64> = None;
                 loop {
                     tokio::select! {
                         biased;
@@ -424,13 +449,20 @@ mod native {
                     if *closed_rx.borrow() {
                         return;
                     }
-                    if awaiting_pong.swap(true, Ordering::SeqCst) {
-                        // Previous ping went unanswered across a full interval: drop connection.
-                        let _ = closed_tx.send(true);
-                        let mut guard = writer.lock().await;
-                        let _ = guard.close().await;
-                        return;
+                    if liveness.awaiting_pong.load(Ordering::SeqCst) {
+                        let current = liveness.reading_call();
+                        if window.is_some() && current == window {
+                            // Unanswered across a full interval of continuous reading.
+                            let _ = closed_tx.send(true);
+                            let mut guard = writer.lock().await;
+                            let _ = guard.close().await;
+                            return;
+                        }
+                        window = current;
+                        continue;
                     }
+                    liveness.awaiting_pong.store(true, Ordering::SeqCst);
+                    window = liveness.reading_call();
                     let mut guard = writer.lock().await;
                     if guard.send(Message::Ping(Vec::new().into())).await.is_err() {
                         let _ = closed_tx.send(true);
@@ -438,6 +470,41 @@ mod native {
                     }
                 }
             })
+        }
+    }
+
+    /// Keep-alive state shared between the reader and the ping task.
+    #[derive(Debug, Default)]
+    struct Liveness {
+        /// A ping was sent and neither a pong nor any other frame has arrived since.
+        awaiting_pong: AtomicBool,
+        /// A `receive_message` call is waiting on the socket.
+        reading: AtomicBool,
+        /// Number of `receive_message` calls that started waiting.
+        read_calls: AtomicU64,
+    }
+
+    impl Liveness {
+        /// Identifies the `receive_message` call waiting right now, if any.
+        fn reading_call(&self) -> Option<u64> {
+            self.reading
+                .load(Ordering::SeqCst)
+                .then(|| self.read_calls.load(Ordering::SeqCst))
+        }
+
+        fn start_reading(&self) -> ReadingGuard<'_> {
+            self.read_calls.fetch_add(1, Ordering::SeqCst);
+            self.reading.store(true, Ordering::SeqCst);
+            ReadingGuard(self)
+        }
+    }
+
+    /// Clears [`Liveness::reading`] when a receive call returns or is cancelled.
+    struct ReadingGuard<'a>(&'a Liveness);
+
+    impl Drop for ReadingGuard<'_> {
+        fn drop(&mut self) {
+            self.0.reading.store(false, Ordering::SeqCst);
         }
     }
 
@@ -461,6 +528,7 @@ mod native {
                 }
 
                 let mut reader = self.reader.lock().await;
+                let _reading = self.liveness.start_reading();
                 loop {
                     if *closed_rx.borrow() {
                         return Err(FirehoseSubscriptionError::ConnectionClosed);
@@ -476,6 +544,10 @@ mod native {
                         msg = reader.next() => msg,
                     };
 
+                    // Any frame from the peer proves the connection is alive.
+                    if matches!(next, Some(Ok(_))) {
+                        self.liveness.awaiting_pong.store(false, Ordering::SeqCst);
+                    }
                     match next {
                         Some(Ok(Message::Binary(data))) => {
                             if data.len() > self.maximum_message_size {
@@ -499,10 +571,7 @@ mod native {
                             let mut writer = self.writer.lock().await;
                             let _ = writer.send(Message::Pong(payload)).await;
                         }
-                        Some(Ok(Message::Pong(_))) => {
-                            self.awaiting_pong.store(false, Ordering::SeqCst);
-                        }
-                        Some(Ok(Message::Frame(_))) => {}
+                        Some(Ok(Message::Pong(_) | Message::Frame(_))) => {}
                         Some(Ok(Message::Close(_))) | None => {
                             return Err(FirehoseSubscriptionError::ConnectionClosed);
                         }
@@ -568,6 +637,37 @@ mod native {
             WsError::Url(e) => FirehoseSubscriptionError::SecurityViolation(e.to_string()),
             WsError::Io(e) => FirehoseSubscriptionError::Network(e.to_string()),
             other => FirehoseSubscriptionError::Network(other.to_string()),
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn empty_or_failed_dns_answer_is_retryable_but_private_ips_are_fatal() {
+            assert!(matches!(
+                classify_dns_answer("relay.example.com", Ok(Vec::new())),
+                Err(FirehoseSubscriptionError::Network(_))
+            ));
+            assert!(matches!(
+                classify_dns_answer("relay.example.com", Err("SERVFAIL".to_owned())),
+                Err(FirehoseSubscriptionError::Network(_))
+            ));
+            assert_eq!(
+                classify_dns_answer("localhost", Ok(Vec::new()))
+                    .unwrap()
+                    .len(),
+                2
+            );
+            let public = vec![IpAddr::V4(Ipv4Addr::new(93, 184, 216, 34))];
+            assert_eq!(
+                classify_dns_answer("relay.example.com", Ok(public.clone())),
+                Ok(public)
+            );
+            // The address policy itself stays fatal.
+            let private = [IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))];
+            assert!(validate_resolved_addresses("relay.example.com", &private).is_err());
         }
     }
 }

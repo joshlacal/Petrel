@@ -355,10 +355,14 @@ async fn event_stream_subscription_decodes_labels_info_unknown_and_errors() {
     })
     .unwrap();
 
+    // Malformed frame (non-minimal integer in the header, no body) -> IgnoredFrame, not fatal.
+    let f_bad = vec![0xA1, 0x62, b'o', b'p', 0x18, 0x01];
+
     let session = Arc::new(common::ScriptedSession::from_actions(vec![
         Ok(f1),
         Ok(f2),
         Ok(f3),
+        Ok(f_bad),
         Ok(f4),
     ]));
     let factory = Arc::new(common::ScriptedWebSocketFactory::new(vec![Ok(session)]));
@@ -394,6 +398,17 @@ async fn event_stream_subscription_decodes_labels_info_unknown_and_errors() {
         EventStreamEvent::IgnoredFrame(EventStreamIgnoredFrame {
             operation: 9,
             reason: IgnoredFrameReason::UnknownOperation,
+            ..
+        })
+    ));
+
+    let malformed = stream.next().await.unwrap().unwrap();
+    assert!(matches!(
+        malformed,
+        EventStreamEvent::IgnoredFrame(EventStreamIgnoredFrame {
+            operation: 1,
+            sequence: None,
+            reason: IgnoredFrameReason::MalformedFrame(_),
             ..
         })
     ));

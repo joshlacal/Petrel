@@ -3,6 +3,7 @@
 
 use std::marker::PhantomData;
 use std::sync::Arc;
+use std::time::Duration;
 
 use petrel::rt::MaybeSend;
 use petrel_api::generated::com::atproto::label::subscribe_labels::SubscribeLabels;
@@ -11,7 +12,7 @@ use url::Url;
 
 use crate::decoder::{
     EventStreamIgnoredFrame, IgnoredFrameReason, RelayFrame, RelayFrameDecoder,
-    RelayFrameDecodingMode,
+    RelayFrameDecodingMode, lenient_frame_hints,
 };
 use crate::pump::{
     BoxedEventStream, EventStreamCursorCoordinator, EventStreamError, EventStreamPumpConfiguration,
@@ -31,7 +32,9 @@ pub enum FirehoseSubscriptionEvent {
     Event(RelayEvent),
     /// The stream skipped from `expected - 1` to `received`; informational, the stream continues.
     SequenceGap { expected: i64, received: i64 },
-    /// A frame skipped in lenient mode (unknown `op`, unknown `t`, or schema mismatch).
+    /// A frame skipped instead of ending the stream: unknown `op` or `t`, schema mismatch,
+    /// a frame that failed canonical parsing, or a message the transport refused as too large
+    /// (see [`IgnoredFrameReason`]).
     IgnoredFrame(EventStreamIgnoredFrame),
 }
 
@@ -46,12 +49,34 @@ pub struct FirehoseSubscriptionConfiguration {
     pub backoff: FirehoseBackoffConfiguration,
     /// WebSocket session factory.
     pub session_factory: Arc<dyn FirehoseWebSocketSessionFactory>,
-    /// Retained for source compatibility (streams are pull-based).
-    pub buffer_limit: usize,
     /// Automatically advance the cursor once the consumer asks for the next element.
+    ///
+    /// When `false`, the cursor only moves when the consumer calls `acknowledge`. Every
+    /// reconnect resumes from the last *acknowledged* cursor, so events delivered but not yet
+    /// acknowledged are delivered again (at-least-once delivery): consumers must tolerate
+    /// duplicates or acknowledge before they can lose an event.
     pub auto_acknowledge: bool,
     /// Reconnect from the cursor on `ConsumerTooSlow` instead of ending the stream.
     pub reconnects_on_consumer_too_slow: bool,
+    /// Consecutive [`FirehoseSubscriptionError::FrameTooLarge`] failures tolerated at the same
+    /// stream position before the stream ends (default 3; values below 1 act as 1).
+    ///
+    /// The transport cannot read an oversize message, so its sequence is unknown and it cannot
+    /// be skipped. Each failure yields an [`IgnoredFrameReason::FrameTooLarge`] event and a
+    /// reconnect with backoff from the same cursor (the relay may have been mid-way through a
+    /// transient burst). The position is the last sequence decoded before the failure; any
+    /// progress past it resets the count. When the limit is reached the stream ends with
+    /// [`FirehoseSubscriptionError::FrameTooLargeAtCursor`] naming that sequence, so the
+    /// consumer can raise `maximum_message_size` or move its stored cursor past the frame.
+    pub oversize_frame_retry_limit: u32,
+    /// A connection that stayed open at least this long resets reconnect backoff when it
+    /// ends (default 30s).
+    pub backoff_reset_after: Duration,
+    /// A connection that delivered at least this many frames resets reconnect backoff when it
+    /// ends (default 100). Until a connection is stable by either measure, backoff keeps
+    /// growing, so a server that accepts, sends a frame or two, and closes cannot drive a
+    /// reconnect loop at the initial delay.
+    pub backoff_reset_after_frames: u64,
 }
 
 impl FirehoseSubscriptionConfiguration {
@@ -63,9 +88,11 @@ impl FirehoseSubscriptionConfiguration {
             cursor_storage: Arc::new(InMemoryFirehoseCursorStorage::new()),
             backoff: FirehoseBackoffConfiguration::new(),
             session_factory: default_websocket_factory(FirehoseWebSocketOptions::new()),
-            buffer_limit: 1000,
             auto_acknowledge: false,
             reconnects_on_consumer_too_slow: false,
+            oversize_frame_retry_limit: 3,
+            backoff_reset_after: Duration::from_secs(30),
+            backoff_reset_after_frames: 100,
         }
     }
 
@@ -77,6 +104,9 @@ impl FirehoseSubscriptionConfiguration {
             session_factory: Arc::clone(&self.session_factory),
             auto_acknowledge: self.auto_acknowledge,
             reconnects_on_consumer_too_slow: self.reconnects_on_consumer_too_slow,
+            oversize_frame_retry_limit: self.oversize_frame_retry_limit.max(1),
+            backoff_reset_after: self.backoff_reset_after,
+            backoff_reset_after_frames: self.backoff_reset_after_frames,
         }
     }
 }
@@ -166,6 +196,14 @@ impl FirehoseSubscription {
     }
 
     /// Connects and returns a pull-based stream of firehose events.
+    ///
+    /// A single bad frame never ends the stream: frames that fail canonical parsing or schema
+    /// decoding arrive as [`FirehoseSubscriptionEvent::IgnoredFrame`]. The stream ends on a
+    /// server `#error` frame (except `ConsumerTooSlow` when reconnecting is enabled), a
+    /// non-retryable transport error, a sequence regression or duplicate, a cursor storage
+    /// failure, or too many oversize frames at one position. With
+    /// `auto_acknowledge == false`, reconnects redeliver unacknowledged events (see
+    /// [`FirehoseSubscriptionConfiguration::auto_acknowledge`]).
     pub fn events(
         &self,
     ) -> BoxedEventStream<Result<FirehoseSubscriptionEvent, FirehoseStreamError>> {
@@ -176,29 +214,47 @@ impl FirehoseSubscription {
             Arc::new(
                 |expected, received| FirehoseSubscriptionEvent::SequenceGap { expected, received },
             ),
+            Arc::new(FirehoseSubscriptionEvent::IgnoredFrame),
         )
     }
 
+    // Signature fixed by `DecodeFn`; a single frame can no longer fail the stream.
+    #[allow(clippy::unnecessary_wraps)]
     pub(crate) fn step(
         data: &[u8],
     ) -> Result<EventStreamStep<FirehoseSubscriptionEvent>, FirehoseStreamError> {
-        let parsed = RelayFrameDecoder::parse(data)?;
+        let parsed = match RelayFrameDecoder::parse(data) {
+            Ok(parsed) => parsed,
+            Err(err) => {
+                return Ok(malformed_frame_step(
+                    data,
+                    err.raw_value().to_owned(),
+                    FirehoseSubscriptionEvent::IgnoredFrame,
+                ));
+            }
+        };
         let frame = match RelayFrameDecoder::decode_parsed(&parsed, RelayFrameDecodingMode::Lenient)
         {
             Ok(f) => f,
-            Err(err) if parsed.operation == 1 => {
+            Err(err) => {
+                // `op: 1` with a schema mismatch, or an `op: -1` error frame whose body is
+                // not a valid error object. Only well-formed error frames end the stream.
+                let reason = if parsed.operation == 1 {
+                    IgnoredFrameReason::UndecodablePayload(err.raw_value().to_owned())
+                } else {
+                    IgnoredFrameReason::MalformedFrame(err.raw_value().to_owned())
+                };
                 let ignored = EventStreamIgnoredFrame {
                     operation: parsed.operation,
                     r#type: parsed.r#type.clone(),
                     sequence: parsed.sequence,
-                    reason: IgnoredFrameReason::UndecodablePayload(err.raw_value().to_owned()),
+                    reason,
                 };
                 return Ok(EventStreamStep::deliver(
                     FirehoseSubscriptionEvent::IgnoredFrame(ignored),
                     parsed.sequence,
                 ));
             }
-            Err(err) => return Err(FirehoseStreamError::Verifier(err)),
         };
 
         match frame {
@@ -295,15 +351,26 @@ where
             Arc::clone(&self.coordinator),
             Arc::new(move |data| Self::step(data, &nsid)),
             Arc::new(|expected, received| EventStreamEvent::SequenceGap { expected, received }),
+            Arc::new(EventStreamEvent::IgnoredFrame),
         )
     }
 
+    // Signature fixed by `DecodeFn`; a single frame can no longer fail the stream.
+    #[allow(clippy::unnecessary_wraps)]
     pub(crate) fn step(
         data: &[u8],
         nsid: &str,
     ) -> Result<EventStreamStep<EventStreamEvent<S::Message>>, FirehoseStreamError> {
-        let frame = decode_frame_with(data, Some(nsid))
-            .map_err(|e| FirehoseStreamError::Frame(e.to_string()))?;
+        let frame = match decode_frame_with(data, Some(nsid)) {
+            Ok(frame) => frame,
+            Err(err) => {
+                return Ok(malformed_frame_step(
+                    data,
+                    err.to_string(),
+                    EventStreamEvent::IgnoredFrame,
+                ));
+            }
+        };
 
         match frame {
             SubscriptionFrame::Error { error, message } => Ok(EventStreamStep::fail(
@@ -346,6 +413,26 @@ where
             },
         }
     }
+}
+
+/// Turns a frame that failed parsing into an ignored-frame step.
+///
+/// The sequence comes from a lenient read of the raw bytes, so the pump treats it as a hint:
+/// it advances the cursor only when it is newer than the last sequence seen.
+fn malformed_frame_step<Output>(
+    data: &[u8],
+    error: String,
+    wrap: impl FnOnce(EventStreamIgnoredFrame) -> Output,
+) -> EventStreamStep<Output> {
+    let hints = lenient_frame_hints(data);
+    let sequence = hints.sequence;
+    let ignored = EventStreamIgnoredFrame {
+        operation: hints.operation.unwrap_or(0),
+        r#type: hints.r#type,
+        sequence,
+        reason: IgnoredFrameReason::MalformedFrame(error),
+    };
+    EventStreamStep::deliver_with_sequence_hint(wrap(ignored), sequence)
 }
 
 /// Consumer of `com.atproto.label.subscribeLabels`.

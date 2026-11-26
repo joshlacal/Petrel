@@ -33,7 +33,7 @@ pub use pump::{
     FirehoseBoundedSender, FirehoseCursorStorage, FirehoseStreamError,
     InMemoryFirehoseCursorStorage, bounded_firehose_channel,
 };
-pub use records::RelayRecordOperation;
+pub use records::{RelayRecordOperation, RelayRecordOperationError};
 pub use repo_seam::{
     FixedRepositorySigningKey, RepoBlockSourceAdapter, RepoCommitVerifier,
     RepoCommitVerifierAdapter, RepoSigningKeyResolverAdapter, RepositoryBlockSource,
