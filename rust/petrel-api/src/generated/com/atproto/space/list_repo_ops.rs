@@ -271,7 +271,7 @@ impl OpEntry {
             cid: reader.required_nullable("cid")?,
             prev: reader.required_nullable("prev")?,
             value: reader.optional("value")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

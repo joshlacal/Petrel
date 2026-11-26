@@ -183,10 +183,10 @@ impl petrel_core::ToValue for OutputData {
 impl OutputData {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.external#viewArticle" => petrel_core::decode_value(value, strict).map(Self::ViewArticle),
-            "app.bsky.embed.external#viewArticlePublication" => petrel_core::decode_value(value, strict).map(Self::ViewArticlePublication),
-            "app.bsky.embed.external#viewGallery" => petrel_core::decode_value(value, strict).map(Self::ViewGallery),
-            "app.bsky.embed.external#viewLivestream" => petrel_core::decode_value(value, strict).map(Self::ViewLivestream),
+            "app.bsky.embed.external#viewArticle" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ViewArticle),
+            "app.bsky.embed.external#viewArticlePublication" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ViewArticlePublication),
+            "app.bsky.embed.external#viewGallery" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ViewGallery),
+            "app.bsky.embed.external#viewLivestream" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ViewLivestream),
             _ => Ok(Self::Unknown(value)),
         }
     }

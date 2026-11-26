@@ -196,7 +196,7 @@ impl Repo {
             rev: reader.required("rev")?,
             active: reader.optional("active")?,
             status: reader.optional("status")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

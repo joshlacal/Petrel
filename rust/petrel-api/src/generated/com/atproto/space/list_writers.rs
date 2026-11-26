@@ -209,8 +209,8 @@ impl petrel_core::ToValue for OutputRepos {
 impl OutputRepos {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.space.defs#repoWrite" => petrel_core::decode_value(value, strict).map(Self::RepoWrite),
-            "com.atproto.space.defs#repoRemoved" => petrel_core::decode_value(value, strict).map(Self::RepoRemoved),
+            "com.atproto.space.defs#repoWrite" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoWrite),
+            "com.atproto.space.defs#repoRemoved" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoRemoved),
             _ => Ok(Self::Unknown(value)),
         }
     }

@@ -39,7 +39,7 @@ impl ConvoRef {
         Ok(Self {
             did: reader.required("did")?,
             convo_id: reader.required("convoId")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -122,7 +122,7 @@ impl MessageRef {
             did: reader.required("did")?,
             convo_id: reader.required("convoId")?,
             message_id: reader.required("messageId")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -211,7 +211,7 @@ impl MessageInput {
             facets: reader.optional("facets")?,
             embed: reader.optional("embed")?,
             reply_to: reader.optional("replyTo")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -287,7 +287,7 @@ impl ReplyRef {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             message_id: reader.required("messageId")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -397,7 +397,7 @@ impl MessageView {
             reply_to: reader.optional("replyTo")?,
             sender: reader.required("sender")?,
             sent_at: reader.required("sentAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -472,7 +472,7 @@ impl SystemMessageReferredUser {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             did: reader.required("did")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -559,7 +559,7 @@ impl SystemMessageView {
             rev: reader.required("rev")?,
             sent_at: reader.required("sentAt")?,
             data: reader.required("data")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -645,7 +645,7 @@ impl SystemMessageDataAddMember {
             member: reader.required("member")?,
             role: reader.required("role")?,
             added_by: reader.required("addedBy")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -726,7 +726,7 @@ impl SystemMessageDataRemoveMember {
         Ok(Self {
             member: reader.required("member")?,
             removed_by: reader.required("removedBy")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -813,7 +813,7 @@ impl SystemMessageDataMemberJoin {
             member: reader.required("member")?,
             role: reader.required("role")?,
             approved_by: reader.optional("approvedBy")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -890,7 +890,7 @@ impl SystemMessageDataMemberLeave {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             member: reader.required("member")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -967,7 +967,7 @@ impl SystemMessageDataLockConvo {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             locked_by: reader.required("lockedBy")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1044,7 +1044,7 @@ impl SystemMessageDataUnlockConvo {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             unlocked_by: reader.required("unlockedBy")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1121,7 +1121,7 @@ impl SystemMessageDataLockConvoPermanently {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             locked_by: reader.required("lockedBy")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1209,7 +1209,7 @@ impl SystemMessageDataEditGroup {
         Ok(Self {
             old_name: reader.optional("oldName")?,
             new_name: reader.optional("newName")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1287,7 +1287,7 @@ impl SystemMessageDataCreateJoinLink {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1365,7 +1365,7 @@ impl SystemMessageDataEditJoinLink {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1443,7 +1443,7 @@ impl SystemMessageDataEnableJoinLink {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1521,7 +1521,7 @@ impl SystemMessageDataDisableJoinLink {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1608,7 +1608,7 @@ impl DeletedMessageView {
             rev: reader.required("rev")?,
             sender: reader.required("sender")?,
             sent_at: reader.required("sentAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1686,7 +1686,7 @@ impl MessageBeforeUserJoinedGroupView {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1761,7 +1761,7 @@ impl MessageViewSender {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             did: reader.required("did")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1844,7 +1844,7 @@ impl ReactionView {
             value: reader.required("value")?,
             sender: reader.required("sender")?,
             created_at: reader.required("createdAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1919,7 +1919,7 @@ impl ReactionViewSender {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             did: reader.required("did")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1998,7 +1998,7 @@ impl MessageAndReactionView {
         Ok(Self {
             message: reader.required("message")?,
             reaction: reader.required("reaction")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2108,7 +2108,7 @@ impl ConvoView {
             status: reader.optional("status")?,
             unread_count: reader.required("unreadCount")?,
             kind: reader.optional("kind")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2185,7 +2185,7 @@ impl DirectConvo {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2299,7 +2299,7 @@ impl GroupConvo {
             member_limit: reader.required("memberLimit")?,
             name: reader.required("name")?,
             unread_join_request_count: reader.optional("unreadJoinRequestCount")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2379,7 +2379,7 @@ impl LogBeginConvo {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2459,7 +2459,7 @@ impl LogAcceptConvo {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2539,7 +2539,7 @@ impl LogLeaveConvo {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2619,7 +2619,7 @@ impl LogMuteConvo {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2699,7 +2699,7 @@ impl LogUnmuteConvo {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2788,7 +2788,7 @@ impl LogCreateMessage {
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             related_profiles: reader.optional("relatedProfiles")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2872,7 +2872,7 @@ impl LogDeleteMessage {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2956,7 +2956,7 @@ impl LogReadMessage {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -3049,7 +3049,7 @@ impl LogAddReaction {
             message: reader.required("message")?,
             reaction: reader.required("reaction")?,
             related_profiles: reader.optional("relatedProfiles")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -3142,7 +3142,7 @@ impl LogRemoveReaction {
             message: reader.required("message")?,
             reaction: reader.required("reaction")?,
             related_profiles: reader.optional("relatedProfiles")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -3226,7 +3226,7 @@ impl LogReadConvo {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -3316,7 +3316,7 @@ impl LogAddMember {
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             related_profiles: reader.required("relatedProfiles")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -3406,7 +3406,7 @@ impl LogRemoveMember {
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             related_profiles: reader.required("relatedProfiles")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -3496,7 +3496,7 @@ impl LogMemberJoin {
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             related_profiles: reader.required("relatedProfiles")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -3586,7 +3586,7 @@ impl LogMemberLeave {
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             related_profiles: reader.required("relatedProfiles")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -3676,7 +3676,7 @@ impl LogLockConvo {
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             related_profiles: reader.required("relatedProfiles")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -3766,7 +3766,7 @@ impl LogUnlockConvo {
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             related_profiles: reader.required("relatedProfiles")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -3856,7 +3856,7 @@ impl LogLockConvoPermanently {
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
             related_profiles: reader.required("relatedProfiles")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -3941,7 +3941,7 @@ impl LogEditGroup {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -4026,7 +4026,7 @@ impl LogCreateJoinLink {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -4111,7 +4111,7 @@ impl LogEditJoinLink {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -4196,7 +4196,7 @@ impl LogEnableJoinLink {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -4281,7 +4281,7 @@ impl LogDisableJoinLink {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -4366,7 +4366,7 @@ impl LogIncomingJoinRequest {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             member: reader.required("member")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -4451,7 +4451,7 @@ impl LogApproveJoinRequest {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             member: reader.required("member")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -4536,7 +4536,7 @@ impl LogRejectJoinRequest {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             member: reader.required("member")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -4616,7 +4616,7 @@ impl LogOutgoingJoinRequest {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -4701,7 +4701,7 @@ impl LogWithdrawIncomingJoinRequest {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
             member: reader.required("member")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -4781,7 +4781,7 @@ impl LogWithdrawOutgoingJoinRequest {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -4861,7 +4861,7 @@ impl LogReadJoinRequests {
         Ok(Self {
             rev: reader.required("rev")?,
             convo_id: reader.required("convoId")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -5247,8 +5247,8 @@ impl petrel_core::ToValue for MessageInputEmbed {
 impl MessageInputEmbed {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.record" => petrel_core::decode_value(value, strict).map(Self::Record),
-            "chat.bsky.embed.joinLink" => petrel_core::decode_value(value, strict).map(Self::JoinLink),
+            "app.bsky.embed.record" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Record),
+            "chat.bsky.embed.joinLink" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::JoinLink),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -5312,8 +5312,8 @@ impl petrel_core::ToValue for MessageViewEmbed {
 impl MessageViewEmbed {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.record#view" => petrel_core::decode_value(value, strict).map(Self::RecordView),
-            "chat.bsky.embed.joinLink#view" => petrel_core::decode_value(value, strict).map(Self::JoinLinkView),
+            "app.bsky.embed.record#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RecordView),
+            "chat.bsky.embed.joinLink#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::JoinLinkView),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -5379,9 +5379,9 @@ impl petrel_core::ToValue for MessageViewReplyTo {
 impl MessageViewReplyTo {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
-            "chat.bsky.convo.defs#messageBeforeUserJoinedGroupView" => petrel_core::decode_value(value, strict).map(Self::MessageBeforeUserJoinedGroupView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#messageBeforeUserJoinedGroupView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MessageBeforeUserJoinedGroupView),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -5465,18 +5465,18 @@ impl petrel_core::ToValue for SystemMessageViewData {
 impl SystemMessageViewData {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#systemMessageDataAddMember" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataAddMember),
-            "chat.bsky.convo.defs#systemMessageDataRemoveMember" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataRemoveMember),
-            "chat.bsky.convo.defs#systemMessageDataMemberJoin" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataMemberJoin),
-            "chat.bsky.convo.defs#systemMessageDataMemberLeave" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataMemberLeave),
-            "chat.bsky.convo.defs#systemMessageDataLockConvo" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataLockConvo),
-            "chat.bsky.convo.defs#systemMessageDataUnlockConvo" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataUnlockConvo),
-            "chat.bsky.convo.defs#systemMessageDataLockConvoPermanently" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataLockConvoPermanently),
-            "chat.bsky.convo.defs#systemMessageDataEditGroup" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataEditGroup),
-            "chat.bsky.convo.defs#systemMessageDataCreateJoinLink" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataCreateJoinLink),
-            "chat.bsky.convo.defs#systemMessageDataEditJoinLink" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataEditJoinLink),
-            "chat.bsky.convo.defs#systemMessageDataEnableJoinLink" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataEnableJoinLink),
-            "chat.bsky.convo.defs#systemMessageDataDisableJoinLink" => petrel_core::decode_value(value, strict).map(Self::SystemMessageDataDisableJoinLink),
+            "chat.bsky.convo.defs#systemMessageDataAddMember" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SystemMessageDataAddMember),
+            "chat.bsky.convo.defs#systemMessageDataRemoveMember" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SystemMessageDataRemoveMember),
+            "chat.bsky.convo.defs#systemMessageDataMemberJoin" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SystemMessageDataMemberJoin),
+            "chat.bsky.convo.defs#systemMessageDataMemberLeave" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SystemMessageDataMemberLeave),
+            "chat.bsky.convo.defs#systemMessageDataLockConvo" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SystemMessageDataLockConvo),
+            "chat.bsky.convo.defs#systemMessageDataUnlockConvo" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SystemMessageDataUnlockConvo),
+            "chat.bsky.convo.defs#systemMessageDataLockConvoPermanently" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SystemMessageDataLockConvoPermanently),
+            "chat.bsky.convo.defs#systemMessageDataEditGroup" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SystemMessageDataEditGroup),
+            "chat.bsky.convo.defs#systemMessageDataCreateJoinLink" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SystemMessageDataCreateJoinLink),
+            "chat.bsky.convo.defs#systemMessageDataEditJoinLink" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SystemMessageDataEditJoinLink),
+            "chat.bsky.convo.defs#systemMessageDataEnableJoinLink" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SystemMessageDataEnableJoinLink),
+            "chat.bsky.convo.defs#systemMessageDataDisableJoinLink" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SystemMessageDataDisableJoinLink),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -5542,9 +5542,9 @@ impl petrel_core::ToValue for ConvoViewLastMessage {
 impl ConvoViewLastMessage {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
-            "chat.bsky.convo.defs#systemMessageView" => petrel_core::decode_value(value, strict).map(Self::SystemMessageView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#systemMessageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SystemMessageView),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -5606,7 +5606,7 @@ impl petrel_core::ToValue for ConvoViewLastReaction {
 impl ConvoViewLastReaction {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageAndReactionView" => petrel_core::decode_value(value, strict).map(Self::MessageAndReactionView),
+            "chat.bsky.convo.defs#messageAndReactionView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MessageAndReactionView),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -5670,8 +5670,8 @@ impl petrel_core::ToValue for ConvoViewKind {
 impl ConvoViewKind {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#directConvo" => petrel_core::decode_value(value, strict).map(Self::DirectConvo),
-            "chat.bsky.convo.defs#groupConvo" => petrel_core::decode_value(value, strict).map(Self::GroupConvo),
+            "chat.bsky.convo.defs#directConvo" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DirectConvo),
+            "chat.bsky.convo.defs#groupConvo" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::GroupConvo),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -5735,8 +5735,8 @@ impl petrel_core::ToValue for LogCreateMessageMessage {
 impl LogCreateMessageMessage {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DeletedMessageView),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -5800,8 +5800,8 @@ impl petrel_core::ToValue for LogDeleteMessageMessage {
 impl LogDeleteMessageMessage {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DeletedMessageView),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -5867,9 +5867,9 @@ impl petrel_core::ToValue for LogReadMessageMessage {
 impl LogReadMessageMessage {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
-            "chat.bsky.convo.defs#systemMessageView" => petrel_core::decode_value(value, strict).map(Self::SystemMessageView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#systemMessageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SystemMessageView),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -5933,8 +5933,8 @@ impl petrel_core::ToValue for LogAddReactionMessage {
 impl LogAddReactionMessage {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DeletedMessageView),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -5998,8 +5998,8 @@ impl petrel_core::ToValue for LogRemoveReactionMessage {
 impl LogRemoveReactionMessage {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DeletedMessageView),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -6065,9 +6065,9 @@ impl petrel_core::ToValue for LogReadConvoMessage {
 impl LogReadConvoMessage {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
-            "chat.bsky.convo.defs#systemMessageView" => petrel_core::decode_value(value, strict).map(Self::SystemMessageView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#systemMessageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SystemMessageView),
             _ => Ok(Self::Unknown(value)),
         }
     }

@@ -260,7 +260,7 @@ impl Create {
             collection: reader.required("collection")?,
             rkey: reader.optional("rkey")?,
             value: reader.required("value")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -344,7 +344,7 @@ impl Update {
             collection: reader.required("collection")?,
             rkey: reader.required("rkey")?,
             value: reader.required("value")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -424,7 +424,7 @@ impl Delete {
         Ok(Self {
             collection: reader.required("collection")?,
             rkey: reader.required("rkey")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -507,7 +507,7 @@ impl CreateResult {
             uri: reader.required("uri")?,
             cid: reader.required("cid")?,
             validation_status: reader.optional("validationStatus")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -590,7 +590,7 @@ impl UpdateResult {
             uri: reader.required("uri")?,
             cid: reader.required("cid")?,
             validation_status: reader.optional("validationStatus")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -667,7 +667,7 @@ impl DeleteResult {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -730,9 +730,9 @@ impl petrel_core::ToValue for InputWrites {
 impl InputWrites {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.repo.applyWrites#create" => petrel_core::decode_value(value, strict).map(Self::Create),
-            "com.atproto.repo.applyWrites#update" => petrel_core::decode_value(value, strict).map(Self::Update),
-            "com.atproto.repo.applyWrites#delete" => petrel_core::decode_value(value, strict).map(Self::Delete),
+            "com.atproto.repo.applyWrites#create" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Create),
+            "com.atproto.repo.applyWrites#update" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Update),
+            "com.atproto.repo.applyWrites#delete" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Delete),
             other => Err(petrel_core::DecodeError::UnknownType(other.to_owned())),
         }
     }
@@ -796,9 +796,9 @@ impl petrel_core::ToValue for OutputResults {
 impl OutputResults {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.repo.applyWrites#createResult" => petrel_core::decode_value(value, strict).map(Self::CreateResult),
-            "com.atproto.repo.applyWrites#updateResult" => petrel_core::decode_value(value, strict).map(Self::UpdateResult),
-            "com.atproto.repo.applyWrites#deleteResult" => petrel_core::decode_value(value, strict).map(Self::DeleteResult),
+            "com.atproto.repo.applyWrites#createResult" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::CreateResult),
+            "com.atproto.repo.applyWrites#updateResult" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::UpdateResult),
+            "com.atproto.repo.applyWrites#deleteResult" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DeleteResult),
             other => Err(petrel_core::DecodeError::UnknownType(other.to_owned())),
         }
     }

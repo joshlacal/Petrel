@@ -129,7 +129,7 @@ impl Suggestion {
             tag: reader.required("tag")?,
             subject_type: reader.required("subjectType")?,
             subject: reader.required("subject")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

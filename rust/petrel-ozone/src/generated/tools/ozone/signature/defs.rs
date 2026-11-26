@@ -39,7 +39,7 @@ impl SigDetail {
         Ok(Self {
             property: reader.required("property")?,
             value: reader.required("value")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

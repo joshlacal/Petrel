@@ -187,7 +187,7 @@ impl TimelineItem {
         Ok(Self {
             day: reader.required("day")?,
             summary: reader.required("summary")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -270,7 +270,7 @@ impl TimelineItemSummary {
             event_subject_type: reader.required("eventSubjectType")?,
             event_type: reader.required("eventType")?,
             count: reader.required("count")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

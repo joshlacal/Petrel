@@ -41,7 +41,7 @@ impl Facet {
         Ok(Self {
             index: reader.required("index")?,
             features: reader.required("features")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -117,7 +117,7 @@ impl Mention {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             did: reader.required("did")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -193,7 +193,7 @@ impl Link {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -269,7 +269,7 @@ impl Tag {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             tag: reader.required("tag")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -349,7 +349,7 @@ impl ByteSlice {
         Ok(Self {
             byte_start: reader.required("byteStart")?,
             byte_end: reader.required("byteEnd")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -414,9 +414,9 @@ impl petrel_core::ToValue for FacetFeatures {
 impl FacetFeatures {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.richtext.facet#mention" => petrel_core::decode_value(value, strict).map(Self::Mention),
-            "app.bsky.richtext.facet#link" => petrel_core::decode_value(value, strict).map(Self::Link),
-            "app.bsky.richtext.facet#tag" => petrel_core::decode_value(value, strict).map(Self::Tag),
+            "app.bsky.richtext.facet#mention" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Mention),
+            "app.bsky.richtext.facet#link" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Link),
+            "app.bsky.richtext.facet#tag" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Tag),
             _ => Ok(Self::Unknown(value)),
         }
     }

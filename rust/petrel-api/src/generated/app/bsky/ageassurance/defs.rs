@@ -45,7 +45,7 @@ impl State {
             last_initiated_at: reader.optional("lastInitiatedAt")?,
             status: reader.required("status")?,
             access: reader.required("access")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -128,7 +128,7 @@ impl StateMetadata {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             account_created_at: reader.optional("accountCreatedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -204,7 +204,7 @@ impl Config {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             regions: reader.required("regions")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -306,7 +306,7 @@ impl ConfigRegion {
             min_access_age: reader.required("minAccessAge")?,
             additional_verification_methods: reader.optional("additionalVerificationMethods")?,
             rules: reader.required("rules")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -382,7 +382,7 @@ impl ConfigRegionRuleDefault {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             access: reader.required("access")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -463,7 +463,7 @@ impl ConfigRegionRuleIfDeclaredOverAge {
         Ok(Self {
             age: reader.required("age")?,
             access: reader.required("access")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -544,7 +544,7 @@ impl ConfigRegionRuleIfDeclaredUnderAge {
         Ok(Self {
             age: reader.required("age")?,
             access: reader.required("access")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -625,7 +625,7 @@ impl ConfigRegionRuleIfAssuredOverAge {
         Ok(Self {
             age: reader.required("age")?,
             access: reader.required("access")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -706,7 +706,7 @@ impl ConfigRegionRuleIfAssuredUnderAge {
         Ok(Self {
             age: reader.required("age")?,
             access: reader.required("access")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -787,7 +787,7 @@ impl ConfigRegionRuleIfAccountNewerThan {
         Ok(Self {
             date: reader.required("date")?,
             access: reader.required("access")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -868,7 +868,7 @@ impl ConfigRegionRuleIfAccountOlderThan {
         Ok(Self {
             date: reader.required("date")?,
             access: reader.required("access")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -995,7 +995,7 @@ impl Event {
             init_ua: reader.optional("initUa")?,
             complete_ip: reader.optional("completeIp")?,
             complete_ua: reader.optional("completeUa")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1300,13 +1300,13 @@ impl petrel_core::ToValue for ConfigRegionRules {
 impl ConfigRegionRules {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.ageassurance.defs#configRegionRuleDefault" => petrel_core::decode_value(value, strict).map(Self::ConfigRegionRuleDefault),
-            "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge" => petrel_core::decode_value(value, strict).map(Self::ConfigRegionRuleIfDeclaredOverAge),
-            "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge" => petrel_core::decode_value(value, strict).map(Self::ConfigRegionRuleIfDeclaredUnderAge),
-            "app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge" => petrel_core::decode_value(value, strict).map(Self::ConfigRegionRuleIfAssuredOverAge),
-            "app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge" => petrel_core::decode_value(value, strict).map(Self::ConfigRegionRuleIfAssuredUnderAge),
-            "app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan" => petrel_core::decode_value(value, strict).map(Self::ConfigRegionRuleIfAccountNewerThan),
-            "app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan" => petrel_core::decode_value(value, strict).map(Self::ConfigRegionRuleIfAccountOlderThan),
+            "app.bsky.ageassurance.defs#configRegionRuleDefault" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ConfigRegionRuleDefault),
+            "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ConfigRegionRuleIfDeclaredOverAge),
+            "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ConfigRegionRuleIfDeclaredUnderAge),
+            "app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ConfigRegionRuleIfAssuredOverAge),
+            "app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ConfigRegionRuleIfAssuredUnderAge),
+            "app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ConfigRegionRuleIfAccountNewerThan),
+            "app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ConfigRegionRuleIfAccountOlderThan),
             _ => Ok(Self::Unknown(value)),
         }
     }

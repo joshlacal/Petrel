@@ -242,7 +242,7 @@ impl Notification {
             is_read: reader.required("isRead")?,
             indexed_at: reader.required("indexedAt")?,
             labels: reader.optional("labels")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

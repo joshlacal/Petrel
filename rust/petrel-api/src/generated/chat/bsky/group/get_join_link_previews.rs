@@ -138,9 +138,9 @@ impl petrel_core::ToValue for OutputJoinLinkPreviews {
 impl OutputJoinLinkPreviews {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.group.defs#joinLinkPreviewView" => petrel_core::decode_value(value, strict).map(Self::JoinLinkPreviewView),
-            "chat.bsky.group.defs#disabledJoinLinkPreviewView" => petrel_core::decode_value(value, strict).map(Self::DisabledJoinLinkPreviewView),
-            "chat.bsky.group.defs#invalidJoinLinkPreviewView" => petrel_core::decode_value(value, strict).map(Self::InvalidJoinLinkPreviewView),
+            "chat.bsky.group.defs#joinLinkPreviewView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::JoinLinkPreviewView),
+            "chat.bsky.group.defs#disabledJoinLinkPreviewView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DisabledJoinLinkPreviewView),
+            "chat.bsky.group.defs#invalidJoinLinkPreviewView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::InvalidJoinLinkPreviewView),
             _ => Ok(Self::Unknown(value)),
         }
     }

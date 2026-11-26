@@ -206,9 +206,9 @@ impl petrel_core::ToValue for OutputMessages {
 impl OutputMessages {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(value, strict).map(Self::MessageView),
-            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(value, strict).map(Self::DeletedMessageView),
-            "chat.bsky.convo.defs#systemMessageView" => petrel_core::decode_value(value, strict).map(Self::SystemMessageView),
+            "chat.bsky.convo.defs#messageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MessageView),
+            "chat.bsky.convo.defs#deletedMessageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DeletedMessageView),
+            "chat.bsky.convo.defs#systemMessageView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SystemMessageView),
             _ => Ok(Self::Unknown(value)),
         }
     }

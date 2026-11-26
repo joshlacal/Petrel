@@ -130,7 +130,7 @@ impl SpaceDeleted {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -206,7 +206,7 @@ impl RegistrationExpired {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             space_rev: reader.required("spaceRev")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -273,10 +273,10 @@ impl petrel_core::ToValue for InputUpdate {
 impl InputUpdate {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.space.defs#repoWrite" => petrel_core::decode_value(value, strict).map(Self::RepoWrite),
-            "com.atproto.space.defs#repoRemoved" => petrel_core::decode_value(value, strict).map(Self::RepoRemoved),
-            "com.atproto.space.notifySpaceUpdate#spaceDeleted" => petrel_core::decode_value(value, strict).map(Self::SpaceDeleted),
-            "com.atproto.space.notifySpaceUpdate#registrationExpired" => petrel_core::decode_value(value, strict).map(Self::RegistrationExpired),
+            "com.atproto.space.defs#repoWrite" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoWrite),
+            "com.atproto.space.defs#repoRemoved" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoRemoved),
+            "com.atproto.space.notifySpaceUpdate#spaceDeleted" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SpaceDeleted),
+            "com.atproto.space.notifySpaceUpdate#registrationExpired" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RegistrationExpired),
             _ => Ok(Self::Unknown(value)),
         }
     }

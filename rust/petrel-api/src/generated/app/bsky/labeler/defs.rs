@@ -59,7 +59,7 @@ impl LabelerView {
             viewer: reader.optional("viewer")?,
             indexed_at: reader.required("indexedAt")?,
             labels: reader.optional("labels")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -177,7 +177,7 @@ impl LabelerViewDetailed {
             reason_types: reader.optional("reasonTypes")?,
             subject_types: reader.optional("subjectTypes")?,
             subject_collections: reader.optional("subjectCollections")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -258,7 +258,7 @@ impl LabelerViewerState {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             like: reader.optional("like")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -339,7 +339,7 @@ impl LabelerPolicies {
         Ok(Self {
             label_values: reader.required("labelValues")?,
             label_value_definitions: reader.optional("labelValueDefinitions")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

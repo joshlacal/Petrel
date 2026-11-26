@@ -172,7 +172,7 @@ impl EventConvoFirstMessage {
             recipients: reader.required("recipients")?,
             rev: reader.required("rev")?,
             user: reader.required("user")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -286,7 +286,7 @@ impl EventGroupChatCreated {
             initial_member_dids: reader.required("initialMemberDids")?,
             owner_did: reader.required("ownerDid")?,
             rev: reader.required("rev")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -409,7 +409,7 @@ impl EventGroupChatMemberAdded {
             rev: reader.required("rev")?,
             subject_did: reader.required("subjectDid")?,
             subject_follows_owner: reader.required("subjectFollowsOwner")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -527,7 +527,7 @@ impl EventGroupChatMemberJoined {
             owner_did: reader.required("ownerDid")?,
             rev: reader.required("rev")?,
             subject_follows_owner: reader.required("subjectFollowsOwner")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -645,7 +645,7 @@ impl EventGroupChatJoinRequest {
             owner_did: reader.required("ownerDid")?,
             rev: reader.required("rev")?,
             subject_follows_owner: reader.required("subjectFollowsOwner")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -758,7 +758,7 @@ impl EventGroupChatJoinRequestApproved {
             owner_did: reader.required("ownerDid")?,
             rev: reader.required("rev")?,
             subject_did: reader.required("subjectDid")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -871,7 +871,7 @@ impl EventGroupChatJoinRequestRejected {
             owner_did: reader.required("ownerDid")?,
             rev: reader.required("rev")?,
             subject_did: reader.required("subjectDid")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -985,7 +985,7 @@ impl EventChatAccepted {
             method: reader.required("method")?,
             owner_did: reader.optional("ownerDid")?,
             rev: reader.required("rev")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1103,7 +1103,7 @@ impl EventGroupChatMemberLeft {
             owner_did: reader.required("ownerDid")?,
             rev: reader.required("rev")?,
             subject_did: reader.required("subjectDid")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1247,7 +1247,7 @@ impl EventGroupChatUpdated {
             owner_did: reader.required("ownerDid")?,
             rev: reader.required("rev")?,
             update_type: reader.required("updateType")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1337,7 +1337,7 @@ impl EventRateLimitExceeded {
             created_at: reader.required("createdAt")?,
             endpoint: reader.required("endpoint")?,
             rev: reader.required("rev")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1418,17 +1418,17 @@ impl petrel_core::ToValue for Message {
 impl Message {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage" => petrel_core::decode_value(value, strict).map(Self::EventConvoFirstMessage),
-            "chat.bsky.moderation.subscribeModEvents#eventGroupChatCreated" => petrel_core::decode_value(value, strict).map(Self::EventGroupChatCreated),
-            "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberAdded" => petrel_core::decode_value(value, strict).map(Self::EventGroupChatMemberAdded),
-            "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberJoined" => petrel_core::decode_value(value, strict).map(Self::EventGroupChatMemberJoined),
-            "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequest" => petrel_core::decode_value(value, strict).map(Self::EventGroupChatJoinRequest),
-            "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestApproved" => petrel_core::decode_value(value, strict).map(Self::EventGroupChatJoinRequestApproved),
-            "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestRejected" => petrel_core::decode_value(value, strict).map(Self::EventGroupChatJoinRequestRejected),
-            "chat.bsky.moderation.subscribeModEvents#eventChatAccepted" => petrel_core::decode_value(value, strict).map(Self::EventChatAccepted),
-            "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberLeft" => petrel_core::decode_value(value, strict).map(Self::EventGroupChatMemberLeft),
-            "chat.bsky.moderation.subscribeModEvents#eventGroupChatUpdated" => petrel_core::decode_value(value, strict).map(Self::EventGroupChatUpdated),
-            "chat.bsky.moderation.subscribeModEvents#eventRateLimitExceeded" => petrel_core::decode_value(value, strict).map(Self::EventRateLimitExceeded),
+            "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::EventConvoFirstMessage),
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatCreated" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::EventGroupChatCreated),
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberAdded" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::EventGroupChatMemberAdded),
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberJoined" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::EventGroupChatMemberJoined),
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequest" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::EventGroupChatJoinRequest),
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestApproved" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::EventGroupChatJoinRequestApproved),
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestRejected" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::EventGroupChatJoinRequestRejected),
+            "chat.bsky.moderation.subscribeModEvents#eventChatAccepted" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::EventChatAccepted),
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberLeft" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::EventGroupChatMemberLeft),
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatUpdated" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::EventGroupChatUpdated),
+            "chat.bsky.moderation.subscribeModEvents#eventRateLimitExceeded" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::EventRateLimitExceeded),
             _ => Ok(Self::Unknown(value)),
         }
     }

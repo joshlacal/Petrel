@@ -43,7 +43,7 @@ impl Rgb {
             b: reader.required("b")?,
             g: reader.required("g")?,
             r: reader.required("r")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -130,7 +130,7 @@ impl Rgba {
             b: reader.required("b")?,
             g: reader.required("g")?,
             r: reader.required("r")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

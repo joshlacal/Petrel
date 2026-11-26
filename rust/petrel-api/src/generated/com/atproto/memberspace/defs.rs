@@ -43,7 +43,7 @@ impl Member {
             did: reader.required("did")?,
             read: reader.required("read")?,
             write: reader.required("write")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

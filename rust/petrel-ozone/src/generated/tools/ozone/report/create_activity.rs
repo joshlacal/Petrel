@@ -260,12 +260,12 @@ impl petrel_core::ToValue for InputActivity {
 impl InputActivity {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "tools.ozone.report.defs#queueActivity" => petrel_core::decode_value(value, strict).map(Self::QueueActivity),
-            "tools.ozone.report.defs#assignmentActivity" => petrel_core::decode_value(value, strict).map(Self::AssignmentActivity),
-            "tools.ozone.report.defs#escalationActivity" => petrel_core::decode_value(value, strict).map(Self::EscalationActivity),
-            "tools.ozone.report.defs#closeActivity" => petrel_core::decode_value(value, strict).map(Self::CloseActivity),
-            "tools.ozone.report.defs#reopenActivity" => petrel_core::decode_value(value, strict).map(Self::ReopenActivity),
-            "tools.ozone.report.defs#noteActivity" => petrel_core::decode_value(value, strict).map(Self::NoteActivity),
+            "tools.ozone.report.defs#queueActivity" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::QueueActivity),
+            "tools.ozone.report.defs#assignmentActivity" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::AssignmentActivity),
+            "tools.ozone.report.defs#escalationActivity" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::EscalationActivity),
+            "tools.ozone.report.defs#closeActivity" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::CloseActivity),
+            "tools.ozone.report.defs#reopenActivity" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ReopenActivity),
+            "tools.ozone.report.defs#noteActivity" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::NoteActivity),
             _ => Ok(Self::Unknown(value)),
         }
     }

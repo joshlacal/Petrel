@@ -167,7 +167,7 @@ impl ReportAssignment {
             did: reader.required("did")?,
             moderator: reader.optional("moderator")?,
             assigned_at: reader.required("assignedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -363,7 +363,7 @@ impl ReportView {
             queue: reader.optional("queue")?,
             is_muted: reader.optional("isMuted")?,
             is_automated: reader.optional("isAutomated")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -446,7 +446,7 @@ impl QueueActivity {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             previous_status: reader.optional("previousStatus")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -529,7 +529,7 @@ impl AssignmentActivity {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             previous_status: reader.optional("previousStatus")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -617,7 +617,7 @@ impl UnassignmentActivity {
         Ok(Self {
             previous_status: reader.optional("previousStatus")?,
             next_status: reader.optional("nextStatus")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -700,7 +700,7 @@ impl EscalationActivity {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             previous_status: reader.optional("previousStatus")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -783,7 +783,7 @@ impl CloseActivity {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             previous_status: reader.optional("previousStatus")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -866,7 +866,7 @@ impl ReopenActivity {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             previous_status: reader.optional("previousStatus")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -944,7 +944,7 @@ impl NoteActivity {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1071,7 +1071,7 @@ impl ReportActivityView {
             moderator: reader.optional("moderator")?,
             report: reader.optional("report")?,
             created_at: reader.required("createdAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1254,7 +1254,7 @@ impl LiveStats {
             avg_handling_time_sec: reader.optional("avgHandlingTimeSec")?,
             avg_resolution_time_sec: reader.optional("avgResolutionTimeSec")?,
             last_updated: reader.optional("lastUpdated")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1436,7 +1436,7 @@ impl HistoricalStats {
             action_rate: reader.optional("actionRate")?,
             avg_handling_time_sec: reader.optional("avgHandlingTimeSec")?,
             avg_resolution_time_sec: reader.optional("avgResolutionTimeSec")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1536,7 +1536,7 @@ impl AssignmentView {
             report_id: reader.required("reportId")?,
             start_at: reader.required("startAt")?,
             end_at: reader.optional("endAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1905,13 +1905,13 @@ impl petrel_core::ToValue for ReportActivityViewActivity {
 impl ReportActivityViewActivity {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "tools.ozone.report.defs#queueActivity" => petrel_core::decode_value(value, strict).map(Self::QueueActivity),
-            "tools.ozone.report.defs#assignmentActivity" => petrel_core::decode_value(value, strict).map(Self::AssignmentActivity),
-            "tools.ozone.report.defs#unassignmentActivity" => petrel_core::decode_value(value, strict).map(Self::UnassignmentActivity),
-            "tools.ozone.report.defs#escalationActivity" => petrel_core::decode_value(value, strict).map(Self::EscalationActivity),
-            "tools.ozone.report.defs#closeActivity" => petrel_core::decode_value(value, strict).map(Self::CloseActivity),
-            "tools.ozone.report.defs#reopenActivity" => petrel_core::decode_value(value, strict).map(Self::ReopenActivity),
-            "tools.ozone.report.defs#noteActivity" => petrel_core::decode_value(value, strict).map(Self::NoteActivity),
+            "tools.ozone.report.defs#queueActivity" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::QueueActivity),
+            "tools.ozone.report.defs#assignmentActivity" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::AssignmentActivity),
+            "tools.ozone.report.defs#unassignmentActivity" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::UnassignmentActivity),
+            "tools.ozone.report.defs#escalationActivity" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::EscalationActivity),
+            "tools.ozone.report.defs#closeActivity" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::CloseActivity),
+            "tools.ozone.report.defs#reopenActivity" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ReopenActivity),
+            "tools.ozone.report.defs#noteActivity" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::NoteActivity),
             _ => Ok(Self::Unknown(value)),
         }
     }

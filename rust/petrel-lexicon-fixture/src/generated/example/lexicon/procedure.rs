@@ -266,7 +266,7 @@ impl OutputObject {
         Ok(Self {
             a: reader.optional("a")?,
             b: reader.optional("b")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

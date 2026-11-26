@@ -190,7 +190,7 @@ impl Contributor {
             did: reader.required("did")?,
             display_name: reader.optional("displayName")?,
             role: reader.optional("role")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -299,7 +299,7 @@ impl petrel_core::ToValue for DocumentLabels {
 impl DocumentLabels {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.label.defs#selfLabels" => petrel_core::decode_value(value, strict).map(Self::SelfLabels),
+            "com.atproto.label.defs#selfLabels" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SelfLabels),
             _ => Ok(Self::Unknown(value)),
         }
     }

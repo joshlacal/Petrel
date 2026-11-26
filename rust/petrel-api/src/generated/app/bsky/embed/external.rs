@@ -37,7 +37,7 @@ impl External {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             external: reader.required("external")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -129,7 +129,7 @@ impl ExternalDef {
             description: reader.required("description")?,
             thumb: reader.optional("thumb")?,
             associated_refs: reader.optional("associatedRefs")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -204,7 +204,7 @@ impl View {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             external: reader.required("external")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -324,7 +324,7 @@ impl ViewExternal {
             source: reader.optional("source")?,
             associated_refs: reader.optional("associatedRefs")?,
             associated_profiles: reader.optional("associatedProfiles")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -418,7 +418,7 @@ impl ViewExternalSource {
             title: reader.required("title")?,
             description: reader.optional("description")?,
             theme: reader.optional("theme")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -512,7 +512,7 @@ impl ViewExternalSourceTheme {
             foreground_rgb: reader.optional("foregroundRGB")?,
             accent_rgb: reader.optional("accentRGB")?,
             accent_foreground_rgb: reader.optional("accentForegroundRGB")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -596,7 +596,7 @@ impl ColorRGB {
             r: reader.required("r")?,
             g: reader.required("g")?,
             b: reader.required("b")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -720,7 +720,7 @@ impl ViewArticle {
             reading_time: reader.optional("readingTime")?,
             like_count: reader.optional("likeCount")?,
             likers: reader.optional("likers")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -844,7 +844,7 @@ impl ViewArticlePublication {
             theme: reader.optional("theme")?,
             subscription_count: reader.optional("subscriptionCount")?,
             subscribers: reader.optional("subscribers")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -941,7 +941,7 @@ impl ViewArticlePublicationTheme {
             foreground: reader.optional("foreground")?,
             accent: reader.optional("accent")?,
             accent_foreground: reader.optional("accentForeground")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1058,7 +1058,7 @@ impl ViewGallery {
             items: reader.required("items")?,
             like_count: reader.optional("likeCount")?,
             likers: reader.optional("likers")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1148,7 +1148,7 @@ impl ViewGalleryImage {
             fullsize: reader.required("fullsize")?,
             alt: reader.optional("alt")?,
             aspect_ratio: reader.optional("aspectRatio")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1268,7 +1268,7 @@ impl ViewLivestream {
             active: reader.required("active")?,
             started_at: reader.optional("startedAt")?,
             ended_at: reader.optional("endedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1329,7 +1329,7 @@ impl petrel_core::ToValue for ViewGalleryItems {
 impl ViewGalleryItems {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.external#viewGalleryImage" => petrel_core::decode_value(value, strict).map(Self::ViewGalleryImage),
+            "app.bsky.embed.external#viewGalleryImage" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ViewGalleryImage),
             _ => Ok(Self::Unknown(value)),
         }
     }

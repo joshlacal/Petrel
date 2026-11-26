@@ -40,7 +40,7 @@ impl AspectRatio {
         Ok(Self {
             width: reader.required("width")?,
             height: reader.required("height")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

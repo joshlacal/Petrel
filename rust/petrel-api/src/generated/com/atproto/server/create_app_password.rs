@@ -173,7 +173,7 @@ impl AppPassword {
             password: reader.required("password")?,
             created_at: reader.required("createdAt")?,
             privileged: reader.optional("privileged")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

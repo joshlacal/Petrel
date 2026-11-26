@@ -66,7 +66,7 @@ impl JobStatus {
             error: reader.optional("error")?,
             failure_code: reader.optional("failureCode")?,
             message: reader.optional("message")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

@@ -130,7 +130,7 @@ impl Yo {
         Ok(Self {
             seq: reader.required("seq")?,
             yo: reader.required("yo")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -209,7 +209,7 @@ impl Info {
         Ok(Self {
             name: reader.required("name")?,
             message: reader.optional("message")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -272,8 +272,8 @@ impl petrel_core::ToValue for Message {
 impl Message {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "example.lexicon.subscription#yo" => petrel_core::decode_value(value, strict).map(Self::Yo),
-            "example.lexicon.subscription#info" => petrel_core::decode_value(value, strict).map(Self::Info),
+            "example.lexicon.subscription#yo" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Yo),
+            "example.lexicon.subscription#info" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Info),
             _ => Ok(Self::Unknown(value)),
         }
     }

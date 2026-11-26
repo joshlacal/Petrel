@@ -188,7 +188,7 @@ impl Commit {
             blobs: reader.required("blobs")?,
             prev_data: reader.optional("prevData")?,
             time: reader.required("time")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -285,7 +285,7 @@ impl Sync {
             blocks: reader.required("blocks")?,
             rev: reader.required("rev")?,
             time: reader.required("time")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -374,7 +374,7 @@ impl Identity {
             did: reader.required("did")?,
             time: reader.required("time")?,
             handle: reader.optional("handle")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -468,7 +468,7 @@ impl Account {
             time: reader.required("time")?,
             active: reader.required("active")?,
             status: reader.optional("status")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -547,7 +547,7 @@ impl Info {
         Ok(Self {
             name: reader.required("name")?,
             message: reader.optional("message")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -637,7 +637,7 @@ impl RepoOp {
             path: reader.required("path")?,
             cid: reader.required_nullable("cid")?,
             prev: reader.optional("prev")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -706,11 +706,11 @@ impl petrel_core::ToValue for Message {
 impl Message {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.sync.subscribeRepos#commit" => petrel_core::decode_value(value, strict).map(Self::Commit),
-            "com.atproto.sync.subscribeRepos#sync" => petrel_core::decode_value(value, strict).map(Self::Sync),
-            "com.atproto.sync.subscribeRepos#identity" => petrel_core::decode_value(value, strict).map(Self::Identity),
-            "com.atproto.sync.subscribeRepos#account" => petrel_core::decode_value(value, strict).map(Self::Account),
-            "com.atproto.sync.subscribeRepos#info" => petrel_core::decode_value(value, strict).map(Self::Info),
+            "com.atproto.sync.subscribeRepos#commit" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Commit),
+            "com.atproto.sync.subscribeRepos#sync" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Sync),
+            "com.atproto.sync.subscribeRepos#identity" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Identity),
+            "com.atproto.sync.subscribeRepos#account" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Account),
+            "com.atproto.sync.subscribeRepos#info" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Info),
             _ => Ok(Self::Unknown(value)),
         }
     }

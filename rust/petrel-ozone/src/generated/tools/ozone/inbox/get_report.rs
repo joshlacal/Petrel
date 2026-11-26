@@ -231,7 +231,7 @@ impl ReportView {
             status: reader.required("status")?,
             created_at: reader.required("createdAt")?,
             updated_at: reader.required("updatedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -319,7 +319,7 @@ impl ResolutionView {
             action_taken: reader.optional("actionTaken")?,
             scope: reader.optional("scope")?,
             resolved_at: reader.required("resolvedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -386,10 +386,10 @@ impl petrel_core::ToValue for ReportViewSubject {
 impl ReportViewSubject {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(value, strict).map(Self::RepoRef),
-            "com.atproto.repo.strongRef" => petrel_core::decode_value(value, strict).map(Self::StrongRef),
-            "chat.bsky.convo.defs#messageRef" => petrel_core::decode_value(value, strict).map(Self::MessageRef),
-            "chat.bsky.convo.defs#convoRef" => petrel_core::decode_value(value, strict).map(Self::ConvoRef),
+            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoRef),
+            "com.atproto.repo.strongRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::StrongRef),
+            "chat.bsky.convo.defs#messageRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MessageRef),
+            "chat.bsky.convo.defs#convoRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ConvoRef),
             _ => Ok(Self::Unknown(value)),
         }
     }

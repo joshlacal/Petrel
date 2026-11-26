@@ -251,7 +251,7 @@ impl Record {
             rkey: reader.required("rkey")?,
             cid: reader.required("cid")?,
             value: reader.optional("value")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

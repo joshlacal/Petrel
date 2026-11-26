@@ -129,7 +129,7 @@ impl Created {
         Ok(Self {
             seq: reader.required("seq")?,
             gadget: reader.required("gadget")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -204,7 +204,7 @@ impl Deleted {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             seq: reader.required("seq")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -267,8 +267,8 @@ impl petrel_core::ToValue for Message {
 impl Message {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.example.widget.subscribeThings#created" => petrel_core::decode_value(value, strict).map(Self::Created),
-            "com.example.widget.subscribeThings#deleted" => petrel_core::decode_value(value, strict).map(Self::Deleted),
+            "com.example.widget.subscribeThings#created" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Created),
+            "com.example.widget.subscribeThings#deleted" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Deleted),
             _ => Ok(Self::Unknown(value)),
         }
     }

@@ -154,9 +154,9 @@ impl petrel_core::ToValue for InputPolicy {
 impl InputPolicy {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.personalspace.policy" => petrel_core::decode_value(value, strict).map(Self::PersonalspacePolicy),
-            "com.atproto.memberspace.policy" => petrel_core::decode_value(value, strict).map(Self::MemberspacePolicy),
-            "com.atproto.managedspace.policy" => petrel_core::decode_value(value, strict).map(Self::ManagedspacePolicy),
+            "com.atproto.personalspace.policy" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::PersonalspacePolicy),
+            "com.atproto.memberspace.policy" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MemberspacePolicy),
+            "com.atproto.managedspace.policy" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ManagedspacePolicy),
             _ => Ok(Self::Unknown(value)),
         }
     }

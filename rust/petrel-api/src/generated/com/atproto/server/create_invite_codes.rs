@@ -201,7 +201,7 @@ impl AccountCodes {
         Ok(Self {
             account: reader.required("account")?,
             codes: reader.required("codes")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

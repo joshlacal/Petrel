@@ -37,7 +37,7 @@ impl Images {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             images: reader.required("images")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -122,7 +122,7 @@ impl Image {
             image: reader.required("image")?,
             alt: reader.required("alt")?,
             aspect_ratio: reader.optional("aspectRatio")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -197,7 +197,7 @@ impl View {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             images: reader.required("images")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -287,7 +287,7 @@ impl ViewImage {
             fullsize: reader.required("fullsize")?,
             alt: reader.required("alt")?,
             aspect_ratio: reader.optional("aspectRatio")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

@@ -56,7 +56,7 @@ impl Video {
             alt: reader.optional("alt")?,
             aspect_ratio: reader.optional("aspectRatio")?,
             presentation: reader.optional("presentation")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -135,7 +135,7 @@ impl Caption {
         Ok(Self {
             lang: reader.required("lang")?,
             file: reader.required("file")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -231,7 +231,7 @@ impl View {
             alt: reader.optional("alt")?,
             aspect_ratio: reader.optional("aspectRatio")?,
             presentation: reader.optional("presentation")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

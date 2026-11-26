@@ -93,7 +93,7 @@ impl VerificationView {
             issuer_profile: reader.optional("issuerProfile")?,
             subject_repo: reader.optional("subjectRepo")?,
             issuer_repo: reader.optional("issuerRepo")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -252,8 +252,8 @@ impl petrel_core::ToValue for VerificationViewSubjectRepo {
 impl VerificationViewSubjectRepo {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "tools.ozone.moderation.defs#repoViewDetail" => petrel_core::decode_value(value, strict).map(Self::RepoViewDetail),
-            "tools.ozone.moderation.defs#repoViewNotFound" => petrel_core::decode_value(value, strict).map(Self::RepoViewNotFound),
+            "tools.ozone.moderation.defs#repoViewDetail" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoViewDetail),
+            "tools.ozone.moderation.defs#repoViewNotFound" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoViewNotFound),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -317,8 +317,8 @@ impl petrel_core::ToValue for VerificationViewIssuerRepo {
 impl VerificationViewIssuerRepo {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "tools.ozone.moderation.defs#repoViewDetail" => petrel_core::decode_value(value, strict).map(Self::RepoViewDetail),
-            "tools.ozone.moderation.defs#repoViewNotFound" => petrel_core::decode_value(value, strict).map(Self::RepoViewNotFound),
+            "tools.ozone.moderation.defs#repoViewDetail" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoViewDetail),
+            "tools.ozone.moderation.defs#repoViewNotFound" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoViewNotFound),
             _ => Ok(Self::Unknown(value)),
         }
     }

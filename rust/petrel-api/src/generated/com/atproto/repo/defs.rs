@@ -39,7 +39,7 @@ impl CommitMeta {
         Ok(Self {
             cid: reader.required("cid")?,
             rev: reader.required("rev")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

@@ -167,7 +167,7 @@ impl Metadata {
             messages_received: reader.required("messagesReceived")?,
             convos: reader.required("convos")?,
             convos_started: reader.required("convosStarted")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

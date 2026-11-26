@@ -184,7 +184,7 @@ impl ActionRef {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             id: reader.required("id")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -260,7 +260,7 @@ impl LabelRef {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             val: reader.required("val")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -337,7 +337,7 @@ impl TakedownRef {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -400,9 +400,9 @@ impl petrel_core::ToValue for InputAction {
 impl InputAction {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "tools.ozone.inbox.appealActionedSubject#actionRef" => petrel_core::decode_value(value, strict).map(Self::ActionRef),
-            "tools.ozone.inbox.appealActionedSubject#labelRef" => petrel_core::decode_value(value, strict).map(Self::LabelRef),
-            "tools.ozone.inbox.appealActionedSubject#takedownRef" => petrel_core::decode_value(value, strict).map(Self::TakedownRef),
+            "tools.ozone.inbox.appealActionedSubject#actionRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ActionRef),
+            "tools.ozone.inbox.appealActionedSubject#labelRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::LabelRef),
+            "tools.ozone.inbox.appealActionedSubject#takedownRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::TakedownRef),
             other => Err(petrel_core::DecodeError::UnknownType(other.to_owned())),
         }
     }
@@ -466,8 +466,8 @@ impl petrel_core::ToValue for InputSubject {
 impl InputSubject {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(value, strict).map(Self::RepoRef),
-            "com.atproto.repo.strongRef" => petrel_core::decode_value(value, strict).map(Self::StrongRef),
+            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoRef),
+            "com.atproto.repo.strongRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::StrongRef),
             _ => Ok(Self::Unknown(value)),
         }
     }

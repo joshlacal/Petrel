@@ -41,7 +41,7 @@ impl RecordWithMedia {
         Ok(Self {
             record: reader.required("record")?,
             media: reader.required("media")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -120,7 +120,7 @@ impl View {
         Ok(Self {
             record: reader.required("record")?,
             media: reader.required("media")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -187,10 +187,10 @@ impl petrel_core::ToValue for RecordWithMediaMedia {
 impl RecordWithMediaMedia {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.images" => petrel_core::decode_value(value, strict).map(Self::Images),
-            "app.bsky.embed.video" => petrel_core::decode_value(value, strict).map(Self::Video),
-            "app.bsky.embed.gallery" => petrel_core::decode_value(value, strict).map(Self::Gallery),
-            "app.bsky.embed.external" => petrel_core::decode_value(value, strict).map(Self::External),
+            "app.bsky.embed.images" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Images),
+            "app.bsky.embed.video" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Video),
+            "app.bsky.embed.gallery" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Gallery),
+            "app.bsky.embed.external" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::External),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -258,10 +258,10 @@ impl petrel_core::ToValue for ViewMedia {
 impl ViewMedia {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.images#view" => petrel_core::decode_value(value, strict).map(Self::ImagesView),
-            "app.bsky.embed.video#view" => petrel_core::decode_value(value, strict).map(Self::VideoView),
-            "app.bsky.embed.gallery#view" => petrel_core::decode_value(value, strict).map(Self::GalleryView),
-            "app.bsky.embed.external#view" => petrel_core::decode_value(value, strict).map(Self::ExternalView),
+            "app.bsky.embed.images#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ImagesView),
+            "app.bsky.embed.video#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::VideoView),
+            "app.bsky.embed.gallery#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::GalleryView),
+            "app.bsky.embed.external#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ExternalView),
             _ => Ok(Self::Unknown(value)),
         }
     }

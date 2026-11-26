@@ -166,8 +166,8 @@ impl petrel_core::ToValue for OutputRequests {
 impl OutputRequests {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.convo.defs#convoView" => petrel_core::decode_value(value, strict).map(Self::ConvoView),
-            "chat.bsky.group.defs#joinRequestConvoView" => petrel_core::decode_value(value, strict).map(Self::JoinRequestConvoView),
+            "chat.bsky.convo.defs#convoView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ConvoView),
+            "chat.bsky.group.defs#joinRequestConvoView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::JoinRequestConvoView),
             _ => Ok(Self::Unknown(value)),
         }
     }

@@ -132,7 +132,7 @@ impl CancellationResults {
         Ok(Self {
             succeeded: reader.required("succeeded")?,
             failed: reader.required("failed")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -215,7 +215,7 @@ impl FailedCancellation {
             did: reader.required("did")?,
             error: reader.required("error")?,
             error_code: reader.optional("errorCode")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

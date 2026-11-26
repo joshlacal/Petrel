@@ -159,7 +159,7 @@ impl ThreadItem {
             uri: reader.required("uri")?,
             depth: reader.required("depth")?,
             value: reader.required("value")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -220,7 +220,7 @@ impl petrel_core::ToValue for ThreadItemValue {
 impl ThreadItemValue {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.unspecced.defs#threadItemPost" => petrel_core::decode_value(value, strict).map(Self::ThreadItemPost),
+            "app.bsky.unspecced.defs#threadItemPost" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ThreadItemPost),
             _ => Ok(Self::Unknown(value)),
         }
     }

@@ -114,7 +114,7 @@ impl QueueView {
             deleted_at: reader.optional("deletedAt")?,
             stats: reader.required("stats")?,
             strict_access: reader.optional("strictAccess")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -296,7 +296,7 @@ impl QueueStats {
             avg_handling_time_sec: reader.optional("avgHandlingTimeSec")?,
             avg_resolution_time_sec: reader.optional("avgResolutionTimeSec")?,
             last_updated: reader.optional("lastUpdated")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -392,7 +392,7 @@ impl AssignmentView {
             queue: reader.required("queue")?,
             start_at: reader.required("startAt")?,
             end_at: reader.optional("endAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

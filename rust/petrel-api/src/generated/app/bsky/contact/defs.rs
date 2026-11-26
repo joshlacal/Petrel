@@ -42,7 +42,7 @@ impl MatchAndContactIndex {
         Ok(Self {
             r#match: reader.required("match")?,
             contact_index: reader.required("contactIndex")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -123,7 +123,7 @@ impl SyncStatus {
         Ok(Self {
             synced_at: reader.required("syncedAt")?,
             matches_count: reader.required("matchesCount")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -205,7 +205,7 @@ impl Notification {
         Ok(Self {
             from: reader.required("from")?,
             to: reader.required("to")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

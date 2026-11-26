@@ -38,7 +38,7 @@ impl Gallery {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -122,7 +122,7 @@ impl Image {
             image: reader.required("image")?,
             alt: reader.required("alt")?,
             aspect_ratio: reader.required("aspectRatio")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -197,7 +197,7 @@ impl View {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -287,7 +287,7 @@ impl ViewImage {
             fullsize: reader.required("fullsize")?,
             alt: reader.required("alt")?,
             aspect_ratio: reader.required("aspectRatio")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -348,7 +348,7 @@ impl petrel_core::ToValue for GalleryItems {
 impl GalleryItems {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.gallery#image" => petrel_core::decode_value(value, strict).map(Self::Image),
+            "app.bsky.embed.gallery#image" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Image),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -410,7 +410,7 @@ impl petrel_core::ToValue for ViewItems {
 impl ViewItems {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.gallery#viewImage" => petrel_core::decode_value(value, strict).map(Self::ViewImage),
+            "app.bsky.embed.gallery#viewImage" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ViewImage),
             _ => Ok(Self::Unknown(value)),
         }
     }

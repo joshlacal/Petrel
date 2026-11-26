@@ -73,7 +73,7 @@ impl SubjectView {
             created_at: reader.required("createdAt")?,
             updated_at: reader.required("updatedAt")?,
             is_read: reader.required("isRead")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -162,7 +162,7 @@ impl EnforcementView {
             scope: reader.optional("scope")?,
             expires_at: reader.optional("expiresAt")?,
             labels: reader.optional("labels")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -256,7 +256,7 @@ impl AppealView {
             resolved_at: reader.optional("resolvedAt")?,
             outcome: reader.optional("outcome")?,
             appealable_until: reader.optional("appealableUntil")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -364,7 +364,7 @@ impl ActionView {
             expires_at: reader.optional("expiresAt")?,
             labels: reader.optional("labels")?,
             policies: reader.optional("policies")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -447,7 +447,7 @@ impl PolicyView {
             key: reader.required("key")?,
             display_name: reader.required("displayName")?,
             link: reader.required("link")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -576,7 +576,7 @@ impl SubjectViewDetail {
             reports: reader.optional("reports")?,
             created_at: reader.required("createdAt")?,
             updated_at: reader.required("updatedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -669,7 +669,7 @@ impl AccountPreview {
         Ok(Self {
             handle: reader.optional("handle")?,
             profile: reader.optional("profile")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -756,7 +756,7 @@ impl ReportsSummary {
             reason_types: reader.required("reasonTypes")?,
             first_reported_on: reader.required("firstReportedOn")?,
             last_reported_on: reader.required("lastReportedOn")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -847,7 +847,7 @@ impl Notification {
             target: reader.required("target")?,
             is_read: reader.required("isRead")?,
             created_at: reader.required("createdAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -934,7 +934,7 @@ impl NotificationPreferences {
             reports: reader.required("reports")?,
             account: reader.required("account")?,
             labels: reader.required("labels")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1018,7 +1018,7 @@ impl ReportRef {
             report_id: reader.required("reportId")?,
             subject: reader.optional("subject")?,
             status: reader.optional("status")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1106,7 +1106,7 @@ impl SubjectRef {
             subject: reader.required("subject")?,
             action_type: reader.optional("actionType")?,
             action_id: reader.optional("actionId")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1185,7 +1185,7 @@ impl StandingRef {
         Ok(Self {
             standing: reader.required("standing")?,
             previous_standing: reader.optional("previousStanding")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1248,8 +1248,8 @@ impl petrel_core::ToValue for SubjectViewSubject {
 impl SubjectViewSubject {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(value, strict).map(Self::RepoRef),
-            "com.atproto.repo.strongRef" => petrel_core::decode_value(value, strict).map(Self::StrongRef),
+            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoRef),
+            "com.atproto.repo.strongRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::StrongRef),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -1313,8 +1313,8 @@ impl petrel_core::ToValue for SubjectViewDetailSubject {
 impl SubjectViewDetailSubject {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(value, strict).map(Self::RepoRef),
-            "com.atproto.repo.strongRef" => petrel_core::decode_value(value, strict).map(Self::StrongRef),
+            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoRef),
+            "com.atproto.repo.strongRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::StrongRef),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -1380,9 +1380,9 @@ impl petrel_core::ToValue for NotificationTarget {
 impl NotificationTarget {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "tools.ozone.inbox.defs#reportRef" => petrel_core::decode_value(value, strict).map(Self::ReportRef),
-            "tools.ozone.inbox.defs#subjectRef" => petrel_core::decode_value(value, strict).map(Self::SubjectRef),
-            "tools.ozone.inbox.defs#standingRef" => petrel_core::decode_value(value, strict).map(Self::StandingRef),
+            "tools.ozone.inbox.defs#reportRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ReportRef),
+            "tools.ozone.inbox.defs#subjectRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SubjectRef),
+            "tools.ozone.inbox.defs#standingRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::StandingRef),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -1446,8 +1446,8 @@ impl petrel_core::ToValue for ReportRefSubject {
 impl ReportRefSubject {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(value, strict).map(Self::RepoRef),
-            "com.atproto.repo.strongRef" => petrel_core::decode_value(value, strict).map(Self::StrongRef),
+            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoRef),
+            "com.atproto.repo.strongRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::StrongRef),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -1511,8 +1511,8 @@ impl petrel_core::ToValue for SubjectRefSubject {
 impl SubjectRefSubject {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(value, strict).map(Self::RepoRef),
-            "com.atproto.repo.strongRef" => petrel_core::decode_value(value, strict).map(Self::StrongRef),
+            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoRef),
+            "com.atproto.repo.strongRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::StrongRef),
             _ => Ok(Self::Unknown(value)),
         }
     }

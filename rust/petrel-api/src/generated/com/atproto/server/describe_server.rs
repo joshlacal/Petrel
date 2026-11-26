@@ -161,7 +161,7 @@ impl Links {
         Ok(Self {
             privacy_policy: reader.optional("privacyPolicy")?,
             terms_of_service: reader.optional("termsOfService")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -242,7 +242,7 @@ impl Contact {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             email: reader.optional("email")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

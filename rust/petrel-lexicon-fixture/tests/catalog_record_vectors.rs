@@ -87,6 +87,9 @@ fn vectors(file: &str) -> Vec<Vector> {
 const CONSTRAINT_ONLY: &[&str] = &[
     "wrong const value",
     "integer not in enum",
+    // A string `enum` decodes forward-compatibly: a value a newer peer added
+    // is kept verbatim in the enum's `Unknown` arm, as Jacquard does.
+    "out of enum string",
     "out of integer range",
     "string too short",
     "string too long",
@@ -222,5 +225,50 @@ fn the_vectors_drisl_blob_refs_are_refused_as_the_spec_requires() {
     assert_eq!(
         to_dag_cbor(&record).unwrap(),
         to_dag_cbor(&original).unwrap()
+    );
+}
+
+#[test]
+fn an_out_of_enum_string_is_kept_verbatim_and_re_encodes_byte_for_byte() {
+    use petrel_lexicon_fixture::generated::example::lexicon::record::RecordEnumString;
+
+    let vector = vectors("record-data-invalid")
+        .into_iter()
+        .find(|vector| vector.name == "out of enum string")
+        .unwrap();
+    for record in [
+        from_json::<Record>(&vector.json).unwrap(),
+        from_json_strict::<Record>(&vector.json).unwrap(),
+    ] {
+        let Some(RecordEnumString::Unknown(raw)) = &record.enum_string else {
+            panic!("expected the Unknown arm, got {:?}", record.enum_string);
+        };
+        assert!(
+            record.extra_data.is_none()
+                || !record
+                    .extra_data
+                    .as_ref()
+                    .unwrap()
+                    .contains_key("enumString")
+        );
+        let original: Value = from_json(&vector.json).unwrap();
+        assert_eq!(
+            original.as_object().unwrap()["enumString"].as_str(),
+            Some(raw.as_str())
+        );
+        assert_eq!(to_json(&record).unwrap(), to_json(&original).unwrap());
+        assert_eq!(
+            to_dag_cbor(&record).unwrap(),
+            to_dag_cbor(&original).unwrap()
+        );
+    }
+    // Known values still map to their own arm, and parsing never fails.
+    assert_eq!(
+        "fish".parse::<RecordEnumString>(),
+        Ok(RecordEnumString::Fish)
+    );
+    assert_eq!(
+        "newer".parse::<RecordEnumString>(),
+        Ok(RecordEnumString::Unknown("newer".into()))
     );
 }
