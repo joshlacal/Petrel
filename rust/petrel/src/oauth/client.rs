@@ -314,7 +314,8 @@ impl DpopKeyStore for SoftwareKeyStore {
 type StartTargetKey = (String, String, Option<String>);
 
 pub struct OAuthClient {
-    pub(super) protocol: OAuthProtocol,
+    /// Shared with refresh exchanges that outlive the caller's future.
+    pub(super) protocol: Arc<OAuthProtocol>,
     pub(super) storage: SessionStore,
     pub(super) keys: Arc<dyn DpopKeyStore>,
     pub(super) resource_nonces: DpopNonces,
@@ -372,13 +373,13 @@ impl OAuthClient {
             return Err(OAuthError::ClientId);
         }
         Ok(Self {
-            protocol: OAuthProtocol {
+            protocol: Arc::new(OAuthProtocol {
                 transport,
                 client_id: config.client_id.clone(),
                 authentication: config.authentication.clone(),
                 allow_loopback: config.allow_loopback,
                 nonces: DpopNonces::default(),
-            },
+            }),
             keys: Arc::new(SoftwareKeyStore {
                 storage: storage.clone(),
             }),
@@ -1026,6 +1027,28 @@ impl OAuthClient {
         key: &dyn DpopSigner,
         body: &[u8],
     ) {
+        self.protocol.revoke_returned(server, key, body).await;
+    }
+
+    pub(super) async fn revoke(
+        &self,
+        server: &ValidatedAuthorizationServer,
+        key: &dyn DpopSigner,
+        token: &str,
+    ) -> bool {
+        self.protocol.revoke(server, key, token).await
+    }
+}
+
+impl OAuthProtocol {
+    /// Revokes the token in an unusable token response, so a rejected
+    /// session does not stay live at the authorization server.
+    pub(super) async fn revoke_returned(
+        &self,
+        server: &ValidatedAuthorizationServer,
+        key: &dyn DpopSigner,
+        body: &[u8],
+    ) {
         let Ok(fields) =
             serde_json::from_slice::<HashMap<String, &serde_json::value::RawValue>>(body)
         else {
@@ -1052,8 +1075,7 @@ impl OAuthClient {
         if server.revocation_endpoint.is_none() {
             return false;
         }
-        self.protocol
-            .send_as(server, AsEndpoint::Revoke, &[("token", token)], key)
+        self.send_as(server, AsEndpoint::Revoke, &[("token", token)], key)
             .await
             .is_ok_and(|response| response.status() == StatusCode::OK)
     }

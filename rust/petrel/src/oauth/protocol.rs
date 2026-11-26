@@ -487,11 +487,13 @@ pub(super) async fn retry_delay(millis: u32) {
     tokio::time::sleep(Duration::from_millis(u64::from(millis))).await;
     #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
     gloo_timers::future::TimeoutFuture::new(millis).await;
+    // Without a runtime feature a helper thread provides the delay, so retry
+    // and lease-wait loops never spin.
     #[cfg(not(any(
         all(not(target_arch = "wasm32"), feature = "native"),
         all(target_arch = "wasm32", feature = "wasm")
     )))]
-    let _ = millis;
+    crate::auth::background::thread_delay(Duration::from_millis(u64::from(millis))).await;
 }
 
 #[cfg(test)]

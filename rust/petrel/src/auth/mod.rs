@@ -1,5 +1,6 @@
 //! Authentication strategies, continuity tracking, hosting status, and refresh circuit breakers.
 
+pub(crate) mod background;
 mod circuit_breaker;
 mod continuity;
 mod legacy_password;

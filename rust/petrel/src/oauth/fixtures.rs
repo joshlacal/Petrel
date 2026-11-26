@@ -50,6 +50,7 @@ struct Exchanges {
     resource_metadata_requests: usize,
     issuer_metadata_requests: usize,
     resource_issuer_override: Option<&'static str>,
+    refresh_transport_failed: bool,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -85,6 +86,19 @@ enum Scenario {
     TokenRedirect,
     CabNonce,
     CabClientMismatch,
+    /// The first refresh gets this status and OAuth error code; later ones succeed.
+    FirstRefreshRejected(u16, &'static str),
+    /// The first refresh fails in the transport before reaching the server.
+    FirstRefreshTransportError,
+    /// Every refresh rotates: `refresh-first` -> `second` -> `third`.
+    #[cfg_attr(
+        not(any(
+            all(not(target_arch = "wasm32"), feature = "native"),
+            all(target_arch = "wasm32", feature = "wasm")
+        )),
+        allow(dead_code)
+    )]
+    Rotating,
 }
 
 struct Server {
@@ -175,6 +189,16 @@ impl Server {
                 self.cab_exchange(&request, &form)
             }
             (Some("issuer.example"), "/par") => self.par_exchange(&request, form),
+            (Some("issuer.example"), "/token")
+                if matches!(self.scenario, Scenario::FirstRefreshTransportError)
+                    && form.get("grant_type").map(String::as_str) == Some("refresh_token")
+                    && !std::mem::replace(
+                        &mut self.exchanges.lock().unwrap().refresh_transport_failed,
+                        true,
+                    ) =>
+            {
+                return Err(TransportError::Other("TLS handshake failed".into()));
+            }
             (Some("issuer.example"), "/token") => self.token_exchange(&request, &form).await,
             (Some("issuer.example"), "/revoke") => self.revoke_exchange(&request, &form),
             (Some("pds.example"), "/xrpc/com.atproto.server.getServiceAuth") => {
@@ -369,7 +393,9 @@ impl Server {
         form: &HashMap<String, String>,
         proof: &Value,
     ) -> Response<Bytes> {
-        assert_eq!(form["refresh_token"], "refresh-first");
+        if !matches!(self.scenario, Scenario::Rotating) {
+            assert_eq!(form["refresh_token"], "refresh-first");
+        }
         assert_eq!(proof["nonce"], "token-nonce");
         let count = {
             let mut exchanges = self.exchanges.lock().unwrap();
@@ -393,6 +419,19 @@ impl Server {
             match self.scenario {
                 Scenario::TransientRefresh if count == 1 => {
                     json_response(503, None, &json!({"error":"temporary"}))
+                }
+                Scenario::FirstRefreshRejected(status, code) if count == 1 => {
+                    json_response(status, None, &json!({ "error": code }))
+                }
+                Scenario::Rotating => {
+                    // A replayed refresh token would be a protocol violation.
+                    let (expected, next) = match count {
+                        1 => ("refresh-first", "second"),
+                        2 => ("refresh-second", "third"),
+                        _ => panic!("unexpected refresh"),
+                    };
+                    assert_eq!(form["refresh_token"], expected, "refresh token replayed");
+                    token_response(DID, next, None)
                 }
                 Scenario::InvalidGrant => {
                     json_response(400, None, &json!({"error":"invalid_grant"}))
@@ -1276,7 +1315,13 @@ impl crate::storage::SecretStore for FaultStore {
             && self.pause_pending_session_write.load(Ordering::Relaxed)
         {
             self.pending_write_started.store(true, Ordering::Relaxed);
-            return Box::pin(std::future::pending());
+            // Hold the write until the test unpauses it.
+            return Box::pin(async move {
+                while self.pause_pending_session_write.load(Ordering::Relaxed) {
+                    super::protocol::retry_delay(5).await;
+                }
+                self.inner.put(ns, key, value).await
+            });
         }
         if key == "accountDIDs"
             && self.fail_account_selection_write.load(Ordering::Relaxed)
@@ -2465,4 +2510,194 @@ async fn web_crypto_key_store_binds_oauth_session_without_persisting_raw_scalar(
         "DPoP access-first"
     );
     assert!(prepared.headers().contains_key("dpop"));
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn refresh_failures_that_leave_the_token_unconsumed_do_not_burn_it() {
+    use crate::xrpc::AuthError;
+
+    for (scenario, expected, reached_server) in [
+        (
+            Scenario::FirstRefreshRejected(400, "invalid_dpop_proof"),
+            OAuthError::ServerStatus(400),
+            true,
+        ),
+        (
+            Scenario::FirstRefreshRejected(401, "invalid_client"),
+            OAuthError::ServerStatus(401),
+            true,
+        ),
+        (
+            Scenario::FirstRefreshRejected(403, "forbidden"),
+            OAuthError::ServerStatus(403),
+            true,
+        ),
+        (
+            Scenario::FirstRefreshRejected(408, "timeout"),
+            OAuthError::ServerStatus(408),
+            true,
+        ),
+        (
+            Scenario::FirstRefreshRejected(413, "too_large"),
+            OAuthError::ServerStatus(413),
+            true,
+        ),
+        (
+            Scenario::FirstRefreshTransportError,
+            OAuthError::Protocol(OAuthProtocolError::Transport(TransportError::Other(
+                "TLS handshake failed".into(),
+            ))),
+            false,
+        ),
+    ] {
+        let server = Arc::new(Server::new(scenario));
+        let client = client(&server, ClientAuth::Public);
+        start(&client).await;
+        let session = client
+            .complete_authorization(&server.pushed_callback(ISSUER))
+            .await
+            .unwrap();
+        let error = client.refresh(&session.did, true).await.unwrap_err();
+        assert_eq!(error, expected);
+        assert!(
+            !matches!(
+                super::resource_auth::auth_error(error),
+                AuthError::SessionExpired(_)
+            ),
+            "{expected:?} must not end the session"
+        );
+        // The token was not consumed, so the next refresh may use it.
+        assert_eq!(
+            client
+                .refresh(&session.did, true)
+                .await
+                .unwrap()
+                .access_token(),
+            "access-second"
+        );
+        let refreshes = server.exchanges.lock().unwrap().refreshes;
+        assert_eq!(refreshes, if reached_server { 2 } else { 1 });
+    }
+}
+
+// Needs a runtime to detach onto; without one the exchange runs on the
+// caller's task and is cancelled with it (see `crate::auth::background`).
+#[cfg(any(
+    all(not(target_arch = "wasm32"), feature = "native"),
+    all(target_arch = "wasm32", feature = "wasm")
+))]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn a_refresh_dropped_after_the_server_received_it_still_persists_the_rotation() {
+    let server = Arc::new(Server::new(Scenario::Rotating));
+    let storage = SessionStore::new(Arc::new(MemorySecretStore::new()), "fixtures").unwrap();
+    let config = OAuthConfig::new(
+        CLIENT,
+        Url::parse(REDIRECT).unwrap(),
+        SCOPE,
+        ClientAuth::Public,
+    )
+    .unwrap();
+    let client = OAuthClient::new(server.clone(), server.clone(), storage.clone(), config).unwrap();
+    start(&client).await;
+    let session = client
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+
+    // The server has the request and rotates the token, but its response is
+    // held back. The caller gives up (a disconnected HTTP client, a timeout).
+    let hold_response = server.refresh_response_gate.lock().await;
+    let refresh = Box::pin(client.refresh(&session.did, true));
+    let received = Box::pin(async {
+        while server.exchanges.lock().unwrap().refreshes == 0 {
+            super::protocol::retry_delay(1).await;
+        }
+    });
+    match futures_util::future::select(refresh, received).await {
+        futures_util::future::Either::Left(_) => panic!("the held response was delivered"),
+        futures_util::future::Either::Right(((), refresh)) => drop(refresh),
+    }
+    drop(hold_response);
+
+    // The exchange finished on its own and stored the rotation.
+    let recovered = client.session(&session.did).await.unwrap().unwrap();
+    assert_eq!(recovered.access_token(), "access-second");
+    assert_eq!(
+        storage
+            .get_session(&session.did)
+            .await
+            .unwrap()
+            .unwrap()
+            .session
+            .access_token(),
+        "access-second"
+    );
+    // The next refresh sends the rotated token; the fixture panics on a replay.
+    assert_eq!(
+        client
+            .refresh(&session.did, true)
+            .await
+            .unwrap()
+            .access_token(),
+        "access-third"
+    );
+    assert_eq!(server.exchanges.lock().unwrap().refreshes, 2);
+}
+
+#[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn a_slow_refresh_renews_its_lease_and_a_peer_waits_for_it_past_five_seconds() {
+    let server = Arc::new(Server::new(Scenario::Public));
+    let storage = SessionStore::new(Arc::new(MemorySecretStore::new()), "fixtures").unwrap();
+    let config = OAuthConfig::new(
+        CLIENT,
+        Url::parse(REDIRECT).unwrap(),
+        SCOPE,
+        ClientAuth::Public,
+    )
+    .unwrap();
+    let client_a = Arc::new(
+        OAuthClient::new(
+            server.clone(),
+            server.clone(),
+            storage.clone(),
+            config.clone(),
+        )
+        .unwrap(),
+    );
+    let client_b = Arc::new(
+        OAuthClient::new(server.clone(), server.clone(), storage.clone(), config).unwrap(),
+    );
+    start(&client_a).await;
+    let session = client_a
+        .complete_authorization(&server.pushed_callback(ISSUER))
+        .await
+        .unwrap();
+    let did = session.did.clone();
+
+    let hold_response = server.refresh_response_gate.lock().await;
+    let call_a = client_a.refresh(&did, true);
+    let call_b = client_b.refresh(&did, true);
+    let driver = async {
+        while server.exchanges.lock().unwrap().refreshes == 0 {
+            super::protocol::retry_delay(5).await;
+        }
+        let first = storage.refresh_lease(&did).await.unwrap().expires_at();
+        // Longer than the old fixed five-second peer wait.
+        super::protocol::retry_delay(5_500).await;
+        let renewed = storage.refresh_lease(&did).await.unwrap().expires_at();
+        assert!(
+            renewed >= first + 5,
+            "lease was not renewed: {first} -> {renewed}"
+        );
+        drop(hold_response);
+    };
+    let (res_a, res_b, ()) = futures_util::future::join3(call_a, call_b, driver).await;
+    assert_eq!(res_a.unwrap().access_token(), "access-second");
+    assert_eq!(res_b.unwrap().access_token(), "access-second");
+    assert_eq!(server.exchanges.lock().unwrap().refreshes, 1);
+    assert!(storage.refresh_lease(&did).await.is_none());
 }

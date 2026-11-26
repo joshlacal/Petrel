@@ -44,8 +44,9 @@ const V2_MAGIC: &[u8; 8] = b"PTLSECv2";
 /// names. A namespace cannot contain a period. The typed session records
 /// written by [`super::SessionStore`] have a separate Rust JSON format.
 ///
-/// Under the `native` feature, async [`SecretStore`] methods offload blocking
-/// filesystem I/O onto `tokio::task::spawn_blocking`. Rust instances serialize
+/// Async [`SecretStore`] methods offload blocking filesystem I/O onto
+/// `tokio::task::spawn_blocking` under the `native` feature, and onto a
+/// helper thread without it. Rust instances serialize
 /// mutations with an advisory lock. Coordinate independently running Swift
 /// and Rust writers externally when using a directory from both runtimes.
 pub struct FileSecretStore {
@@ -123,9 +124,12 @@ where
             .await
             .map_err(|_| StoreError::Unavailable("file store task cancelled".into()))?
     }
+    // Without Tokio, a helper thread keeps file I/O off the polling executor.
     #[cfg(not(all(not(target_arch = "wasm32"), feature = "native")))]
     {
-        operation()
+        crate::auth::background::on_thread(operation)
+            .await
+            .ok_or_else(|| StoreError::Unavailable("file store thread unavailable".into()))?
     }
 }
 

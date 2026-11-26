@@ -243,7 +243,10 @@ pub struct LegacyPasswordStrategy {
     circuit_breaker: RefreshCircuitBreaker,
     last_refresh_attempt: Mutex<HashMap<Did, Instant>>,
     last_successful_refresh: Mutex<HashMap<Did, Instant>>,
-    used_refresh_tokens: Mutex<HashSet<[u8; 32]>>,
+    /// Refresh tokens with an exchange in flight or definitively consumed. A
+    /// synchronous lock so a cancelled exchange can always release its token
+    /// from `Drop`; it is never held across an await.
+    used_refresh_tokens: std::sync::Mutex<HashSet<[u8; 32]>>,
     next_refresh_generation: AtomicU64,
     active_refreshes: Mutex<HashMap<Did, ActiveRefreshEntry>>,
     account_statuses: Mutex<HashMap<Did, AccountStatus>>,
@@ -276,12 +279,18 @@ impl LegacyPasswordStrategy {
             circuit_breaker: RefreshCircuitBreaker::new(),
             last_refresh_attempt: Mutex::new(HashMap::new()),
             last_successful_refresh: Mutex::new(HashMap::new()),
-            used_refresh_tokens: Mutex::new(HashSet::new()),
+            used_refresh_tokens: std::sync::Mutex::new(HashSet::new()),
             next_refresh_generation: AtomicU64::new(1),
             active_refreshes: Mutex::new(HashMap::new()),
             account_statuses: Mutex::new(HashMap::new()),
             lifecycle_lock: Mutex::new(()),
         }
+    }
+
+    fn used_refresh_tokens(&self) -> std::sync::MutexGuard<'_, HashSet<[u8; 32]>> {
+        self.used_refresh_tokens
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// Permits loopback HTTP/HTTPS endpoints (for local tests and development servers).
@@ -702,7 +711,7 @@ impl LegacyPasswordStrategy {
                 all(not(target_arch = "wasm32"), feature = "native"),
                 all(target_arch = "wasm32", feature = "wasm")
             )))]
-            let _ = wait;
+            super::background::thread_delay(wait).await;
         }
 
         let (shared, mut waiter) = self.spawn_or_join_refresh(did, token_hash).await?;
@@ -743,25 +752,32 @@ impl LegacyPasswordStrategy {
             did: &did,
             probe_id: acquired_probe,
         };
-        {
-            let mut used = self.used_refresh_tokens.lock().await;
+        let replayed = {
+            let mut used = self.used_refresh_tokens();
             if used.contains(&token_hash) {
                 used.remove(&token_hash);
-                drop(used);
-                if let Some(id) = probe_guard.take() {
-                    self.circuit_breaker.release_half_open_probe(&did, id).await;
-                }
-                return Err(PasswordAuthError::TokenRefreshFailed(
-                    "refresh token replay prevented".to_owned(),
-                ));
+                true
+            } else {
+                used.insert(token_hash);
+                false
             }
-            used.insert(token_hash);
+        };
+        if replayed {
+            if let Some(id) = probe_guard.take() {
+                self.circuit_breaker.release_half_open_probe(&did, id).await;
+            }
+            return Err(PasswordAuthError::TokenRefreshFailed(
+                "refresh token replay prevented".to_owned(),
+            ));
         }
 
         let probe_id = probe_guard.take();
         drop(probe_guard);
         let generation = self.next_refresh_generation.fetch_add(1, Ordering::Relaxed);
-        let active_waiters = Arc::new(AtomicUsize::new(1));
+        // One waiter for this caller and one for the background runner below,
+        // so the entry stays joinable while the exchange runs even if every
+        // caller has gone.
+        let active_waiters = Arc::new(AtomicUsize::new(2));
         let weak_this = Arc::downgrade(self);
         let did_for_task = did.clone();
         let fut = async move {
@@ -776,10 +792,15 @@ impl LegacyPasswordStrategy {
             let Some(this) = weak_this.upgrade() else {
                 return Err(PasswordAuthError::NoActiveAccount);
             };
-            let res = this.perform_refresh(&did_for_task).await;
+            let mut consumed = false;
+            let res = this.perform_refresh(&did_for_task, &mut consumed).await;
             drop(this);
-            let keep_token_burned =
-                res.is_ok() || matches!(res, Err(PasswordAuthError::InvalidCredentials));
+            // The PDS used the token if it answered with success (even one
+            // we could not apply) or rejected it as expired or invalid.
+            // Anything else leaves it usable for the next attempt.
+            let keep_token_burned = consumed
+                || res.is_ok()
+                || matches!(res, Err(PasswordAuthError::InvalidCredentials));
             cleanup.finish_async(keep_token_burned).await;
             res
         };
@@ -794,6 +815,7 @@ impl LegacyPasswordStrategy {
         > = Box::pin(fut);
 
         let shared = boxed.shared();
+        run_in_background(&shared, &active_waiters);
         let waiter = RefreshWaiterGuard {
             strategy: Arc::downgrade(self),
             did: did.clone(),
@@ -835,7 +857,11 @@ impl LegacyPasswordStrategy {
         ))
     }
 
-    async fn perform_refresh(&self, did: &Did) -> Result<TokenRefreshResult, PasswordAuthError> {
+    async fn perform_refresh(
+        &self,
+        did: &Did,
+        consumed: &mut bool,
+    ) -> Result<TokenRefreshResult, PasswordAuthError> {
         let Some(session) = self.get_session(did).await? else {
             return Err(PasswordAuthError::TokenRefreshFailed(
                 "missing session".to_owned(),
@@ -850,6 +876,7 @@ impl LegacyPasswordStrategy {
         let response = self
             .send_refresh_request(did, &account.pds, &session)
             .await?;
+        *consumed = response.status().is_success();
         let refreshed = self.handle_refresh_response(did, &response).await?;
 
         let _lifecycle = self.lifecycle_lock.lock().await;
@@ -985,10 +1012,14 @@ impl LegacyPasswordStrategy {
                     .insert(did.clone(), status_err.status.clone());
                 return Err(PasswordAuthError::AccountStatus(status_err));
             }
-            self.circuit_breaker
-                .record_failure(did, RefreshFailureKind::InvalidGrant)
-                .await;
-            return Err(PasswordAuthError::InvalidCredentials);
+            let error = Self::refresh_error(status_code, response.body());
+            let kind = if error == PasswordAuthError::InvalidCredentials {
+                RefreshFailureKind::InvalidGrant
+            } else {
+                RefreshFailureKind::Server
+            };
+            self.circuit_breaker.record_failure(did, kind).await;
+            return Err(error);
         }
 
         let refreshed: refresh_session::Output = petrel_core::from_json(response.body())
@@ -1001,6 +1032,26 @@ impl LegacyPasswordStrategy {
             return Err(PasswordAuthError::InvalidCredentials);
         }
         Ok(refreshed)
+    }
+
+    /// Classifies a non-2xx, non-429, non-5xx `refreshSession` reply. Only a
+    /// rejection of the refresh token itself (`ExpiredToken`, `InvalidToken`,
+    /// or a 401 asking for authentication) ends the session. Other replies,
+    /// such as a proxy's 403/408/413 or an unrelated 400, are reported as
+    /// [`PasswordAuthError::ServerError`] and leave the session usable.
+    fn refresh_error(status: u16, body: &[u8]) -> PasswordAuthError {
+        let parsed = XrpcErrorBody::parse(body);
+        let code = parsed.as_ref().map(|err| err.error.as_str());
+        let terminal = matches!(code, Some("ExpiredToken" | "InvalidToken"))
+            || (status == 401 && code == Some("AuthenticationRequired"));
+        if terminal {
+            return PasswordAuthError::InvalidCredentials;
+        }
+        let message = parsed.map_or_else(String::new, |err| match err.message {
+            Some(msg) if !msg.is_empty() => format!("{}: {msg}", err.error),
+            _ => err.error,
+        });
+        PasswordAuthError::ServerError { status, message }
     }
 
     /// Resets the circuit breaker for `did` (or the current account) and attempts a forced refresh.
@@ -1130,6 +1181,20 @@ impl AuthProvider for Arc<LegacyPasswordStrategy> {
     }
 }
 
+/// Drives a refresh to completion on the platform runtime, counted as one of
+/// its waiters until it finishes. Once `refreshSession` may have reached the
+/// PDS, losing its answer loses the rotated token, so the exchange must not
+/// depend on any caller keeping its future alive.
+fn run_in_background(shared: &SharedRefreshFuture, active_waiters: &Arc<AtomicUsize>) {
+    let runner_waiters = Arc::clone(active_waiters);
+    let runner = shared.clone().map(move |_| {
+        runner_waiters.fetch_sub(1, Ordering::AcqRel);
+    });
+    if !super::background::spawn(runner) {
+        active_waiters.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
 fn try_increment_waiter(active_waiters: &AtomicUsize) -> bool {
     let mut current = active_waiters.load(Ordering::Acquire);
     while current > 0 {
@@ -1225,11 +1290,7 @@ impl RefreshCleanupGuard {
             }
             drop(refreshes);
             if !keep_token_burned {
-                strategy
-                    .used_refresh_tokens
-                    .lock()
-                    .await
-                    .remove(&self.token_hash);
+                strategy.used_refresh_tokens().remove(&self.token_hash);
             }
         }
     }
@@ -1253,9 +1314,7 @@ impl Drop for RefreshCleanupGuard {
             {
                 refreshes.remove(&self.did);
             }
-            if let Some(mut used) = strategy.used_refresh_tokens.try_lock() {
-                used.remove(&self.token_hash);
-            }
+            strategy.used_refresh_tokens().remove(&self.token_hash);
         }
     }
 }
@@ -1421,6 +1480,27 @@ mod tests {
                 .body(Bytes::from(serde_json::to_vec(&payload).unwrap()))
                 .unwrap()))
         }
+    }
+
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+    #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+    async fn cancelled_refresh_releases_its_token_while_the_refresh_map_is_busy() {
+        let (strategy, _, _) = make_recovery_strategy();
+        let hash = [7_u8; 32];
+        strategy.used_refresh_tokens().insert(hash);
+        let busy = strategy.active_refreshes.lock().await;
+        drop(RefreshCleanupGuard {
+            strategy: Arc::downgrade(&strategy),
+            did: A_DID.parse().unwrap(),
+            generation: 1,
+            token_hash: hash,
+            probe_id: None,
+            finished: false,
+        });
+        drop(busy);
+        // Before: `try_lock` lost to contention and left the token burned, so
+        // the next refresh failed with "refresh token replay prevented".
+        assert!(!strategy.used_refresh_tokens().contains(&hash));
     }
 
     #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
