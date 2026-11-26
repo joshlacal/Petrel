@@ -119,7 +119,11 @@ Names shared by the generator and the runtime. Changing one needs a dated
 **`petrel_core`**
 
 - `Value`: `Null`, `Bool`, `Integer(i64)`, `String`, `Bytes`, `Link(Cid)`,
-  `Array`, `Object(BTreeMap<String, Value>)`. No floats.
+  `Array`, `Object(BTreeMap<String, Value>)`, and `Float`, which only a
+  lenient (output) JSON decode produces for a fractional number in an untyped
+  position; it re-encodes as JSON and has no DAG-CBOR form (`to_dag_cbor`
+  refuses it). Strict and data-model decoding refuse fractional numbers; an
+  exact integer spelled `1.0` reads as `Integer` on every path.
 - Identifiers: `Did`, `Handle`, `AtIdentifier`, `Nsid`, `AtUri`, `SpaceRef`,
   `Uri`, `Tid`, `RecordKey`, `Datetime`, `Language`, `CidString`. Each has
   `parse`, `as_str`, `into_string`, `FromStr`, `Display`, and the bridge and

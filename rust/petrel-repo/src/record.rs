@@ -260,6 +260,7 @@ fn validate_value(
     }
     match val {
         Value::Null | Value::Bool(_) | Value::String(_) | Value::Bytes(_) => Ok(()),
+        Value::Float(_) => Err(RecordCodecError::FloatingPointDisallowed),
         Value::Integer(n) => {
             if policy.requires_safe_integers && (*n < MIN_SAFE_INT || *n > MAX_SAFE_INT) {
                 return Err(RecordCodecError::UnsafeInteger(*n));
@@ -622,6 +623,7 @@ fn value_to_json(val: &Value, depth: usize) -> Result<JsonValue, RecordJsonError
         Value::Bool(b) => Ok(JsonValue::Bool(*b)),
         Value::Integer(n) => Ok(JsonValue::Number((*n).into())),
         Value::String(s) => Ok(JsonValue::String(s.clone())),
+        Value::Float(_) => Err(RecordJsonError::FloatingPointDisallowed),
         Value::Bytes(bytes) => {
             let mut map = JsonMap::new();
             let encoded = STANDARD.encode(bytes);

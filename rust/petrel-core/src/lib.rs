@@ -54,7 +54,7 @@ pub use syntax::{
     SpaceRef, Tid, Uri,
 };
 pub use tid::TidGenerator;
-pub use value::{Blob, Bytes, CidLink, Nullable, Value};
+pub use value::{Blob, Bytes, CidLink, Float, Nullable, Value};
 pub use xrpc::{
     Collection, DeclaredXrpcError, FromQueryParams, RateLimit, RecordKeyType, ToQueryParams,
     XRPC_V1_JSON_SUBPROTOCOL, XrpcErrorBody, XrpcInput, XrpcMethod, XrpcOutput, XrpcRequest,

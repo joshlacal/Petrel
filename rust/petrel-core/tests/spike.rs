@@ -760,15 +760,34 @@ mod spike {
     }
 
     #[test]
-    fn floats_are_rejected_everywhere() {
-        for json in ["1.5", "1.0", "1e2", "{\"x\":[0.1]}"] {
-            let error = from_json::<Value>(json.as_bytes()).unwrap_err();
+    fn floats_are_rejected_everywhere_but_untyped_lenient_positions() {
+        for json in ["1.5", "{\"x\":[0.1]}"] {
+            let error = petrel_core::from_json_strict::<Value>(json.as_bytes()).unwrap_err();
             assert!(
                 matches!(error, DecodeError::Json(ref text) if text.contains("float")),
                 "{json}"
             );
+            // A lenient read keeps it, and it then has no DAG-CBOR form.
+            let kept = from_json::<Value>(json.as_bytes()).unwrap();
+            assert!(kept.contains_float(), "{json}");
+            assert!(petrel_core::to_dag_cbor(&kept).is_err(), "{json}");
         }
-        assert!(from_json::<Post>(minimal_post_json(",\"likeCount\":1.5").as_bytes()).is_err());
+        // An exact integer spelled as a float is the integer on every path.
+        for json in ["1.0", "1e2"] {
+            assert!(matches!(
+                from_json::<Value>(json.as_bytes()),
+                Ok(Value::Integer(_))
+            ));
+            assert!(matches!(
+                Value::from_json_data_model(json.as_bytes()),
+                Ok(Value::Integer(_))
+            ));
+        }
+        // A typed integer field refuses a float: an optional one degrades to
+        // its raw value, which still has no DAG-CBOR form.
+        let post = from_json::<Post>(minimal_post_json(",\"likeCount\":1.5").as_bytes()).unwrap();
+        assert_eq!(post.like_count, None);
+        assert!(petrel_core::to_dag_cbor(&post).is_err());
 
         let half = [0xf9, 0x3c, 0x00];
         let single = [0xfa, 0x3f, 0x80, 0x00, 0x00];

@@ -67,7 +67,7 @@ use serde::ser::Error as _;
 use crate::cid::Cid;
 use crate::dagcbor;
 use crate::error::{DecodeError, EncodeError};
-use crate::value::{Nullable, Value};
+use crate::value::{Nullable, Value, ValueVisitor};
 
 /// A type that can be written to the data model.
 pub trait ToValue {
@@ -107,7 +107,10 @@ pub fn to_json<T: ToValue + ?Sized>(value: &T) -> Result<Vec<u8>, EncodeError> {
     serde_json::to_vec(&value.to_value()?).map_err(|error| EncodeError::Custom(error.to_string()))
 }
 
-/// Decodes a typed value from JSON. Floats and duplicate keys are refused.
+/// Decodes a typed value from JSON. Duplicate keys are refused. A number
+/// with a fractional part is kept as [`Value::Float`] in an untyped position
+/// and refused by every typed field; one that is an exact integer (`1.0`)
+/// reads as an integer.
 pub fn from_json<T: FromValue>(json: &[u8]) -> Result<T, DecodeError> {
     let value: Value =
         serde_json::from_slice(json).map_err(|error| DecodeError::Json(error.to_string()))?;
@@ -118,19 +121,26 @@ pub fn from_json<T: FromValue>(json: &[u8]) -> Result<T, DecodeError> {
 /// Floats, duplicate keys, and malformed optional fields anywhere in the
 /// object tree are refused.
 pub fn from_json_strict<T: FromValue>(json: &[u8]) -> Result<T, DecodeError> {
-    let value: Value =
-        serde_json::from_slice(json).map_err(|error| DecodeError::Json(error.to_string()))?;
+    use serde::de::DeserializeSeed as _;
+    let json_error = |error: serde_json::Error| DecodeError::Json(error.to_string());
+    let mut deserializer = serde_json::Deserializer::from_slice(json);
+    let value = ValueVisitor::STRICT
+        .deserialize(&mut deserializer)
+        .map_err(json_error)?;
+    deserializer.end().map_err(json_error)?;
     T::from_value_strict(value)
 }
 
-/// Encodes a typed value as canonical DAG-CBOR.
+/// Encodes a typed value as canonical DAG-CBOR. A value holding a
+/// [`Value::Float`] is refused.
 pub fn to_dag_cbor<T: ToValue + ?Sized>(value: &T) -> Result<Vec<u8>, EncodeError> {
-    Ok(dagcbor::encode(&value.to_value()?))
+    dagcbor::try_encode(&value.to_value()?)
 }
 
-/// Computes the CID of a typed value's canonical DAG-CBOR representation.
+/// Computes the CID of a typed value's canonical DAG-CBOR representation. A
+/// value holding a [`Value::Float`] is refused.
 pub fn cid_of<T: ToValue + ?Sized>(value: &T) -> Result<Cid, EncodeError> {
-    Ok(value.to_value()?.cid())
+    Ok(Cid::for_dag_cbor(&to_dag_cbor(value)?))
 }
 
 /// Decodes a typed value from canonical DAG-CBOR. Non-canonical input is
@@ -454,11 +464,21 @@ impl ObjectReader {
         Ok(self.finish())
     }
 
-    /// Finishes an object or record: everything not read (minus `$type`) plus
-    /// the raw form of every degraded field, or `None` when there is nothing.
-    /// This is the type's `extra_data`.
+    /// Finishes a record (or anything else that writes its own `$type`):
+    /// everything not read (minus `$type`) plus the raw form of every degraded
+    /// field, or `None` when there is nothing. This is the type's
+    /// `extra_data`.
     pub fn finish(mut self) -> Option<BTreeMap<String, Value>> {
         self.fields.remove("$type");
+        self.finish_preserving_type()
+    }
+
+    /// Finishes an object that does not write its own `$type` (a named or
+    /// inline object def): like [`finish`](Self::finish), but a `$type` the
+    /// input carried stays in `extra_data`, so re-encoding writes it back and
+    /// the DAG-CBOR bytes (and CID) do not change. An absent `$type` stays
+    /// absent.
+    pub fn finish_preserving_type(mut self) -> Option<BTreeMap<String, Value>> {
         self.fields.append(&mut self.degraded);
         (!self.fields.is_empty()).then_some(self.fields)
     }

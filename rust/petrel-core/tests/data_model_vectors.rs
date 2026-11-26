@@ -538,7 +538,13 @@ fn dynamic_decoding_preserves_unknown_values_and_guards_projection() {
     );
     let lookalike = parse(r#"{"$link":"invalid","field":true}"#);
     assert!(matches!(lookalike, Value::Object(_)));
-    assert!(from_json::<Value>(br#"{"$link":"invalid"}"#).is_err());
+    // In an untyped position a lenient read keeps a malformed lookalike as
+    // the plain map it is; a strict read refuses it.
+    assert!(matches!(
+        from_json::<Value>(br#"{"$link":"invalid"}"#),
+        Ok(Value::Object(_))
+    ));
+    assert!(petrel_core::from_json_strict::<Value>(br#"{"$link":"invalid"}"#).is_err());
 
     let mut reader = ObjectReader::new(parse(r#"{"bad":"none","future":7}"#)).unwrap();
     assert_eq!(reader.optional::<i64>("bad"), Ok(None));
