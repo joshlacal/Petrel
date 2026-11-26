@@ -298,7 +298,7 @@ class RustEnumGenerator:
             lines.append("        match petrel_core::unknown::type_of(&value)? {")
             for variant in variants:
                 lines.append(
-                    f"            {variant['wire_tag_literal']} => petrel_core::decode_value(value, strict).map(Self::{variant['name']}),"
+                    f"            {variant['wire_tag_literal']} => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::{variant['name']}),"
                 )
             if not closed:
                 lines.append("            _ => Ok(Self::Unknown(value)),")
@@ -535,7 +535,17 @@ class RustEnumGenerator:
         values: List[str],
         identity: Any,
     ) -> str:
-        """Generate a closed Rust enum with collision-detecting identity registry."""
+        """Generate a Rust enum for a lexicon `enum` string, with a
+        collision-detecting identity registry.
+
+        The lexicon calls the set closed, but a newer peer can add a value
+        before this build knows it. Decoding one must not fail the object that
+        holds it (and, through an array, the whole response), so the enum has
+        an `Unknown(String)` catch-all that keeps the value verbatim and
+        writes it back unchanged. The name matches the `Unknown` arm of open
+        unions; a wire value that would itself be called `Unknown` gets the
+        injective fallback name.
+        """
         if not isinstance(values, list) or not all(isinstance(v, str) for v in values):
             raise ValueError(f"closed enum '{enum_name}' values must be a list of strings")
         if len(values) != len(set(values)):
@@ -560,26 +570,31 @@ class RustEnumGenerator:
         used_variants: Set[str] = set()
         entries: List[Dict[str, str]] = []
         for value in values:
-            variant_name = _clean_variant_identifier(value, used_variants)
+            variant_name = _clean_variant_identifier(
+                value, used_variants, reserved={"Self", "Unknown"}
+            )
             entries.append({
                 "name": variant_name,
                 "wire_literal": rust_string_literal(value),
             })
 
-        expected_variants = ", ".join(entry["wire_literal"] for entry in entries)
         lines: List[str] = [
-            "#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]",
+            "#[derive(Debug, Clone, PartialEq, Eq, Hash)]",
             f"pub enum {enum_name} {{",
         ]
         for entry in entries:
             lines.append(f"    {entry['name']},")
+        lines.append("    /// A value this build does not know (a newer peer added it), kept")
+        lines.append("    /// verbatim so it is written back unchanged.")
+        lines.append("    Unknown(String),")
         lines.append("}")
         lines.append("")
         lines.append(f"impl {enum_name} {{")
-        lines.append("    pub const fn as_str(&self) -> &'static str {")
+        lines.append("    pub fn as_str(&self) -> &str {")
         lines.append("        match self {")
         for entry in entries:
             lines.append(f"            Self::{entry['name']} => {entry['wire_literal']},")
+        lines.append("            Self::Unknown(value) => value.as_str(),")
         lines.append("        }")
         lines.append("    }")
         lines.append("}")
@@ -591,13 +606,13 @@ class RustEnumGenerator:
         lines.append("}")
         lines.append("")
         lines.append(f"impl core::str::FromStr for {enum_name} {{")
-        lines.append("    type Err = &'static str;")
+        lines.append("    type Err = core::convert::Infallible;")
         lines.append("    fn from_str(s: &str) -> Result<Self, Self::Err> {")
-        lines.append("        match s {")
+        lines.append("        Ok(match s {")
         for entry in entries:
-            lines.append(f"            {entry['wire_literal']} => Ok(Self::{entry['name']}),")
-        lines.append(f'            _ => Err("unknown variant for {enum_name}"),')
-        lines.append("        }")
+            lines.append(f"            {entry['wire_literal']} => Self::{entry['name']},")
+        lines.append("            other => Self::Unknown(other.to_owned()),")
+        lines.append("        })")
         lines.append("    }")
         lines.append("}")
         lines.append("")
@@ -614,13 +629,11 @@ class RustEnumGenerator:
             "    fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {"
         )
         lines.append("        let raw = String::from_value(value)?;")
-        lines.append("        match raw.as_str() {")
+        lines.append("        Ok(match raw.as_str() {")
         for entry in entries:
-            lines.append(f"            {entry['wire_literal']} => Ok(Self::{entry['name']}),")
-        lines.append(
-            f'            other => Err(petrel_core::DecodeError::Custom(format!("unknown variant `{{other}}` for {enum_name}"))),'
-        )
-        lines.append("        }")
+            lines.append(f"            {entry['wire_literal']} => Self::{entry['name']},")
+        lines.append("            _ => Self::Unknown(raw),")
+        lines.append("        })")
         lines.append("    }")
         lines.append("}")
         lines.append("")
@@ -632,7 +645,10 @@ class RustEnumGenerator:
         lines.append("")
         lines.append(f"impl petrel_core::xrpc::FromQueryValue for {enum_name} {{")
         lines.append("    fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {")
-        lines.append("        value.parse::<Self>().map_err(|err| petrel_core::DecodeError::Custom(err.to_owned()))")
+        lines.append("        Ok(match value.parse::<Self>() {")
+        lines.append("            Ok(parsed) => parsed,")
+        lines.append("            Err(never) => match never {},")
+        lines.append("        })")
         lines.append("    }")
         lines.append("}")
         lines.append("")

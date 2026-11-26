@@ -87,7 +87,7 @@ class RustUnionAndEnumGenerationTests(unittest.TestCase):
                 enum_code,
             )
             self.assertIn(
-                '"com.example.unions#alpha" => petrel_core::decode_value(value, strict).map(Self::Alpha),',
+                '"com.example.unions#alpha" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Alpha),',
                 enum_code,
             )
             self.assertNotIn("petrel_core::FromValue::from_value(value)", enum_code)
@@ -249,7 +249,9 @@ class RustUnionAndEnumGenerationTests(unittest.TestCase):
         self.assertEqual(ty, "DefsAction")
         enum_src = gen.enum_generator.closed_enums["DefsAction"]
         self.assertNotIn("Other(", enum_src)
-        self.assertIn("petrel_core::DecodeError::Custom", enum_src)
+        # Forward compatible: a value a newer peer added is kept, not refused.
+        self.assertIn("    Unknown(String),", enum_src)
+        self.assertNotIn("unknown variant", enum_src)
         self.assertIn("petrel_core::serde_bridge::deserialize", enum_src)
         self.assertIn('say\\"hi', enum_src)
         self.assertNotIn("Serialize,", enum_src)
@@ -274,6 +276,47 @@ class RustUnionAndEnumGenerationTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(ValueError, "duplicate wire values"):
             gen.enum_generator.generate_closed_string_enum("DupEnum", ["x", "x"], ("def", "dup"))
+
+    def test_closed_enum_keeps_an_unknown_value_verbatim(self):
+        gen = _StubRustGenerator({"lexicon": 1, "id": "com.example.defs", "defs": {"mode": {"type": "string"}}})
+        name = gen.enum_generator.generate_closed_string_enum(
+            "Mode", ["fast", "unknown", "Unknown"], ("definition", "com.example.defs", "mode")
+        )
+        src = gen.enum_generator.closed_enums[name]
+        # A wire value spelled `unknown` must not take the catch-all's name.
+        variants = re.findall(r"^    ([A-Za-z_][A-Za-z0-9_]*)(?:\(String\))?,$", src, re.MULTILINE)
+        self.assertEqual(variants.count("Unknown"), 1)
+        self.assertEqual(len(variants), 4)
+        self.assertIn("    Unknown(String),", src)
+        # Copy is gone (the catch-all owns a String); as_str borrows.
+        self.assertIn("#[derive(Debug, Clone, PartialEq, Eq, Hash)]", src)
+        self.assertIn("pub fn as_str(&self) -> &str {", src)
+        self.assertIn("Self::Unknown(value) => value.as_str(),", src)
+        self.assertIn("other => Self::Unknown(other.to_owned()),", src)
+        self.assertIn("type Err = core::convert::Infallible;", src)
+        self.assertNotIn("DecodeError::Custom", src)
+
+    def test_a_union_decodes_its_member_without_the_tag_it_writes_back(self):
+        lexicon = {
+            "lexicon": 1,
+            "id": "com.example.unions",
+            "defs": {
+                "main": {
+                    "type": "object",
+                    "properties": {"u": {"type": "union", "refs": ["#alpha"]}},
+                },
+                "alpha": {"type": "object", "properties": {"a": {"type": "string"}}},
+            },
+        }
+        gen = _StubRustGenerator(lexicon)
+        gen.type_converter.determine_type("u", lexicon["defs"]["main"]["properties"]["u"], [], "Unions")
+        src = next(c for c in gen.enum_generator.enums_code if "pub enum UnionsU" in c)
+        self.assertIn(
+            "petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Alpha)",
+            src,
+        )
+        # An unknown member keeps its whole raw object, tag included.
+        self.assertIn("_ => Ok(Self::Unknown(value)),", src)
 
     def test_numeric_known_values_and_closed_enum_use_camel_case_value1_value2(self):
         lexicon = {
