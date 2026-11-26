@@ -20,6 +20,8 @@ wasm = [
     "petrel/wasm",
     "getrandom/js",
 ]
+# Server-side XRPC event-stream subscriptions (WebSocket) on `XrpcRouter`.
+ws = ["axum", "axum/ws", "tokio/macros", "futures-util/sink"]
 
 [dependencies]
 petrel-core = { workspace = true }
@@ -59,6 +61,8 @@ tower-service = { workspace = true, optional = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 petrel-api = { workspace = true, features = ["com_atproto", "app_bsky"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "net"] }
+petrel-firehose = { workspace = true, features = ["native"] }
+tokio-tungstenite = { workspace = true, features = ["connect"] }
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dev-dependencies]
 wasm-bindgen-test = { workspace = true }
