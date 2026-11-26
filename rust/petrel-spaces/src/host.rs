@@ -38,6 +38,9 @@ use crate::tokens::{
 /// Default credential TTL minted by a `SpaceHost` (15 minutes, matching spec cap).
 pub const DEFAULT_CREDENTIAL_TTL_SECS: i64 = MAX_CREDENTIAL_LIFETIME_SECS;
 
+/// Maximum credential JTIs allowed per `com.atproto.space.notifyCredentialsRevoked` payload.
+pub const MAX_CREDENTIALS_PER_REVOCATION_NOTICE: usize = 100;
+
 /// Registered notification callback for a space syncer.
 #[derive(Clone, PartialEq, Eq)]
 pub struct NotifyRegistration {
@@ -933,21 +936,27 @@ impl<B: SpaceHostBackend, R: SigningKeyResolver, S: SignatureReplayStore> SpaceH
         Ok(GetSpaceOutput::new(hosted.space, hosted.policy))
     }
 
-    /// Revoke all credentials issued to `user` in `space` and construct a
-    /// `com.atproto.space.notifyCredentialsRevoked` payload (or `None` if no credentials were active).
-    pub async fn revoke_user_credentials_and_build_notice(
+    /// Revoke all credentials issued to `user` in `space` and construct batched
+    /// `com.atproto.space.notifyCredentialsRevoked` payloads of at most `100` JTIs each
+    /// (matching `credentials.maxLength = 100` in the lexicon, returning an empty `Vec` if no
+    /// credentials were active).
+    pub async fn revoke_user_credentials_and_build_notices(
         &self,
         space: &SpaceRef,
         user: &Did,
-    ) -> Result<Option<NotifyCredentialsRevokedInput>> {
-        let jtis = self.backend.revoke_user_credentials(space, user).await?;
-        if jtis.is_empty() {
-            return Ok(None);
-        }
-        Ok(Some(NotifyCredentialsRevokedInput::new(
-            space.clone(),
-            jtis,
-        )))
+    ) -> Result<Vec<NotifyCredentialsRevokedInput>> {
+        self.ensure_hosted_by_self(space)?;
+        let jtis: Vec<String> = self
+            .backend
+            .revoke_user_credentials(space, user)
+            .await?
+            .into_iter()
+            .filter(|j| !j.is_empty())
+            .collect();
+        Ok(jtis
+            .chunks(MAX_CREDENTIALS_PER_REVOCATION_NOTICE)
+            .map(|chunk| NotifyCredentialsRevokedInput::new(space.clone(), chunk.to_vec()))
+            .collect())
     }
 
     /// Construct a `com.atproto.space.notifySpaceUpdate` payload for a deleted space.

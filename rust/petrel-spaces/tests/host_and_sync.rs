@@ -867,10 +867,10 @@ fn end_to_end_space_host_and_sync_engine_full_lifecycle() {
         )
     ));
 
-    let notice = block_on(host.revoke_user_credentials_and_build_notice(&space, &reader_did))
-        .unwrap()
-        .expect("issued credential should be revoked");
-    assert_ne!(notice.credentials.len(), 0);
+    let notices =
+        block_on(host.revoke_user_credentials_and_build_notices(&space, &reader_did)).unwrap();
+    assert_eq!(notices.len(), 1);
+    assert_ne!(notices[0].credentials.len(), 0);
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
@@ -2639,4 +2639,74 @@ async fn credential_manager_concurrent_401_revocation_preserves_in_flight_refres
     let cred_2 = mgr.credential(&space, false, now).await.unwrap();
     assert_ne!(cred_2.jwt, cred_1.jwt);
     assert_eq!(exchanger.calls.load(Ordering::SeqCst), 3);
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[test]
+fn host_batches_revocation_notices_within_max_length_100() {
+    use petrel_spaces::{MAX_CREDENTIALS_PER_REVOCATION_NOTICE, SpaceHostBackend};
+
+    let now = 1_800_000_000_i64;
+    let host_did = Did::parse("did:web:host.example.com").unwrap();
+    let user = Did::parse("did:plc:batchuser1111111111111111").unwrap();
+    let space =
+        parse_space_ref("at:space/did:web:host.example.com/blue.catbird.mlsChat/3l2batchrevok")
+            .unwrap();
+    let foreign_space =
+        parse_space_ref("at:space/did:web:other.example.com/blue.catbird.mlsChat/3l2batchother")
+            .unwrap();
+
+    let backend = Arc::new(InMemorySpaceHostBackend::new());
+    let host = SpaceHost::with_in_memory_replay(
+        host_did,
+        SigningKeyPair::generate_p256().unwrap(),
+        backend.clone(),
+        Arc::new(StaticDidResolver::new()),
+    );
+
+    // Foreign space authority fails closed.
+    assert!(matches!(
+        block_on(host.revoke_user_credentials_and_build_notices(&foreign_space, &user)),
+        Err(SpaceError::InvalidSubject(_))
+    ));
+
+    // Zero credentials -> empty Vec.
+    let empty_notices =
+        block_on(host.revoke_user_credentials_and_build_notices(&space, &user)).unwrap();
+    assert_eq!(empty_notices.len(), 0);
+
+    // Exact boundary: 100 credentials -> 1 notice of 100.
+    for i in 0..MAX_CREDENTIALS_PER_REVOCATION_NOTICE {
+        block_on(backend.record_issued_credential(&space, &user, &format!("jti-100-{i}"), now))
+            .unwrap();
+    }
+    let exact_notices =
+        block_on(host.revoke_user_credentials_and_build_notices(&space, &user)).unwrap();
+    assert_eq!(exact_notices.len(), 1);
+    assert_eq!(exact_notices[0].credentials.len(), 100);
+
+    // Over limit: 205 credentials -> [100, 100, 5] preserving all unique JTIs.
+    let mut expected_jtis = Vec::with_capacity(205);
+    for i in 0..205 {
+        let jti = format!("jti-205-{i}");
+        expected_jtis.push(jti.clone());
+        block_on(backend.record_issued_credential(&space, &user, &jti, now + i64::from(i)))
+            .unwrap();
+    }
+    let batched = block_on(host.revoke_user_credentials_and_build_notices(&space, &user)).unwrap();
+    assert_eq!(batched.len(), 3);
+    assert_eq!(batched[0].credentials.len(), 100);
+    assert_eq!(batched[1].credentials.len(), 100);
+    assert_eq!(batched[2].credentials.len(), 5);
+    let mut collected: Vec<String> = Vec::new();
+    for notice in batched {
+        assert_eq!(notice.space, space);
+        assert!((1..=MAX_CREDENTIALS_PER_REVOCATION_NOTICE).contains(&notice.credentials.len()));
+        collected.extend(notice.credentials);
+    }
+    assert_eq!(collected, expected_jtis);
+
+    // Subsequent revocation has no active credentials remaining.
+    let after = block_on(host.revoke_user_credentials_and_build_notices(&space, &user)).unwrap();
+    assert_eq!(after.len(), 0);
 }

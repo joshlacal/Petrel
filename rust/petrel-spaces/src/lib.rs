@@ -27,8 +27,8 @@ pub use credential_manager::{
 };
 pub use error::{Result, SpaceBlobLocator, SpaceError, constant_time_eq, parse_space_ref};
 pub use host::{
-    HostedSpace, InMemorySpaceHostBackend, NotifyRegistration, SpaceHost, SpaceHostBackend,
-    WriterState,
+    HostedSpace, InMemorySpaceHostBackend, MAX_CREDENTIALS_PER_REVOCATION_NOTICE,
+    NotifyRegistration, SpaceHost, SpaceHostBackend, WriterState,
 };
 pub use http_signature::{
     MAX_HTTP_SIGNATURE_AGE_SECS, MAX_HTTP_SIGNATURE_SKEW_SECS, MAX_NONCE_BYTES,
