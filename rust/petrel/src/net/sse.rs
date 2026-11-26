@@ -308,7 +308,7 @@ impl NativeSseClient {
         maximum_event_bytes: usize,
     ) -> Result<NativeSseStream, SseError> {
         let (mut parts, body) = request.into_parts();
-        let (url, origin) = validate_request_uri(&parts.uri, options.allow_loopback)
+        let (url, origin) = validate_request_uri(&parts.uri, options)
             .map_err(|error| TransportError::PolicyViolation(error.to_string()))?;
         if !matches!(origin.scheme(), "http" | "https") {
             return Err(TransportError::InvalidRequest(
