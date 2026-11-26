@@ -23,6 +23,14 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            feeds: petrel_core::xrpc::pull_array_param(params, "feeds")?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     pub feeds: Vec<crate::generated::app::bsky::feed::defs::GeneratorView>,

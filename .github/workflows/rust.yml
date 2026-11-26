@@ -87,18 +87,18 @@ jobs:
       - name: Build the SDK crates for wasm32
         run: |
           cargo build --locked --target wasm32-unknown-unknown --no-default-features --features wasm \
-            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel-api -p petrel -p petrel-repo
+            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel-api -p petrel -p petrel-repo -p petrel-server
       - name: Check wasm32 with the minimum supported Rust version
         run: |
           rustup toolchain install 1.88.0 --profile minimal --target wasm32-unknown-unknown
           cargo +1.88.0 check --locked --target wasm32-unknown-unknown --no-default-features --features wasm \
-            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel-api -p petrel -p petrel-repo
+            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel-api -p petrel -p petrel-repo -p petrel-server
       - name: Keep native-only dependencies out of the wasm SDK
         run: |
           set -euo pipefail
           tree=$(cargo tree --locked --target wasm32-unknown-unknown --no-default-features --features wasm \
-            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel-api -p petrel -p petrel-repo --edges normal --prefix none)
-          if grep -E '^(tokio|mio|socket2|hickory-[^ ]+|aws-lc[^ ]*) v' <<< "$tree"; then
+            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel-api -p petrel -p petrel-repo -p petrel-server --edges normal --prefix none)
+          if grep -E '^(tokio|mio|socket2|hickory-[^ ]+|aws-lc[^ ]*|axum[^ ]*|reqwest[^ ]*|rusqlite[^ ]*) v' <<< "$tree"; then
             echo 'Native-only dependencies found in the wasm SDK' >&2
             exit 1
           fi
@@ -124,7 +124,7 @@ jobs:
         run: |
           test "$(node --version)" = "$NODE_VERSION"
           cargo test --locked --target wasm32-unknown-unknown --no-default-features --features wasm \
-            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel -p petrel-repo
+            -p petrel-core -p petrel-crypto -p petrel-oauth-scopes -p petrel -p petrel-repo -p petrel-server
 
   e2e:
     name: Rust client against the Swift OAuth and CAB servers
@@ -156,10 +156,11 @@ jobs:
           exit 1
       - name: Verify pinned Swift
         run: test "$(swift --version | head -n 1)" = 'Swift version 6.1.2 (swift-6.1.2-RELEASE)'
-      - name: Build the Swift test servers
+      - name: Build the Swift test servers and client probe
         run: |
           swift build --package-path Server --product petrel-oauth-server-example
           swift build --package-path Server --product petrel-cab-server
+          swift build --package-path Server --product petrel-swift-client-probe
           bin_dir=$(swift build --package-path Server --show-bin-path)
           printf 'PETREL_E2E_SERVER_BIN_DIR=%s\n' "$bin_dir" >> "$GITHUB_ENV"
       - name: Install checksum-pinned rustup

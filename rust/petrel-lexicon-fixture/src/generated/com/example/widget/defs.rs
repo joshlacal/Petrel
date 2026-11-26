@@ -832,6 +832,12 @@ impl petrel_core::xrpc::QueryValue for Status {
     }
 }
 
+impl petrel_core::xrpc::FromQueryValue for Status {
+    fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self::from(value.to_owned()))
+    }
+}
+
 impl petrel_core::XrpcInput for Status {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
@@ -916,6 +922,12 @@ impl petrel_core::FromValue for Grade {
 impl petrel_core::xrpc::QueryValue for Grade {
     fn to_query_value(&self) -> String {
         self.as_str().to_owned()
+    }
+}
+
+impl petrel_core::xrpc::FromQueryValue for Grade {
+    fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
+        value.parse::<Self>().map_err(|err| petrel_core::DecodeError::Custom(err.to_owned()))
     }
 }
 

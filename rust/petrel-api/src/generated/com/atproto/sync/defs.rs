@@ -90,6 +90,12 @@ impl petrel_core::xrpc::QueryValue for HostStatus {
     }
 }
 
+impl petrel_core::xrpc::FromQueryValue for HostStatus {
+    fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self::from(value.to_owned()))
+    }
+}
+
 impl petrel_core::XrpcInput for HostStatus {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)

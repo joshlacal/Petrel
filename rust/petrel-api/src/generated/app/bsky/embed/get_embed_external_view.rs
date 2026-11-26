@@ -34,6 +34,16 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            url: petrel_core::xrpc::pull_param(params, "url")?,
+            canonical_uri: petrel_core::xrpc::pull_optional_param(params, "canonicalUri")?,
+            uris: petrel_core::xrpc::pull_optional_array_param(params, "uris")?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     /// Legacy hydrated view of the embed, returned for Standard.site records only. Present only when validation passed and the records supply enough information to populate the required `viewExternal` fields.

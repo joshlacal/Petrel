@@ -24,6 +24,14 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            starter_pack: petrel_core::xrpc::pull_param(params, "starterPack")?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     pub starter_pack: crate::generated::app::bsky::graph::defs::StarterPackView,

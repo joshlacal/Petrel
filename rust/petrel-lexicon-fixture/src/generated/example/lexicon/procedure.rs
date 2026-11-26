@@ -38,6 +38,16 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            boolean: petrel_core::xrpc::pull_optional_param(params, "boolean")?,
+            integer: petrel_core::xrpc::pull_optional_param(params, "integer")?,
+            string_field: petrel_core::xrpc::pull_optional_param(params, "stringField")?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Input {
     pub preferences: petrel_api::generated::app::bsky::actor::defs::Preferences,

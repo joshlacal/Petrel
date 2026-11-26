@@ -36,6 +36,18 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            actor: petrel_core::xrpc::pull_param(params, "actor")?,
+            limit: petrel_core::xrpc::pull_default_param(params, "limit", || 50)?,
+            cursor: petrel_core::xrpc::pull_optional_param(params, "cursor")?,
+            filter: petrel_core::xrpc::pull_default_param(params, "filter", || "posts_with_replies".to_owned())?,
+            include_pins: petrel_core::xrpc::pull_default_param(params, "includePins", || false)?,
+        })
+    }
+}
+
 impl petrel_core::xrpc::CursorParams for Parameters {
     fn cursor(&self) -> Option<&str> {
         self.cursor.as_deref()

@@ -35,6 +35,16 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            did: petrel_core::xrpc::pull_optional_param(params, "did")?,
+            uri: petrel_core::xrpc::pull_optional_param(params, "uri")?,
+            blob: petrel_core::xrpc::pull_optional_param(params, "blob")?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     pub subject: OutputSubject,

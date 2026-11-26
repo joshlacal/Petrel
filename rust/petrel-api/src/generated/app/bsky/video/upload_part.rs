@@ -26,6 +26,15 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            job_id: petrel_core::xrpc::pull_param(params, "jobId")?,
+            part_number: petrel_core::xrpc::pull_param(params, "partNumber")?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     pub part_number: i64,

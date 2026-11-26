@@ -9,6 +9,7 @@ let package = Package(
     .executable(name: "petrel-cab-demo", targets: ["petrel-cab-demo"]),
     .library(name: "PetrelCABServerCore", targets: ["PetrelCABServerCore"]),
     .executable(name: "petrel-oauth-server-example", targets: ["petrel-oauth-server-example"]),
+    .executable(name: "petrel-swift-client-probe", targets: ["petrel-swift-client-probe"]),
   ],
   dependencies: [
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.26.0"),
@@ -59,6 +60,14 @@ let package = Package(
         .product(name: "PetrelOAuthServerLexicon", package: "Petrel"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
         .product(name: "Hummingbird", package: "hummingbird"),
+      ],
+      swiftSettings: [.swiftLanguageMode(.v6)]
+    ),
+    .executableTarget(
+      name: "petrel-swift-client-probe",
+      dependencies: [
+        .product(name: "Petrel", package: "Petrel"),
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
       swiftSettings: [.swiftLanguageMode(.v6)]
     ),

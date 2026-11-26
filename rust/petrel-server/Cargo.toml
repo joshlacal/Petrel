@@ -1,0 +1,63 @@
+[package]
+name = "petrel-server"
+description = "Petrel AT Protocol server building blocks: OAuth 2.1 authorization server, resource server DPoP verifier, CAB core, service auth JWT verification, and typed XRPC routing."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["native", "axum"]
+native = ["petrel/native", "dep:tokio"]
+axum = ["native", "dep:axum", "dep:tower-layer", "dep:tower-service"]
+wasm = [
+    "petrel-core/wasm",
+    "petrel-crypto/wasm",
+    "petrel-oauth-scopes/wasm",
+    "petrel/wasm",
+    "getrandom/js",
+]
+
+[dependencies]
+petrel-core = { workspace = true }
+petrel-crypto = { workspace = true }
+petrel-oauth-scopes = { workspace = true }
+petrel = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+base64 = { workspace = true }
+bs58 = { workspace = true }
+sha2 = { workspace = true }
+hmac = { workspace = true }
+subtle = { workspace = true }
+p256 = { workspace = true }
+k256 = { workspace = true }
+getrandom = { workspace = true }
+zeroize = { workspace = true }
+http = { workspace = true }
+bytes = { workspace = true }
+url = { workspace = true }
+form_urlencoded = { workspace = true }
+uuid = { workspace = true }
+async-lock = { workspace = true }
+futures-util = { workspace = true }
+web-time = { workspace = true }
+tracing = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, optional = true, features = ["sync", "time", "net"] }
+axum = { workspace = true, optional = true }
+tower-layer = { workspace = true, optional = true }
+tower-service = { workspace = true, optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+petrel-api = { workspace = true, features = ["com_atproto", "app_bsky"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "net"] }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
+[lints]
+workspace = true

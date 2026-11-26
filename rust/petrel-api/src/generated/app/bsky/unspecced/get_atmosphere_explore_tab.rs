@@ -40,6 +40,16 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            langs: petrel_core::xrpc::pull_optional_array_param(params, "langs")?,
+            country_code: petrel_core::xrpc::pull_optional_param(params, "countryCode")?,
+            region_code: petrel_core::xrpc::pull_optional_param(params, "regionCode")?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     pub announcement_banner: Option<AnnouncementBanner>,

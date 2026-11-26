@@ -714,6 +714,12 @@ impl petrel_core::xrpc::QueryValue for RecordEnumString {
     }
 }
 
+impl petrel_core::xrpc::FromQueryValue for RecordEnumString {
+    fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
+        value.parse::<Self>().map_err(|err| petrel_core::DecodeError::Custom(err.to_owned()))
+    }
+}
+
 impl petrel_core::XrpcInput for RecordEnumString {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)

@@ -372,3 +372,132 @@ pub fn push_array_param(
         push_param(out, name, value);
     }
 }
+
+/// Parses an endpoint's query parameters from decoded `(name, value)` pairs.
+///
+/// Mirrors [`ToQueryParams`] for server-side request routing.
+pub trait FromQueryParams: Sized {
+    /// Parses query parameters from decoded `(name, value)` pairs.
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, DecodeError>;
+}
+
+impl FromQueryParams for () {
+    fn from_query_params(_: &[(&str, &str)]) -> Result<Self, DecodeError> {
+        Ok(())
+    }
+}
+
+/// A type that can be parsed from a single query parameter value.
+pub trait FromQueryValue: Sized {
+    /// Parses the unencoded query value text.
+    fn from_query_value(value: &str) -> Result<Self, DecodeError>;
+}
+
+impl FromQueryValue for String {
+    fn from_query_value(value: &str) -> Result<Self, DecodeError> {
+        Ok(value.to_owned())
+    }
+}
+
+impl FromQueryValue for bool {
+    fn from_query_value(value: &str) -> Result<Self, DecodeError> {
+        match value {
+            "true" => Ok(true),
+            "false" => Ok(false),
+            _ => Err(DecodeError::Custom(format!(
+                "invalid boolean query value `{value}`"
+            ))),
+        }
+    }
+}
+
+impl FromQueryValue for i64 {
+    fn from_query_value(value: &str) -> Result<Self, DecodeError> {
+        if value.is_empty()
+            || value.starts_with('+')
+            || value.bytes().any(|b| b.is_ascii_whitespace())
+        {
+            return Err(DecodeError::Custom(format!(
+                "invalid integer query value `{value}`"
+            )));
+        }
+        value.parse::<Self>().map_err(|err| {
+            DecodeError::Custom(format!("invalid integer query value `{value}`: {err}"))
+        })
+    }
+}
+
+impl FromQueryValue for Cid {
+    fn from_query_value(value: &str) -> Result<Self, DecodeError> {
+        value.parse().map_err(Into::into)
+    }
+}
+
+impl FromQueryValue for crate::Datetime {
+    fn from_query_value(value: &str) -> Result<Self, DecodeError> {
+        Self::parse(value).map_err(Into::into)
+    }
+}
+
+/// Reads a required scalar query parameter, rejecting missing or repeated values.
+pub fn pull_param<T: FromQueryValue>(
+    params: &[(&str, &str)],
+    name: &str,
+) -> Result<T, DecodeError> {
+    pull_optional_param(params, name)?.ok_or_else(|| DecodeError::MissingField(name.to_owned()))
+}
+
+/// Reads an optional scalar query parameter, rejecting repeated values.
+pub fn pull_optional_param<T: FromQueryValue>(
+    params: &[(&str, &str)],
+    name: &str,
+) -> Result<Option<T>, DecodeError> {
+    let mut matched = params.iter().filter(|(k, _)| *k == name).map(|(_, v)| *v);
+    let Some(first) = matched.next() else {
+        return Ok(None);
+    };
+    if matched.next().is_some() {
+        return Err(DecodeError::Custom(format!(
+            "duplicate query parameter `{name}`"
+        )));
+    }
+    T::from_query_value(first)
+        .map(Some)
+        .map_err(|err| err.in_field(name))
+}
+
+/// Reads an optional scalar query parameter with a lexicon default, rejecting repeated values.
+pub fn pull_default_param<T: FromQueryValue>(
+    params: &[(&str, &str)],
+    name: &str,
+    default: impl FnOnce() -> T,
+) -> Result<T, DecodeError> {
+    Ok(pull_optional_param(params, name)?.unwrap_or_else(default))
+}
+
+/// Reads a required array query parameter (`>= 1` values).
+pub fn pull_array_param<T: FromQueryValue>(
+    params: &[(&str, &str)],
+    name: &str,
+) -> Result<Vec<T>, DecodeError> {
+    pull_optional_array_param(params, name)?
+        .ok_or_else(|| DecodeError::MissingField(name.to_owned()))
+}
+
+/// Reads an optional array query parameter (`None` when no values are present).
+pub fn pull_optional_array_param<T: FromQueryValue>(
+    params: &[(&str, &str)],
+    name: &str,
+) -> Result<Option<Vec<T>>, DecodeError> {
+    let mut out = Vec::new();
+    for (key, value) in params {
+        if *key == name {
+            out.push(T::from_query_value(value).map_err(|err| err.in_field(name))?);
+        }
+    }
+    if out.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(out))
+    }
+}

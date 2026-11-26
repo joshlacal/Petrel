@@ -28,6 +28,15 @@ impl petrel_core::ToQueryParams for Parameters {
     }
 }
 
+impl petrel_core::FromQueryParams for Parameters {
+    fn from_query_params(params: &[(&str, &str)]) -> Result<Self, petrel_core::DecodeError> {
+        Ok(Self {
+            segment: petrel_core::xrpc::pull_param(params, "segment")?,
+            block_index: petrel_core::xrpc::pull_param(params, "blockIndex")?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
     /// No sealed segment exists for the given name.
