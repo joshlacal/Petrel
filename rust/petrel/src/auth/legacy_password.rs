@@ -652,7 +652,18 @@ impl LegacyPasswordStrategy {
         let Some(account) = self.account_manager.get_current_account().await? else {
             return Err(PasswordAuthError::NoActiveAccount);
         };
-        let did = account.did.clone();
+        self.refresh_token_for_did(&account.did, force_refresh)
+            .await
+    }
+
+    /// Refreshes `did`'s tokens if due (or when `force_refresh` is true),
+    /// using single-flight deduplication and refresh-token replay protection.
+    pub async fn refresh_token_for_did(
+        self: &Arc<Self>,
+        did: &Did,
+        force_refresh: bool,
+    ) -> Result<TokenRefreshResult, PasswordAuthError> {
+        let did = did.clone();
         let Some(session) = self.get_session(&did).await? else {
             return Err(PasswordAuthError::NoActiveAccount);
         };
@@ -994,7 +1005,7 @@ impl LegacyPasswordStrategy {
             return Ok(());
         };
         self.circuit_breaker.reset(&target).await;
-        let _ = self.refresh_token_if_needed(true).await?;
+        let _ = self.refresh_token_for_did(&target, true).await?;
         Ok(())
     }
 }
@@ -1076,7 +1087,21 @@ impl AuthProvider for Arc<LegacyPasswordStrategy> {
             {
                 return Ok(UnauthorizedAction::Retry);
             }
-            match self.refresh_token_if_needed(true).await {
+            let refresh_result = if let Some(ref did) = ctx.did {
+                let current_did = self
+                    .account_manager
+                    .current_did()
+                    .await
+                    .map_err(PasswordAuthError::from)
+                    .map_err(AuthError::from)?;
+                if current_did.as_ref() != Some(did) {
+                    return Ok(UnauthorizedAction::GiveUp);
+                }
+                self.refresh_token_for_did(did, true).await
+            } else {
+                self.refresh_token_if_needed(true).await
+            };
+            match refresh_result {
                 Ok(TokenRefreshResult::RefreshedSuccessfully) => Ok(UnauthorizedAction::Retry),
                 Ok(_) => Ok(UnauthorizedAction::GiveUp),
                 Err(err) => Err(AuthError::from(err)),
@@ -1208,4 +1233,253 @@ fn unix_now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_secs())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Mutex as StdMutex;
+
+    use serde_json::json;
+
+    use super::*;
+    use crate::{
+        net::HttpTransport,
+        oauth::{OAuthIdentity, OAuthIdentityError},
+        storage::{MemorySecretStore, SessionStore},
+    };
+
+    const A_DID: &str = "did:plc:recova111111111111111111";
+    const B_DID: &str = "did:plc:recovb222222222222222222";
+    const PDS_URL: &str = "https://pds.recovery.example";
+
+    struct StaticRecoveryResolver;
+    impl OAuthIdentityResolver for StaticRecoveryResolver {
+        fn resolve_identity<'a>(
+            &'a self,
+            identifier: &'a AtIdentifier,
+            _force_refresh: bool,
+        ) -> BoxFuture<'a, Result<OAuthIdentity, OAuthIdentityError>> {
+            let ident = identifier.as_str().to_owned();
+            Box::pin(async move {
+                let did = if ident.contains("recova") || ident == "alice.example" {
+                    A_DID
+                } else {
+                    B_DID
+                };
+                Ok(OAuthIdentity {
+                    did: did.parse().expect("valid did"),
+                    handle: None,
+                    pds: Url::parse(PDS_URL).expect("valid pds url"),
+                })
+            })
+        }
+    }
+
+    struct MultiAccountRecoveryTransport {
+        refresh_bearers: StdMutex<Vec<String>>,
+        a_refresh_seq: StdMutex<usize>,
+        b_refresh_seq: StdMutex<usize>,
+    }
+
+    impl MultiAccountRecoveryTransport {
+        fn new() -> Self {
+            Self {
+                refresh_bearers: StdMutex::new(Vec::new()),
+                a_refresh_seq: StdMutex::new(0),
+                b_refresh_seq: StdMutex::new(0),
+            }
+        }
+    }
+
+    impl HttpTransport for MultiAccountRecoveryTransport {
+        fn send(
+            &self,
+            request: Request<Bytes>,
+            _options: &SendOptions,
+        ) -> impl std::future::Future<Output = Result<Response<Bytes>, TransportError>>
+        + crate::rt::MaybeSend {
+            let path = request.uri().path().to_owned();
+            let auth = request
+                .headers()
+                .get(AUTHORIZATION)
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_owned);
+            let body = request.into_body();
+            let (status, payload) = match path.as_str() {
+                "/xrpc/com.atproto.server.createSession" => {
+                    let parsed: serde_json::Value =
+                        serde_json::from_slice(&body).expect("valid login JSON");
+                    let identifier = parsed["identifier"].as_str().unwrap_or_default();
+                    if identifier == "alice.example" || identifier == A_DID {
+                        (
+                            StatusCode::OK,
+                            json!({
+                                "did": A_DID,
+                                "handle": "alice.example",
+                                "accessJwt": "a-access-0",
+                                "refreshJwt": "a-refresh-0",
+                                "active": true
+                            }),
+                        )
+                    } else {
+                        (
+                            StatusCode::OK,
+                            json!({
+                                "did": B_DID,
+                                "handle": "bob.example",
+                                "accessJwt": "b-access-0",
+                                "refreshJwt": "b-refresh-0",
+                                "active": true
+                            }),
+                        )
+                    }
+                }
+                "/xrpc/com.atproto.server.refreshSession" => {
+                    let bearer = auth.unwrap_or_default();
+                    self.refresh_bearers.lock().unwrap().push(bearer.clone());
+                    if bearer.starts_with("Bearer a-refresh-") {
+                        let mut seq = self.a_refresh_seq.lock().unwrap();
+                        *seq += 1;
+                        (
+                            StatusCode::OK,
+                            json!({
+                                "did": A_DID,
+                                "handle": "alice.example",
+                                "accessJwt": format!("a-access-{}", *seq),
+                                "refreshJwt": format!("a-refresh-{}", *seq),
+                                "active": true
+                            }),
+                        )
+                    } else if bearer.starts_with("Bearer b-refresh-") {
+                        let mut seq = self.b_refresh_seq.lock().unwrap();
+                        *seq += 1;
+                        (
+                            StatusCode::OK,
+                            json!({
+                                "did": B_DID,
+                                "handle": "bob.example",
+                                "accessJwt": format!("b-access-{}", *seq),
+                                "refreshJwt": format!("b-refresh-{}", *seq),
+                                "active": true
+                            }),
+                        )
+                    } else {
+                        (
+                            StatusCode::UNAUTHORIZED,
+                            json!({"error": "InvalidToken", "message": "unexpected token"}),
+                        )
+                    }
+                }
+                _ => (StatusCode::NOT_FOUND, json!({"error": "NotFound"})),
+            };
+            std::future::ready(Ok(Response::builder()
+                .status(status)
+                .header(CONTENT_TYPE, "application/json")
+                .body(Bytes::from(serde_json::to_vec(&payload).unwrap()))
+                .unwrap()))
+        }
+    }
+
+    #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+    fn make_recovery_strategy() -> (
+        Arc<LegacyPasswordStrategy>,
+        Arc<AccountManager>,
+        Arc<MultiAccountRecoveryTransport>,
+    ) {
+        let store = SessionStore::new(Arc::new(MemorySecretStore::new()), "pw-recovery-test")
+            .expect("session store");
+        let account_manager = Arc::new(AccountManager::new(store));
+        let transport = Arc::new(MultiAccountRecoveryTransport::new());
+        let shared: SharedTransport = transport.clone();
+        let strategy = Arc::new(LegacyPasswordStrategy::new(
+            Arc::clone(&account_manager),
+            shared,
+            Arc::new(StaticRecoveryResolver),
+            Url::parse(PDS_URL).expect("valid pds url"),
+        ));
+        (strategy, account_manager, transport)
+    }
+
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+    #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+    async fn attempt_recovery_refreshes_targeted_account_while_different_account_is_active() {
+        let (strategy, account_manager, transport) = make_recovery_strategy();
+        let did_a: Did = A_DID.parse().unwrap();
+        let did_b: Did = B_DID.parse().unwrap();
+        let missing_did: Did = "did:plc:missing33333333333333333".parse().unwrap();
+
+        strategy
+            .login_with_password("alice.example", "pw-a", None)
+            .await
+            .unwrap();
+        strategy
+            .login_with_password("bob.example", "pw-b", None)
+            .await
+            .unwrap();
+        assert_eq!(
+            account_manager.current_did().await.unwrap(),
+            Some(did_b.clone())
+        );
+
+        for _ in 0..3 {
+            strategy
+                .circuit_breaker
+                .record_failure(&did_a, RefreshFailureKind::Server)
+                .await;
+        }
+        assert!(!strategy.circuit_breaker.can_attempt_refresh(&did_a).await);
+        assert!(matches!(
+            strategy.refresh_token_for_did(&did_a, true).await,
+            Err(PasswordAuthError::TokenRefreshFailed(_))
+        ));
+
+        // Recovering `did_a` while `did_b` is active must refresh ONLY `did_a` and keep `did_b` active/untouched.
+        strategy
+            .attempt_recovery_from_server_failures(Some(&did_a))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            transport.refresh_bearers.lock().unwrap().as_slice(),
+            ["Bearer a-refresh-0"]
+        );
+        assert!(strategy.circuit_breaker.can_attempt_refresh(&did_a).await);
+        assert_eq!(
+            account_manager.current_did().await.unwrap(),
+            Some(did_b.clone())
+        );
+
+        let session_a = strategy.get_session(&did_a).await.unwrap().unwrap();
+        assert_eq!(session_a.access_jwt(), "a-access-1");
+        assert_eq!(session_a.refresh_jwt(), "a-refresh-1");
+
+        let session_b = strategy.get_session(&did_b).await.unwrap().unwrap();
+        assert_eq!(session_b.access_jwt(), "b-access-0");
+        assert_eq!(session_b.refresh_jwt(), "b-refresh-0");
+
+        // Recovering an unknown DID fails cleanly without refreshing either A or B.
+        assert!(matches!(
+            strategy
+                .attempt_recovery_from_server_failures(Some(&missing_did))
+                .await,
+            Err(PasswordAuthError::NoActiveAccount)
+        ));
+        assert_eq!(
+            transport.refresh_bearers.lock().unwrap().as_slice(),
+            ["Bearer a-refresh-0"]
+        );
+
+        // `None` falls back to recovering the currently active account (`did_b`).
+        strategy
+            .attempt_recovery_from_server_failures(None)
+            .await
+            .unwrap();
+        assert_eq!(
+            transport.refresh_bearers.lock().unwrap().as_slice(),
+            ["Bearer a-refresh-0", "Bearer b-refresh-0"]
+        );
+        let session_b_after = strategy.get_session(&did_b).await.unwrap().unwrap();
+        assert_eq!(session_b_after.access_jwt(), "b-access-1");
+        assert_eq!(session_b_after.refresh_jwt(), "b-refresh-1");
+    }
 }
