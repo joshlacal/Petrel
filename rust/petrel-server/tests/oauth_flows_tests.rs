@@ -2896,3 +2896,214 @@ async fn refresh_and_initial_grant_cap_jwt_exp_and_expires_in_at_session_hard_ex
     .unwrap();
     assert_eq!(short_verified.claims.exp, t0 + 120);
 }
+
+#[tokio::test]
+#[allow(clippy::too_many_lines)]
+async fn concurrent_authorize_flows_in_shared_cookie_jar_both_succeed_and_reject_invalid_csrf() {
+    use petrel_server::http::OAuthHttpRequest;
+
+    let harness = TestServer::new(OAuthAccessTokenFormat::Opaque).await;
+    let mut client1 = TestClient::web(&harness);
+    let mut client2 = TestClient::web(&harness);
+
+    // Tab 1 starts authorize GET with empty cookie jar.
+    let req_uri1 = client1.push_request("atproto transition:generic").await;
+    let q1 = format!(
+        "client_id={}&request_uri={}",
+        OAuthForm::encode_component(&client1.client_id),
+        OAuthForm::encode_component(&req_uri1)
+    );
+    let page1 = harness.get("/oauth/authorize", Some(&q1)).await;
+    assert_eq!(page1.status, 200, "tab 1 GET failed: {}", page1.text());
+    let set_cookie1 = page1.headers.get("Set-Cookie").expect("tab 1 Set-Cookie");
+    assert!(set_cookie1.starts_with("__Host-petrel_oauth_csrf="));
+    assert!(set_cookie1.contains("HttpOnly; SameSite=Lax; Path=/; Secure"));
+    let cookie_jar = set_cookie1.split(';').next().unwrap().to_owned();
+    let html1 = page1.text();
+    let flow1 = common::extract_hidden_input(&html1, "flow_id");
+    let csrf1 = common::extract_hidden_input(&html1, "csrf_token");
+
+    // Tab 2 opens authorize GET for the same issuer in the SAME browser cookie jar.
+    let req_uri2 = client2.push_request("atproto transition:generic").await;
+    let q2 = format!(
+        "client_id={}&request_uri={}",
+        OAuthForm::encode_component(&client2.client_id),
+        OAuthForm::encode_component(&req_uri2)
+    );
+    let mut hdrs2 = OAuthHttpHeaders::default();
+    hdrs2.set("Cookie", &cookie_jar);
+    let page2 = harness
+        .server
+        .handle(
+            OAuthHttpRequest::new("GET", "/oauth/authorize")
+                .with_query(q2)
+                .with_headers(hdrs2),
+        )
+        .await;
+    assert_eq!(page2.status, 200, "tab 2 GET failed: {}", page2.text());
+    let set_cookie2 = page2.headers.get("Set-Cookie").expect("tab 2 Set-Cookie");
+    let cookie_jar = set_cookie2.split(';').next().unwrap().to_owned();
+    let html2 = page2.text();
+    let flow2 = common::extract_hidden_input(&html2, "flow_id");
+    let csrf2 = common::extract_hidden_input(&html2, "csrf_token");
+    assert_ne!(flow1, flow2);
+    assert_ne!(csrf1, csrf2);
+
+    // Missing or invalid CSRF cookie on Tab 1 rejects 403 and does NOT consume Tab 1 flow.
+    let missing_cookie_resp = harness
+        .post_form(
+            "/oauth/authorize",
+            &[
+                ("flow_id", &flow1),
+                ("csrf_token", &csrf1),
+                ("identifier", ALICE_HANDLE),
+                ("password", "alice-password"),
+                ("decision", "approve"),
+            ],
+            &[],
+        )
+        .await;
+    assert_eq!(missing_cookie_resp.status, 403);
+
+    let forged_cookie_resp = harness
+        .post_form(
+            "/oauth/authorize",
+            &[
+                ("flow_id", &flow1),
+                ("csrf_token", &csrf1),
+                ("identifier", ALICE_HANDLE),
+                ("password", "alice-password"),
+                ("decision", "approve"),
+            ],
+            &[("Cookie", "__Host-petrel_oauth_csrf=wrong-cookie")],
+        )
+        .await;
+    assert_eq!(forged_cookie_resp.status, 403);
+
+    // Tab 1 STILL completes consent cleanly even after Tab 2 overwrote jar's Set-Cookie header.
+    let consent1 = harness
+        .post_form(
+            "/oauth/authorize",
+            &[
+                ("flow_id", &flow1),
+                ("csrf_token", &csrf1),
+                ("identifier", ALICE_HANDLE),
+                ("password", "alice-password"),
+                ("decision", "approve"),
+            ],
+            &[("Cookie", &cookie_jar)],
+        )
+        .await;
+    assert_eq!(
+        consent1.status,
+        303,
+        "tab 1 POST failed: {}",
+        consent1.text()
+    );
+    let code1 = url::Url::parse(consent1.headers.get("Location").unwrap())
+        .unwrap()
+        .query_pairs()
+        .find(|(k, _)| k == "code")
+        .unwrap()
+        .1
+        .into_owned();
+    let verifier1 = client1.verifier.clone();
+    let redirect1 = client1.redirect_uri.clone();
+    let tok1 = client1
+        .send_post(
+            "/oauth/token",
+            &[
+                ("grant_type", "authorization_code"),
+                ("code", &code1),
+                ("code_verifier", &verifier1),
+                ("redirect_uri", &redirect1),
+            ],
+        )
+        .await;
+    assert_eq!(tok1.status, 200);
+
+    // Tab 2 ALSO completes consent cleanly using the same cookie jar + its own hidden csrf2.
+    let consent2 = harness
+        .post_form(
+            "/oauth/authorize",
+            &[
+                ("flow_id", &flow2),
+                ("csrf_token", &csrf2),
+                ("identifier", ALICE_HANDLE),
+                ("password", "alice-password"),
+                ("decision", "approve"),
+            ],
+            &[("Cookie", &cookie_jar)],
+        )
+        .await;
+    assert_eq!(
+        consent2.status,
+        303,
+        "tab 2 POST failed: {}",
+        consent2.text()
+    );
+    let code2 = url::Url::parse(consent2.headers.get("Location").unwrap())
+        .unwrap()
+        .query_pairs()
+        .find(|(k, _)| k == "code")
+        .unwrap()
+        .1
+        .into_owned();
+    let verifier2 = client2.verifier.clone();
+    let redirect2 = client2.redirect_uri.clone();
+    let tok2 = client2
+        .send_post(
+            "/oauth/token",
+            &[
+                ("grant_type", "authorization_code"),
+                ("code", &code2),
+                ("code_verifier", &verifier2),
+                ("redirect_uri", &redirect2),
+            ],
+        )
+        .await;
+    assert_eq!(tok2.status, 200);
+
+    // Single-use browser flow rejects replay of Tab 2.
+    let replay2 = harness
+        .post_form(
+            "/oauth/authorize",
+            &[
+                ("flow_id", &flow2),
+                ("csrf_token", &csrf2),
+                ("identifier", ALICE_HANDLE),
+                ("password", "alice-password"),
+                ("decision", "approve"),
+            ],
+            &[("Cookie", &cookie_jar)],
+        )
+        .await;
+    assert_eq!(replay2.status, 400);
+
+    // Valid CSRF cookie from an independent browser session still fails 403 on another flow.
+    let mut client3 = TestClient::web(&harness);
+    let req_uri3 = client3.push_request("atproto transition:generic").await;
+    let q3 = format!(
+        "client_id={}&request_uri={}",
+        OAuthForm::encode_component(&client3.client_id),
+        OAuthForm::encode_component(&req_uri3)
+    );
+    let page3 = harness.get("/oauth/authorize", Some(&q3)).await;
+    let html3 = page3.text();
+    let flow3 = common::extract_hidden_input(&html3, "flow_id");
+    let csrf3 = common::extract_hidden_input(&html3, "csrf_token");
+    let cross_browser = harness
+        .post_form(
+            "/oauth/authorize",
+            &[
+                ("flow_id", &flow3),
+                ("csrf_token", &csrf3),
+                ("identifier", ALICE_HANDLE),
+                ("password", "alice-password"),
+                ("decision", "approve"),
+            ],
+            &[("Cookie", &cookie_jar)],
+        )
+        .await;
+    assert_eq!(cross_browser.status, 403);
+}

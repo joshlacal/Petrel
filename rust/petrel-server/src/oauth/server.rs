@@ -34,7 +34,7 @@ use crate::store::{
 };
 use crate::support::{
     ConstantTime, DigestPurpose, OAuthClock, OAuthKeyedDigest, OAuthPkce, OAuthRandomSource,
-    SystemOAuthClock, SystemOAuthRandomSource,
+    SystemOAuthClock, SystemOAuthRandomSource, base64url_encode,
 };
 
 const CSRF_COOKIE_NAME_INSECURE: &str = "__petrel_oauth_csrf";
@@ -689,15 +689,18 @@ impl OAuthAuthorizationServer {
             Err(err) => return Self::html_error(400, &err_msg(&err)),
         };
 
+        let cookie_name = self.csrf_cookie_name();
+        let csrf_cookie = match extract_cookie(&req.headers, cookie_name) {
+            Some(existing) if self.verify_csrf_cookie_value(existing) => existing.to_owned(),
+            _ => self.issue_csrf_cookie_value(),
+        };
         let flow_id = format!("flow_{}", self.random.opaque_value());
         let csrf_token = self.random.opaque_value();
         let flow = OAuthBrowserFlowRecord {
             flow_id_digest: self
                 .keyed_digest
                 .digest_str(&flow_id, DigestPurpose::BrowserFlow),
-            csrf_token_digest: self
-                .keyed_digest
-                .digest_str(&csrf_token, DigestPurpose::BrowserFlow),
+            csrf_token_digest: self.csrf_binding_digest(&csrf_cookie, &csrf_token),
             client_id: par.client_id.clone(),
             redirect_uri: par.redirect_uri.clone(),
             scope: par.scope.clone(),
@@ -727,7 +730,7 @@ impl OAuthAuthorizationServer {
         let issuer_base = self.config.issuer.trim_end_matches('/');
         let page_req = OAuthAuthorizationPageRequest {
             flow_id,
-            csrf_token: csrf_token.clone(),
+            csrf_token,
             action_url: format!("{issuer_base}/oauth/authorize"),
             client: resolved_client,
             redirect_uri: par.redirect_uri,
@@ -743,11 +746,10 @@ impl OAuthAuthorizationServer {
         } else {
             ""
         };
-        let cookie_name = self.csrf_cookie_name();
         let cookie_path = self.authorize_cookie_path();
         resp.headers.add(
             "Set-Cookie",
-            format!("{cookie_name}={csrf_token}; HttpOnly; SameSite=Lax; Path={cookie_path}{secure_flag}"),
+            format!("{cookie_name}={csrf_cookie}; HttpOnly; SameSite=Lax; Path={cookie_path}{secure_flag}"),
         );
         resp
     }
@@ -983,7 +985,7 @@ impl OAuthAuthorizationServer {
         let Some(cookie_csrf) = extract_cookie(&req.headers, cookie_name) else {
             return Err(Self::html_error(403, "missing CSRF cookie"));
         };
-        if !ConstantTime::equal(cookie_csrf, form_csrf) {
+        if !self.verify_csrf_cookie_value(cookie_csrf) {
             return Err(Self::html_error(403, "CSRF token mismatch"));
         }
         let flow_digest = self
@@ -1009,13 +1011,43 @@ impl OAuthAuthorizationServer {
                 ));
             }
         };
-        let presented_csrf_digest = self
-            .keyed_digest
-            .digest_str(form_csrf, DigestPurpose::BrowserFlow);
+        let presented_csrf_digest = self.csrf_binding_digest(cookie_csrf, form_csrf);
         if !ConstantTime::equal_bytes(&flow.csrf_token_digest, &presented_csrf_digest) {
-            return Err(Self::html_error(403, "CSRF digest mismatch"));
+            return Err(Self::html_error(403, "CSRF token mismatch"));
         }
         Ok((form, flow))
+    }
+
+    fn issue_csrf_cookie_value(&self) -> String {
+        let secret = self.random.opaque_value();
+        let mac = self.csrf_cookie_mac(&secret);
+        format!("{secret}.{mac}")
+    }
+
+    fn verify_csrf_cookie_value(&self, cookie_val: &str) -> bool {
+        let Some((secret, presented_mac)) = cookie_val.split_once('.') else {
+            return false;
+        };
+        if secret.is_empty() || presented_mac.is_empty() {
+            return false;
+        }
+        let expected_mac = self.csrf_cookie_mac(secret);
+        ConstantTime::equal(presented_mac, &expected_mac)
+    }
+
+    fn csrf_cookie_mac(&self, secret: &str) -> String {
+        let digest = self.keyed_digest.digest_str(
+            &format!("csrf-cookie\0{secret}"),
+            DigestPurpose::BrowserFlow,
+        );
+        base64url_encode(&digest)
+    }
+
+    fn csrf_binding_digest(&self, cookie_val: &str, form_csrf: &str) -> Vec<u8> {
+        self.keyed_digest.digest_str(
+            &format!("csrf-bind\0{cookie_val}\0{form_csrf}"),
+            DigestPurpose::BrowserFlow,
+        )
     }
 
     async fn handle_authorization_code_grant(
