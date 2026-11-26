@@ -1,0 +1,80 @@
+[package]
+name = "petrel-firehose"
+description = "AT Protocol firehose and event-stream consumer, frame encoder/decoder, and relay repository verifier."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["native"]
+native = [
+    "petrel/native",
+    "petrel-repo/native",
+    "dep:tokio",
+    "dep:tokio-tungstenite",
+]
+wasm = [
+    "petrel/wasm",
+    "petrel-core/wasm",
+    "petrel-api/wasm",
+    "petrel-repo/wasm",
+    "petrel-crypto/wasm",
+    "dep:gloo-timers",
+    "dep:wasm-bindgen",
+    "dep:wasm-bindgen-futures",
+    "dep:js-sys",
+    "dep:web-sys",
+    "getrandom/js",
+]
+
+[dependencies]
+petrel-core = { workspace = true }
+petrel-api = { workspace = true, features = ["com_atproto"] }
+petrel = { workspace = true }
+petrel-repo = { workspace = true }
+petrel-crypto = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+bytes = { workspace = true }
+http = { workspace = true }
+url = { workspace = true }
+async-lock = { workspace = true }
+futures-util = { workspace = true }
+futures-channel = { workspace = true, features = ["sink"] }
+sha2 = { workspace = true }
+p256 = { workspace = true }
+k256 = { workspace = true }
+getrandom = { workspace = true }
+web-time = { workspace = true }
+tracing = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, optional = true, features = ["rt", "time", "sync", "net", "macros"] }
+tokio-tungstenite = { workspace = true, optional = true, features = ["connect", "rustls-tls-webpki-roots"] }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+gloo-timers = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { workspace = true, optional = true }
+js-sys = { workspace = true, optional = true }
+web-sys = { workspace = true, optional = true, features = [
+    "BinaryType",
+    "CloseEvent",
+    "ErrorEvent",
+    "MessageEvent",
+    "WebSocket",
+] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "net", "sync"] }
+tokio-tungstenite = { workspace = true, features = ["handshake"] }
+tempfile = { workspace = true }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
+[lints]
+workspace = true
