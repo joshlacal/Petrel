@@ -10,13 +10,44 @@ use web_time::SystemTime;
 
 use crate::rt::{MaybeSend, MaybeSync};
 
-use super::DidDocument;
+use super::{DidDocument, IdentityError};
 
-/// Maximum age for a fresh hit, and for a stale hit after a transient failure.
+/// Maximum age for a fresh hit, for a stale hit after a transient failure,
+/// and optionally for negative caching of definitive failures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CachePolicy {
     pub fresh_for: Duration,
     pub maximum_age: Duration,
+    pub negative_ttl: Duration,
+}
+
+impl CachePolicy {
+    /// Creates a cache policy, clamping `maximum_age` to at least `fresh_for`.
+    #[must_use]
+    pub fn new(fresh_for: Duration, maximum_age: Duration) -> Self {
+        Self {
+            fresh_for,
+            maximum_age: maximum_age.max(fresh_for),
+            negative_ttl: Duration::ZERO,
+        }
+    }
+
+    /// Disables positive and negative caching.
+    #[must_use]
+    pub const fn disabled() -> Self {
+        Self {
+            fresh_for: Duration::ZERO,
+            maximum_age: Duration::ZERO,
+            negative_ttl: Duration::ZERO,
+        }
+    }
+
+    /// Enables negative caching of definitive lookup failures for `negative_ttl`.
+    #[must_use]
+    pub const fn with_negative_ttl(mut self, negative_ttl: Duration) -> Self {
+        self.negative_ttl = negative_ttl;
+        self
+    }
 }
 
 impl Default for CachePolicy {
@@ -24,6 +55,7 @@ impl Default for CachePolicy {
         Self {
             fresh_for: Duration::from_secs(60 * 60),
             maximum_age: Duration::from_secs(24 * 60 * 60),
+            negative_ttl: Duration::ZERO,
         }
     }
 }
@@ -61,12 +93,48 @@ pub trait IdentityCache: MaybeSend + MaybeSync {
     fn remove_document(&self, did: &Did) -> impl Future<Output = ()> + MaybeSend;
     fn remove_handle(&self, handle: &Handle) -> impl Future<Output = ()> + MaybeSend;
     fn clear(&self) -> impl Future<Output = ()> + MaybeSend;
+
+    /// Returns a negatively cached definitive DID lookup failure, if supported.
+    fn negative_document(
+        &self,
+        _did: &Did,
+    ) -> impl Future<Output = Option<CacheEntry<IdentityError>>> + MaybeSend {
+        ready(None)
+    }
+
+    /// Stores a negatively cached definitive DID lookup failure.
+    fn put_negative_document(
+        &self,
+        _did: Did,
+        _error: CacheEntry<IdentityError>,
+    ) -> impl Future<Output = ()> + MaybeSend {
+        ready(())
+    }
+
+    /// Returns a negatively cached definitive handle lookup failure, if supported.
+    fn negative_handle(
+        &self,
+        _handle: &Handle,
+    ) -> impl Future<Output = Option<CacheEntry<IdentityError>>> + MaybeSend {
+        ready(None)
+    }
+
+    /// Stores a negatively cached definitive handle lookup failure.
+    fn put_negative_handle(
+        &self,
+        _handle: Handle,
+        _error: CacheEntry<IdentityError>,
+    ) -> impl Future<Output = ()> + MaybeSend {
+        ready(())
+    }
 }
 
 #[derive(Debug)]
 pub struct InMemoryIdentityCache {
     documents: Mutex<BTreeMap<Did, CacheEntry<DidDocument>>>,
     handles: Mutex<BTreeMap<String, CacheEntry<Did>>>,
+    negative_documents: Mutex<BTreeMap<Did, CacheEntry<IdentityError>>>,
+    negative_handles: Mutex<BTreeMap<String, CacheEntry<IdentityError>>>,
     capacity: usize,
 }
 
@@ -76,7 +144,14 @@ impl InMemoryIdentityCache {
             capacity: capacity.max(1),
             documents: Mutex::default(),
             handles: Mutex::default(),
+            negative_documents: Mutex::default(),
+            negative_handles: Mutex::default(),
         }
+    }
+
+    /// Maximum number of entries retained per category.
+    pub fn capacity(&self) -> usize {
+        self.capacity
     }
 }
 
@@ -114,11 +189,16 @@ impl IdentityCache for InMemoryIdentityCache {
         &self,
         document: CacheEntry<DidDocument>,
     ) -> impl Future<Output = ()> + MaybeSend {
+        let did = document.value.id.clone();
+        self.negative_documents
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(&did);
         let mut cache = self
             .documents
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
-        cache.insert(document.value.id.clone(), document);
+        cache.insert(did, document);
         trim(&mut cache, self.capacity);
         ready(())
     }
@@ -128,8 +208,13 @@ impl IdentityCache for InMemoryIdentityCache {
         handle: Handle,
         candidate: CacheEntry<Did>,
     ) -> impl Future<Output = ()> + MaybeSend {
+        let key = handle.normalized().to_owned();
+        self.negative_handles
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(&key);
         let mut cache = self.handles.lock().unwrap_or_else(PoisonError::into_inner);
-        cache.insert(handle.normalized().to_owned(), candidate);
+        cache.insert(key, candidate);
         trim(&mut cache, self.capacity);
         ready(())
     }
@@ -139,11 +224,19 @@ impl IdentityCache for InMemoryIdentityCache {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .remove(did);
+        self.negative_documents
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(did);
         ready(())
     }
 
     fn remove_handle(&self, handle: &Handle) -> impl Future<Output = ()> + MaybeSend {
         self.handles
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(handle.normalized());
+        self.negative_handles
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .remove(handle.normalized());
@@ -159,6 +252,77 @@ impl IdentityCache for InMemoryIdentityCache {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .clear();
+        self.negative_documents
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
+        self.negative_handles
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
+        ready(())
+    }
+
+    fn negative_document(
+        &self,
+        did: &Did,
+    ) -> impl Future<Output = Option<CacheEntry<IdentityError>>> + MaybeSend {
+        ready(
+            self.negative_documents
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .get(did)
+                .cloned(),
+        )
+    }
+
+    fn put_negative_document(
+        &self,
+        did: Did,
+        error: CacheEntry<IdentityError>,
+    ) -> impl Future<Output = ()> + MaybeSend {
+        self.documents
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(&did);
+        let mut cache = self
+            .negative_documents
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        cache.insert(did, error);
+        trim(&mut cache, self.capacity);
+        ready(())
+    }
+
+    fn negative_handle(
+        &self,
+        handle: &Handle,
+    ) -> impl Future<Output = Option<CacheEntry<IdentityError>>> + MaybeSend {
+        ready(
+            self.negative_handles
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .get(handle.normalized())
+                .cloned(),
+        )
+    }
+
+    fn put_negative_handle(
+        &self,
+        handle: Handle,
+        error: CacheEntry<IdentityError>,
+    ) -> impl Future<Output = ()> + MaybeSend {
+        let key = handle.normalized().to_owned();
+        self.handles
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(&key);
+        let mut cache = self
+            .negative_handles
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        cache.insert(key, error);
+        trim(&mut cache, self.capacity);
         ready(())
     }
 }

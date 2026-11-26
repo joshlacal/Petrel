@@ -15,6 +15,7 @@ members = [
     "petrel",
     "petrel-repo",
     "petrel-server",
+    "petrel-plc",
     "petrel-e2e",
     "petrel-lexicon-fixture",
 ]

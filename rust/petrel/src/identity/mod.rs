@@ -14,11 +14,14 @@ pub use cache::{CacheEntry, CachePolicy, IdentityCache, InMemoryIdentityCache};
 pub use dns::HickoryResolver;
 pub use dns::{DnsError, DnsResolver, DohResolver};
 pub use document::{
-    DidDocument, Service, ServiceKind, SigningCurve, SigningKey, VerificationMethod,
+    DidDocument, DidServiceIdentifier, Service, ServiceKind, SigningCurve, SigningKey,
+    VerificationMethod,
 };
 pub use resolver::{
+    DidDocumentServiceAuthKeyResolver, DidResolutionService, DidResolving, DirectLookupOrder,
     HandleConflictPolicy, HandleLookup, HandleStrategy, HandleVerification, IdentityError,
-    IdentityOptions, IdentityResolver, ResolvedIdentity,
+    IdentityOptions, IdentityResolver, ResolvedIdentity, dids_in_txt_records,
+    is_strictly_valid_did,
 };
 pub use web::{DidWebError, DidWebIdentifier};
 

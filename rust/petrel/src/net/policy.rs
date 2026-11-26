@@ -95,6 +95,14 @@ pub fn validate_url_with_development(
     url: &Url,
     allow_loopback: bool,
 ) -> Result<Origin, PolicyError> {
+    validate_url_with_options(url, allow_loopback, None)
+}
+
+fn validate_url_with_options(
+    url: &Url,
+    allow_loopback: bool,
+    allowed_cleartext_origin: Option<&Origin>,
+) -> Result<Origin, PolicyError> {
     let origin = Origin::from_url(url)?;
     if !url.username().is_empty() || url.password().is_some() || url.fragment().is_some() {
         return Err(PolicyError::InvalidAuthority);
@@ -103,7 +111,9 @@ pub fn validate_url_with_development(
     if local && !allow_loopback {
         return Err(PolicyError::LoopbackDisabled);
     }
-    if !local && matches!(origin.scheme(), "http" | "ws") {
+    let matches_allowed_cleartext = allowed_cleartext_origin
+        .is_some_and(|allowed| allowed == &origin && allowed.scheme() == "http");
+    if !local && matches!(origin.scheme(), "http" | "ws") && !matches_allowed_cleartext {
         return Err(PolicyError::Cleartext);
     }
 
@@ -118,7 +128,7 @@ pub fn validate_url_with_development(
 /// Check a request's original authority before URL normalization.
 pub(crate) fn validate_request_uri(
     uri: &Uri,
-    allow_loopback: bool,
+    options: &super::SendOptions,
 ) -> Result<(Url, Origin), PolicyError> {
     if uri
         .authority()
@@ -127,7 +137,11 @@ pub(crate) fn validate_request_uri(
         return Err(PolicyError::InvalidAuthority);
     }
     let url = Url::parse(&uri.to_string()).map_err(|_| PolicyError::InvalidAuthority)?;
-    let origin = validate_url_with_development(&url, allow_loopback)?;
+    let origin = validate_url_with_options(
+        &url,
+        options.allow_loopback,
+        options.allowed_cleartext_origin.as_ref(),
+    )?;
     if is_loopback_host(origin.host())
         && !uri
             .host()
@@ -344,5 +358,28 @@ mod tests {
         }
         assert_eq!(redacted["accept"], "application/json");
         assert_eq!(headers["authorization"], "example-credential");
+    }
+
+    #[test]
+    fn allowed_cleartext_origin_is_strictly_scoped_to_exact_http_origin() {
+        let allowed = Origin::from_url(&Url::parse("http://plc.lab:2582").unwrap()).unwrap();
+        let mut opts = crate::net::SendOptions::new();
+        opts.allowed_cleartext_origin = Some(allowed);
+
+        assert!(
+            validate_request_uri(&"http://plc.lab:2582/did:plc:abc".parse().unwrap(), &opts)
+                .is_ok()
+        );
+        for rejected in [
+            "http://plc.lab:2583/did:plc:abc",
+            "http://other.lab:2582/did:plc:abc",
+            "ws://plc.lab:2582/did:plc:abc",
+            "http://127.0.0.1:2582/did:plc:abc",
+        ] {
+            assert!(
+                validate_request_uri(&rejected.parse().unwrap(), &opts).is_err(),
+                "{rejected}"
+            );
+        }
     }
 }

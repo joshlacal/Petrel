@@ -1,0 +1,35 @@
+[package]
+name = "petrel-plc"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["native"]
+native = ["petrel-crypto/std", "petrel/native"]
+wasm = ["petrel-crypto/wasm", "petrel/wasm"]
+
+[dependencies]
+bytes.workspace = true
+http.workspace = true
+petrel = { workspace = true }
+petrel-api = { workspace = true, features = ["com_atproto"] }
+petrel-core = { workspace = true }
+petrel-crypto.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+url.workspace = true
+web-time.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "sync"] }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test.workspace = true
