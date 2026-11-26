@@ -524,3 +524,48 @@ fn gb11_resets_ext_pict_state_after_additional_zwj_or_extend() {
         2
     );
 }
+
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+fn detects_combining_mark_hashtags_by_grapheme_and_byte_limits() {
+    let grapheme = "e\u{0301}";
+    // 33 graphemes == 66 Unicode scalars == 99 UTF-8 tag bytes (within 64 graphemes / 640 bytes).
+    let tag_33 = grapheme.repeat(33);
+    let post_33 = format!("Hello #{tag_33} world");
+    let mut rt_33 = RichText::from_text(&post_33);
+    rt_33.detect_facets_without_resolution();
+    let expected_end_33 = i64::try_from("Hello ".len() + 1 + tag_33.len()).unwrap();
+    assert_eq!(rt_33.facets.len(), 1);
+    assert_eq!(rt_33.facets[0].index.byte_start, 6);
+    assert_eq!(rt_33.facets[0].index.byte_end, expected_end_33);
+    let seg_33 = rt_33
+        .segments()
+        .into_iter()
+        .find(|s| s.tag().is_some())
+        .expect("33-grapheme combining tag facet");
+    assert_eq!(seg_33.tag().unwrap().tag, tag_33);
+
+    // Exact 64-grapheme boundary is accepted; 65 graphemes is rejected.
+    let tag_64 = grapheme.repeat(64);
+    let post_64 = format!("#{tag_64}");
+    let mut rt_64 = RichText::from_text(&post_64);
+    rt_64.detect_facets_without_resolution();
+    assert_eq!(rt_64.facets.len(), 1);
+
+    let post_65 = format!("#{}", grapheme.repeat(65));
+    let mut rt_65 = RichText::from_text(&post_65);
+    rt_65.detect_facets_without_resolution();
+    assert_eq!(rt_65.facets.len(), 0);
+
+    // Lexicon UTF-8 byte ceiling (640 bytes) still applies even when <= 64 graphemes.
+    let heavy_grapheme = format!("a{}", "\u{0301}".repeat(10)); // 1 grapheme, 21 UTF-8 bytes
+    let tag_630_bytes = heavy_grapheme.repeat(30); // 30 graphemes, 630 bytes
+    let mut rt_630 = RichText::from_text(format!("#{tag_630_bytes}"));
+    rt_630.detect_facets_without_resolution();
+    assert_eq!(rt_630.facets.len(), 1);
+
+    let tag_651_bytes = heavy_grapheme.repeat(31); // 31 graphemes, 651 bytes > 640
+    let mut rt_651 = RichText::from_text(format!("#{tag_651_bytes}"));
+    rt_651.detect_facets_without_resolution();
+    assert_eq!(rt_651.facets.len(), 0);
+}

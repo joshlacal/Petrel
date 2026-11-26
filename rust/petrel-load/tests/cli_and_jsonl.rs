@@ -790,3 +790,165 @@ async fn simulate_ambiguous_timeout_injects_pending_refresh_recovers_and_verifie
     client.switch_auth_mode(AuthMode::Legacy).await.unwrap();
     assert!(client.simulate_ambiguous_refresh_timeout().await.is_err());
 }
+
+fn stored_pds_account(did: &Did, pds_url: &str) -> Account {
+    let as_meta = serde_json::from_value(serde_json::json!({
+        "issuer": pds_url,
+        "authorization_endpoint": format!("{pds_url}/oauth/authorize"),
+        "token_endpoint": format!("{pds_url}/oauth/token"),
+        "pushed_authorization_request_endpoint": format!("{pds_url}/oauth/par"),
+        "revocation_endpoint": format!("{pds_url}/oauth/revoke"),
+        "response_types_supported": ["code"],
+        "grant_types_supported": ["authorization_code", "refresh_token"],
+        "code_challenge_methods_supported": ["S256"],
+        "token_endpoint_auth_methods_supported": ["none", "private_key_jwt"],
+        "token_endpoint_auth_signing_alg_values_supported": ["ES256"],
+        "dpop_signing_alg_values_supported": ["ES256"],
+        "scopes_supported": ["atproto", "transition:generic"],
+        "authorization_response_iss_parameter_supported": true,
+        "require_pushed_authorization_requests": true,
+        "client_id_metadata_document_supported": true,
+    }))
+    .unwrap();
+    Account {
+        did: did.clone(),
+        handle: Some("stored.pds.example".parse().unwrap()),
+        pds: pds_url.to_owned(),
+        authorization_server: Some(as_meta),
+        expected_issuer: Some(pds_url.to_owned()),
+    }
+}
+
+#[tokio::test]
+async fn resolve_cli_base_url_prefers_stored_pds_when_omitted() {
+    let did: Did = "did:plc:storedpds111111111111111".parse().unwrap();
+    let mem_store = SessionStore::new(Arc::new(MemorySecretStore::new()), "resolve-base").unwrap();
+    assert_eq!(
+        petrel_load::resolve_cli_base_url(None, &mem_store, false)
+            .await
+            .unwrap()
+            .as_str(),
+        "https://bsky.social/"
+    );
+
+    let pds_url = "https://custom.pds.example";
+    let account = stored_pds_account(&did, pds_url);
+    mem_store.save_account(&account).await.unwrap();
+    mem_store.save_current_did(&did).await.unwrap();
+    assert_eq!(
+        petrel_load::resolve_cli_base_url(None, &mem_store, false)
+            .await
+            .unwrap()
+            .as_str(),
+        format!("{pds_url}/")
+    );
+    assert_eq!(
+        petrel_load::resolve_cli_base_url(None, &mem_store, true)
+            .await
+            .unwrap()
+            .as_str(),
+        "https://bsky.social/"
+    );
+    assert_eq!(
+        petrel_load::resolve_cli_base_url(Some("https://override.example"), &mem_store, false)
+            .await
+            .unwrap()
+            .as_str(),
+        "https://override.example/"
+    );
+}
+
+#[tokio::test]
+async fn omitted_base_url_uses_stored_account_pds_for_authenticated_run_cli() {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use petrel::crypto::{DpopSigner, SoftwareDpopSigner};
+    use petrel::oauth::{Session, SessionRecord};
+    use serde_json::json;
+
+    let did: Did = "did:plc:storedpds111111111111111".parse().unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let pds_url = format!("http://{addr}");
+    let account = stored_pds_account(&did, &pds_url);
+
+    let seen_requests = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let seen_clone = Arc::clone(&seen_requests);
+    let server = std::thread::spawn(move || {
+        let (mut socket, _) = listener.accept().unwrap();
+        let mut buf = [0u8; 4096];
+        let n = socket.read(&mut buf).unwrap();
+        seen_clone
+            .lock()
+            .unwrap()
+            .push(String::from_utf8_lossy(&buf[..n]).into_owned());
+        let resp = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}";
+        socket.write_all(resp).unwrap();
+    });
+
+    let unique_ns = format!("load-stored-pds-{}", std::process::id());
+    let temp_store_dir = std::fs::canonicalize(std::env::temp_dir())
+        .unwrap()
+        .join(format!("petrel-load-store-{unique_ns}"));
+    let _ = std::fs::remove_dir_all(&temp_store_dir);
+    let _cleanup = TempDirCleanup(temp_store_dir);
+
+    let store = open_session_store(&unique_ns).unwrap();
+    let signer = SoftwareDpopSigner::generate().unwrap();
+    let jkt = signer.public_jwk().thumbprint().unwrap();
+    store
+        .save_dpop_key("key-stored", &signer.to_bytes())
+        .await
+        .unwrap();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let session: Session = serde_json::from_value(json!({
+        "did": did,
+        "access_token": "restored-access",
+        "refresh_token": "restored-refresh",
+        "created_at": now,
+        "expires_in": 3600,
+        "scope": "atproto transition:generic",
+    }))
+    .unwrap();
+    store
+        .save_session(&SessionRecord {
+            account,
+            session,
+            dpop_key_id: "key-stored".to_owned(),
+            dpop_jkt: jkt,
+        })
+        .await
+        .unwrap();
+    store.save_current_did(&did).await.unwrap();
+    drop(store);
+
+    petrel_load::run_cli(&[
+        "petrel-load",
+        "--namespace",
+        &unique_ns,
+        "--endpoint",
+        "app.bsky.actor.getProfile",
+        "--client-id",
+        "https://client.example/oauth-client-metadata.json",
+        "--redirect-uri",
+        "https://client.example/callback",
+        "--requests",
+        "1",
+        "--concurrency",
+        "1",
+    ])
+    .await
+    .unwrap();
+
+    server.join().unwrap();
+    let recorded = seen_requests.lock().unwrap();
+    assert_eq!(recorded.len(), 1);
+    let lower = recorded[0].to_ascii_lowercase();
+    assert!(recorded[0].starts_with("GET /xrpc/app.bsky.actor.getProfile?"));
+    assert!(lower.contains("\r\nauthorization: dpop restored-access\r\n"));
+}

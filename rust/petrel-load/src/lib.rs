@@ -854,14 +854,20 @@ fn build_client(
         dns,
         IdentityOptions::default(),
     )));
+    let allow_loopback = base_url_allows_loopback(&base_url);
     let oauth_client = if let Some(cfg) = oauth_cfg {
+        let mut oauth_config = cfg
+            .clone()
+            .into_oauth_config()
+            .map_err(ScenarioError::CommandFailure)?;
+        if allow_loopback {
+            oauth_config = oauth_config.with_loopback_development();
+        }
         Some(Arc::new(OAuthClient::new(
             Arc::clone(&transport),
             identity_resolver.clone(),
             session_store.clone(),
-            cfg.clone()
-                .into_oauth_config()
-                .map_err(ScenarioError::CommandFailure)?,
+            oauth_config,
         )?))
     } else {
         None
@@ -871,7 +877,6 @@ fn build_client(
     } else {
         AuthMode::PublicOAuth
     };
-    let allow_loopback = base_url_allows_loopback(&base_url);
     Ok(Arc::new(AtProtoClient::new(
         base_url,
         transport,
@@ -881,6 +886,27 @@ fn build_client(
         auth_mode,
         allow_loopback,
     )?))
+}
+
+/// Resolves the effective CLI base URL: `--base-url` when explicitly provided, otherwise
+/// (when not `--unauth`) the currently selected stored account's PDS URL if present and valid,
+/// falling back to `https://bsky.social`.
+pub async fn resolve_cli_base_url(
+    explicit: Option<&str>,
+    session_store: &SessionStore,
+    unauth: bool,
+) -> Result<Url, Box<dyn std::error::Error + Send + Sync>> {
+    if let Some(raw) = explicit {
+        return Ok(PetrelLoadCli::validated_base_url(raw)?);
+    }
+    if !unauth
+        && let Ok(Some(did)) = session_store.get_current_did().await
+        && let Ok(Some(account)) = session_store.get_account(&did).await
+        && let Ok(pds) = PetrelLoadCli::validated_base_url(&account.pds)
+    {
+        return Ok(pds);
+    }
+    Ok(Url::parse("https://bsky.social")?)
 }
 
 /// Runs the PetrelLoad CLI to completion, ensuring any JSONL event writer drains before returning.
@@ -893,12 +919,15 @@ pub async fn run_cli<S: AsRef<str>>(
         eprintln!("{USAGE}");
         std::process::exit(2);
     };
-    let base_url = match parsed.get("base-url") {
-        Some(raw) => PetrelLoadCli::validated_base_url(raw)?,
-        None => Url::parse("https://bsky.social")?,
-    };
     let oauth_cfg = PetrelLoadCli::oauth_configuration(&parsed)?;
     let session_store = open_session_store(namespace)?;
+    let unauth = parsed.get("unauth").map(String::as_str) == Some("true");
+    let base_url = resolve_cli_base_url(
+        parsed.get("base-url").map(String::as_str),
+        &session_store,
+        unauth,
+    )
+    .await?;
     let recorder = parsed
         .get("log-file")
         .filter(|p| !p.is_empty())

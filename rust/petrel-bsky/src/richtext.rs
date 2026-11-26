@@ -902,7 +902,7 @@ fn detect_tags(text: &str, chars: &[(usize, char)], out: &mut Vec<RichTextDetect
         let raw_end_byte = byte_end_of(text, chars, end);
         let raw = &text[raw_start_byte..raw_end_byte];
         let trimmed = raw.trim_end_matches(is_unicode_punctuation);
-        if !trimmed.is_empty() && trimmed.chars().count() <= 64 {
+        if !trimmed.is_empty() && count_graphemes(trimmed) <= 64 && trimmed.len() <= 640 {
             let tag_end_byte = raw_start_byte + trimmed.len();
             out.push(RichTextDetection::new(
                 chars[i].0,
