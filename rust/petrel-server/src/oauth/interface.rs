@@ -50,6 +50,7 @@ pub struct OAuthAuthorizationPageRequest {
     pub requested_scope: String,
     pub scope_descriptions: Vec<OAuthScopeDescription>,
     pub login_hint: Option<String>,
+    pub error_message: Option<String>,
 }
 
 /// Pluggable HTML/UI renderer for `/oauth/authorize` consent pages.
@@ -100,6 +101,11 @@ impl OAuthInterfaceRendering for DefaultOAuthHtmlRenderer {
             let flow_id = Self::escape_html(&request.flow_id);
             let csrf = Self::escape_html(&request.csrf_token);
             let login_hint = Self::escape_html(request.login_hint.as_deref().unwrap_or(""));
+            let error_html = request
+                .error_message
+                .as_deref()
+                .map(|msg| format!("<p role=\"alert\">{}</p>", Self::escape_html(msg)))
+                .unwrap_or_default();
 
             let mut scopes_html = String::new();
             for desc in &request.scope_descriptions {
@@ -115,7 +121,7 @@ impl OAuthInterfaceRendering for DefaultOAuthHtmlRenderer {
 
             let html = format!(
                 "<!doctype html><html><head><meta charset=\"utf-8\"><title>Authorize {client_name}</title></head>\
-<body><h1>Authorize {client_name}</h1><p>Client: <code>{client_id}</code></p>\
+<body><h1>Authorize {client_name}</h1><p>Client: <code>{client_id}</code></p>{error_html}\
 <ul>{scopes_html}</ul>\
 <form method=\"POST\" action=\"{action}\">\
 <input type=\"hidden\" name=\"flow_id\" value=\"{flow_id}\">\

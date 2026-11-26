@@ -116,6 +116,26 @@ impl OAuthClientMetadata {
         }
     }
 
+    /// Checks whether a PAR/authorize `redirect_uri` matches this client's registered redirects.
+    ///
+    /// Loopback `http://localhost` development clients use port-insensitive loopback matching per
+    /// RFC 8252 / AT Protocol OAuth profile (matching Swift `OAuthClientMetadata.matchesRedirectURI`).
+    /// All other clients require an exact URI match.
+    pub fn matches_redirect_uri(&self, requested_redirect_uri: &str) -> bool {
+        if Url::parse(&self.client_id).is_ok_and(|url| is_loopback_client_url(&url)) {
+            let Ok(requested) = Url::parse(requested_redirect_uri) else {
+                return false;
+            };
+            return self
+                .redirect_uris
+                .iter()
+                .any(|registered| matches_loopback_redirect(registered, &requested));
+        }
+        self.redirect_uris
+            .iter()
+            .any(|registered| registered == requested_redirect_uri)
+    }
+
     /// True if this client authenticates confidentially via `private_key_jwt`.
     pub const fn is_confidential(&self) -> bool {
         matches!(
@@ -238,11 +258,43 @@ impl OAuthClientMetadata {
 }
 
 fn is_loopback_client_url(url: &Url) -> bool {
-    url.scheme() == "http" && matches!(url.host_str(), Some("localhost"))
+    url.scheme() == "http"
+        && matches!(url.host_str(), Some("localhost"))
+        && url.port().is_none()
+        && url.username().is_empty()
+        && url.password().is_none()
+        && url.fragment().is_none()
+        && matches!(url.path(), "/" | "")
+}
+
+fn loopback_host(host: Option<&str>) -> Option<&str> {
+    match host {
+        Some("127.0.0.1") => Some("127.0.0.1"),
+        Some("[::1]" | "::1") => Some("::1"),
+        _ => None,
+    }
 }
 
 fn is_loopback_redirect(url: &Url) -> bool {
-    url.scheme() == "http" && matches!(url.host_str(), Some("127.0.0.1" | "[::1]" | "::1"))
+    url.scheme() == "http"
+        && url.username().is_empty()
+        && url.password().is_none()
+        && url.fragment().is_none()
+        && !url.path().is_empty()
+        && loopback_host(url.host_str()).is_some()
+}
+
+fn matches_loopback_redirect(registered_uri: &str, requested: &Url) -> bool {
+    let Ok(registered) = Url::parse(registered_uri) else {
+        return false;
+    };
+    if !is_loopback_redirect(&registered) || !is_loopback_redirect(requested) {
+        return false;
+    }
+    registered.scheme() == requested.scheme()
+        && loopback_host(registered.host_str()) == loopback_host(requested.host_str())
+        && registered.path() == requested.path()
+        && registered.query() == requested.query()
 }
 
 fn validate_redirect_for_application_type(
@@ -361,7 +413,12 @@ pub fn synthesize_loopback_client(
     if url.scheme() != "http" || url.host_str() != Some("localhost") {
         return Ok(None);
     }
-    if url.port().is_some() || !matches!(url.path(), "/" | "") || url.fragment().is_some() {
+    if url.port().is_some()
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || !matches!(url.path(), "/" | "")
+        || url.fragment().is_some()
+    {
         return Err(OAuthServerError::InvalidIdentifier(
             "loopback client_id must be http://localhost without port, path, or fragment".into(),
         ));

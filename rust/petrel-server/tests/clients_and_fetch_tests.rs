@@ -560,3 +560,46 @@ async fn client_metadata_loader_negative_caches_failures_and_purges_expired_meta
             .is_none()
     );
 }
+
+#[tokio::test]
+async fn matches_redirect_uri_port_insensitive_only_for_localhost_clients() {
+    let resolver = StaticOAuthClientResolver::new();
+    let default_loopback = resolver.resolve("http://localhost").await.unwrap().metadata;
+    assert!(default_loopback.matches_redirect_uri("http://127.0.0.1:49152/"));
+    assert!(default_loopback.matches_redirect_uri("http://[::1]:49152/"));
+    assert!(default_loopback.matches_redirect_uri("http://127.0.0.1/"));
+    assert!(!default_loopback.matches_redirect_uri("http://127.0.0.1:49152/callback"));
+    assert!(!default_loopback.matches_redirect_uri("https://127.0.0.1:49152/"));
+    assert!(!default_loopback.matches_redirect_uri("http://localhost:49152/"));
+    assert!(!default_loopback.matches_redirect_uri("http://127.0.0.1:49152/?q=1"));
+
+    let custom_loopback = resolver
+        .resolve("http://localhost?redirect_uri=http%3A%2F%2F127.0.0.1%2Fcb%3Fv%3D1&scope=atproto")
+        .await
+        .unwrap()
+        .metadata;
+    assert!(custom_loopback.matches_redirect_uri("http://127.0.0.1:54321/cb?v=1"));
+    assert!(!custom_loopback.matches_redirect_uri("http://127.0.0.1:54321/cb"));
+    assert!(!custom_loopback.matches_redirect_uri("http://127.0.0.1:54321/other?v=1"));
+
+    let standard_native = OAuthClientMetadata {
+        client_id: "https://app.example.com/client.json".into(),
+        client_name: None,
+        client_uri: None,
+        logo_uri: None,
+        tos_uri: None,
+        policy_uri: None,
+        application_type: OAuthApplicationType::Native,
+        grant_types: vec!["authorization_code".into()],
+        response_types: vec!["code".into()],
+        redirect_uris: vec!["http://127.0.0.1:8080/cb".into()],
+        scope: Some("atproto".into()),
+        token_endpoint_auth_method: OAuthTokenEndpointAuthMethod::None,
+        token_endpoint_auth_signing_alg: None,
+        dpop_bound_access_tokens: true,
+        jwks_uri: None,
+        jwks: None,
+    };
+    assert!(standard_native.matches_redirect_uri("http://127.0.0.1:8080/cb"));
+    assert!(!standard_native.matches_redirect_uri("http://127.0.0.1:9090/cb"));
+}

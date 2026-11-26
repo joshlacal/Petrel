@@ -3107,3 +3107,337 @@ async fn concurrent_authorize_flows_in_shared_cookie_jar_both_succeed_and_reject
         .await;
     assert_eq!(cross_browser.status, 403);
 }
+
+#[tokio::test]
+#[allow(clippy::too_many_lines)]
+async fn localhost_client_par_allows_ephemeral_loopback_ports_and_rejects_mismatched_paths() {
+    let harness = TestServer::new(OAuthAccessTokenFormat::Opaque).await;
+
+    // 1. Default `http://localhost` completes full PAR -> authorize -> token with ephemeral port
+    let mut loopback_client = TestClient::web(&harness);
+    loopback_client.client_id = "http://localhost".to_owned();
+    loopback_client.redirect_uri = "http://127.0.0.1:49152/".to_owned();
+    let tok = loopback_client
+        .sign_in(ALICE_HANDLE, "alice-password", "atproto transition:generic")
+        .await;
+    assert_eq!(tok.sub, ALICE_DID);
+
+    // 2. IPv6 `[::1]` with ephemeral port also matches default `http://localhost`
+    let mut v6_client = TestClient::web(&harness);
+    v6_client.client_id = "http://localhost".to_owned();
+    v6_client.redirect_uri = "http://[::1]:49153/".to_owned();
+    let v6_uri = v6_client.push_request("atproto transition:generic").await;
+    assert!(v6_uri.starts_with("urn:ietf:params:oauth:request_uri:"));
+
+    // 3. Path mismatch on default `http://localhost` still fails PAR 400
+    let chal = loopback_client.challenge();
+    let bad_path = loopback_client
+        .send_post(
+            "/oauth/par",
+            &[
+                ("response_type", "code"),
+                ("code_challenge", &chal),
+                ("code_challenge_method", "S256"),
+                ("redirect_uri", "http://127.0.0.1:49152/unexpected"),
+                ("scope", "atproto"),
+            ],
+        )
+        .await;
+    assert_eq!(bad_path.status, 400);
+
+    // 4. Query-registered redirect path matches with ephemeral port, rejects wrong path
+    let mut custom_client = TestClient::web(&harness);
+    custom_client.client_id =
+        "http://localhost?redirect_uri=http%3A%2F%2F127.0.0.1%2Fcb&scope=atproto".to_owned();
+    custom_client.redirect_uri = "http://127.0.0.1:54321/cb".to_owned();
+    let tok_custom = custom_client
+        .sign_in(ALICE_HANDLE, "alice-password", "atproto")
+        .await;
+    assert_eq!(tok_custom.sub, ALICE_DID);
+}
+
+#[tokio::test]
+#[allow(clippy::too_many_lines)]
+async fn authorize_preserves_flow_on_rejected_credentials_and_consumes_on_success_or_deny() {
+    let harness = Arc::new(TestServer::new(OAuthAccessTokenFormat::Opaque).await);
+
+    // Flow A: mistyped password -> 401 retryable form -> retry with corrected password succeeds -> replay 400
+    let mut c1 = TestClient::web(&harness);
+    let req_uri1 = c1.push_request("atproto transition:generic").await;
+    let q1 = format!(
+        "client_id={}&request_uri={}",
+        OAuthForm::encode_component(&c1.client_id),
+        OAuthForm::encode_component(&req_uri1)
+    );
+    let page1 = harness.get("/oauth/authorize", Some(&q1)).await;
+    assert_eq!(page1.status, 200);
+    let cookie1 = page1
+        .headers
+        .get("Set-Cookie")
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_owned();
+    let html1 = page1.text();
+    let flow1 = common::extract_hidden_input(&html1, "flow_id");
+    let csrf1 = common::extract_hidden_input(&html1, "csrf_token");
+
+    let wrong_pw = harness
+        .post_form(
+            "/oauth/authorize",
+            &[
+                ("flow_id", &flow1),
+                ("csrf_token", &csrf1),
+                ("identifier", ALICE_HANDLE),
+                ("password", "wrong-password"),
+                ("decision", "approve"),
+            ],
+            &[("Cookie", &cookie1)],
+        )
+        .await;
+    assert_eq!(wrong_pw.status, 401);
+    let retry_html = wrong_pw.text();
+    assert!(retry_html.contains("invalid account credentials"));
+    assert_eq!(common::extract_hidden_input(&retry_html, "flow_id"), flow1);
+    assert_eq!(
+        common::extract_hidden_input(&retry_html, "csrf_token"),
+        csrf1
+    );
+
+    let ok_retry = harness
+        .post_form(
+            "/oauth/authorize",
+            &[
+                ("flow_id", &flow1),
+                ("csrf_token", &csrf1),
+                ("identifier", ALICE_HANDLE),
+                ("password", "alice-password"),
+                ("decision", "approve"),
+            ],
+            &[("Cookie", &cookie1)],
+        )
+        .await;
+    assert_eq!(ok_retry.status, 303, "retry failed: {}", ok_retry.text());
+    let code1 = url::Url::parse(ok_retry.headers.get("Location").unwrap())
+        .unwrap()
+        .query_pairs()
+        .find(|(k, _)| k == "code")
+        .unwrap()
+        .1
+        .into_owned();
+    let verifier1 = c1.verifier.clone();
+    let redirect1 = c1.redirect_uri.clone();
+    let tok1 = c1
+        .send_post(
+            "/oauth/token",
+            &[
+                ("grant_type", "authorization_code"),
+                ("code", &code1),
+                ("code_verifier", &verifier1),
+                ("redirect_uri", &redirect1),
+            ],
+        )
+        .await;
+    assert_eq!(tok1.status, 200);
+
+    // Replaying the same flow after success fails 400.
+    let replay1 = harness
+        .post_form(
+            "/oauth/authorize",
+            &[
+                ("flow_id", &flow1),
+                ("csrf_token", &csrf1),
+                ("identifier", ALICE_HANDLE),
+                ("password", "alice-password"),
+                ("decision", "approve"),
+            ],
+            &[("Cookie", &cookie1)],
+        )
+        .await;
+    assert_eq!(replay1.status, 400);
+
+    // Flow B: wrong password -> deny permanently consumes flow.
+    let mut c2 = TestClient::web(&harness);
+    let req_uri2 = c2.push_request("atproto transition:generic").await;
+    let q2 = format!(
+        "client_id={}&request_uri={}",
+        OAuthForm::encode_component(&c2.client_id),
+        OAuthForm::encode_component(&req_uri2)
+    );
+    let page2 = harness.get("/oauth/authorize", Some(&q2)).await;
+    let cookie2 = page2
+        .headers
+        .get("Set-Cookie")
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_owned();
+    let html2 = page2.text();
+    let flow2 = common::extract_hidden_input(&html2, "flow_id");
+    let csrf2 = common::extract_hidden_input(&html2, "csrf_token");
+    assert_eq!(
+        harness
+            .post_form(
+                "/oauth/authorize",
+                &[
+                    ("flow_id", &flow2),
+                    ("csrf_token", &csrf2),
+                    ("identifier", ALICE_HANDLE),
+                    ("password", "bad"),
+                    ("decision", "approve"),
+                ],
+                &[("Cookie", &cookie2)],
+            )
+            .await
+            .status,
+        401
+    );
+    let deny2 = harness
+        .post_form(
+            "/oauth/authorize",
+            &[
+                ("flow_id", &flow2),
+                ("csrf_token", &csrf2),
+                ("decision", "deny"),
+            ],
+            &[("Cookie", &cookie2)],
+        )
+        .await;
+    assert_eq!(deny2.status, 303);
+    assert!(
+        deny2
+            .headers
+            .get("Location")
+            .unwrap()
+            .contains("access_denied")
+    );
+    assert_eq!(
+        harness
+            .post_form(
+                "/oauth/authorize",
+                &[
+                    ("flow_id", &flow2),
+                    ("csrf_token", &csrf2),
+                    ("identifier", ALICE_HANDLE),
+                    ("password", "alice-password"),
+                    ("decision", "approve"),
+                ],
+                &[("Cookie", &cookie2)],
+            )
+            .await
+            .status,
+        400
+    );
+
+    // Flow C: concurrent valid retries after a failed attempt issue at most one code.
+    let mut c3 = TestClient::web(&harness);
+    let req_uri3 = c3.push_request("atproto transition:generic").await;
+    let q3 = format!(
+        "client_id={}&request_uri={}",
+        OAuthForm::encode_component(&c3.client_id),
+        OAuthForm::encode_component(&req_uri3)
+    );
+    let page3 = harness.get("/oauth/authorize", Some(&q3)).await;
+    let cookie3 = page3
+        .headers
+        .get("Set-Cookie")
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_owned();
+    let html3 = page3.text();
+    let flow3 = common::extract_hidden_input(&html3, "flow_id");
+    let csrf3 = common::extract_hidden_input(&html3, "csrf_token");
+    assert_eq!(
+        harness
+            .post_form(
+                "/oauth/authorize",
+                &[
+                    ("flow_id", &flow3),
+                    ("csrf_token", &csrf3),
+                    ("identifier", ALICE_HANDLE),
+                    ("password", "bad"),
+                    ("decision", "approve"),
+                ],
+                &[("Cookie", &cookie3)],
+            )
+            .await
+            .status,
+        401
+    );
+    let fields3 = [
+        ("flow_id", flow3.as_str()),
+        ("csrf_token", csrf3.as_str()),
+        ("identifier", ALICE_HANDLE),
+        ("password", "alice-password"),
+        ("decision", "approve"),
+    ];
+    let hdrs3 = [("Cookie", cookie3.as_str())];
+    let (r_a, r_b) = tokio::join!(
+        harness.post_form("/oauth/authorize", &fields3, &hdrs3),
+        harness.post_form("/oauth/authorize", &fields3, &hdrs3),
+    );
+    let mut statuses = [r_a.status, r_b.status];
+    statuses.sort_unstable();
+    assert_eq!(statuses, [303, 400]);
+
+    // Flow D: excessive wrong password attempts exhaust retry budget and close flow.
+    let mut c4 = TestClient::web(&harness);
+    let req_uri4 = c4.push_request("atproto transition:generic").await;
+    let q4 = format!(
+        "client_id={}&request_uri={}",
+        OAuthForm::encode_component(&c4.client_id),
+        OAuthForm::encode_component(&req_uri4)
+    );
+    let page4 = harness.get("/oauth/authorize", Some(&q4)).await;
+    let cookie4 = page4
+        .headers
+        .get("Set-Cookie")
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_owned();
+    let html4 = page4.text();
+    let flow4 = common::extract_hidden_input(&html4, "flow_id");
+    let csrf4 = common::extract_hidden_input(&html4, "csrf_token");
+    for _ in 0..6 {
+        assert_eq!(
+            harness
+                .post_form(
+                    "/oauth/authorize",
+                    &[
+                        ("flow_id", &flow4),
+                        ("csrf_token", &csrf4),
+                        ("identifier", ALICE_HANDLE),
+                        ("password", "wrong"),
+                        ("decision", "approve"),
+                    ],
+                    &[("Cookie", &cookie4)],
+                )
+                .await
+                .status,
+            401
+        );
+    }
+    assert_eq!(
+        harness
+            .post_form(
+                "/oauth/authorize",
+                &[
+                    ("flow_id", &flow4),
+                    ("csrf_token", &csrf4),
+                    ("identifier", ALICE_HANDLE),
+                    ("password", "alice-password"),
+                    ("decision", "approve"),
+                ],
+                &[("Cookie", &cookie4)],
+            )
+            .await
+            .status,
+        400
+    );
+}

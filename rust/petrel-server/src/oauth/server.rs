@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
+use async_lock::Mutex;
+
 use petrel_oauth_scopes::{
     OAuthScopeAdmissionPolicy, OAuthScopeBudget, OAuthScopeTokenizer, ScopeSet,
 };
@@ -39,6 +41,8 @@ use crate::support::{
 
 const CSRF_COOKIE_NAME_INSECURE: &str = "__petrel_oauth_csrf";
 const CSRF_COOKIE_NAME_SECURE: &str = "__Host-petrel_oauth_csrf";
+const MAX_AUTHORIZE_CREDENTIAL_RETRIES: u8 = 5;
+const MAX_FAILED_AUTH_FLOW_TRACKING: usize = 4096;
 
 struct ArcClock(Arc<dyn OAuthClock>);
 impl OAuthClock for ArcClock {
@@ -104,6 +108,7 @@ pub struct OAuthAuthorizationServer {
     clock: Arc<dyn OAuthClock>,
     random: Arc<dyn OAuthRandomSource>,
     last_purge_secs: AtomicI64,
+    failed_auth_attempts: Mutex<HashMap<Vec<u8>, (u8, i64)>>,
 }
 
 impl std::fmt::Debug for OAuthAuthorizationServer {
@@ -244,6 +249,7 @@ impl OAuthAuthorizationServer {
             clock,
             random,
             last_purge_secs: AtomicI64::new(i64::MIN),
+            failed_auth_attempts: Mutex::new(HashMap::new()),
         })
     }
 
@@ -596,7 +602,7 @@ impl OAuthAuthorizationServer {
                 None,
             ));
         };
-        if !metadata.redirect_uris.contains(redirect_uri) {
+        if !metadata.matches_redirect_uri(redirect_uri) {
             return Err(self.json_error(
                 400,
                 "invalid_request",
@@ -737,15 +743,28 @@ impl OAuthAuthorizationServer {
             requested_scope: par.scope,
             scope_descriptions,
             login_hint: par.login_hint,
+            error_message: None,
         };
+        self.render_authorize_page_response(page_req, &csrf_cookie, 200)
+            .await
+    }
+
+    async fn render_authorize_page_response(
+        &self,
+        page_req: OAuthAuthorizationPageRequest,
+        csrf_cookie: &str,
+        status: u16,
+    ) -> OAuthHttpResponse {
         let Ok(mut resp) = self.renderer.render_authorization_page(page_req).await else {
             return Self::html_error(500, "internal server error");
         };
+        resp.status = status;
         let secure_flag = if self.config.issuer.starts_with("https://") {
             "; Secure"
         } else {
             ""
         };
+        let cookie_name = self.csrf_cookie_name();
         let cookie_path = self.authorize_cookie_path();
         resp.headers.add(
             "Set-Cookie",
@@ -756,16 +775,18 @@ impl OAuthAuthorizationServer {
 
     async fn handle_authorize_post(&self, req: &OAuthHttpRequest) -> OAuthHttpResponse {
         let now = self.clock.now_secs();
-        let (form, flow) = match self.consume_authorize_consent_submission(req, now).await {
-            Ok(pair) => pair,
-            Err(resp) => return resp,
-        };
+        let (form, flow, cookie_csrf, form_csrf) =
+            match self.consume_authorize_consent_submission(req, now).await {
+                Ok(tuple) => tuple,
+                Err(resp) => return resp,
+            };
 
         let action = match form.get("decision").map(String::as_str) {
             Some("deny") => OAuthConsentAction::Deny,
             _ => OAuthConsentAction::Approve,
         };
         if action == OAuthConsentAction::Deny {
+            self.clear_failed_auth_attempts(&flow.flow_id_digest).await;
             return self.authorization_error_redirect(
                 &flow.redirect_uri,
                 flow.response_mode,
@@ -779,14 +800,29 @@ impl OAuthAuthorizationServer {
             client_id: flow.client_id.clone(),
             scope: flow.scope.clone(),
             login_hint: flow.login_hint.clone(),
-            form_fields: form,
+            form_fields: form.clone(),
         };
         let authenticated = match self.accounts.authenticate(auth_req).await {
-            Ok(Some(acct)) => acct,
+            Ok(Some(acct)) => {
+                self.clear_failed_auth_attempts(&flow.flow_id_digest).await;
+                acct
+            }
             Ok(None) => {
-                return Self::html_error(401, "invalid account credentials");
+                return self
+                    .handle_rejected_authorize_credentials(
+                        req,
+                        &form,
+                        flow,
+                        &cookie_csrf,
+                        form_csrf,
+                        now,
+                    )
+                    .await;
             }
             Err(_) => {
+                if now < flow.expires_at_secs {
+                    let _ = self.stores.browser_flows.store_browser_flow(flow).await;
+                }
                 return Self::html_error(500, "internal server error");
             }
         };
@@ -960,11 +996,113 @@ impl OAuthAuthorizationServer {
         }
     }
 
+    async fn handle_rejected_authorize_credentials(
+        &self,
+        req: &OAuthHttpRequest,
+        form: &HashMap<String, String>,
+        flow: OAuthBrowserFlowRecord,
+        cookie_csrf: &str,
+        form_csrf: String,
+        now: i64,
+    ) -> OAuthHttpResponse {
+        let allow_retry = self
+            .record_failed_auth_attempt(&flow.flow_id_digest, flow.expires_at_secs, now)
+            .await;
+        if !allow_retry {
+            return Self::html_error(401, "invalid account credentials");
+        }
+        let Some(flow_id) = form.get("flow_id").cloned() else {
+            return Self::html_error(401, "invalid account credentials");
+        };
+        let client_id = flow.client_id.clone();
+        let redirect_uri = flow.redirect_uri.clone();
+        let scope = flow.scope.clone();
+        let login_hint = form
+            .get("identifier")
+            .filter(|s| !s.is_empty())
+            .cloned()
+            .or_else(|| flow.login_hint.clone());
+        if self
+            .stores
+            .browser_flows
+            .store_browser_flow(flow)
+            .await
+            .is_err()
+        {
+            return Self::html_error(503, "authorization service temporarily unavailable");
+        }
+        let Ok(resolved_client) = self.clients.resolve(&client_id).await else {
+            return Self::html_error(401, "invalid account credentials");
+        };
+        let langs = parse_accept_language(req.headers.get("Accept-Language"));
+        let lang_refs: Vec<&str> = langs.iter().map(String::as_str).collect();
+        let scope_descriptions = self
+            .describe_scopes(&scope, &resolved_client.metadata, &lang_refs)
+            .await;
+        let issuer_base = self.config.issuer.trim_end_matches('/');
+        let page_req = OAuthAuthorizationPageRequest {
+            flow_id,
+            csrf_token: form_csrf,
+            action_url: format!("{issuer_base}/oauth/authorize"),
+            client: resolved_client,
+            redirect_uri,
+            requested_scope: scope,
+            scope_descriptions,
+            login_hint,
+            error_message: Some("invalid account credentials".to_owned()),
+        };
+        self.render_authorize_page_response(page_req, cookie_csrf, 401)
+            .await
+    }
+
+    async fn record_failed_auth_attempt(
+        &self,
+        flow_id_digest: &[u8],
+        expires_at_secs: i64,
+        now: i64,
+    ) -> bool {
+        if now >= expires_at_secs {
+            return false;
+        }
+        let mut guard = self.failed_auth_attempts.lock().await;
+        if guard.len() >= MAX_FAILED_AUTH_FLOW_TRACKING && !guard.contains_key(flow_id_digest) {
+            guard.retain(|_, &mut (_, exp)| now < exp);
+            if guard.len() >= MAX_FAILED_AUTH_FLOW_TRACKING {
+                return false;
+            }
+        }
+        let entry = guard
+            .entry(flow_id_digest.to_vec())
+            .or_insert((0, expires_at_secs));
+        if entry.0 >= MAX_AUTHORIZE_CREDENTIAL_RETRIES {
+            guard.remove(flow_id_digest);
+            return false;
+        }
+        entry.0 = entry.0.saturating_add(1);
+        entry.1 = expires_at_secs;
+        true
+    }
+
+    async fn clear_failed_auth_attempts(&self, flow_id_digest: &[u8]) {
+        self.failed_auth_attempts
+            .lock()
+            .await
+            .remove(flow_id_digest);
+    }
+
     async fn consume_authorize_consent_submission(
         &self,
         req: &OAuthHttpRequest,
         now: i64,
-    ) -> Result<(HashMap<String, String>, OAuthBrowserFlowRecord), OAuthHttpResponse> {
+    ) -> Result<
+        (
+            HashMap<String, String>,
+            OAuthBrowserFlowRecord,
+            String,
+            String,
+        ),
+        OAuthHttpResponse,
+    > {
         if !OAuthForm::is_form_content_type(&req.headers) {
             return Err(Self::html_error(
                 400,
@@ -978,14 +1116,14 @@ impl OAuthAuthorizationServer {
         let Some(flow_id) = form.get("flow_id") else {
             return Err(Self::html_error(400, "missing flow_id"));
         };
-        let Some(form_csrf) = form.get("csrf_token") else {
+        let Some(form_csrf) = form.get("csrf_token").cloned() else {
             return Err(Self::html_error(403, "missing csrf_token"));
         };
         let cookie_name = self.csrf_cookie_name();
-        let Some(cookie_csrf) = extract_cookie(&req.headers, cookie_name) else {
+        let Some(cookie_csrf) = extract_cookie(&req.headers, cookie_name).map(str::to_owned) else {
             return Err(Self::html_error(403, "missing CSRF cookie"));
         };
-        if !self.verify_csrf_cookie_value(cookie_csrf) {
+        if !self.verify_csrf_cookie_value(&cookie_csrf) {
             return Err(Self::html_error(403, "CSRF token mismatch"));
         }
         let flow_digest = self
@@ -1011,11 +1149,11 @@ impl OAuthAuthorizationServer {
                 ));
             }
         };
-        let presented_csrf_digest = self.csrf_binding_digest(cookie_csrf, form_csrf);
+        let presented_csrf_digest = self.csrf_binding_digest(&cookie_csrf, &form_csrf);
         if !ConstantTime::equal_bytes(&flow.csrf_token_digest, &presented_csrf_digest) {
             return Err(Self::html_error(403, "CSRF token mismatch"));
         }
-        Ok((form, flow))
+        Ok((form, flow, cookie_csrf, form_csrf))
     }
 
     fn issue_csrf_cookie_value(&self) -> String {
