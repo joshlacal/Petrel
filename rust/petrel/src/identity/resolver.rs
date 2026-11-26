@@ -449,12 +449,12 @@ impl<D: DnsResolver, C: IdentityCache> IdentityResolver<D, C> {
 
     /// Resolves a DID's required `#atproto_pds` service URL.
     pub async fn resolve_did_to_pds_url(&self, did: &str) -> Result<Url, IdentityError> {
-        self.resolve_did_document_str(did, false)
+        let parsed =
+            strict_did(did).ok_or_else(|| IdentityError::InvalidDidSyntax(did.to_owned()))?;
+        let allow_dev_endpoint = self.allows_development_endpoint_for(&parsed);
+        self.resolve_document(&parsed, false)
             .await?
-            .service_endpoint_with_development(
-                &DidServiceIdentifier::pds(),
-                self.options.allow_development_identifiers,
-            )
+            .service_endpoint_with_development(&DidServiceIdentifier::pds(), allow_dev_endpoint)
     }
 
     /// Resolves a DID's verified handle (or `handle.invalid`) and required `#atproto_pds` URL.
@@ -464,11 +464,11 @@ impl<D: DnsResolver, C: IdentityCache> IdentityResolver<D, C> {
     ) -> Result<(Handle, Url), IdentityError> {
         let parsed =
             strict_did(did).ok_or_else(|| IdentityError::InvalidDidSyntax(did.to_owned()))?;
+        let allow_dev_endpoint = self.allows_development_endpoint_for(&parsed);
         let identity = self.resolve_identity_with_refresh(&parsed, false).await?;
-        let pds = identity.document.service_endpoint_with_development(
-            &DidServiceIdentifier::pds(),
-            self.options.allow_development_identifiers,
-        )?;
+        let pds = identity
+            .document
+            .service_endpoint_with_development(&DidServiceIdentifier::pds(), allow_dev_endpoint)?;
         Ok((identity.handle, pds))
     }
 

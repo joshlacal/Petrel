@@ -313,6 +313,14 @@ async fn allow_development_identifiers_does_not_allow_loopback_endpoints_from_pu
             .await,
         Err(IdentityError::InvalidServiceEndpoint { .. })
     ));
+    assert!(matches!(
+        resolver.resolve_did_to_pds_url(DID).await,
+        Err(IdentityError::InvalidServiceEndpoint { .. })
+    ));
+    assert!(matches!(
+        resolver.resolve_did_to_handle_and_pds_url(DID).await,
+        Err(IdentityError::InvalidServiceEndpoint { .. })
+    ));
 }
 
 #[test]
