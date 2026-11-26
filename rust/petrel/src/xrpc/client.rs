@@ -254,6 +254,56 @@ impl XrpcClient {
         self
     }
 
+    /// Returns the base XRPC URL configured on this client.
+    #[must_use]
+    pub const fn base_url(&self) -> &Url {
+        &self.base_url
+    }
+
+    /// Returns the underlying transport.
+    #[must_use]
+    pub const fn transport(&self) -> &SharedTransport {
+        &self.transport
+    }
+
+    /// Returns the default `atproto-accept-labelers` entries configured on this client.
+    #[must_use]
+    pub fn labelers(&self) -> &[XrpcLabeler] {
+        &self.labelers
+    }
+
+    /// Uploads a raw blob via `com.atproto.repo.uploadBlob` after verifying the MIME type
+    /// and maximum size (defaulting to 50 MiB when `max_bytes` is `None`).
+    pub async fn upload_blob(
+        &self,
+        data: Bytes,
+        mime_type: &str,
+        max_bytes: Option<usize>,
+        options: &CallOptions,
+    ) -> Result<petrel_api::generated::com::atproto::repo::upload_blob::Output, Error> {
+        let limit = max_bytes.unwrap_or(50 * 1024 * 1024);
+        if data.len() > limit {
+            return Err(TransportError::InvalidRequest(format!(
+                "blob exceeds maximum upload size of {limit} bytes"
+            ))
+            .into());
+        }
+        let body = XrpcBody::bytes(data, mime_type)?;
+        let response = self
+            .procedure(
+                petrel_api::generated::com::atproto::repo::upload_blob::NSID,
+                std::iter::empty::<(&str, &str)>(),
+                Some(body),
+                options,
+            )
+            .await?;
+        petrel_core::from_json(&response.body).map_err(|source| Error::Decode {
+            endpoint: petrel_api::generated::com::atproto::repo::upload_blob::NSID,
+            status: response.metadata.status,
+            source,
+        })
+    }
+
     pub async fn send<R: XrpcRequest>(
         &self,
         params: R::Params,
@@ -482,11 +532,7 @@ impl XrpcClient {
 
         if same_origin {
             if let Some(labelers) = &options.accept_labelers {
-                if labelers.is_empty() {
-                    headers.remove(LABELERS);
-                } else {
-                    set_header(&mut headers, LABELERS, &XrpcLabeler::header_value(labelers))?;
-                }
+                set_header(&mut headers, LABELERS, &XrpcLabeler::header_value(labelers))?;
             } else if !headers.contains_key(LABELERS) && !self.labelers.is_empty() {
                 set_header(
                     &mut headers,

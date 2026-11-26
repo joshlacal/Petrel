@@ -87,6 +87,9 @@ pub enum AuthError {
     /// A request to the authorization server could not be sent.
     #[error(transparent)]
     Transport(#[from] TransportError),
+    /// The server rejected the request due to account hosting status.
+    #[error(transparent)]
+    AccountStatus(#[from] crate::auth::AccountStatusError),
     /// Anything else.
     #[error("{0}")]
     Other(String),

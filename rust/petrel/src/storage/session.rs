@@ -97,6 +97,18 @@ impl SessionStore {
         })
     }
 
+    /// Returns the underlying secret store.
+    #[must_use]
+    pub const fn secrets(&self) -> &Arc<dyn SecretStore> {
+        &self.secrets
+    }
+
+    /// Returns the namespace this session store operates within.
+    #[must_use]
+    pub fn namespace(&self) -> &str {
+        &self.namespace
+    }
+
     /// Observes local auth events from this store and its clones.
     ///
     /// Callbacks run inline after storage releases its own locks. Schedule

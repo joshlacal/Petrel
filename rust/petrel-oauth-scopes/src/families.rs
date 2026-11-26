@@ -408,6 +408,15 @@ impl RepoPermission {
         REPO.needed(&[("collection", collection), ("action", action)])
     }
 
+    pub fn granting_scope(collection: &str, action: &str) -> Result<String, ScopeParseError> {
+        let scope = Self::scope_needed(collection, action)?;
+        let permission = Self::parse(&scope)?;
+        if !permission.matches(collection, action) {
+            return Err(ScopeParseError::ForbiddenCombination { prefix: "repo" });
+        }
+        Ok(scope)
+    }
+
     pub(crate) fn from_lexicon(fields: BTreeMap<&str, Vec<&str>>) -> Result<Self, ScopeParseError> {
         REPO.read(None, fields).map(Self)
     }
@@ -428,6 +437,15 @@ impl RpcPermission {
         RPC.needed(&[("lxm", lxm), ("aud", aud)])
     }
 
+    pub fn granting_scope(lxm: &str, aud: &str) -> Result<String, ScopeParseError> {
+        let scope = Self::scope_needed(lxm, aud)?;
+        let permission = Self::parse(&scope)?;
+        if !permission.matches(lxm, aud) {
+            return Err(ScopeParseError::ForbiddenCombination { prefix: "rpc" });
+        }
+        Ok(scope)
+    }
+
     pub(crate) fn from_lexicon(fields: BTreeMap<&str, Vec<&str>>) -> Result<Self, ScopeParseError> {
         RPC.read(None, fields).map(Self)
     }
@@ -436,8 +454,13 @@ impl RpcPermission {
 impl AccountPermission {
     /// Build a validated permission from decoded parameter values.
     pub fn new(attr: &str, action: &str) -> Result<Self, ScopeParseError> {
+        Self::with_actions(attr, &[action])
+    }
+
+    /// Build a validated permission with one or more account actions.
+    pub fn with_actions(attr: &str, actions: &[&str]) -> Result<Self, ScopeParseError> {
         ACCOUNT
-            .build(&[("attr", &[attr]), ("action", &[action])])
+            .build(&[("attr", &[attr]), ("action", actions)])
             .map(Self)
     }
 
@@ -449,6 +472,15 @@ impl AccountPermission {
 
     pub fn scope_needed(attr: &str, action: &str) -> Result<String, ScopeParseError> {
         ACCOUNT.needed(&[("attr", attr), ("action", action)])
+    }
+
+    pub fn granting_scope(attr: &str, action: &str) -> Result<String, ScopeParseError> {
+        let scope = Self::scope_needed(attr, action)?;
+        let permission = Self::parse(&scope)?;
+        if !permission.matches(attr, action) {
+            return Err(ScopeParseError::ForbiddenCombination { prefix: "account" });
+        }
+        Ok(scope)
     }
 }
 
@@ -471,6 +503,15 @@ impl BlobPermission {
     pub fn scope_needed(mime: &str) -> Result<String, ScopeParseError> {
         BLOB.needed(&[("accept", mime)])
     }
+
+    pub fn granting_scope(mime: &str) -> Result<String, ScopeParseError> {
+        let scope = Self::scope_needed(mime)?;
+        let permission = Self::parse(&scope)?;
+        if !permission.matches(mime) {
+            return Err(ScopeParseError::ForbiddenCombination { prefix: "blob" });
+        }
+        Ok(scope)
+    }
 }
 
 impl IdentityPermission {
@@ -486,6 +527,15 @@ impl IdentityPermission {
 
     pub fn scope_needed(attr: &str) -> Result<String, ScopeParseError> {
         IDENTITY.needed(&[("attr", attr)])
+    }
+
+    pub fn granting_scope(attr: &str) -> Result<String, ScopeParseError> {
+        let scope = Self::scope_needed(attr)?;
+        let permission = Self::parse(&scope)?;
+        if !permission.matches(attr) {
+            return Err(ScopeParseError::ForbiddenCombination { prefix: "identity" });
+        }
+        Ok(scope)
     }
 }
 

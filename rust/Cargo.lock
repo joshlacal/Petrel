@@ -1690,6 +1690,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "petrel-bsky"
+version = "0.0.0"
+dependencies = [
+ "async-lock",
+ "bytes",
+ "futures-util",
+ "http",
+ "petrel",
+ "petrel-api",
+ "petrel-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "url",
+ "wasm-bindgen-test",
+ "web-time",
+]
+
+[[package]]
 name = "petrel-core"
 version = "0.0.0"
 dependencies = [
@@ -1850,6 +1870,28 @@ dependencies = [
  "petrel-core",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "petrel-load"
+version = "0.0.0"
+dependencies = [
+ "async-lock",
+ "bytes",
+ "futures-util",
+ "http",
+ "petrel",
+ "petrel-api",
+ "petrel-core",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "url",
+ "web-time",
 ]
 
 [[package]]

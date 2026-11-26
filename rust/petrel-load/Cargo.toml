@@ -1,0 +1,39 @@
+[package]
+name = "petrel-load"
+description = "CLI load generator and auth-event JSONL recorder for Petrel. Never published."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[features]
+default = ["native"]
+native = ["petrel/native", "petrel/file-store"]
+# Present only so `--features wasm` is valid across the workspace. The CLI is
+# native-only and compiles to an empty crate on wasm32.
+wasm = []
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+async-lock = { workspace = true }
+bytes = { workspace = true }
+futures-util = { workspace = true }
+http = { workspace = true }
+petrel = { workspace = true, features = ["native", "file-store"] }
+petrel-api = { workspace = true, features = ["app_bsky"] }
+petrel-core = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "io-std", "signal", "fs"] }
+url = { workspace = true }
+web-time = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

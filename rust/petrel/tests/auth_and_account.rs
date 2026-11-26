@@ -1,0 +1,1721 @@
+#![cfg(not(target_arch = "wasm32"))]
+
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, Mutex},
+    time::Duration,
+};
+
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use bytes::Bytes;
+use http::{Request, Response, StatusCode};
+use petrel::{
+    account::{AccountManager, AccountSwitchCoordinator, AccountSwitchError},
+    auth::{
+        AccountStatus, AccountStatusError, AccountStatusReason, AuthContinuityState,
+        AuthContinuityTransactionResult, AuthFactorTokenRequiredError, AuthMode,
+        GatewayAuthIdentity, LegacyPasswordStrategy, PasswordAuthError, RefreshCircuitBreaker,
+        RefreshFailureKind, TokenRefreshResult,
+    },
+    client::AtProtoClient,
+    net::{HttpTransport, SendOptions, TransportError},
+    oauth::{Account, OAuthIdentity, OAuthIdentityError, OAuthIdentityResolver},
+    rt::BoxFuture,
+    storage::{MemorySecretStore, SessionStore},
+    xrpc::{AuthCtx, AuthProvider, CallOptions, UnauthorizedAction, XrpcLabeler},
+};
+use petrel_core::{AtIdentifier, Did, Handle};
+use url::Url;
+
+const ALICE_DID: &str = "did:plc:passwordalice";
+const ALICE_HANDLE: &str = "alice.test";
+const ALICE_EMAIL: &str = "alice@example.com";
+const ALICE_PASSWORD: &str = "app-password";
+const AUTH_FACTOR_CODE: &str = "ABCDE-12345";
+
+struct FakeResolver {
+    records: Mutex<HashMap<String, (Did, Handle, Url)>>,
+}
+
+impl FakeResolver {
+    fn new() -> Self {
+        Self {
+            records: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn register(&self, did: &str, handle: &str, pds: &Url) {
+        let mut guard = self.records.lock().unwrap();
+        let entry = (
+            did.parse::<Did>().unwrap(),
+            handle.parse::<Handle>().unwrap(),
+            pds.clone(),
+        );
+        guard.insert(did.to_owned(), entry.clone());
+        guard.insert(handle.to_owned(), entry);
+    }
+}
+
+impl OAuthIdentityResolver for FakeResolver {
+    fn resolve_identity<'a>(
+        &'a self,
+        identifier: &'a AtIdentifier,
+        _force_refresh: bool,
+    ) -> BoxFuture<'a, Result<OAuthIdentity, OAuthIdentityError>> {
+        let key = identifier.as_str().to_owned();
+        let found = self.records.lock().unwrap().get(&key).cloned();
+        Box::pin(async move {
+            let (did, handle, pds) = found.ok_or(OAuthIdentityError)?;
+            Ok(OAuthIdentity {
+                did,
+                handle: Some(handle),
+                pds,
+            })
+        })
+    }
+}
+
+#[derive(Clone)]
+struct FakeAccount {
+    did: String,
+    handle: String,
+    email: String,
+    password: String,
+    active: bool,
+    status: Option<String>,
+    requires_auth_factor: bool,
+}
+
+#[derive(Clone)]
+struct RecordedCall {
+    path: String,
+    auth: Option<String>,
+    dpop: Option<String>,
+    body: serde_json::Value,
+    status: u16,
+}
+
+struct FakePdsState {
+    origin: String,
+    accounts: HashMap<String, FakeAccount>,
+    access_tokens: HashMap<String, String>,
+    expired_access_tokens: HashSet<String>,
+    refresh_tokens: HashMap<String, String>,
+    recorded: Vec<RecordedCall>,
+    create_session_did_override: Option<String>,
+    forced_status: HashMap<String, u16>,
+    refresh_delay_ms: u64,
+    refresh_post_response_gate: Option<(Arc<tokio::sync::Notify>, Arc<tokio::sync::Notify>)>,
+    access_lifetime_secs: u64,
+    counter: u64,
+}
+
+impl FakePdsState {
+    fn new(origin: &str) -> Self {
+        Self {
+            origin: origin.to_owned(),
+            accounts: HashMap::new(),
+            access_tokens: HashMap::new(),
+            expired_access_tokens: HashSet::new(),
+            refresh_tokens: HashMap::new(),
+            recorded: Vec::new(),
+            create_session_did_override: None,
+            forced_status: HashMap::new(),
+            refresh_delay_ms: 0,
+            refresh_post_response_gate: None,
+            access_lifetime_secs: 7200,
+            counter: 0,
+        }
+    }
+
+    fn issue_jwt(&mut self, sub: &str, lifetime: u64) -> String {
+        self.counter += 1;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let header = URL_SAFE_NO_PAD.encode(br#"{"alg":"HS256","typ":"JWT"}"#);
+        let payload = URL_SAFE_NO_PAD.encode(
+            serde_json::to_vec(&serde_json::json!({
+                "sub": sub,
+                "iat": now,
+                "exp": now + lifetime,
+                "jti": self.counter,
+            }))
+            .unwrap(),
+        );
+        format!("{header}.{payload}.sig")
+    }
+}
+
+struct FakePdsNetwork {
+    servers: Mutex<HashMap<String, FakePdsState>>,
+}
+
+impl FakePdsNetwork {
+    fn new(states: Vec<FakePdsState>) -> Self {
+        let mut map = HashMap::new();
+        for state in states {
+            map.insert(state.origin.clone(), state);
+        }
+        Self {
+            servers: Mutex::new(map),
+        }
+    }
+
+    fn calls(&self, origin: &str, suffix: &str) -> Vec<RecordedCall> {
+        self.servers.lock().unwrap()[origin]
+            .recorded
+            .iter()
+            .filter(|call| call.path.ends_with(suffix))
+            .cloned()
+            .collect()
+    }
+
+    fn live_session_count(&self, origin: &str) -> usize {
+        self.servers.lock().unwrap()[origin].refresh_tokens.len()
+    }
+
+    fn set_status(&self, origin: &str, did: &str, active: bool, status: Option<&str>) {
+        let mut servers = self.servers.lock().unwrap();
+        let acct = servers
+            .get_mut(origin)
+            .unwrap()
+            .accounts
+            .get_mut(did)
+            .unwrap();
+        acct.active = active;
+        acct.status = status.map(str::to_owned);
+    }
+
+    fn set_forced_status(&self, origin: &str, method: Option<(&str, u16)>) {
+        let mut servers = self.servers.lock().unwrap();
+        let server = servers.get_mut(origin).unwrap();
+        server.forced_status.clear();
+        if let Some((m, code)) = method {
+            server.forced_status.insert(m.to_owned(), code);
+        }
+    }
+
+    fn set_refresh_delay_ms(&self, origin: &str, delay_ms: u64) {
+        self.servers
+            .lock()
+            .unwrap()
+            .get_mut(origin)
+            .unwrap()
+            .refresh_delay_ms = delay_ms;
+    }
+
+    fn expire_all_access_tokens(&self, origin: &str) {
+        let mut servers = self.servers.lock().unwrap();
+        let server = servers.get_mut(origin).unwrap();
+        let tokens: Vec<String> = server.access_tokens.keys().cloned().collect();
+        server.expired_access_tokens.extend(tokens);
+    }
+
+    fn set_refresh_post_response_gate(
+        &self,
+        origin: &str,
+        gate: Option<(Arc<tokio::sync::Notify>, Arc<tokio::sync::Notify>)>,
+    ) {
+        self.servers
+            .lock()
+            .unwrap()
+            .get_mut(origin)
+            .unwrap()
+            .refresh_post_response_gate = gate;
+    }
+}
+
+impl FakePdsState {
+    fn handle_create_session(&mut self, body: &serde_json::Value) -> (u16, serde_json::Value) {
+        let id = body["identifier"].as_str().unwrap_or("");
+        let pw = body["password"].as_str().unwrap_or("");
+        let token = body.get("authFactorToken").and_then(|v| v.as_str());
+        let matched = self
+            .accounts
+            .values()
+            .find(|a| a.did == id || a.handle == id || a.email == id)
+            .cloned();
+        let Some(acct) = matched.filter(|a| a.password == pw) else {
+            return (
+                401,
+                serde_json::json!({"error": "AuthenticationRequired", "message": "Invalid identifier or password"}),
+            );
+        };
+        if acct.requires_auth_factor && token.is_none() {
+            return (401, serde_json::json!({"error": "AuthFactorTokenRequired"}));
+        }
+        if acct.requires_auth_factor && token != Some(AUTH_FACTOR_CODE) {
+            return (
+                401,
+                serde_json::json!({"error": "AuthenticationRequired", "message": "bad token"}),
+            );
+        }
+        if let Some(err) = account_status_error(acct.status.as_deref()) {
+            return err;
+        }
+        let did = self
+            .create_session_did_override
+            .clone()
+            .unwrap_or_else(|| acct.did.clone());
+        let lifetime = self.access_lifetime_secs;
+        let access = self.issue_jwt(&did, lifetime);
+        let refresh = self.issue_jwt(&did, 86_400);
+        self.access_tokens.insert(access.clone(), did.clone());
+        self.refresh_tokens.insert(refresh.clone(), did.clone());
+        (
+            200,
+            serde_json::json!({
+                "accessJwt": access,
+                "refreshJwt": refresh,
+                "handle": acct.handle,
+                "did": did,
+                "active": acct.active,
+                "status": acct.status,
+            }),
+        )
+    }
+
+    fn handle_refresh_session(&mut self, bearer: Option<&str>) -> (u16, serde_json::Value) {
+        let maybe_did = bearer.and_then(|t| self.refresh_tokens.get(t)).cloned();
+        let (Some(old_token), Some(did)) = (bearer, maybe_did) else {
+            return (
+                401,
+                serde_json::json!({"error": "ExpiredToken", "message": "bad refresh"}),
+            );
+        };
+        let acct = self.accounts[&did].clone();
+        if let Some(err) = account_status_error(acct.status.as_deref()) {
+            return err;
+        }
+        self.refresh_tokens.remove(old_token);
+        let lifetime = self.access_lifetime_secs;
+        let access = self.issue_jwt(&did, lifetime);
+        let refresh = self.issue_jwt(&did, 86_400);
+        self.access_tokens.insert(access.clone(), did.clone());
+        self.refresh_tokens.insert(refresh.clone(), did);
+        (
+            200,
+            serde_json::json!({
+                "accessJwt": access,
+                "refreshJwt": refresh,
+                "handle": acct.handle,
+                "did": acct.did,
+                "active": acct.active,
+                "status": acct.status,
+            }),
+        )
+    }
+
+    fn handle_get_session(&self, bearer: Option<&str>) -> (u16, serde_json::Value) {
+        let Some(did) = bearer.and_then(|t| self.access_tokens.get(t)).cloned() else {
+            return (401, serde_json::json!({"error": "InvalidToken"}));
+        };
+        let acct = self.accounts[&did].clone();
+        if acct.status.as_deref() == Some("takendown") {
+            return (
+                401,
+                serde_json::json!({"error": "AccountTakedown", "message": "Account has been taken down"}),
+            );
+        }
+        (
+            200,
+            serde_json::json!({
+                "handle": acct.handle,
+                "did": acct.did,
+                "active": acct.active,
+                "status": acct.status,
+            }),
+        )
+    }
+    fn handle_get_profile(&self, bearer: Option<&str>) -> (u16, serde_json::Value) {
+        let Some(token) = bearer else {
+            return (401, serde_json::json!({"error": "AuthMissing"}));
+        };
+        if self.expired_access_tokens.contains(token) {
+            return (
+                400,
+                serde_json::json!({"error": "ExpiredToken", "message": "Token has expired"}),
+            );
+        }
+        let Some(did) = self.access_tokens.get(token).cloned() else {
+            return (401, serde_json::json!({"error": "InvalidToken"}));
+        };
+        let acct = &self.accounts[&did];
+        (
+            200,
+            serde_json::json!({
+                "did": acct.did,
+                "handle": acct.handle,
+            }),
+        )
+    }
+}
+
+fn account_status_error(status: Option<&str>) -> Option<(u16, serde_json::Value)> {
+    match status {
+        Some("takendown") => Some((
+            401,
+            serde_json::json!({"error": "AccountTakedown", "message": "Account has been taken down"}),
+        )),
+        Some("suspended") => Some((
+            401,
+            serde_json::json!({"error": "AccountSuspended", "message": "Account is suspended"}),
+        )),
+        _ => None,
+    }
+}
+
+impl HttpTransport for FakePdsNetwork {
+    fn send(
+        &self,
+        request: Request<Bytes>,
+        _options: &SendOptions,
+    ) -> impl std::future::Future<Output = Result<Response<Bytes>, TransportError>> + Send {
+        let uri = request.uri().to_string();
+        let url = Url::parse(&uri).unwrap();
+        let origin = url.origin().ascii_serialization();
+        let path = url.path().to_owned();
+        let auth = request
+            .headers()
+            .get("authorization")
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_owned);
+        let dpop = request
+            .headers()
+            .get("dpop")
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_owned);
+        let bearer = auth
+            .as_deref()
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .map(str::to_owned);
+        let body: serde_json::Value =
+            serde_json::from_slice(request.body()).unwrap_or_else(|_| serde_json::json!({}));
+
+        let (delay_ms, gate) = if path == "/xrpc/com.atproto.server.refreshSession" {
+            let mut servers = self.servers.lock().unwrap();
+            let server = servers.get_mut(&origin).unwrap();
+            (
+                server.refresh_delay_ms,
+                server.refresh_post_response_gate.take(),
+            )
+        } else {
+            (0, None)
+        };
+        let servers_ref = &self.servers;
+        async move {
+            if delay_ms > 0 {
+                tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+            }
+            let (status, payload) = {
+                let mut servers = servers_ref.lock().unwrap();
+                let server = servers.get_mut(&origin).expect("unknown test origin");
+                let method = path.rsplit('/').next().unwrap_or("");
+                let result = if let Some(&forced) = server.forced_status.get(method) {
+                    (
+                        forced,
+                        serde_json::json!({"error": "InternalServerError", "message": "forced"}),
+                    )
+                } else {
+                    match path.as_str() {
+                        "/xrpc/com.atproto.server.createSession" => {
+                            server.handle_create_session(&body)
+                        }
+                        "/xrpc/com.atproto.server.refreshSession" => {
+                            server.handle_refresh_session(bearer.as_deref())
+                        }
+                        "/xrpc/com.atproto.server.deleteSession" => {
+                            if let Some(tok) = bearer.as_deref()
+                                && server.refresh_tokens.remove(tok).is_some()
+                            {
+                                (200, serde_json::json!({}))
+                            } else {
+                                (401, serde_json::json!({"error": "InvalidToken"}))
+                            }
+                        }
+                        "/xrpc/com.atproto.server.getSession" => {
+                            server.handle_get_session(bearer.as_deref())
+                        }
+                        "/xrpc/app.bsky.actor.getProfile" => {
+                            server.handle_get_profile(bearer.as_deref())
+                        }
+                        _ => (404, serde_json::json!({"error": "MethodNotImplemented"})),
+                    }
+                };
+                server.recorded.push(RecordedCall {
+                    path,
+                    auth,
+                    dpop,
+                    body,
+                    status: result.0,
+                });
+                result
+            };
+
+            if let Some((entered, release)) = gate {
+                entered.notify_one();
+                release.notified().await;
+            }
+
+            Ok(Response::builder()
+                .status(status)
+                .header("Content-Type", "application/json")
+                .body(Bytes::from(serde_json::to_vec(&payload).unwrap()))
+                .unwrap())
+        }
+    }
+}
+
+fn alice_account() -> FakeAccount {
+    FakeAccount {
+        did: ALICE_DID.to_owned(),
+        handle: ALICE_HANDLE.to_owned(),
+        email: ALICE_EMAIL.to_owned(),
+        password: ALICE_PASSWORD.to_owned(),
+        active: true,
+        status: None,
+        requires_auth_factor: false,
+    }
+}
+
+#[test]
+fn account_status_and_xrpc_error_mapping() {
+    assert_eq!(
+        AccountStatus::from_api(Some(true), None),
+        AccountStatus::active()
+    );
+    assert!(AccountStatus::from_api(None, None).is_active);
+    for (raw, expected) in [
+        ("takendown", AccountStatusReason::Takendown),
+        ("suspended", AccountStatusReason::Suspended),
+        ("deleted", AccountStatusReason::Deleted),
+        ("deactivated", AccountStatusReason::Deactivated),
+        ("desynchronized", AccountStatusReason::Desynchronized),
+        ("throttled", AccountStatusReason::Throttled),
+    ] {
+        let parsed = AccountStatus::from_api(Some(false), Some(raw));
+        assert!(!parsed.is_active);
+        assert_eq!(parsed.reason.as_ref(), Some(&expected));
+        assert_eq!(parsed.reason.as_ref().unwrap().raw_value(), raw);
+    }
+    let future = AccountStatus::from_api(Some(false), Some("quarantined"));
+    assert_eq!(
+        future.reason,
+        Some(AccountStatusReason::Other("quarantined".to_owned()))
+    );
+    assert_eq!(
+        AccountStatus::from_api(Some(false), Some("takendown")).to_string(),
+        "inactive (takendown)"
+    );
+
+    assert_eq!(
+        AccountStatusError::from_xrpc_error("AccountTakedown", Some("gone")),
+        Some(AccountStatusError::new(
+            AccountStatus::new(false, Some(AccountStatusReason::Takendown)),
+            Some("gone".to_owned())
+        ))
+    );
+    assert!(AccountStatusError::from_xrpc_error("ExpiredToken", None).is_none());
+    assert!(AccountStatusError::from_xrpc_body(br#"{"error":"AccountSuspended"}"#).is_some());
+    assert!(AccountStatusError::from_xrpc_body(b"not json").is_none());
+}
+
+#[tokio::test]
+async fn legacy_password_login_2fa_refresh_status_and_logout_lifecycle() {
+    let pds_url = Url::parse("https://pds.password.test").unwrap();
+    let entryway_url = Url::parse("https://entryway.password.test").unwrap();
+
+    let mut pds_state = FakePdsState::new("https://pds.password.test");
+    pds_state
+        .accounts
+        .insert(ALICE_DID.to_owned(), alice_account());
+    let mut entryway_state = FakePdsState::new("https://entryway.password.test");
+    entryway_state
+        .accounts
+        .insert(ALICE_DID.to_owned(), alice_account());
+
+    let net = Arc::new(FakePdsNetwork::new(vec![pds_state, entryway_state]));
+    let resolver = Arc::new(FakeResolver::new());
+    resolver.register(ALICE_DID, ALICE_HANDLE, &pds_url);
+
+    let secrets = Arc::new(MemorySecretStore::new());
+    let store = SessionStore::new(secrets, "legacy-test").unwrap();
+    let client = AtProtoClient::new(
+        entryway_url.clone(),
+        net.clone(),
+        store,
+        resolver.clone(),
+        None,
+        AuthMode::Legacy,
+        false,
+    )
+    .unwrap();
+
+    // 1. Handle sign-in routes straight to the PDS without sending credentials.
+    let res = client
+        .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, None)
+        .await
+        .unwrap();
+    assert_eq!(res.did.as_str(), ALICE_DID);
+    assert_eq!(res.pds_url, pds_url);
+    assert_eq!(
+        net.calls("https://entryway.password.test", "createSession")
+            .len(),
+        0
+    );
+    let create = net
+        .calls("https://pds.password.test", "createSession")
+        .pop()
+        .unwrap();
+    assert!(create.auth.is_none());
+    assert!(create.dpop.is_none());
+    assert_eq!(create.body["identifier"], ALICE_HANDLE);
+    assert_eq!(create.status, 200);
+    assert_eq!(client.base_url().await, pds_url);
+    assert_eq!(
+        client.fetch_account_status().await.unwrap(),
+        AccountStatus::active()
+    );
+
+    // 2. Labeler configuration works dynamically on AtProtoClient.
+    client
+        .configure_labelers(&[XrpcLabeler {
+            did: "did:plc:ar7c4by46qjdydhdevvrndac".to_owned(),
+            redact: true,
+        }])
+        .await
+        .unwrap();
+    assert_eq!(client.configured_labelers().await.unwrap().len(), 1);
+    client.clear_labelers().await.unwrap();
+    assert!(client.configured_labelers().await.is_none());
+
+    // 3. Takedown refusal on getSession yields AccountStatus without refreshing or signing out.
+    net.set_status(
+        "https://pds.password.test",
+        ALICE_DID,
+        false,
+        Some("takendown"),
+    );
+    let status = client.fetch_account_status().await.unwrap();
+    assert_eq!(
+        status,
+        AccountStatus::new(false, Some(AccountStatusReason::Takendown))
+    );
+    assert_eq!(
+        net.calls("https://pds.password.test", "refreshSession")
+            .len(),
+        0
+    );
+
+    // Reinstated -> logout deletes session on PDS using refresh JWT.
+    net.set_status("https://pds.password.test", ALICE_DID, true, None);
+    client.logout().await.unwrap();
+    assert_eq!(net.live_session_count("https://pds.password.test"), 0);
+    assert!(!client.has_valid_session().await);
+
+    // 4. Email login targets configured fallback entryway and updates base_url to PDS.
+    client.set_base_url(entryway_url.clone()).await.unwrap();
+    client.switch_auth_mode(AuthMode::Legacy).await.unwrap();
+    let email_res = client
+        .login_with_password(ALICE_EMAIL, ALICE_PASSWORD, None)
+        .await
+        .unwrap();
+    assert_eq!(email_res.pds_url, pds_url);
+    assert_eq!(client.base_url().await, pds_url);
+    assert_eq!(
+        net.calls("https://entryway.password.test", "createSession")
+            .len(),
+        1
+    );
+}
+
+#[tokio::test]
+async fn legacy_password_2fa_wrong_password_mismatch_and_refresh_non_spend() {
+    let pds_url = Url::parse("https://pds.password.test").unwrap();
+    let mut pds_state = FakePdsState::new("https://pds.password.test");
+    let mut acct = alice_account();
+    acct.requires_auth_factor = true;
+    pds_state.accounts.insert(ALICE_DID.to_owned(), acct);
+
+    let net = Arc::new(FakePdsNetwork::new(vec![pds_state]));
+    let resolver = Arc::new(FakeResolver::new());
+    resolver.register(ALICE_DID, ALICE_HANDLE, &pds_url);
+
+    let store = SessionStore::new(Arc::new(MemorySecretStore::new()), "pw-edge").unwrap();
+    let accounts = Arc::new(AccountManager::new(store));
+    let strategy = Arc::new(LegacyPasswordStrategy::new(
+        accounts.clone(),
+        net.clone(),
+        resolver,
+        pds_url.clone(),
+    ));
+
+    // Wrong password
+    assert!(matches!(
+        strategy
+            .login_with_password(ALICE_HANDLE, "wrong", None)
+            .await,
+        Err(PasswordAuthError::InvalidCredentials)
+    ));
+
+    // 2FA required -> wrong code -> valid code
+    assert!(matches!(
+        strategy
+            .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, None)
+            .await,
+        Err(PasswordAuthError::AuthFactorTokenRequired(
+            AuthFactorTokenRequiredError
+        ))
+    ));
+    assert!(matches!(
+        strategy
+            .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, Some("bad"))
+            .await,
+        Err(PasswordAuthError::InvalidCredentials)
+    ));
+    strategy
+        .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, Some(AUTH_FACTOR_CODE))
+        .await
+        .unwrap();
+
+    // 5xx and 429 during refresh do NOT burn refresh token.
+    net.set_forced_status(
+        "https://pds.password.test",
+        Some(("com.atproto.server.refreshSession", 503)),
+    );
+    assert!(matches!(
+        strategy.refresh_token_if_needed(true).await,
+        Err(PasswordAuthError::TokenRefreshFailed(_))
+    ));
+    net.set_forced_status(
+        "https://pds.password.test",
+        Some(("com.atproto.server.refreshSession", 429)),
+    );
+    assert!(matches!(
+        strategy.refresh_token_if_needed(true).await,
+        Err(PasswordAuthError::RateLimited)
+    ));
+    net.set_forced_status("https://pds.password.test", None);
+    assert_eq!(
+        strategy.refresh_token_if_needed(true).await.unwrap(),
+        TokenRefreshResult::RefreshedSuccessfully
+    );
+
+    // Status error during refresh keeps session & records status.
+    net.set_status(
+        "https://pds.password.test",
+        ALICE_DID,
+        false,
+        Some("suspended"),
+    );
+    assert!(matches!(
+        strategy.refresh_token_if_needed(true).await,
+        Err(PasswordAuthError::AccountStatus(AccountStatusError { .. }))
+    ));
+    assert_eq!(
+        strategy
+            .last_known_account_status(&ALICE_DID.parse().unwrap())
+            .await,
+        Some(AccountStatus::new(
+            false,
+            Some(AccountStatusReason::Suspended)
+        ))
+    );
+
+    // Mismatched returned DID is discarded and deleted on server.
+    net.set_status("https://pds.password.test", ALICE_DID, true, None);
+    {
+        let mut servers = net.servers.lock().unwrap();
+        servers
+            .get_mut("https://pds.password.test")
+            .unwrap()
+            .create_session_did_override = Some("did:plc:someoneelse".to_owned());
+    }
+    let before_sessions = net.live_session_count("https://pds.password.test");
+    assert!(matches!(
+        strategy
+            .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, Some(AUTH_FACTOR_CODE))
+            .await,
+        Err(PasswordAuthError::InvalidResponse(_))
+    ));
+    assert_eq!(
+        net.live_session_count("https://pds.password.test"),
+        before_sessions
+    );
+}
+
+#[tokio::test]
+async fn auth_continuity_state_account_manager_and_circuit_breaker() {
+    let mut continuity = AuthContinuityState::new(AuthMode::Gateway {
+        origin: Url::parse("https://gateway.example").unwrap(),
+    });
+    let s0 = continuity.snapshot();
+    assert!(s0.did.is_none());
+    assert!(s0.mode.is_gateway());
+
+    continuity.observe_gateway_identity(Some(GatewayAuthIdentity::new(ALICE_DID, "secret-1")));
+    let s1 = continuity.snapshot();
+    assert_eq!(s1.did.as_deref(), Some(ALICE_DID));
+
+    continuity.observe_gateway_identity(Some(GatewayAuthIdentity::new(ALICE_DID, "secret-2")));
+    let s2 = continuity.snapshot();
+    assert!(s2.generation > s1.generation);
+    assert!(!format!("{s2:?}").contains("secret-2"));
+
+    // Exhaustion at u64::MAX fails closed and clears principal permanently.
+    let mut exhausted = AuthContinuityState::with_observed(
+        AuthMode::Gateway {
+            origin: Url::parse("https://gateway.example").unwrap(),
+        },
+        u64::MAX,
+        Some(GatewayAuthIdentity::new(ALICE_DID, "secret")),
+    );
+    exhausted.invalidate();
+    assert!(exhausted.is_exhausted());
+    assert!(exhausted.snapshot().did.is_none());
+
+    // AccountSwitchCoordinator rejects concurrent switches & completes cleanly.
+    let coord = AccountSwitchCoordinator::new();
+    let did_a: Did = ALICE_DID.parse().unwrap();
+    let did_b: Did = "did:plc:bob".parse().unwrap();
+    coord.begin_account_switch(None, &did_a).unwrap();
+    assert!(coord.is_account_switch_in_progress());
+    assert_eq!(
+        coord.begin_account_switch(Some(&did_a), &did_b),
+        Err(AccountSwitchError::SwitchInProgress)
+    );
+    coord.complete_account_switch();
+    assert!(!coord.is_account_switch_in_progress());
+
+    // AccountManager removal auto-switches when enabled.
+    let store = SessionStore::new(Arc::new(MemorySecretStore::new()), "acct-mgr").unwrap();
+    let mgr = AccountManager::new(store);
+    mgr.add_account(&Account {
+        did: did_a.clone(),
+        handle: None,
+        pds: "https://a.example".to_owned(),
+        authorization_server: None,
+        expected_issuer: None,
+    })
+    .await
+    .unwrap();
+    mgr.add_account(&Account {
+        did: did_b.clone(),
+        handle: None,
+        pds: "https://b.example".to_owned(),
+        authorization_server: None,
+        expected_issuer: None,
+    })
+    .await
+    .unwrap();
+    mgr.remove_account(&did_a).await.unwrap();
+    assert_eq!(mgr.current_did().await.unwrap(), Some(did_b));
+
+    // AuthManager continuity transaction rejects stale snapshots.
+    let resolver = Arc::new(FakeResolver::new());
+    let net = Arc::new(FakePdsNetwork::new(vec![]));
+    let client = AtProtoClient::new(
+        Url::parse("https://gateway.example").unwrap(),
+        net,
+        SessionStore::new(Arc::new(MemorySecretStore::new()), "txn").unwrap(),
+        resolver,
+        None,
+        AuthMode::Gateway {
+            origin: Url::parse("https://gateway.example").unwrap(),
+        },
+        false,
+    )
+    .unwrap();
+    let snap = client.auth_continuity_snapshot().await;
+    assert_eq!(
+        client
+            .perform_with_exact_auth_continuity(&snap, || 42)
+            .await,
+        AuthContinuityTransactionResult::Performed(42)
+    );
+    client.switch_auth_mode(AuthMode::Legacy).await.unwrap();
+    assert_eq!(
+        client
+            .perform_with_exact_auth_continuity(&snap, || 42)
+            .await,
+        AuthContinuityTransactionResult::ContinuityChanged
+    );
+
+    // RefreshCircuitBreaker ignores nonce challenges and opens on 3 real failures.
+    let breaker = RefreshCircuitBreaker::new();
+    breaker
+        .record_failure(&did_a, RefreshFailureKind::NonceRecoverable)
+        .await;
+    assert!(breaker.can_attempt_refresh(&did_a).await);
+    for _ in 0..3 {
+        breaker
+            .record_failure(&did_a, RefreshFailureKind::Server)
+            .await;
+    }
+    assert!(!breaker.can_attempt_refresh(&did_a).await);
+    assert!(breaker.force_half_open(&did_a).await);
+    assert!(breaker.can_attempt_refresh(&did_a).await);
+    assert!(!breaker.can_attempt_refresh(&did_a).await);
+    breaker.record_success(&did_a).await;
+    assert!(breaker.can_attempt_refresh(&did_a).await);
+}
+
+#[tokio::test]
+async fn legacy_password_concurrent_refresh_coalesces_without_deadlock_and_recovers_http_400_expired_token()
+ {
+    let pds_url = Url::parse("https://pds.concurrent.test").unwrap();
+    let mut pds_state = FakePdsState::new("https://pds.concurrent.test");
+    pds_state
+        .accounts
+        .insert(ALICE_DID.to_owned(), alice_account());
+
+    let net = Arc::new(FakePdsNetwork::new(vec![pds_state]));
+    let resolver = Arc::new(FakeResolver::new());
+    resolver.register(ALICE_DID, ALICE_HANDLE, &pds_url);
+
+    let store = SessionStore::new(Arc::new(MemorySecretStore::new()), "pw-conc").unwrap();
+    let accounts = Arc::new(AccountManager::new(store.clone()));
+    let strategy = Arc::new(LegacyPasswordStrategy::new(
+        accounts,
+        net.clone(),
+        resolver.clone(),
+        pds_url.clone(),
+    ));
+    strategy
+        .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, None)
+        .await
+        .unwrap();
+
+    // 1. Concurrent `refresh_token_if_needed(true)` must coalesce cleanly without deadlocking.
+    net.set_refresh_delay_ms("https://pds.concurrent.test", 50);
+    let futs = (0..8).map(|_| strategy.refresh_token_if_needed(true));
+    let results =
+        tokio::time::timeout(Duration::from_secs(5), futures_util::future::join_all(futs))
+            .await
+            .expect("concurrent refresh_token_if_needed must not deadlock");
+    for res in results {
+        assert_eq!(res.unwrap(), TokenRefreshResult::RefreshedSuccessfully);
+    }
+    assert_eq!(
+        net.calls("https://pds.concurrent.test", "refreshSession")
+            .len(),
+        1
+    );
+
+    // 2. HTTP 400 with `ExpiredToken` triggers refresh & XRPC retry even when JWT exp is fresh.
+    let client = AtProtoClient::new(
+        pds_url,
+        net.clone(),
+        store,
+        resolver,
+        None,
+        AuthMode::Legacy,
+        false,
+    )
+    .unwrap();
+    net.set_refresh_delay_ms("https://pds.concurrent.test", 0);
+    net.expire_all_access_tokens("https://pds.concurrent.test");
+    let resp = client
+        .query(
+            "app.bsky.actor.getProfile",
+            [("actor", ALICE_DID)],
+            &CallOptions::default(),
+        )
+        .await
+        .unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&resp.body).unwrap();
+    assert_eq!(body["did"], ALICE_DID);
+    assert_eq!(
+        net.calls("https://pds.concurrent.test", "refreshSession")
+            .len(),
+        2
+    );
+    let profile_calls = net.calls("https://pds.concurrent.test", "getProfile");
+    assert_eq!(profile_calls.len(), 2);
+    assert_eq!(profile_calls[0].status, 400);
+    assert_eq!(profile_calls[1].status, 200);
+
+    // Non-ExpiredToken HTTP 400 does NOT trigger a refresh.
+    let bad_req = Response::builder()
+        .status(StatusCode::BAD_REQUEST)
+        .body(Bytes::from_static(br#"{"error":"InvalidRequest"}"#))
+        .unwrap();
+    let action = strategy
+        .handle_unauthorized(&bad_req, &AuthCtx::default())
+        .await
+        .unwrap();
+    assert_eq!(action, UnauthorizedAction::GiveUp);
+}
+
+fn bob_account() -> FakeAccount {
+    FakeAccount {
+        did: "did:plc:passwordbob".to_owned(),
+        handle: "bob.test".to_owned(),
+        email: "bob@example.com".to_owned(),
+        password: "bob-password".to_owned(),
+        active: true,
+        status: None,
+        requires_auth_factor: false,
+    }
+}
+
+#[tokio::test]
+async fn legacy_password_xrpc_snapshot_and_origin_check_prevent_cross_account_token_leak() {
+    let pds_a = Url::parse("https://pds-a.test").unwrap();
+    let pds_b = Url::parse("https://pds-b.test").unwrap();
+
+    let mut state_a = FakePdsState::new("https://pds-a.test");
+    state_a
+        .accounts
+        .insert(ALICE_DID.to_owned(), alice_account());
+    let mut state_b = FakePdsState::new("https://pds-b.test");
+    state_b
+        .accounts
+        .insert(bob_account().did.clone(), bob_account());
+
+    let net = Arc::new(FakePdsNetwork::new(vec![state_a, state_b]));
+    let resolver = Arc::new(FakeResolver::new());
+    resolver.register(ALICE_DID, ALICE_HANDLE, &pds_a);
+    resolver.register(&bob_account().did, "bob.test", &pds_b);
+
+    let store = SessionStore::new(Arc::new(MemorySecretStore::new()), "pw-xrpc-snap").unwrap();
+    let client = AtProtoClient::new(
+        pds_a.clone(),
+        net.clone(),
+        store,
+        resolver.clone(),
+        None,
+        AuthMode::Legacy,
+        false,
+    )
+    .unwrap();
+
+    client
+        .login_with_password("bob.test", "bob-password", None)
+        .await
+        .unwrap();
+    client
+        .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, None)
+        .await
+        .unwrap();
+
+    let xrpc_alice = client.xrpc().await;
+    let bob_did: Did = bob_account().did.parse().unwrap();
+    client.switch_to_account(&bob_did).await.unwrap();
+
+    // Retained XRPC snapshot from Alice must fail closed after switching to Bob.
+    let err = xrpc_alice
+        .query(
+            "app.bsky.actor.getProfile",
+            [("actor", ALICE_DID)],
+            &CallOptions::default(),
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(err, petrel::xrpc::Error::Auth(_)));
+    assert_eq!(net.calls("https://pds-a.test", "getProfile").len(), 0);
+
+    // Raw LegacyPasswordStrategy pointed at PDS-A while Bob (PDS-B) is active must strip auth.
+    let raw_store = SessionStore::new(Arc::new(MemorySecretStore::new()), "pw-raw-origin").unwrap();
+    let raw_accounts = Arc::new(AccountManager::new(raw_store));
+    let strategy = Arc::new(LegacyPasswordStrategy::new(
+        raw_accounts,
+        net.clone(),
+        resolver,
+        pds_b.clone(),
+    ));
+    strategy
+        .login_with_password("bob.test", "bob-password", None)
+        .await
+        .unwrap();
+    let raw_xrpc = petrel::xrpc::XrpcClient::new(pds_a, net.clone())
+        .unwrap()
+        .with_auth_provider(Arc::new(strategy));
+    let _ = raw_xrpc
+        .query(
+            "app.bsky.actor.getProfile",
+            [("actor", ALICE_DID)],
+            &CallOptions::default(),
+        )
+        .await;
+    let calls = net.calls("https://pds-a.test", "getProfile");
+    assert_eq!(calls.len(), 1);
+    assert!(calls[0].auth.is_none());
+}
+
+#[tokio::test]
+async fn legacy_password_inflight_refresh_rejects_commit_after_logout_or_relogin() {
+    let pds_url = Url::parse("https://pds.lifecycle.test").unwrap();
+    let mut state = FakePdsState::new("https://pds.lifecycle.test");
+    state.accounts.insert(ALICE_DID.to_owned(), alice_account());
+
+    let net = Arc::new(FakePdsNetwork::new(vec![state]));
+    let resolver = Arc::new(FakeResolver::new());
+    resolver.register(ALICE_DID, ALICE_HANDLE, &pds_url);
+
+    let store = SessionStore::new(Arc::new(MemorySecretStore::new()), "pw-lifecycle").unwrap();
+    let accounts = Arc::new(AccountManager::new(store.clone()));
+    let strategy = Arc::new(LegacyPasswordStrategy::new(
+        accounts,
+        net.clone(),
+        resolver,
+        pds_url,
+    ));
+    strategy
+        .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, None)
+        .await
+        .unwrap();
+
+    // Part A: logout completes after 200 OK refresh is issued -> deleted session is NOT recreated.
+    let entered_a = Arc::new(tokio::sync::Notify::new());
+    let release_a = Arc::new(tokio::sync::Notify::new());
+    net.set_refresh_post_response_gate(
+        "https://pds.lifecycle.test",
+        Some((Arc::clone(&entered_a), Arc::clone(&release_a))),
+    );
+    let strat_a = Arc::clone(&strategy);
+    let refresh_task = tokio::spawn(async move { strat_a.refresh_token_if_needed(true).await });
+    entered_a.notified().await;
+    strategy.logout().await.unwrap();
+    release_a.notify_one();
+    let refresh_outcome = refresh_task.await.unwrap();
+    assert!(matches!(
+        refresh_outcome,
+        Err(PasswordAuthError::TokenRefreshFailed(_))
+    ));
+    let alice_did: Did = ALICE_DID.parse().unwrap();
+    assert!(strategy.get_session(&alice_did).await.unwrap().is_none());
+    assert!(store.get_current_did().await.unwrap().is_none());
+
+    // Part B: re-login replaces session after 200 OK refresh is issued -> newer tokens stay intact.
+    strategy
+        .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, None)
+        .await
+        .unwrap();
+    let entered_b = Arc::new(tokio::sync::Notify::new());
+    let release_b = Arc::new(tokio::sync::Notify::new());
+    net.set_refresh_post_response_gate(
+        "https://pds.lifecycle.test",
+        Some((Arc::clone(&entered_b), Arc::clone(&release_b))),
+    );
+    let strat_b = Arc::clone(&strategy);
+    let stale_refresh = tokio::spawn(async move { strat_b.refresh_token_if_needed(true).await });
+    entered_b.notified().await;
+    strategy
+        .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, None)
+        .await
+        .unwrap();
+    release_b.notify_one();
+    let latest_access = strategy
+        .get_session(&alice_did)
+        .await
+        .unwrap()
+        .unwrap()
+        .access_jwt()
+        .to_owned();
+    let stale_outcome = stale_refresh.await.unwrap();
+    assert!(matches!(
+        stale_outcome,
+        Err(PasswordAuthError::TokenRefreshFailed(_))
+    ));
+    assert_eq!(
+        strategy
+            .get_session(&alice_did)
+            .await
+            .unwrap()
+            .unwrap()
+            .access_jwt(),
+        latest_access
+    );
+}
+
+async fn seed_oauth_session(
+    store: &SessionStore,
+    did: &Did,
+    pds: &Url,
+    key_id: &str,
+    access_token: &str,
+    now: u64,
+) {
+    use petrel::crypto::{DpopSigner, SoftwareDpopSigner};
+    use petrel::oauth::{Session, SessionRecord};
+
+    let signer = SoftwareDpopSigner::generate().unwrap();
+    let jkt = signer.public_jwk().thumbprint().unwrap();
+    store
+        .save_dpop_key(key_id, &signer.to_bytes())
+        .await
+        .unwrap();
+    let account = Account {
+        did: did.clone(),
+        handle: None,
+        pds: pds.origin().ascii_serialization(),
+        authorization_server: None,
+        expected_issuer: None,
+    };
+    let session: Session = serde_json::from_value(serde_json::json!({
+        "did": did,
+        "access_token": access_token,
+        "refresh_token": "refresh-tok",
+        "created_at": now,
+        "expires_in": 3600,
+        "scope": "atproto transition:generic"
+    }))
+    .unwrap();
+    store.save_account(&account).await.unwrap();
+    store
+        .save_session(&SessionRecord {
+            account,
+            session,
+            dpop_key_id: key_id.to_owned(),
+            dpop_jkt: jkt,
+        })
+        .await
+        .unwrap();
+}
+
+async fn prepare_oauth_get(
+    client: &AtProtoClient,
+    uri: &str,
+) -> Result<(Option<Did>, String), petrel::xrpc::AuthError> {
+    let req = Request::builder().uri(uri).body(Bytes::new()).unwrap();
+    let (prepared, ctx) = client.auth_manager().prepare(req).await?;
+    let auth = prepared
+        .headers()
+        .get(http::header::AUTHORIZATION)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    Ok((ctx.did, auth))
+}
+
+#[tokio::test]
+async fn oauth_remove_account_auto_switch_rebinds_auth_manager_provider() {
+    use petrel::oauth::{ClientAuth, OAuthClient, OAuthConfig};
+    use petrel::xrpc::AuthError;
+
+    let pds_a = Url::parse("https://pds-oauth-a.test").unwrap();
+    let pds_b = Url::parse("https://pds-oauth-b.test").unwrap();
+    let net = Arc::new(FakePdsNetwork::new(vec![
+        FakePdsState::new("https://pds-oauth-a.test"),
+        FakePdsState::new("https://pds-oauth-b.test"),
+    ]));
+    let resolver = Arc::new(FakeResolver::new());
+
+    let store = SessionStore::new(Arc::new(MemorySecretStore::new()), "oauth-remove").unwrap();
+    let oauth_cfg = OAuthConfig::new(
+        "https://client.example/oauth-client-metadata.json",
+        Url::parse("example.client:/callback").unwrap(),
+        "atproto transition:generic",
+        ClientAuth::Public,
+    )
+    .unwrap();
+    let oauth_client = Arc::new(
+        OAuthClient::new(net.clone(), resolver.clone(), store.clone(), oauth_cfg).unwrap(),
+    );
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let alice_did: Did = ALICE_DID.parse().unwrap();
+    let bob_did: Did = "did:plc:oauthbob".parse().unwrap();
+
+    seed_oauth_session(&store, &alice_did, &pds_a, "dpop-a", "jwt-alice", now).await;
+    seed_oauth_session(&store, &bob_did, &pds_b, "dpop-b", "jwt-bob", now).await;
+    store.save_current_did(&alice_did).await.unwrap();
+
+    let client = AtProtoClient::new(
+        pds_a.clone(),
+        net.clone(),
+        store,
+        resolver,
+        Some(oauth_client),
+        AuthMode::PublicOAuth,
+        false,
+    )
+    .unwrap();
+
+    // Warm AuthManager's cached OAuth SessionAuth provider for Alice.
+    assert_eq!(
+        prepare_oauth_get(
+            &client,
+            "https://pds-oauth-a.test/xrpc/app.bsky.actor.getProfile?actor=alice",
+        )
+        .await
+        .unwrap(),
+        (Some(alice_did.clone()), "DPoP jwt-alice".to_owned())
+    );
+
+    let stale_xrpc = client.xrpc().await;
+
+    // Removing Alice via AccountManager auto-selects Bob without calling select_oauth_account.
+    client
+        .account_manager()
+        .remove_account(&alice_did)
+        .await
+        .unwrap();
+    assert_eq!(client.get_did().await.unwrap(), Some(bob_did.clone()));
+
+    // Bound snapshot captured before removal must still fail closed.
+    let err = stale_xrpc
+        .query(
+            "app.bsky.actor.getProfile",
+            [("actor", bob_did.as_str())],
+            &CallOptions::default(),
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(err, petrel::xrpc::Error::Auth(_)));
+    assert_eq!(net.calls("https://pds-oauth-a.test", "getProfile").len(), 0);
+
+    // AuthManager and new XRPC calls must rebind to Bob instead of returning cached Alice SessionAuth.
+    assert_eq!(
+        prepare_oauth_get(
+            &client,
+            "https://pds-oauth-b.test/xrpc/app.bsky.actor.getProfile?actor=bob",
+        )
+        .await
+        .unwrap(),
+        (Some(bob_did.clone()), "DPoP jwt-bob".to_owned())
+    );
+    assert_eq!(client.base_url().await, pds_b);
+
+    // Calling the client facade directly without manual `set_base_url` must target PDS-B with Bob's credentials.
+    let _ = client
+        .query(
+            "app.bsky.actor.getProfile",
+            [("actor", bob_did.as_str())],
+            &CallOptions::default(),
+        )
+        .await;
+    let bob_calls = net.calls("https://pds-oauth-b.test", "getProfile");
+    assert_eq!(bob_calls.len(), 1);
+    assert_eq!(bob_calls[0].auth.as_deref(), Some("DPoP jwt-bob"));
+    assert!(bob_calls[0].dpop.is_some());
+
+    // Removing the last remaining account clears current_did and invalidates the cached provider.
+    client
+        .account_manager()
+        .remove_account(&bob_did)
+        .await
+        .unwrap();
+    assert_eq!(client.get_did().await.unwrap(), None);
+    assert!(matches!(
+        prepare_oauth_get(
+            &client,
+            "https://pds-oauth-b.test/xrpc/app.bsky.actor.getProfile?actor=bob",
+        )
+        .await,
+        Err(AuthError::NoSession)
+    ));
+}
+
+struct GatedSecretStore {
+    inner: MemorySecretStore,
+    block_next_put: std::sync::atomic::AtomicBool,
+    block_next_delete: std::sync::atomic::AtomicBool,
+    entered: Arc<tokio::sync::Notify>,
+    release: Arc<tokio::sync::Notify>,
+}
+
+impl petrel::storage::SecretStore for GatedSecretStore {
+    fn get<'a>(
+        &'a self,
+        namespace: &'a str,
+        key: &'a str,
+    ) -> BoxFuture<'a, Result<Option<Vec<u8>>, petrel::storage::StoreError>> {
+        self.inner.get(namespace, key)
+    }
+
+    fn put<'a>(
+        &'a self,
+        namespace: &'a str,
+        key: &'a str,
+        value: &'a [u8],
+    ) -> BoxFuture<'a, Result<(), petrel::storage::StoreError>> {
+        Box::pin(async move {
+            if self
+                .block_next_put
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
+                self.entered.notify_one();
+                self.release.notified().await;
+            }
+            self.inner.put(namespace, key, value).await
+        })
+    }
+
+    fn delete<'a>(
+        &'a self,
+        namespace: &'a str,
+        key: &'a str,
+    ) -> BoxFuture<'a, Result<(), petrel::storage::StoreError>> {
+        Box::pin(async move {
+            if self
+                .block_next_delete
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
+                self.entered.notify_one();
+                self.release.notified().await;
+            }
+            self.inner.delete(namespace, key).await
+        })
+    }
+
+    fn take<'a>(
+        &'a self,
+        namespace: &'a str,
+        key: &'a str,
+    ) -> BoxFuture<'a, Result<Option<Vec<u8>>, petrel::storage::StoreError>> {
+        self.inner.take(namespace, key)
+    }
+
+    fn delete_namespace<'a>(
+        &'a self,
+        namespace: &'a str,
+    ) -> BoxFuture<'a, Result<(), petrel::storage::StoreError>> {
+        self.inner.delete_namespace(namespace)
+    }
+}
+
+#[tokio::test]
+async fn switch_to_account_releases_coordinator_lock_when_cancelled() {
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let secrets = Arc::new(GatedSecretStore {
+        inner: MemorySecretStore::new(),
+        block_next_put: std::sync::atomic::AtomicBool::new(false),
+        block_next_delete: std::sync::atomic::AtomicBool::new(false),
+        entered: Arc::clone(&entered),
+        release: Arc::clone(&release),
+    });
+    let store = SessionStore::new(secrets.clone(), "switch-cancel").unwrap();
+
+    let alice_did: Did = ALICE_DID.parse().unwrap();
+    let bob_did: Did = "did:plc:switchbob".parse().unwrap();
+    let pds_a = Url::parse("https://pds-a.cancel.test").unwrap();
+    let pds_b = Url::parse("https://pds-b.cancel.test").unwrap();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    seed_oauth_session(&store, &alice_did, &pds_a, "dpop-a", "jwt-a", now).await;
+    seed_oauth_session(&store, &bob_did, &pds_b, "dpop-b", "jwt-b", now).await;
+    store.save_current_did(&alice_did).await.unwrap();
+
+    let net = Arc::new(FakePdsNetwork::new(vec![
+        FakePdsState::new("https://pds-a.cancel.test"),
+        FakePdsState::new("https://pds-b.cancel.test"),
+    ]));
+    let resolver = Arc::new(FakeResolver::new());
+    let client =
+        AtProtoClient::new(pds_a, net, store, resolver, None, AuthMode::Legacy, false).unwrap();
+
+    secrets
+        .block_next_put
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    {
+        let mut switch_fut = std::pin::pin!(client.switch_to_account(&bob_did));
+        tokio::select! {
+            res = &mut switch_fut => panic!("switch unexpectedly completed: {res:?}"),
+            () = entered.notified() => {}
+        }
+        // Dropping `switch_fut` here simulates task cancellation mid-switch.
+    }
+
+    // Subsequent switch must succeed rather than failing with `SwitchInProgress`.
+    client.switch_to_account(&bob_did).await.unwrap();
+    assert_eq!(client.get_did().await.unwrap(), Some(bob_did));
+    assert_eq!(client.base_url().await, pds_b);
+}
+
+#[tokio::test]
+async fn oauth_logout_preserves_concurrently_switched_account_and_provider() {
+    use petrel::oauth::{ClientAuth, OAuthClient, OAuthConfig};
+
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let secrets = Arc::new(GatedSecretStore {
+        inner: MemorySecretStore::new(),
+        block_next_put: std::sync::atomic::AtomicBool::new(false),
+        block_next_delete: std::sync::atomic::AtomicBool::new(false),
+        entered: Arc::clone(&entered),
+        release: Arc::clone(&release),
+    });
+    let store = SessionStore::new(secrets.clone(), "oauth-logout-race").unwrap();
+    let pds_a = Url::parse("https://pds-oauth-a.test").unwrap();
+    let pds_b = Url::parse("https://pds-oauth-b.test").unwrap();
+    let net = Arc::new(FakePdsNetwork::new(vec![
+        FakePdsState::new("https://pds-oauth-a.test"),
+        FakePdsState::new("https://pds-oauth-b.test"),
+    ]));
+    let resolver = Arc::new(FakeResolver::new());
+    let oauth_cfg = OAuthConfig::new(
+        "https://client.example/oauth-client-metadata.json",
+        Url::parse("example.client:/callback").unwrap(),
+        "atproto transition:generic",
+        ClientAuth::Public,
+    )
+    .unwrap();
+    let oauth_client =
+        Arc::new(OAuthClient::new(net, resolver.clone(), store.clone(), oauth_cfg).unwrap());
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let alice_did: Did = ALICE_DID.parse().unwrap();
+    let bob_did: Did = "did:plc:oauthbob".parse().unwrap();
+    seed_oauth_session(&store, &alice_did, &pds_a, "dpop-a", "jwt-alice", now).await;
+    seed_oauth_session(&store, &bob_did, &pds_b, "dpop-b", "jwt-bob", now).await;
+    store.save_current_did(&alice_did).await.unwrap();
+
+    let client = Arc::new(
+        AtProtoClient::new(
+            pds_a,
+            Arc::new(FakePdsNetwork::new(vec![])),
+            store.clone(),
+            resolver,
+            Some(oauth_client),
+            AuthMode::PublicOAuth,
+            false,
+        )
+        .unwrap(),
+    );
+    assert_eq!(
+        prepare_oauth_get(
+            &client,
+            "https://pds-oauth-a.test/xrpc/app.bsky.actor.getProfile?actor=alice",
+        )
+        .await
+        .unwrap(),
+        (Some(alice_did.clone()), "DPoP jwt-alice".to_owned())
+    );
+
+    secrets
+        .block_next_delete
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let c_logout = Arc::clone(&client);
+    let logout_task = tokio::spawn(async move { c_logout.logout().await });
+    entered.notified().await;
+
+    // Concurrent switch to Bob while Alice's OAuth logout is in flight.
+    client.switch_to_account(&bob_did).await.unwrap();
+    let bob_snap = client.auth_continuity_snapshot().await;
+    release.notify_one();
+    logout_task.await.unwrap().unwrap();
+
+    assert_eq!(client.get_did().await.unwrap(), Some(bob_did.clone()));
+    assert_eq!(client.base_url().await, pds_b);
+    assert_eq!(client.auth_continuity_snapshot().await, bob_snap);
+    assert_eq!(
+        prepare_oauth_get(
+            &client,
+            "https://pds-oauth-b.test/xrpc/app.bsky.actor.getProfile?actor=bob",
+        )
+        .await
+        .unwrap(),
+        (Some(bob_did), "DPoP jwt-bob".to_owned())
+    );
+    assert!(store.get_session(&alice_did).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn legacy_logout_preserves_concurrently_switched_account() {
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let secrets = Arc::new(GatedSecretStore {
+        inner: MemorySecretStore::new(),
+        block_next_put: std::sync::atomic::AtomicBool::new(false),
+        block_next_delete: std::sync::atomic::AtomicBool::new(false),
+        entered: Arc::clone(&entered),
+        release: Arc::clone(&release),
+    });
+    let store = SessionStore::new(secrets.clone(), "legacy-logout-race").unwrap();
+    let pds_a = Url::parse("https://pds-a.test").unwrap();
+    let pds_b = Url::parse("https://pds-b.test").unwrap();
+    let mut state_a = FakePdsState::new("https://pds-a.test");
+    state_a
+        .accounts
+        .insert(ALICE_DID.to_owned(), alice_account());
+    let mut state_b = FakePdsState::new("https://pds-b.test");
+    state_b
+        .accounts
+        .insert(bob_account().did.clone(), bob_account());
+
+    let net = Arc::new(FakePdsNetwork::new(vec![state_a, state_b]));
+    let resolver = Arc::new(FakeResolver::new());
+    resolver.register(ALICE_DID, ALICE_HANDLE, &pds_a);
+    resolver.register(&bob_account().did, "bob.test", &pds_b);
+
+    let client = Arc::new(
+        AtProtoClient::new(
+            pds_a,
+            net.clone(),
+            store,
+            resolver,
+            None,
+            AuthMode::Legacy,
+            false,
+        )
+        .unwrap(),
+    );
+    client
+        .login_with_password("bob.test", "bob-password", None)
+        .await
+        .unwrap();
+    client
+        .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, None)
+        .await
+        .unwrap();
+
+    let bob_did: Did = bob_account().did.parse().unwrap();
+    secrets
+        .block_next_delete
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let c_logout = Arc::clone(&client);
+    let logout_task = tokio::spawn(async move { c_logout.logout().await });
+    entered.notified().await;
+
+    client.switch_to_account(&bob_did).await.unwrap();
+    let bob_snap = client.auth_continuity_snapshot().await;
+    release.notify_one();
+    logout_task.await.unwrap().unwrap();
+
+    assert_eq!(client.get_did().await.unwrap(), Some(bob_did.clone()));
+    assert_eq!(client.base_url().await, pds_b);
+    assert_eq!(client.auth_continuity_snapshot().await, bob_snap);
+    let resp = client
+        .query(
+            "app.bsky.actor.getProfile",
+            [("actor", bob_did.as_str())],
+            &CallOptions::default(),
+        )
+        .await
+        .unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&resp.body).unwrap();
+    assert_eq!(body["did"], bob_did.as_str());
+}
+
+#[tokio::test]
+async fn legacy_refresh_cancellation_breaks_arc_cycle_and_releases_abandoned_refresh() {
+    use petrel::auth::{LegacyPasswordStrategy, TokenRefreshResult};
+    use petrel::net::{HttpTransport, SendOptions, TransportError};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    struct SentinelTransport {
+        inner: FakePdsNetwork,
+        block_refresh: AtomicBool,
+        entered: Arc<tokio::sync::Notify>,
+        gate: Arc<tokio::sync::Notify>,
+        refresh_calls: AtomicUsize,
+        dropped_count: Arc<AtomicUsize>,
+    }
+
+    impl Drop for SentinelTransport {
+        fn drop(&mut self) {
+            self.dropped_count.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    impl HttpTransport for SentinelTransport {
+        fn send(
+            &self,
+            request: http::Request<bytes::Bytes>,
+            options: &SendOptions,
+        ) -> impl std::future::Future<Output = Result<http::Response<bytes::Bytes>, TransportError>> + Send
+        {
+            let is_refresh = request.uri().path() == "/xrpc/com.atproto.server.refreshSession";
+            let should_block = is_refresh && self.block_refresh.swap(false, Ordering::SeqCst);
+            if is_refresh {
+                self.refresh_calls.fetch_add(1, Ordering::SeqCst);
+            }
+            let entered = Arc::clone(&self.entered);
+            let gate = Arc::clone(&self.gate);
+            let fut = self.inner.send(request, options);
+            async move {
+                if should_block {
+                    entered.notify_one();
+                    gate.notified().await;
+                }
+                fut.await
+            }
+        }
+    }
+
+    let pds = Url::parse("https://pds-cancel-refresh.test").unwrap();
+    let mut state = FakePdsState::new("https://pds-cancel-refresh.test");
+    state.accounts.insert(ALICE_DID.to_owned(), alice_account());
+
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let gate = Arc::new(tokio::sync::Notify::new());
+    let dropped_count = Arc::new(AtomicUsize::new(0));
+    let transport = Arc::new(SentinelTransport {
+        inner: FakePdsNetwork::new(vec![state]),
+        block_refresh: AtomicBool::new(true),
+        entered: Arc::clone(&entered),
+        gate: Arc::clone(&gate),
+        refresh_calls: AtomicUsize::new(0),
+        dropped_count: Arc::clone(&dropped_count),
+    });
+
+    let store =
+        SessionStore::new(Arc::new(MemorySecretStore::new()), "legacy-refresh-cancel").unwrap();
+    let account_manager = Arc::new(AccountManager::new(store));
+    let resolver = Arc::new(FakeResolver::new());
+    resolver.register(ALICE_DID, ALICE_HANDLE, &pds);
+
+    let strategy = Arc::new(LegacyPasswordStrategy::new(
+        Arc::clone(&account_manager),
+        transport.clone(),
+        resolver.clone(),
+        pds.clone(),
+    ));
+    strategy
+        .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, None)
+        .await
+        .unwrap();
+
+    // 1. Cancel all concurrent waiters mid-refresh on a live strategy, then verify a retry
+    // runs a fresh refresh and succeeds instead of getting wedged on a burned token.
+    {
+        let mut fut1 = Box::pin(strategy.refresh_token_if_needed(true));
+        tokio::select! {
+            res = &mut fut1 => panic!("first refresh unexpectedly completed: {res:?}"),
+            () = entered.notified() => {}
+        }
+        let mut fut2 = Box::pin(strategy.refresh_token_if_needed(true));
+        let poll_res = tokio::time::timeout(std::time::Duration::from_millis(5), &mut fut2).await;
+        assert!(poll_res.is_err());
+        assert_eq!(transport.refresh_calls.load(Ordering::SeqCst), 1);
+
+        drop(fut1);
+        drop(fut2);
+    }
+
+    let retry = strategy.refresh_token_if_needed(true).await.unwrap();
+    assert_eq!(retry, TokenRefreshResult::RefreshedSuccessfully);
+    assert_eq!(transport.refresh_calls.load(Ordering::SeqCst), 2);
+
+    // 2. Abandon a suspended refresh and drop `Arc<LegacyPasswordStrategy>`:
+    // `Weak::strong_count` and `transport` drop immediately (no `Arc` ownership cycle).
+    transport.block_refresh.store(true, Ordering::SeqCst);
+    {
+        let mut fut = Box::pin(strategy.refresh_token_if_needed(true));
+        tokio::select! {
+            res = &mut fut => panic!("refresh unexpectedly completed: {res:?}"),
+            () = entered.notified() => {}
+        }
+        drop(fut);
+    }
+
+    let weak_strategy = Arc::downgrade(&strategy);
+    drop(strategy);
+    drop(transport);
+    assert_eq!(weak_strategy.strong_count(), 0);
+    assert_eq!(dropped_count.load(Ordering::SeqCst), 1);
+}

@@ -47,14 +47,8 @@ impl ResponseMetadata {
 }
 
 pub(crate) fn retry_after(headers: &HeaderMap) -> Option<Duration> {
-    let seconds = headers
-        .get("retry-after")?
-        .to_str()
-        .ok()?
-        .trim()
-        .parse::<f64>()
-        .ok()?;
-    Duration::try_from_secs_f64(seconds).ok()
+    let raw = headers.get("retry-after")?.to_str().ok()?;
+    crate::net::rate_limit::parse_retry_after(raw, crate::rt::SystemTime::now())
 }
 
 /// Applied or requested moderation labeler.
@@ -65,20 +59,45 @@ pub struct XrpcLabeler {
 }
 
 impl XrpcLabeler {
+    /// Collapses repeated labeler DIDs preserving first-seen order; any `;redact` flag wins.
+    #[must_use]
+    pub fn deduplicated(labelers: &[Self]) -> Vec<Self> {
+        let mut order: Vec<String> = Vec::new();
+        let mut redacts: std::collections::HashMap<String, bool> = std::collections::HashMap::new();
+        for labeler in labelers {
+            if let Some(existing) = redacts.get_mut(&labeler.did) {
+                *existing = *existing || labeler.redact;
+            } else {
+                order.push(labeler.did.clone());
+                redacts.insert(labeler.did.clone(), labeler.redact);
+            }
+        }
+        order
+            .into_iter()
+            .map(|did| {
+                let redact = redacts.get(&did).copied().unwrap_or(false);
+                Self { did, redact }
+            })
+            .collect()
+    }
+
+    #[must_use]
     pub fn header_value(labelers: &[Self]) -> String {
-        labelers
-            .iter()
+        Self::deduplicated(labelers)
+            .into_iter()
             .map(|labeler| {
                 if labeler.redact {
                     format!("{};redact", labeler.did)
                 } else {
-                    labeler.did.clone()
+                    labeler.did
                 }
             })
             .collect::<Vec<_>>()
             .join(", ")
     }
 
+    /// Parses an `atproto-accept-labelers` or `atproto-content-labelers` header, preserving
+    /// syntactically non-empty DID entries without validating full DID grammar.
     pub fn parse(header: &str) -> impl Iterator<Item = Self> {
         header.split(',').filter_map(|entry| {
             let mut fields = entry.split(';').map(str::trim);
@@ -91,6 +110,24 @@ impl XrpcLabeler {
                 redact: fields.any(|field| field == "redact"),
             })
         })
+    }
+
+    /// Strictly parses and deduplicates a labeler header, skipping syntactically invalid DIDs.
+    #[must_use]
+    pub fn parse_header(header: &str) -> Vec<Self> {
+        let parsed: Vec<Self> = header
+            .split(',')
+            .filter_map(|entry| {
+                let mut fields = entry.split(';').map(str::trim);
+                let did_str = fields.next()?;
+                did_str.parse::<petrel_core::Did>().ok()?;
+                Some(Self {
+                    did: did_str.to_owned(),
+                    redact: fields.any(|field| field == "redact"),
+                })
+            })
+            .collect();
+        Self::deduplicated(&parsed)
     }
 }
 
