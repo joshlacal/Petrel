@@ -9,12 +9,14 @@ repository.workspace = true
 
 [features]
 default = ["native", "axum"]
-native = ["petrel/native", "dep:tokio"]
+native = ["petrel/native", "petrel-repo/native", "petrel-lexicon/native", "dep:tokio"]
 axum = ["native", "dep:axum", "dep:tower-layer", "dep:tower-service"]
 wasm = [
     "petrel-core/wasm",
     "petrel-crypto/wasm",
     "petrel-oauth-scopes/wasm",
+    "petrel-repo/wasm",
+    "petrel-lexicon/wasm",
     "petrel/wasm",
     "getrandom/js",
 ]
@@ -23,6 +25,8 @@ wasm = [
 petrel-core = { workspace = true }
 petrel-crypto = { workspace = true }
 petrel-oauth-scopes = { workspace = true }
+petrel-repo = { workspace = true }
+petrel-lexicon = { workspace = true }
 petrel = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

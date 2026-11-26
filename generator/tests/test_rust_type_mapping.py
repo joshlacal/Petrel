@@ -464,6 +464,20 @@ class RustTypeMappingTests(unittest.TestCase):
         self.assertEqual(len(cases), 7)
         self.assertEqual(rejected, [c["name"] for c in cases])
 
+    def test_prelude_type_names_are_disambiguated(self):
+        self.assertEqual(
+            resolve_rust_def_type_name("tools.ozone.setting.defs", "option"),
+            "OptionDef",
+        )
+        self.assertEqual(
+            resolve_rust_def_type_name(
+                "tools.ozone.setting.defs",
+                "option",
+                lexicon_defs={"option": {"type": "object", "properties": {}}},
+            ),
+            "OptionDef",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

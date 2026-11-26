@@ -10,5 +10,11 @@
   },
   "swift": {
     "output": "Sources/PetrelOzone/Generated"
+  },
+  "rust": {
+    "output": "rust/petrel-ozone/src/generated",
+    "crate": "petrel_ozone",
+    "crate_path": "crate::generated",
+    "reference_crate": "petrel_api::generated"
   }
 }

@@ -251,13 +251,19 @@ impl OAuthLexiconResolving for StaticOAuthLexiconResolver {
     }
 }
 
-/// Caching wrapper around any [`OAuthLexiconResolving`] backend with TTL + stale-while-revalidate.
+/// Caching wrapper around any [`OAuthLexiconResolving`] backend with TTL + stale-while-revalidate,
+/// outage backoff, and short negative caching.
 pub struct CachingOAuthLexiconResolver {
     inner: Arc<dyn OAuthLexiconResolving>,
     cache: Arc<dyn OAuthLexiconCache>,
     clock: Arc<dyn OAuthClock>,
     ttl_secs: i64,
     stale_ttl_secs: i64,
+    negative_ttl_secs: i64,
+    failure_backoff_secs: i64,
+    max_backoff_entries: usize,
+    negative_until: Mutex<HashMap<String, i64>>,
+    outage_retry_after: Mutex<HashMap<String, i64>>,
 }
 
 impl std::fmt::Debug for CachingOAuthLexiconResolver {
@@ -269,7 +275,11 @@ impl std::fmt::Debug for CachingOAuthLexiconResolver {
 }
 
 impl CachingOAuthLexiconResolver {
-    /// Wraps `inner` with `cache` using default 15-minute fresh / 24-hour stale windows.
+    /// Default capacity ceiling for the in-memory negative-cache and outage-backoff maps.
+    pub const DEFAULT_MAX_BACKOFF_ENTRIES: usize = 4096;
+
+    /// Wraps `inner` with `cache` using default 15-minute fresh / 24-hour stale / 5-minute negative
+    /// & outage backoff windows.
     pub fn new(inner: Arc<dyn OAuthLexiconResolving>, cache: Arc<dyn OAuthLexiconCache>) -> Self {
         Self {
             inner,
@@ -277,6 +287,11 @@ impl CachingOAuthLexiconResolver {
             clock: Arc::new(SystemOAuthClock),
             ttl_secs: 900,
             stale_ttl_secs: 86_400,
+            negative_ttl_secs: 300,
+            failure_backoff_secs: 300,
+            max_backoff_entries: Self::DEFAULT_MAX_BACKOFF_ENTRIES,
+            negative_until: Mutex::new(HashMap::new()),
+            outage_retry_after: Mutex::new(HashMap::new()),
         }
     }
 
@@ -294,6 +309,69 @@ impl CachingOAuthLexiconResolver {
         self.stale_ttl_secs = stale_ttl_secs;
         self
     }
+
+    /// Overrides negative-cache and outage retry backoff windows in seconds.
+    #[must_use]
+    pub fn with_backoffs(mut self, negative_ttl_secs: i64, failure_backoff_secs: i64) -> Self {
+        self.negative_ttl_secs = negative_ttl_secs;
+        self.failure_backoff_secs = failure_backoff_secs;
+        self
+    }
+
+    /// Overrides the maximum entries retained in negative-cache and outage-backoff tracking maps.
+    #[must_use]
+    pub fn with_max_backoff_entries(mut self, max_entries: usize) -> Self {
+        self.max_backoff_entries = max_entries.max(1);
+        self
+    }
+
+    /// Returns current `(negative_cache_entries, outage_backoff_entries)` counts after pruning expired entries.
+    pub async fn backoff_tracking_counts(&self) -> (usize, usize) {
+        let now = self.clock.now_secs();
+        let mut neg = self.negative_until.lock().await;
+        neg.retain(|_, until| now < *until);
+        let mut outage = self.outage_retry_after.lock().await;
+        outage.retain(|_, until| now < *until);
+        (neg.len(), outage.len())
+    }
+
+    fn insert_bounded_deadline(
+        map: &mut HashMap<String, i64>,
+        key: String,
+        until: i64,
+        now: i64,
+        max_entries: usize,
+    ) {
+        map.retain(|_, existing| now < *existing);
+        let cap = max_entries.max(1);
+        if map.len() >= cap
+            && !map.contains_key(&key)
+            && let Some(oldest) = map
+                .iter()
+                .min_by_key(|(_, existing)| *existing)
+                .map(|(k, _)| k.clone())
+        {
+            map.remove(&oldest);
+        }
+        map.insert(key, until);
+    }
+
+    fn decode_cached(
+        nsid: &str,
+        entry: &OAuthCachedLexicon,
+    ) -> Result<OAuthLexiconResolution, OAuthLexiconResolverFailure> {
+        let doc = OAuthLexiconDocument::from_json(
+            nsid,
+            entry.cid.clone(),
+            entry.source_did.clone(),
+            entry.raw_json.clone(),
+        )?;
+        Ok(if doc.permission_set.is_some() {
+            OAuthLexiconResolution::Resolved(Box::new(doc))
+        } else {
+            OAuthLexiconResolution::NotPermissionSet
+        })
+    }
 }
 
 impl OAuthLexiconResolving for CachingOAuthLexiconResolver {
@@ -309,24 +387,31 @@ impl OAuthLexiconResolving for CachingOAuthLexiconResolver {
                 .get_cached_lexicon(&key)
                 .await
                 .map_err(|err| OAuthLexiconResolverFailure::Unavailable(err.to_string()))?;
-            if let Some(ref entry) = cached
-                && now < entry.expires_at_secs
+            if let Some(ref entry) = cached {
+                if now < entry.expires_at_secs {
+                    return Self::decode_cached(&key, entry);
+                }
+                if now < entry.stale_until_secs {
+                    let mut outage = self.outage_retry_after.lock().await;
+                    outage.retain(|_, until| now < *until);
+                    if outage.get(&key).is_some_and(|until| now < *until) {
+                        return Self::decode_cached(&key, entry);
+                    }
+                }
+            }
+
             {
-                let doc = OAuthLexiconDocument::from_json(
-                    &key,
-                    entry.cid.clone(),
-                    entry.source_did.clone(),
-                    entry.raw_json.clone(),
-                )?;
-                return Ok(if doc.permission_set.is_some() {
-                    OAuthLexiconResolution::Resolved(Box::new(doc))
-                } else {
-                    OAuthLexiconResolution::NotPermissionSet
-                });
+                let mut neg = self.negative_until.lock().await;
+                neg.retain(|_, until| now < *until);
+                if neg.get(&key).is_some_and(|until| now < *until) {
+                    return Ok(OAuthLexiconResolution::NotFound);
+                }
             }
 
             match self.inner.resolve(&key).await {
                 Ok(OAuthLexiconResolution::Resolved(doc)) => {
+                    self.negative_until.lock().await.remove(&key);
+                    self.outage_retry_after.lock().await.remove(&key);
                     let entry = OAuthCachedLexicon {
                         nsid: key.clone(),
                         source_did: doc.source_did.clone(),
@@ -339,19 +424,39 @@ impl OAuthLexiconResolving for CachingOAuthLexiconResolver {
                     let _ = self.cache.put_cached_lexicon(entry).await;
                     Ok(OAuthLexiconResolution::Resolved(doc))
                 }
-                Ok(other) => Ok(other),
+                Ok(other) => {
+                    let mut neg = self.negative_until.lock().await;
+                    Self::insert_bounded_deadline(
+                        &mut neg,
+                        key,
+                        now + self.negative_ttl_secs,
+                        now,
+                        self.max_backoff_entries,
+                    );
+                    Ok(other)
+                }
                 Err(err) => {
-                    if let Some(entry) = cached
+                    if let Some(ref entry) = cached
                         && now < entry.stale_until_secs
                     {
-                        let doc = OAuthLexiconDocument::from_json(
-                            &key,
-                            entry.cid,
-                            entry.source_did,
-                            entry.raw_json,
-                        )?;
-                        return Ok(OAuthLexiconResolution::Resolved(Box::new(doc)));
+                        let mut outage = self.outage_retry_after.lock().await;
+                        Self::insert_bounded_deadline(
+                            &mut outage,
+                            key.clone(),
+                            now + self.failure_backoff_secs,
+                            now,
+                            self.max_backoff_entries,
+                        );
+                        return Self::decode_cached(&key, entry);
                     }
+                    let mut neg = self.negative_until.lock().await;
+                    Self::insert_bounded_deadline(
+                        &mut neg,
+                        key,
+                        now + self.negative_ttl_secs,
+                        now,
+                        self.max_backoff_entries,
+                    );
                     Err(err)
                 }
             }

@@ -11,6 +11,8 @@ members = [
     "petrel-core",
     "petrel-crypto",
     "petrel-api",
+    "petrel-ozone",
+    "petrel-lexicon",
     "petrel-oauth-scopes",
     "petrel",
     "petrel-repo",
@@ -34,12 +36,15 @@ petrel-crypto = { path = "petrel-crypto", version = "0.0.0", default-features = 
 petrel-api = { path = "petrel-api", version = "0.0.0" }
 petrel-oauth-scopes = { path = "petrel-oauth-scopes", version = "0.0.0" }
 petrel = { path = "petrel", version = "0.0.0", default-features = false }
+petrel-repo = { path = "petrel-repo", version = "0.0.0", default-features = false }
+petrel-lexicon = { path = "petrel-lexicon", version = "0.0.0", default-features = false }
 petrel-server = { path = "petrel-server", version = "0.0.0", default-features = false }
 
-# Serialization
+# Serialization & text
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
 base64 = "0.22"
+unicode-segmentation = { version = "1.13", default-features = false }
 
 # Errors
 thiserror = "2"

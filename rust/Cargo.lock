@@ -1706,6 +1706,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "petrel-lexicon"
+version = "0.0.0"
+dependencies = [
+ "async-lock",
+ "base64 0.22.1",
+ "bytes",
+ "futures-util",
+ "http",
+ "k256",
+ "p256",
+ "petrel",
+ "petrel-api",
+ "petrel-core",
+ "petrel-crypto",
+ "petrel-repo",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "unicode-segmentation",
+ "url",
+ "wasm-bindgen-test",
+ "web-time",
+]
+
+[[package]]
 name = "petrel-lexicon-fixture"
 version = "0.0.0"
 dependencies = [
@@ -1722,6 +1749,16 @@ dependencies = [
  "serde",
  "serde_json",
  "url",
+ "wasm-bindgen-test",
+]
+
+[[package]]
+name = "petrel-ozone"
+version = "0.0.0"
+dependencies = [
+ "petrel-api",
+ "petrel-core",
+ "serde",
  "wasm-bindgen-test",
 ]
 
@@ -1790,7 +1827,9 @@ dependencies = [
  "petrel-api",
  "petrel-core",
  "petrel-crypto",
+ "petrel-lexicon",
  "petrel-oauth-scopes",
+ "petrel-repo",
  "serde",
  "serde_json",
  "sha2",
@@ -2706,6 +2745,12 @@ name = "unicode-ident"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8"
 
 [[package]]
 name = "universal-hash"

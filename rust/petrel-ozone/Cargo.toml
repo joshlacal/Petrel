@@ -1,0 +1,36 @@
+[package]
+name = "petrel-ozone"
+description = "GENERATED tools.ozone moderation overlay types for Petrel (from generator/manifests/petrel-ozone.json). Do not hand-edit src/generated."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+wasm = ["petrel-core/wasm", "petrel-api/wasm"]
+
+[dependencies]
+petrel-core = { workspace = true }
+petrel-api = { workspace = true, features = ["app_bsky", "chat_bsky", "com_atproto"] }
+serde = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
+# Generated code does not inherit the workspace lint table (a member's [lints]
+# is all-or-nothing), so this crate carries its own matching petrel-api.
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+large_enum_variant = "allow"
+too_many_arguments = "allow"
+struct_excessive_bools = "allow"
+doc_markdown = "allow"
+module_inception = "allow"
+upper_case_acronyms = "allow"
+struct_field_names = "allow"
+too_many_lines = "allow"

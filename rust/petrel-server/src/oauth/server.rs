@@ -1699,6 +1699,16 @@ impl OAuthAuthorizationServer {
                 self.config.unknown_scope_policy,
             )
             .map_err(|err| (err.oauth_error_code(), err.to_string()))?;
+            if admitted
+                .scopes()
+                .iter()
+                .any(|s| matches!(s, petrel_oauth_scopes::AtProtoScope::Include(_)))
+            {
+                return Err((
+                    "invalid_scope",
+                    "include: scopes require a lexicon scope resolver".into(),
+                ));
+            }
             Ok(admitted.scope_string())
         }
     }

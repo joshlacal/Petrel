@@ -1,0 +1,47 @@
+[package]
+name = "petrel-lexicon"
+description = "Runtime AT Protocol Lexicon parsing, catalog, schema & data validation, and NSID resolution for Petrel."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["native"]
+native = ["petrel/native", "petrel-repo/native", "petrel-crypto/std"]
+wasm = ["petrel-core/wasm", "petrel/wasm", "petrel-repo/wasm", "petrel-crypto/wasm"]
+
+[dependencies]
+petrel-core = { workspace = true }
+petrel-crypto = { workspace = true }
+petrel-repo = { workspace = true }
+petrel = { workspace = true }
+http = { workspace = true }
+bytes = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+url = { workspace = true }
+base64 = { workspace = true }
+unicode-segmentation = { workspace = true }
+async-lock = { workspace = true }
+futures-util = { workspace = true }
+web-time = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+futures-util = { workspace = true }
+petrel-api = { workspace = true, features = ["app_bsky"] }
+serde_json = { workspace = true }
+p256 = { workspace = true }
+k256 = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
+[lints]
+workspace = true

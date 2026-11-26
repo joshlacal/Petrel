@@ -16,6 +16,7 @@ pub mod error;
 pub mod http;
 pub mod jose;
 pub mod lexicon;
+pub mod lexicon_resolver;
 pub mod oauth;
 pub mod service_auth;
 pub mod store;

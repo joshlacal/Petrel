@@ -630,8 +630,16 @@ pub struct OAuthRemoteFetchResponse {
     pub body: Vec<u8>,
 }
 
-/// Transport trait for fetching client metadata and JWKS documents.
+/// Transport trait for fetching client metadata, JWKS documents, and Lexicon records.
 pub trait OAuthRemoteTransport: MaybeSend + MaybeSync {
+    /// Whether this transport enforces SSRF-safe address pinning on outbound connections.
+    ///
+    /// Security-sensitive callers such as `AuthenticatedOAuthLexiconResolver` refuse transports
+    /// that return `false` before issuing any network request.
+    fn pins_connections(&self) -> bool {
+        false
+    }
+
     fn fetch<'a>(
         &'a self,
         url: &'a Url,
@@ -705,6 +713,10 @@ impl PetrelOAuthRemoteTransport {
 
 #[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
 impl OAuthRemoteTransport for PetrelOAuthRemoteTransport {
+    fn pins_connections(&self) -> bool {
+        true
+    }
+
     fn fetch<'a>(
         &'a self,
         url: &'a Url,
