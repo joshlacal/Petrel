@@ -13,6 +13,7 @@ members = [
     "petrel-api",
     "petrel-oauth-scopes",
     "petrel",
+    "petrel-repo",
     "petrel-e2e",
     "petrel-lexicon-fixture",
 ]
