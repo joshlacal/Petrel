@@ -464,7 +464,250 @@ fn bsky_recorded_fixtures_labeler_services_and_profile() {
     }
 }
 
-// MARK: 4. Mock Transport for BskyAgent record/service/video tests (Native)
+// MARK: 4. Loopback development propagation (Native + Wasm32)
+
+mod loopback_agent_tests {
+    use std::sync::{Arc, Mutex};
+
+    use bytes::Bytes;
+    use http::{Request, Response, StatusCode};
+    use petrel::auth::AuthMode;
+    use petrel::client::AtProtoClient;
+    use petrel::net::{HttpTransport, SendOptions, TransportError};
+    use petrel::oauth::{OAuthIdentity, OAuthIdentityError, OAuthIdentityResolver};
+    use petrel::rt::{BoxFuture, MaybeSend};
+    use petrel::storage::{MemorySecretStore, SessionStore};
+    use petrel_bsky::{BskyAgent, BskyCallOptions};
+    use petrel_core::{AtIdentifier, Did};
+    use serde_json::json;
+    use url::Url;
+
+    const ALICE_DID: &str = "did:plc:loopbackalice1111111111";
+    const BOB_DID: &str = "did:plc:loopbackbob222222222222";
+    const FAKE_CID: &str = "bafyreiclp443lavogvhj3d2ob2cxbfuscni2k5jk7bebjzg7khl3esabwq";
+    const RAW_BLOB_CID: &str = "bafkreiclp443lavogvhj3d2ob2cxbfuscni2k5jk7bebjzg7khl3esabwq";
+    const LOOPBACK_PDS: &str = "http://127.0.0.1:3000";
+
+    struct StaticLoopbackResolver;
+    impl OAuthIdentityResolver for StaticLoopbackResolver {
+        fn resolve_identity<'a>(
+            &'a self,
+            _identifier: &'a AtIdentifier,
+            _force_refresh: bool,
+        ) -> BoxFuture<'a, Result<OAuthIdentity, OAuthIdentityError>> {
+            Box::pin(async {
+                Ok(OAuthIdentity {
+                    did: ALICE_DID.parse().unwrap(),
+                    handle: Some("alice.test".parse().unwrap()),
+                    pds: Url::parse(LOOPBACK_PDS).unwrap(),
+                })
+            })
+        }
+    }
+
+    struct LoopbackPdsTransport {
+        seen: Mutex<Vec<String>>,
+    }
+
+    impl LoopbackPdsTransport {
+        fn new() -> Self {
+            Self {
+                seen: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    impl HttpTransport for LoopbackPdsTransport {
+        fn send(
+            &self,
+            request: Request<Bytes>,
+            _options: &SendOptions,
+        ) -> impl std::future::Future<Output = Result<Response<Bytes>, TransportError>> + MaybeSend
+        {
+            let uri = request.uri().to_string();
+            let path = request.uri().path().to_owned();
+            self.seen.lock().unwrap().push(uri);
+            let payload = match path.as_str() {
+                "/xrpc/com.atproto.server.createSession" => json!({
+                    "did": ALICE_DID,
+                    "handle": "alice.test",
+                    "accessJwt": "loop-access",
+                    "refreshJwt": "loop-refresh",
+                    "active": true
+                }),
+                "/xrpc/com.atproto.repo.createRecord" => json!({
+                    "uri": format!("at://{ALICE_DID}/app.bsky.feed.post/3kloop1"),
+                    "cid": FAKE_CID
+                }),
+                "/xrpc/app.bsky.actor.getPreferences" => json!({
+                    "preferences": []
+                }),
+                "/xrpc/com.atproto.repo.uploadBlob" => json!({
+                    "blob": {
+                        "$type": "blob",
+                        "ref": { "$link": RAW_BLOB_CID },
+                        "mimeType": "image/png",
+                        "size": 3
+                    }
+                }),
+                "/xrpc/app.bsky.actor.getProfile" => json!({
+                    "did": BOB_DID,
+                    "handle": "bob.test"
+                }),
+                _ => json!({}),
+            };
+            std::future::ready(Ok(Response::builder()
+                .status(StatusCode::OK)
+                .header("Content-Type", "application/json")
+                .body(Bytes::from(serde_json::to_vec(&payload).unwrap()))
+                .unwrap()))
+        }
+    }
+
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+    #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+    #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+    async fn bsky_agent_propagates_client_loopback_flag_to_helpers_and_uploads_only_for_dev_clients()
+     {
+        let pds = Url::parse(LOOPBACK_PDS).unwrap();
+        let transport = Arc::new(LoopbackPdsTransport::new());
+        let store = SessionStore::new(Arc::new(MemorySecretStore::new()), "bsky-loopback").unwrap();
+        let dev_client = Arc::new(
+            AtProtoClient::new(
+                pds.clone(),
+                transport.clone(),
+                store,
+                Arc::new(StaticLoopbackResolver),
+                None,
+                AuthMode::Legacy,
+                true,
+            )
+            .unwrap(),
+        );
+        dev_client
+            .login_with_password("alice.test", "pw", None)
+            .await
+            .unwrap();
+
+        let agent = BskyAgent::from_client(Arc::clone(&dev_client));
+        assert!(agent.allows_loopback());
+
+        // `post_text`, `follow`, `get_preferences`, `upload_blob`, and base-service `query`
+        // all succeed against `http://127.0.0.1:3000`.
+        agent
+            .post_text("hello loopback", None, None, None, None, None, None)
+            .await
+            .unwrap();
+        let target_did: Did = BOB_DID.parse().unwrap();
+        agent.follow(target_did, None).await.unwrap();
+        let prefs = agent.get_preferences().await.unwrap();
+        assert_eq!(prefs.saved_feeds.len(), 1);
+        assert_eq!(prefs.saved_feeds[0].value, "following");
+        let uploaded = agent
+            .upload_blob(Bytes::from_static(b"png"), "image/png")
+            .await
+            .unwrap();
+        assert!(matches!(
+            uploaded,
+            petrel_core::Blob::Typed { ref mime_type, .. }
+                | petrel_core::Blob::TypedWithCid { ref mime_type, .. }
+                | petrel_core::Blob::Legacy { ref mime_type, .. }
+                if mime_type == "image/png"
+        ));
+        let _: serde_json::Value = agent
+            .query(
+                "app.bsky.actor.getProfile",
+                &[("actor", BOB_DID.to_owned())],
+                &BskyCallOptions::default(),
+            )
+            .await
+            .unwrap();
+
+        // Explicit non-loopback `http://` service override must STILL be refused by SSRF policy.
+        let bad_service = BskyCallOptions {
+            service: Some(Url::parse("http://example.com").unwrap()),
+            ..BskyCallOptions::default()
+        };
+        assert!(
+            agent
+                .query::<serde_json::Value>("app.bsky.actor.getProfile", &[], &bad_service)
+                .await
+                .is_err()
+        );
+
+        let seen = transport.seen.lock().unwrap().clone();
+        assert!(
+            seen.iter()
+                .any(|u| u.starts_with("http://127.0.0.1:3000/xrpc/com.atproto.repo.createRecord"))
+        );
+        assert!(
+            seen.iter()
+                .any(|u| u.starts_with("http://127.0.0.1:3000/xrpc/app.bsky.actor.getPreferences"))
+        );
+        assert!(
+            seen.iter()
+                .any(|u| u.starts_with("http://127.0.0.1:3000/xrpc/com.atproto.repo.uploadBlob"))
+        );
+        assert!(!seen.iter().any(|u| u.starts_with("http://example.com")));
+    }
+
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+    #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+    #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+    async fn non_loopback_bsky_agent_still_refuses_loopback_base_calls() {
+        let pds = Url::parse(LOOPBACK_PDS).unwrap();
+        // A client without `allow_loopback = true` still refuses `http://127.0.0.1:3000`
+        // for base-service BskyAgent calls (including `upload_blob` and `get_preferences`).
+        let strict_store =
+            SessionStore::new(Arc::new(MemorySecretStore::new()), "bsky-loopback-strict").unwrap();
+        let alice_did: Did = ALICE_DID.parse().unwrap();
+        strict_store
+            .save_account(&petrel::oauth::Account {
+                did: alice_did.clone(),
+                handle: None,
+                pds: LOOPBACK_PDS.to_owned(),
+                authorization_server: None,
+                expected_issuer: None,
+            })
+            .await
+            .unwrap();
+        strict_store.save_current_did(&alice_did).await.unwrap();
+        let strict_transport = Arc::new(LoopbackPdsTransport::new());
+        let strict_client = Arc::new(
+            AtProtoClient::new(
+                pds,
+                strict_transport.clone(),
+                strict_store,
+                Arc::new(StaticLoopbackResolver),
+                None,
+                AuthMode::Legacy,
+                false,
+            )
+            .unwrap(),
+        );
+        let strict_agent = BskyAgent::from_client(strict_client);
+        assert!(!strict_agent.allows_loopback());
+        for err in [
+            strict_agent.get_preferences().await.unwrap_err(),
+            strict_agent
+                .post_text("nope", None, None, None, None, None, None)
+                .await
+                .unwrap_err(),
+            strict_agent
+                .upload_blob(Bytes::from_static(b"png"), "image/png")
+                .await
+                .unwrap_err(),
+        ] {
+            assert!(
+                !matches!(err, petrel_bsky::BskyAgentError::NotAuthenticated),
+                "unexpected NotAuthenticated: {err:?}"
+            );
+        }
+        assert!(strict_transport.seen.lock().unwrap().is_empty());
+    }
+}
+
+// MARK: 5. Mock Transport for BskyAgent record/service/video tests (Native)
 
 #[cfg(not(target_arch = "wasm32"))]
 mod agent_tests {

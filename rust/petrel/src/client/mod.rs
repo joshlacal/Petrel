@@ -55,6 +55,7 @@ pub struct AtProtoClient {
     auth_manager: Arc<AuthManager>,
     switch_coordinator: AccountSwitchCoordinator,
     deduplicator: RequestDeduplicator,
+    allow_loopback: bool,
     state: RwLock<ClientState>,
 }
 
@@ -114,6 +115,7 @@ impl AtProtoClient {
             auth_manager,
             switch_coordinator: AccountSwitchCoordinator::new(),
             deduplicator: RequestDeduplicator::new(),
+            allow_loopback,
             state: RwLock::new(ClientState {
                 base_url,
                 xrpc,
@@ -124,6 +126,12 @@ impl AtProtoClient {
                 synced_selection_epoch,
             }),
         })
+    }
+
+    /// Returns `true` if loopback HTTP/HTTPS development endpoints are enabled on this client.
+    #[must_use]
+    pub const fn allows_loopback(&self) -> bool {
+        self.allow_loopback
     }
 
     /// Returns the underlying [`AccountManager`].
@@ -466,8 +474,7 @@ impl AtProtoClient {
     /// Queries `com.atproto.server.getSession` to determine the current account's hosting status,
     /// translating hosting-status refusals (`AccountTakedown`, etc.) into `Ok(AccountStatus)`.
     pub async fn fetch_account_status(&self) -> Result<AccountStatus, ClientError> {
-        let xrpc = self.xrpc().await;
-        match xrpc
+        match self
             .send::<get_session::GetSession>((), (), &CallOptions::default())
             .await
         {
@@ -595,6 +602,9 @@ impl AtProtoClient {
         let continuity = self.auth_manager.auth_continuity_snapshot().await;
         let expected_did = self.account_manager.current_did().await.ok().flatten();
         let mut effective = options.clone();
+        if self.allow_loopback && effective.service.is_none() {
+            effective.transport.allow_loopback = true;
+        }
         if effective.accept_labelers.is_none()
             && let Some(ref labelers) = state.labelers
         {

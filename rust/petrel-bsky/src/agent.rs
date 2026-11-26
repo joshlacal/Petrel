@@ -488,12 +488,14 @@ pub struct BskyAgent {
     transport: AgentTransport,
     app_labelers: Vec<Did>,
     preferences_lock: Arc<Mutex<()>>,
+    allow_loopback: bool,
 }
 
 impl std::fmt::Debug for BskyAgent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BskyAgent")
             .field("app_labelers", &self.app_labelers)
+            .field("allow_loopback", &self.allow_loopback)
             .finish_non_exhaustive()
     }
 }
@@ -507,10 +509,12 @@ impl BskyAgent {
     #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
     #[must_use]
     pub fn from_client(client: Arc<AtProtoClient>) -> Self {
+        let allow_loopback = client.allows_loopback();
         Self {
             transport: AgentTransport::Client(client),
             app_labelers: vec![BSKY_LABELER_DID.parse().expect("literal DID must parse")],
             preferences_lock: Arc::new(Mutex::new(())),
+            allow_loopback,
         }
     }
 
@@ -529,7 +533,21 @@ impl BskyAgent {
             },
             app_labelers: vec![BSKY_LABELER_DID.parse().expect("literal DID must parse")],
             preferences_lock: Arc::new(Mutex::new(())),
+            allow_loopback: false,
         }
+    }
+
+    /// Enables or disables loopback HTTP/HTTPS development endpoints for base-service calls.
+    #[must_use]
+    pub const fn with_loopback_development(mut self, allow: bool) -> Self {
+        self.allow_loopback = allow;
+        self
+    }
+
+    /// Returns `true` if loopback development transport is enabled for base-service calls.
+    #[must_use]
+    pub const fn allows_loopback(&self) -> bool {
+        self.allow_loopback
     }
 
     /// Overrides the always-applied app labelers (each sent with `;redact`).
@@ -572,7 +590,7 @@ impl BskyAgent {
         }
     }
 
-    fn build_call_options(options: &BskyCallOptions) -> CallOptions {
+    fn build_call_options(&self, options: &BskyCallOptions) -> CallOptions {
         let mut call = CallOptions {
             headers: options.headers.clone(),
             proxy: options.proxy.as_ref().map(ServiceProxy::header_value),
@@ -580,11 +598,9 @@ impl BskyAgent {
             service: options.service.clone(),
             ..CallOptions::default()
         };
-        if call
-            .service
-            .as_ref()
-            .is_some_and(|u| u.scheme() == "http" && is_loopback_host(u.host_str()))
-        {
+        if call.service.as_ref().map_or(self.allow_loopback, |u| {
+            u.scheme() == "http" && is_loopback_host(u.host_str())
+        }) {
             call.transport.allow_loopback = true;
         }
         call
@@ -596,7 +612,7 @@ impl BskyAgent {
         params: &[(&str, String)],
         options: &BskyCallOptions,
     ) -> Result<XrpcResponse, BskyAgentError> {
-        let call = Self::build_call_options(options);
+        let call = self.build_call_options(options);
         let pairs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
         let res = match &self.transport {
             AgentTransport::Client(client) if call.service.is_none() => {
@@ -616,7 +632,7 @@ impl BskyAgent {
         body: Option<XrpcBody>,
         options: &BskyCallOptions,
     ) -> Result<XrpcResponse, BskyAgentError> {
-        let call = Self::build_call_options(options);
+        let call = self.build_call_options(options);
         let empty: [(&str, &str); 0] = [];
         let res = match &self.transport {
             AgentTransport::Client(client) if call.service.is_none() => {
@@ -2038,7 +2054,7 @@ impl PinnedAgentSession<'_> {
         options: &BskyCallOptions,
     ) -> Result<XrpcResponse, BskyAgentError> {
         self.verify_continuity().await?;
-        let call = BskyAgent::build_call_options(options);
+        let call = self.agent.build_call_options(options);
         let pairs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
         let resp = match self.xrpc.query(nsid, pairs, &call).await {
             Ok(resp) => resp,
@@ -2058,7 +2074,7 @@ impl PinnedAgentSession<'_> {
         options: &BskyCallOptions,
     ) -> Result<XrpcResponse, BskyAgentError> {
         self.verify_continuity().await?;
-        let call = BskyAgent::build_call_options(options);
+        let call = self.agent.build_call_options(options);
         let empty: [(&str, &str); 0] = [];
         let resp = match self.xrpc.procedure(nsid, empty, body, &call).await {
             Ok(resp) => resp,
@@ -2079,11 +2095,8 @@ impl PinnedAgentSession<'_> {
             ));
         }
         self.verify_continuity().await?;
-        let out = match self
-            .xrpc
-            .upload_blob(data, mime_type, None, &CallOptions::default())
-            .await
-        {
+        let call = self.agent.build_call_options(&BskyCallOptions::default());
+        let out = match self.xrpc.upload_blob(data, mime_type, None, &call).await {
             Ok(out) => out,
             Err(err) => {
                 self.verify_continuity().await?;
@@ -2339,7 +2352,7 @@ impl BskyPreferencesSession for NetworkPreferencesSession {
             self.verify_continuity().await?;
             let nsid = "app.bsky.actor.getPreferences";
             let empty: [(&str, &str); 0] = [];
-            let call = BskyAgent::build_call_options(&BskyCallOptions::default());
+            let call = self.agent.build_call_options(&BskyCallOptions::default());
             let resp = match self.xrpc.query(nsid, empty, &call).await {
                 Ok(resp) => resp,
                 Err(err) => {
@@ -2370,7 +2383,7 @@ impl BskyPreferencesSession for NetworkPreferencesSession {
             let encoded = serde_json::to_vec(&body)
                 .map_err(|e| BskyAgentError::InvalidInput(format!("encode {nsid}: {e}")))?;
             let empty: [(&str, &str); 0] = [];
-            let call = BskyAgent::build_call_options(&BskyCallOptions::default());
+            let call = self.agent.build_call_options(&BskyCallOptions::default());
             if let Err(err) = self
                 .xrpc
                 .procedure(nsid, empty, Some(XrpcBody::json(encoded)), &call)
