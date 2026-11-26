@@ -1203,14 +1203,13 @@ impl<B: BlockStore + ?Sized> BlockStore for RollbackTrackingStore<B> {
     ) -> BoxFuture<'a, Result<(), crate::error::BlockStoreError>> {
         Box::pin(async move {
             let already_present = self.inner.contains_block(cid).await?;
-            self.inner.put_block(cid, bytes).await?;
             if !already_present {
                 match self.inserted.lock() {
                     Ok(mut guard) => guard.push(cid.clone()),
                     Err(poisoned) => poisoned.into_inner().push(cid.clone()),
                 }
             }
-            Ok(())
+            self.inner.put_block(cid, bytes).await
         })
     }
 

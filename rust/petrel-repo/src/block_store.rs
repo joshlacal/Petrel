@@ -1014,6 +1014,109 @@ mod file_store {
             std::fs::write(&store_path, bytes).unwrap();
             assert!(FileBlockStore::open(&store_path).is_err());
         }
+
+        #[tokio::test]
+        async fn open_car_source_rolls_back_buffered_block_when_threshold_flush_fails() {
+            use std::collections::BTreeMap;
+
+            use petrel_core::{Did, Value};
+
+            use crate::car::DataCARByteSource;
+            use crate::crypto::P256Keypair;
+            use crate::limits::RepositoryLimits;
+            use crate::repository::{OpenVerification, Repository, create_op};
+            use crate::types::{RepositoryReadPolicy, WriteBatch};
+
+            let did = Did::parse("did:plc:ewvi7nxzyoun6zhxrhs64oiz").unwrap();
+            let signer = P256Keypair::generate().unwrap();
+            let limits = RepositoryLimits::standard();
+            let policy = RepositoryReadPolicy::strict();
+
+            // Create a >1 MiB signed CAR so `FileBlockStore::put_block` hits
+            // `WRITE_BUFFER_THRESHOLD` mid-import and triggers `flush()`.
+            let base = Repository::create(did.clone(), &signer).await.unwrap();
+            let large_ops = (0..3_usize)
+                .map(|idx| {
+                    let mut map = BTreeMap::new();
+                    map.insert(
+                        "$type".to_owned(),
+                        Value::String("app.bsky.feed.post".into()),
+                    );
+                    map.insert(
+                        "text".to_owned(),
+                        Value::String(format!("{idx}-{}", "a".repeat(400_000))),
+                    );
+                    create_op(
+                        "app.bsky.feed.post",
+                        &format!("big{idx}"),
+                        &Value::Object(map),
+                    )
+                    .unwrap()
+                })
+                .collect();
+            let big_repo = base
+                .commit_writes(WriteBatch::new(large_ops).unwrap(), &signer)
+                .await
+                .unwrap();
+            let big_car = big_repo.repository.export_car().await.unwrap();
+
+            // Pre-populate destination FileBlockStore with one synced block, then inject flush failure.
+            let dir = tempfile::tempdir().unwrap();
+            let store_path = dir.path().join("rollback_threshold.carframes");
+            let store = Arc::new(FileBlockStore::open(&store_path).unwrap());
+
+            let pre_bytes = b"\xa1\x63pre\x01".to_vec();
+            let pre_cid = Cid::for_dag_cbor(&pre_bytes);
+            store.put_block(&pre_cid, &pre_bytes).await.unwrap();
+            store.synchronize().await.unwrap();
+
+            let fail_flag = Arc::new(AtomicBool::new(true));
+            {
+                let mut guard = store.state.write().await;
+                let writer_file = OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&store_path)
+                    .unwrap();
+                guard.writer = Box::new(PartialFailWriter {
+                    inner: writer_file,
+                    fail_next: Arc::clone(&fail_flag),
+                });
+            }
+
+            let mut source = DataCARByteSource::new(big_car);
+            let err = Repository::open_car_source(
+                &mut source,
+                Arc::clone(&store),
+                OpenVerification::SigningKey(signer.public_key().clone()),
+                Some(&did),
+                limits,
+                policy,
+                true,
+            )
+            .await
+            .unwrap_err();
+            assert!(matches!(
+                err,
+                crate::error::RepositoryError::Car(crate::error::CARError::BlockStore(
+                    BlockStoreError::Io(_)
+                ))
+            ));
+
+            // Every imported block—including the threshold block whose `flush()` failed—must
+            // have been rolled back from `pending_puts` so later syncs persist zero orphans.
+            assert_eq!(store.all_cids().await.unwrap(), vec![pre_cid.clone()]);
+            assert_eq!(store.len().await.unwrap(), 1);
+            assert_eq!(store.total_bytes().await.unwrap(), pre_bytes.len());
+
+            fail_flag.store(false, Ordering::SeqCst);
+            store.synchronize().await.unwrap();
+            drop(store);
+
+            let reopened = FileBlockStore::open(&store_path).unwrap();
+            assert_eq!(reopened.all_cids().await.unwrap(), vec![pre_cid]);
+            assert_eq!(reopened.total_bytes().await.unwrap(), pre_bytes.len());
+        }
     }
 }
 
