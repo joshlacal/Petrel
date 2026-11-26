@@ -1,4 +1,7 @@
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use petrel_core::Did;
 use serde::{Deserialize, Serialize};
@@ -144,6 +147,115 @@ impl SessionStore {
         let selection = self.report_storage_result(None, "clear current account", result)?;
         self.emit_selection_change(selection);
         Ok(())
+    }
+
+    pub(crate) async fn save_account_selecting_if_unset(
+        &self,
+        account: &Account,
+    ) -> Result<bool, StoreError> {
+        let result = self
+            .edit_catalog(|catalog| {
+                catalog.accounts.insert(
+                    account.did.clone(),
+                    AccountEntry::Profile(Box::new(account.clone())),
+                );
+                if catalog.current.is_none() {
+                    catalog.current = Some(account.did.clone());
+                }
+                Ok(())
+            })
+            .await;
+        let selection = self.report_storage_result(Some(&account.did), "save account", result)?;
+        let changed = selection.0 != selection.1;
+        self.emit_selection_change(selection);
+        Ok(changed)
+    }
+
+    pub(crate) async fn update_account_if_exists(
+        &self,
+        account: &Account,
+    ) -> Result<bool, StoreError> {
+        if self.get_account(&account.did).await?.is_none() {
+            return Ok(false);
+        }
+        let updated = AtomicBool::new(false);
+        let result = self
+            .edit_catalog(|catalog| {
+                let exists = catalog.accounts.contains_key(&account.did);
+                updated.store(exists, Ordering::Relaxed);
+                if exists {
+                    catalog.accounts.insert(
+                        account.did.clone(),
+                        AccountEntry::Profile(Box::new(account.clone())),
+                    );
+                }
+                Ok(())
+            })
+            .await
+            .map(|_| ());
+        self.report_storage_result(Some(&account.did), "update account", result)?;
+        Ok(updated.load(Ordering::Relaxed))
+    }
+
+    pub(crate) async fn remove_account_and_update_selection(
+        &self,
+        did: &Did,
+        auto_switch: bool,
+    ) -> Result<SelectionChange, StoreError> {
+        let discoverable = if auto_switch {
+            self.list_account_dids().await?
+        } else {
+            Vec::new()
+        };
+        let result = self
+            .edit_catalog(|catalog| {
+                catalog.accounts.remove(did);
+                if catalog.current.as_ref() == Some(did) {
+                    catalog.current = if auto_switch {
+                        discoverable
+                            .iter()
+                            .find(|candidate| {
+                                *candidate != did && catalog.accounts.contains_key(*candidate)
+                            })
+                            .cloned()
+                            .or_else(|| {
+                                catalog
+                                    .accounts
+                                    .iter()
+                                    .find(|(candidate, entry)| {
+                                        *candidate != did
+                                            && matches!(entry, AccountEntry::Profile(_))
+                                    })
+                                    .map(|(candidate, _)| candidate.clone())
+                            })
+                    } else {
+                        None
+                    };
+                }
+                Ok(())
+            })
+            .await;
+        let selection = self.report_storage_result(Some(did), "delete account", result)?;
+        self.emit_selection_change(selection.clone());
+        Ok(selection)
+    }
+
+    pub(crate) async fn clear_current_did_if_selected_returning_cleared(
+        &self,
+        did: &Did,
+    ) -> Result<bool, StoreError> {
+        let result = self
+            .edit_catalog(|catalog| {
+                if catalog.current.as_ref() == Some(did) {
+                    catalog.current = None;
+                }
+                Ok(())
+            })
+            .await;
+        let selection = self.report_storage_result(Some(did), "clear current account", result)?;
+        let cleared = selection.1.is_none();
+        self.emit_selection_change(selection);
+        Ok(cleared)
     }
 
     pub(crate) async fn clear_current_did_if_selected(&self, did: &Did) -> Result<(), StoreError> {

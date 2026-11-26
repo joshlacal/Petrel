@@ -125,13 +125,16 @@ impl AccountManager {
 
     /// Adds or updates an account in the catalog; selects it if no current account is active.
     pub async fn add_account(&self, account: &Account) -> Result<(), AccountError> {
-        self.storage.save_account(account).await?;
+        let selected = self
+            .storage
+            .save_account_selecting_if_unset(account)
+            .await?;
         self.cache
             .lock()
             .await
             .insert(account.did.clone(), account.clone());
-        if self.storage.get_current_did().await?.is_none() {
-            self.set_current_account(&account.did).await?;
+        if selected {
+            self.selection_epoch.fetch_add(1, Ordering::AcqRel);
         }
         Ok(())
     }
@@ -139,11 +142,10 @@ impl AccountManager {
     /// Updates an already-registered account's metadata without altering current selection.
     /// Returns `Ok(false)` if the account no longer exists in storage.
     pub async fn update_account(&self, account: &Account) -> Result<bool, AccountError> {
-        if self.storage.get_account(&account.did).await?.is_none() {
+        if !self.storage.update_account_if_exists(account).await? {
             self.cache.lock().await.remove(&account.did);
             return Ok(false);
         }
-        self.storage.save_account(account).await?;
         self.cache
             .lock()
             .await
@@ -186,8 +188,8 @@ impl AccountManager {
         if account.did.as_str().is_empty() {
             return Err(AccountError::InvalidAccount);
         }
-        self.cache.lock().await.insert(did.clone(), account);
         self.storage.save_current_did(did).await?;
+        self.cache.lock().await.insert(did.clone(), account);
         self.selection_epoch.fetch_add(1, Ordering::AcqRel);
         Ok(())
     }
@@ -216,13 +218,11 @@ impl AccountManager {
     /// returning `true` when `did` was cleared (or nothing was selected) and `false`
     /// if another account is now active.
     pub async fn clear_current_account_if_selected(&self, did: &Did) -> Result<bool, AccountError> {
-        self.storage.clear_current_did_if_selected(did).await?;
-        let switched_to_other = self
+        let cleared = self
             .storage
-            .get_current_did()
-            .await?
-            .is_some_and(|current| current != *did);
-        if switched_to_other {
+            .clear_current_did_if_selected_returning_cleared(did)
+            .await?;
+        if !cleared {
             return Ok(false);
         }
         self.selection_epoch.fetch_add(1, Ordering::AcqRel);
@@ -242,7 +242,8 @@ impl AccountManager {
     }
 
     /// Removes `did`, invoking any registered removal handler first while credentials still exist,
-    /// then clearing session/DPoP/account data and optionally auto-switching to another account.
+    /// then clearing session/DPoP/account data and conditionally auto-switching to another account
+    /// atomically in the catalog only if `did` is still the active selection.
     pub async fn remove_account(&self, did: &Did) -> Result<(), AccountError> {
         let handler = self
             .removal_handler
@@ -253,10 +254,7 @@ impl AccountManager {
             handler.on_remove(did).await;
         }
 
-        let was_current = self.storage.get_current_did().await?.as_ref() == Some(did);
-        self.storage.delete_account(did).await?;
         self.cache.lock().await.remove(did);
-
         let _ = self.storage.delete_session(did).await;
         let _ = self.storage.delete_pending_session(did).await;
         let _ = self.storage.delete_dpop_key(did.as_str()).await;
@@ -269,18 +267,259 @@ impl AccountManager {
             )
             .await;
 
-        if was_current {
-            let remaining = self.storage.list_account_dids().await?;
-            if self.auto_switch_on_removal.load(Ordering::Relaxed)
-                && let Some(first) = remaining.first()
-                && self.set_current_account(first).await.is_ok()
-            {
-                // `set_current_account` already persisted the new DID and bumped `selection_epoch`.
-            } else {
-                self.storage.delete_current_did().await?;
-                self.selection_epoch.fetch_add(1, Ordering::AcqRel);
-            }
+        let auto_switch = self.auto_switch_on_removal.load(Ordering::Relaxed);
+        let (previous, current) = self
+            .storage
+            .remove_account_and_update_selection(did, auto_switch)
+            .await?;
+        self.cache.lock().await.remove(did);
+        if previous != current {
+            self.selection_epoch.fetch_add(1, Ordering::AcqRel);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+
+    use futures_util::future::join;
+
+    use super::*;
+    use crate::storage::{MemorySecretStore, SecretStore};
+
+    const ALICE: &str = "did:plc:aliceaaaaaaaaaaaaaaaaa";
+    const BOB: &str = "did:plc:bobbbbbbbbbbbbbbbbbbbb";
+    const CAROL: &str = "did:plc:carolccccccccccccccccc";
+
+    fn account(did: &str) -> Account {
+        Account {
+            did: did.parse().expect("valid did"),
+            handle: None,
+            pds: "https://pds.example".to_owned(),
+            authorization_server: None,
+            expected_issuer: None,
+        }
+    }
+
+    struct AsyncBarrier {
+        opened: AtomicBool,
+        waiter: std::sync::Mutex<Option<std::task::Waker>>,
+    }
+
+    impl AsyncBarrier {
+        fn new() -> Self {
+            Self {
+                opened: AtomicBool::new(false),
+                waiter: std::sync::Mutex::new(None),
+            }
+        }
+
+        fn open(&self) {
+            self.opened.store(true, Ordering::Release);
+            if let Some(waker) = self.waiter.lock().unwrap().take() {
+                waker.wake();
+            }
+        }
+
+        async fn wait(&self) {
+            std::future::poll_fn(|cx| {
+                if self.opened.load(Ordering::Acquire) {
+                    return std::task::Poll::Ready(());
+                }
+                *self.waiter.lock().unwrap() = Some(cx.waker().clone());
+                if self.opened.load(Ordering::Acquire) {
+                    std::task::Poll::Ready(())
+                } else {
+                    std::task::Poll::Pending
+                }
+            })
+            .await;
+        }
+    }
+
+    struct PausedDeleteSecretStore {
+        inner: Arc<MemorySecretStore>,
+        pause_key: String,
+        armed: AtomicBool,
+        entered: Arc<AsyncBarrier>,
+        release: Arc<AsyncBarrier>,
+    }
+
+    impl PausedDeleteSecretStore {
+        fn new(pause_key: String) -> (Self, Arc<AsyncBarrier>, Arc<AsyncBarrier>) {
+            let entered = Arc::new(AsyncBarrier::new());
+            let release = Arc::new(AsyncBarrier::new());
+            (
+                Self {
+                    inner: Arc::new(MemorySecretStore::new()),
+                    pause_key,
+                    armed: AtomicBool::new(false),
+                    entered: Arc::clone(&entered),
+                    release: Arc::clone(&release),
+                },
+                entered,
+                release,
+            )
+        }
+
+        fn arm(&self) {
+            self.armed.store(true, Ordering::Release);
+        }
+    }
+
+    impl SecretStore for PausedDeleteSecretStore {
+        fn get<'a>(
+            &'a self,
+            namespace: &'a str,
+            key: &'a str,
+        ) -> BoxFuture<'a, Result<Option<Vec<u8>>, StoreError>> {
+            self.inner.get(namespace, key)
+        }
+
+        fn put<'a>(
+            &'a self,
+            namespace: &'a str,
+            key: &'a str,
+            value: &'a [u8],
+        ) -> BoxFuture<'a, Result<(), StoreError>> {
+            self.inner.put(namespace, key, value)
+        }
+
+        fn delete<'a>(
+            &'a self,
+            namespace: &'a str,
+            key: &'a str,
+        ) -> BoxFuture<'a, Result<(), StoreError>> {
+            Box::pin(async move {
+                if key == self.pause_key && self.armed.swap(false, Ordering::AcqRel) {
+                    self.entered.open();
+                    self.release.wait().await;
+                }
+                self.inner.delete(namespace, key).await
+            })
+        }
+
+        fn take<'a>(
+            &'a self,
+            namespace: &'a str,
+            key: &'a str,
+        ) -> BoxFuture<'a, Result<Option<Vec<u8>>, StoreError>> {
+            self.inner.take(namespace, key)
+        }
+
+        fn delete_namespace<'a>(
+            &'a self,
+            namespace: &'a str,
+        ) -> BoxFuture<'a, Result<(), StoreError>> {
+            self.inner.delete_namespace(namespace)
+        }
+
+        fn compare_and_swap<'a>(
+            &'a self,
+            namespace: &'a str,
+            key: &'a str,
+            expected: Option<&'a [u8]>,
+            new: Option<&'a [u8]>,
+        ) -> BoxFuture<'a, Result<bool, StoreError>> {
+            self.inner.compare_and_swap(namespace, key, expected, new)
+        }
+    }
+
+    #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+    async fn run_switch_during_removal_case(auto_switch: bool) {
+        let alice: Did = ALICE.parse().unwrap();
+        let _bob: Did = BOB.parse().unwrap();
+        let carol: Did = CAROL.parse().unwrap();
+
+        let (backend, entered, release) =
+            PausedDeleteSecretStore::new(format!("legacySession.{ALICE}"));
+        let backend = Arc::new(backend);
+        let store = SessionStore::new(backend.clone(), "acct-race").unwrap();
+        let mgr = Arc::new(AccountManager::new(store));
+        mgr.set_auto_switch_on_removal(auto_switch);
+
+        // `bob` sorts ahead of `carol`, so a naive fallback would replace `carol` with `bob`
+        // when `auto_switch == true`, or clear `carol` when `auto_switch == false`.
+        mgr.add_account(&account(ALICE)).await.unwrap();
+        mgr.add_account(&account(BOB)).await.unwrap();
+        mgr.add_account(&account(CAROL)).await.unwrap();
+        assert_eq!(mgr.current_did().await.unwrap(), Some(alice.clone()));
+
+        backend.arm();
+        let epoch_before_remove = mgr.selection_epoch();
+        let remove_fut = mgr.remove_account(&alice);
+        let switch_fut = async {
+            entered.wait().await;
+            mgr.set_current_account(&carol).await.unwrap();
+            let epoch_after_switch = mgr.selection_epoch();
+            release.open();
+            epoch_after_switch
+        };
+        let (remove_res, epoch_after_switch) = join(remove_fut, switch_fut).await;
+        remove_res.unwrap();
+
+        assert!(epoch_after_switch > epoch_before_remove);
+        assert_eq!(mgr.current_did().await.unwrap(), Some(carol));
+        assert_eq!(mgr.selection_epoch(), epoch_after_switch);
+        assert!(mgr.get_account(&alice).await.unwrap().is_none());
+    }
+
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+    #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+    async fn concurrent_switch_during_account_removal_preserves_new_selection() {
+        run_switch_during_removal_case(true).await;
+        run_switch_during_removal_case(false).await;
+    }
+
+    struct SwitchOnRemoveHandler {
+        mgr: Arc<AccountManager>,
+        target: Did,
+    }
+
+    impl AccountRemovalHandler for SwitchOnRemoveHandler {
+        fn on_remove<'a>(&'a self, _did: &'a Did) -> BoxFuture<'a, ()> {
+            Box::pin(async move {
+                self.mgr.set_current_account(&self.target).await.unwrap();
+            })
+        }
+    }
+
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+    #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+    #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+    async fn removal_handler_switch_and_atomic_fallback_and_update_guard() {
+        let alice: Did = ALICE.parse().unwrap();
+        let bob: Did = BOB.parse().unwrap();
+        let carol: Did = CAROL.parse().unwrap();
+
+        let store = SessionStore::new(Arc::new(MemorySecretStore::new()), "acct-handler").unwrap();
+        let mgr = Arc::new(AccountManager::new(store));
+        mgr.add_account(&account(ALICE)).await.unwrap();
+        mgr.add_account(&account(BOB)).await.unwrap();
+        mgr.add_account(&account(CAROL)).await.unwrap();
+
+        // Switch inside `AccountRemovalHandler::on_remove` must also be preserved.
+        mgr.set_account_removal_handler(Some(Arc::new(SwitchOnRemoveHandler {
+            mgr: Arc::clone(&mgr),
+            target: carol.clone(),
+        })));
+        mgr.remove_account(&alice).await.unwrap();
+        mgr.set_account_removal_handler(None);
+        assert_eq!(mgr.current_did().await.unwrap(), Some(carol.clone()));
+
+        // Without concurrent switch, removing active `carol` atomically falls back to `bob`.
+        let epoch_before = mgr.selection_epoch();
+        mgr.remove_account(&carol).await.unwrap();
+        assert_eq!(mgr.current_did().await.unwrap(), Some(bob.clone()));
+        assert_eq!(mgr.selection_epoch(), epoch_before + 1);
+
+        // Removed account cannot be resurrected by `update_account`.
+        assert!(!mgr.update_account(&account(CAROL)).await.unwrap());
+        assert!(mgr.get_account(&carol).await.unwrap().is_none());
     }
 }
