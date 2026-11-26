@@ -132,6 +132,67 @@ fn bsky_app_url_round_trips_and_rejects_invalid() {
     );
 }
 
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+fn bsky_app_url_percent_decodes_did_web_and_rejects_malformed_segments() {
+    let did_web = "did:web:example.com%3A8443";
+    for (at_uri, expected_web) in [
+        (
+            format!("at://{did_web}"),
+            "https://bsky.app/profile/did:web:example.com%253A8443".to_owned(),
+        ),
+        (
+            format!("at://{did_web}/app.bsky.feed.post/3kabcdefghi2a"),
+            "https://bsky.app/profile/did:web:example.com%253A8443/post/3kabcdefghi2a".to_owned(),
+        ),
+        (
+            format!("at://{did_web}/app.bsky.graph.starterpack/3kpack"),
+            "https://bsky.app/starter-pack/did:web:example.com%253A8443/3kpack".to_owned(),
+        ),
+    ] {
+        let uri: AtUri = at_uri.parse().unwrap();
+        let web = BskyAppURL::url_for(&uri, None, None).unwrap();
+        assert_eq!(web.as_str(), expected_web);
+        assert_eq!(BskyAppURL::at_uri_from_url(&web, None), Some(uri));
+    }
+
+    let profile_web = BskyAppURL::profile_url(did_web).unwrap();
+    assert_eq!(
+        profile_web.as_str(),
+        "https://bsky.app/profile/did:web:example.com%253A8443"
+    );
+    assert_eq!(
+        BskyAppURL::at_uri_from_url(&profile_web, None)
+            .unwrap()
+            .as_str(),
+        format!("at://{did_web}")
+    );
+
+    let encoded_did_url =
+        Url::parse("https://bsky.app/profile/did%3Aplc%3Az72i7hdynmk6r22z27h6tvur/post/3kabc")
+            .unwrap();
+    assert_eq!(
+        BskyAppURL::at_uri_from_url(&encoded_did_url, None)
+            .unwrap()
+            .as_str(),
+        format!("at://{ALICE_DID}/app.bsky.feed.post/3kabc")
+    );
+
+    assert!(BskyAppURL::profile_url_with_host("alice.example", "bsky.app/evil?a=b").is_none());
+
+    for bad in [
+        "https://bsky.app/profile/alice.example%2",
+        "https://bsky.app/profile/alice.example%ZZ",
+        "https://bsky.app/profile/%FF/post/3kabc",
+        "https://bsky.app/profile/alice.example%2Fextra/post/3kabc",
+        "https://bsky.app/profile/alice.example/post/3k%2Fabc",
+        "https://bsky.app/profile/alice.example/post%2Fextra/3kabc",
+    ] {
+        let url = Url::parse(bad).unwrap();
+        assert!(BskyAppURL::at_uri_from_url(&url, None).is_none(), "{bad}");
+    }
+}
+
 // MARK: 2. BskyLabelSetTests
 
 fn mk_label(

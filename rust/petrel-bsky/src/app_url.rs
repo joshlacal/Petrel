@@ -86,28 +86,29 @@ impl BskyAppURL {
             return None;
         }
 
-        let segments: Vec<&str> = url
+        let segments: Vec<String> = url
             .path()
             .split('/')
             .filter(|part| !part.is_empty())
-            .collect();
+            .map(decode_path_segment)
+            .collect::<Option<Vec<_>>>()?;
         if segments.len() < 2 {
             return None;
         }
 
         let (actor, collection, rkey): (&str, Option<&str>, Option<&str>) =
-            match (segments[0], segments.len()) {
-                ("profile", 2) => (segments[1], None, None),
+            match (segments[0].as_str(), segments.len()) {
+                ("profile", 2) => (segments[1].as_str(), None, None),
                 ("profile", 4) => {
                     let &(col, _) = RECORD_SEGMENTS
                         .iter()
-                        .find(|&&(_, seg)| seg == segments[2])?;
-                    (segments[1], Some(col), Some(segments[3]))
+                        .find(|&&(_, seg)| seg == segments[2].as_str())?;
+                    (segments[1].as_str(), Some(col), Some(segments[3].as_str()))
                 }
                 ("starter-pack" | "start", 3) => (
-                    segments[1],
+                    segments[1].as_str(),
                     Some(STARTER_PACK_COLLECTION),
-                    Some(segments[2]),
+                    Some(segments[2].as_str()),
                 ),
                 _ => return None,
             };
@@ -125,10 +126,56 @@ impl BskyAppURL {
 }
 
 fn build_url(host: &str, segments: &[&str]) -> Option<Url> {
+    if host.is_empty() || host.contains(['/', '?', '#', '@']) {
+        return None;
+    }
     let mut url = Url::parse(&format!("https://{host}")).ok()?;
+    if url.path() != "/"
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return None;
+    }
     {
         let mut path = url.path_segments_mut().ok()?;
         path.extend(segments);
     }
     Some(url)
+}
+
+fn decode_path_segment(raw: &str) -> Option<String> {
+    let bytes = raw.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let byte = bytes[i];
+        if byte == b'%' {
+            let hi = hex_nibble(*bytes.get(i + 1)?)?;
+            let lo = hex_nibble(*bytes.get(i + 2)?)?;
+            let decoded = (hi << 4) | lo;
+            if decoded == b'/' {
+                return None;
+            }
+            out.push(decoded);
+            i += 3;
+        } else {
+            if byte == b'/' {
+                return None;
+            }
+            out.push(byte);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).ok()
+}
+
+const fn hex_nibble(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
 }
