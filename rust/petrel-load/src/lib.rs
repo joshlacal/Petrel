@@ -21,7 +21,7 @@ use petrel::oauth::{
     ClientAuth, OAuthClient, OAuthConfig, OAuthIdentityAdapter, OAuthStartOptions, OAuthTarget,
 };
 use petrel::storage::{AuthEvent, AuthSubscription, FileSecretStore, SessionStore};
-use petrel::xrpc::{AuthProvider, CallOptions};
+use petrel::xrpc::CallOptions;
 use petrel_core::{AtIdentifier, Handle};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -918,6 +918,54 @@ pub async fn run_cli<S: AsRef<str>>(
     let unauth = parsed.get("unauth").map(String::as_str) == Some("true");
     let allow_loopback = base_url_allows_loopback(&base_url);
     let client = build_client(base_url, session_store, oauth_cfg.as_ref(), unauth)?;
+    let outcome = execute_cli_with_client(
+        &client,
+        &parsed,
+        namespace,
+        endpoint,
+        allow_loopback,
+        oauth_cfg.as_ref(),
+    )
+    .await;
+    if let Some(handle) = recorder {
+        handle.drain().await;
+    }
+    outcome
+}
+
+/// Executes parsed `petrel-load` scenarios against a caller-supplied [`AtProtoClient`].
+pub async fn run_cli_with_client<S: AsRef<str>>(
+    client: &Arc<AtProtoClient>,
+    argv: &[S],
+    allow_loopback: bool,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let parsed = PetrelLoadCli::parse_args(argv)?;
+    let (Some(namespace), Some(endpoint)) = (parsed.get("namespace"), parsed.get("endpoint"))
+    else {
+        return Err(Box::new(ArgumentError::MissingValue(
+            "namespace/endpoint".to_owned(),
+        )));
+    };
+    let oauth_cfg = PetrelLoadCli::oauth_configuration(&parsed)?;
+    execute_cli_with_client(
+        client,
+        &parsed,
+        namespace,
+        endpoint,
+        allow_loopback,
+        oauth_cfg.as_ref(),
+    )
+    .await
+}
+
+async fn execute_cli_with_client(
+    client: &Arc<AtProtoClient>,
+    parsed: &BTreeMap<String, String>,
+    namespace: &str,
+    endpoint: &str,
+    allow_loopback: bool,
+    oauth_cfg: Option<&CliOAuthConfig>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let opts = RunOptions {
         namespace,
         endpoint,
@@ -929,7 +977,7 @@ pub async fn run_cli<S: AsRef<str>>(
             .get("concurrency")
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(10),
-        unauth,
+        unauth: parsed.get("unauth").map(String::as_str) == Some("true"),
         allow_loopback,
         keep_running: parsed.get("keep-running").map(String::as_str) == Some("true"),
         oauth_stress: parsed.get("oauth-stress").map(String::as_str) == Some("true"),
@@ -937,13 +985,9 @@ pub async fn run_cli<S: AsRef<str>>(
         dpop_test: parsed.get("dpop-test").map(String::as_str),
         simulate_ambiguous: parsed.get("simulate-ambiguous-timeout").map(String::as_str)
             == Some("true"),
-        oauth_cfg: oauth_cfg.as_ref(),
+        oauth_cfg,
     };
-    let outcome = execute_mode(&client, &parsed, &opts).await;
-    if let Some(handle) = recorder {
-        handle.drain().await;
-    }
-    outcome
+    execute_mode(client, parsed, &opts).await
 }
 
 async fn execute_mode(
@@ -1073,13 +1117,7 @@ async fn run_oauth_diagnostics(
         )));
     }
     if opts.simulate_ambiguous {
-        if !cfg!(debug_assertions) {
-            return Err(Box::new(ScenarioError::DebugBuildRequired(
-                "--simulate-ambiguous-timeout".to_owned(),
-            )));
-        }
-        client.auth_manager().refresh_if_needed().await?;
-        return Ok(());
+        return run_simulate_ambiguous_timeout(client, opts.allow_loopback).await;
     }
     if opts.oauth_stress {
         return run_basic_stress_test(
@@ -1110,8 +1148,9 @@ async fn run_oauth_diagnostics(
                 .await
             }
             ScenarioPlan::SerialRefreshes { count } => {
-                for _ in 0..count {
-                    client.auth_manager().refresh_if_needed().await?;
+                for step in 0..count {
+                    let refreshed = client.refresh_token(true).await?;
+                    println!("Token refresh {}/{count}: {refreshed}", step + 1);
                 }
                 Ok(())
             }
@@ -1135,6 +1174,41 @@ async fn run_oauth_diagnostics(
         return run_dpop_test_mode(client, mode, opts).await;
     }
     Ok(())
+}
+
+#[cfg(debug_assertions)]
+async fn run_simulate_ambiguous_timeout(
+    client: &Arc<AtProtoClient>,
+    allow_loopback: bool,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    println!("Simulating ambiguous refresh timeout…");
+    client.simulate_ambiguous_refresh_timeout().await?;
+    println!("Triggering refresh after simulated ambiguous timeout…");
+    let refreshed = client.refresh_token(true).await?;
+    println!("Refresh returned: {refreshed}");
+    let account = client.get_current_account().await?;
+    let actor = account
+        .as_ref()
+        .and_then(|acc| acc.handle.as_ref().map(Handle::as_str))
+        .or_else(|| account.as_ref().map(|acc| acc.did.as_str()))
+        .unwrap_or("bsky.app");
+    let mut call_opts = CallOptions::default();
+    call_opts.transport.allow_loopback = allow_loopback;
+    let resp = client
+        .query("app.bsky.actor.getProfile", [("actor", actor)], &call_opts)
+        .await?;
+    println!("✓ API call after ambiguous path: {}", resp.metadata.status);
+    Ok(())
+}
+
+#[cfg(not(debug_assertions))]
+async fn run_simulate_ambiguous_timeout(
+    _client: &Arc<AtProtoClient>,
+    _allow_loopback: bool,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    Err(Box::new(ScenarioError::DebugBuildRequired(
+        "--simulate-ambiguous-timeout".to_owned(),
+    )))
 }
 
 async fn run_dpop_test_mode(
@@ -1166,7 +1240,8 @@ async fn run_dpop_test_mode(
             .await
         }
         ScenarioPlan::SingleRefresh => {
-            client.auth_manager().refresh_if_needed().await?;
+            let refreshed = client.refresh_token(true).await?;
+            println!("✓ Token refresh result: {refreshed}");
             Ok(())
         }
         ScenarioPlan::SerialRefreshes { .. } | ScenarioPlan::SessionSnapshot => {

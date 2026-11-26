@@ -5,6 +5,7 @@ use std::io::Cursor;
 use std::process::Command;
 use std::sync::Arc;
 
+use petrel::auth::AuthMode;
 use petrel::oauth::Account;
 use petrel::storage::{MemorySecretStore, SessionStore};
 use petrel_core::Did;
@@ -404,4 +405,388 @@ fn auth_event_jsonl_writer_restricts_file_permissions_to_0600() {
         .mode()
         & 0o777;
     assert_eq!(existing_mode, 0o600);
+}
+
+mod oauth_diagnostics_support {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex};
+
+    use bytes::Bytes;
+    use http::{Request, Response, StatusCode};
+    use petrel::auth::AuthMode;
+    use petrel::client::AtProtoClient;
+    use petrel::crypto::{DpopSigner, SoftwareDpopSigner};
+    use petrel::net::{HttpTransport, SendOptions, TransportError};
+    use petrel::oauth::{
+        Account, ClientAuth, OAuthClient, OAuthConfig, OAuthIdentity, OAuthIdentityError,
+        OAuthIdentityResolver, Session, SessionRecord,
+    };
+    use petrel::rt::BoxFuture;
+    use petrel::storage::{MemorySecretStore, SessionStore};
+    use petrel_core::{AtIdentifier, Did};
+    use serde_json::json;
+    use url::Url;
+
+    pub(super) const DID: &str = "did:plc:loaddiag";
+    pub(super) const PDS_ORIGIN: &str = "https://pds.load-diag.example";
+
+    pub(super) struct StaticResolver;
+    impl OAuthIdentityResolver for StaticResolver {
+        fn resolve_identity<'a>(
+            &'a self,
+            _identifier: &'a AtIdentifier,
+            _force_refresh: bool,
+        ) -> BoxFuture<'a, Result<OAuthIdentity, OAuthIdentityError>> {
+            Box::pin(async {
+                Ok(OAuthIdentity {
+                    did: DID.parse().unwrap(),
+                    handle: None,
+                    pds: Url::parse(PDS_ORIGIN).unwrap(),
+                })
+            })
+        }
+    }
+
+    pub(super) struct MockOAuthPdsTransport {
+        pub(super) token_calls: AtomicUsize,
+        pub(super) profile_calls: AtomicUsize,
+        current_refresh: Mutex<String>,
+        current_access: Mutex<String>,
+        pub(super) seen_profile_auth: Mutex<Vec<String>>,
+    }
+
+    impl MockOAuthPdsTransport {
+        pub(super) fn new() -> Self {
+            Self {
+                token_calls: AtomicUsize::new(0),
+                profile_calls: AtomicUsize::new(0),
+                current_refresh: Mutex::new("refresh-0".to_owned()),
+                current_access: Mutex::new("access-0".to_owned()),
+                seen_profile_auth: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    impl HttpTransport for MockOAuthPdsTransport {
+        fn send(
+            &self,
+            request: Request<Bytes>,
+            _options: &SendOptions,
+        ) -> impl std::future::Future<Output = Result<Response<Bytes>, TransportError>> + Send
+        {
+            let path = request.uri().path().to_owned();
+            let auth_hdr = request
+                .headers()
+                .get(http::header::AUTHORIZATION)
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_owned);
+            let body_bytes = request.into_body();
+            let result = match path.as_str() {
+                "/oauth/token" => {
+                    let count = self.token_calls.fetch_add(1, Ordering::SeqCst) + 1;
+                    let params: Vec<(String, String)> = url::form_urlencoded::parse(&body_bytes)
+                        .into_owned()
+                        .collect();
+                    let offered = params
+                        .iter()
+                        .find(|(k, _)| k == "refresh_token")
+                        .map_or("", |(_, v)| v.as_str());
+                    let mut cur_refresh = self.current_refresh.lock().unwrap();
+                    if offered == cur_refresh.as_str() {
+                        let next_refresh = format!("refresh-{count}");
+                        let next_access = format!("access-{count}");
+                        cur_refresh.clone_from(&next_refresh);
+                        self.current_access.lock().unwrap().clone_from(&next_access);
+                        (
+                            StatusCode::OK,
+                            json!({
+                                "sub": DID,
+                                "access_token": next_access,
+                                "refresh_token": next_refresh,
+                                "token_type": "DPoP",
+                                "expires_in": 3600,
+                                "scope": "atproto transition:generic",
+                            }),
+                        )
+                    } else {
+                        (
+                            StatusCode::BAD_REQUEST,
+                            json!({"error": "invalid_grant", "error_description": "stale refresh"}),
+                        )
+                    }
+                }
+                "/xrpc/app.bsky.actor.getProfile" => {
+                    self.profile_calls.fetch_add(1, Ordering::SeqCst);
+                    let expected_access = self.current_access.lock().unwrap().clone();
+                    let expected_auth = format!("DPoP {expected_access}");
+                    if let Some(ref hdr) = auth_hdr {
+                        self.seen_profile_auth.lock().unwrap().push(hdr.clone());
+                    }
+                    if auth_hdr.as_deref() == Some(expected_auth.as_str()) {
+                        (
+                            StatusCode::OK,
+                            json!({
+                                "did": DID,
+                                "handle": "diag.load.example",
+                            }),
+                        )
+                    } else {
+                        (StatusCode::UNAUTHORIZED, json!({"error": "InvalidToken"}))
+                    }
+                }
+                _ => (StatusCode::NOT_FOUND, json!({"error": "NotFound"})),
+            };
+            std::future::ready(Ok(Response::builder()
+                .status(result.0)
+                .header("Content-Type", "application/json")
+                .body(Bytes::from(serde_json::to_vec(&result.1).unwrap()))
+                .unwrap()))
+        }
+    }
+
+    pub(super) async fn setup_oauth_client(
+        ns: &str,
+    ) -> (
+        Arc<AtProtoClient>,
+        Arc<MockOAuthPdsTransport>,
+        SessionStore,
+        Did,
+    ) {
+        let did: Did = DID.parse().unwrap();
+        let pds = Url::parse(PDS_ORIGIN).unwrap();
+        let net = Arc::new(MockOAuthPdsTransport::new());
+        let store = SessionStore::new(Arc::new(MemorySecretStore::new()), ns).unwrap();
+        let resolver = Arc::new(StaticResolver);
+        let cfg = OAuthConfig::new(
+            "https://client.example/oauth-client-metadata.json",
+            Url::parse("https://client.example/callback").unwrap(),
+            "atproto transition:generic",
+            ClientAuth::Public,
+        )
+        .unwrap();
+        let oauth_client =
+            Arc::new(OAuthClient::new(net.clone(), resolver.clone(), store.clone(), cfg).unwrap());
+
+        let signer = SoftwareDpopSigner::generate().unwrap();
+        let jkt = signer.public_jwk().thumbprint().unwrap();
+        store
+            .save_dpop_key("key-diag", &signer.to_bytes())
+            .await
+            .unwrap();
+        let as_meta = serde_json::from_value(json!({
+            "issuer": PDS_ORIGIN,
+            "authorization_endpoint": format!("{PDS_ORIGIN}/oauth/authorize"),
+            "token_endpoint": format!("{PDS_ORIGIN}/oauth/token"),
+            "pushed_authorization_request_endpoint": format!("{PDS_ORIGIN}/oauth/par"),
+            "revocation_endpoint": format!("{PDS_ORIGIN}/oauth/revoke"),
+            "response_types_supported": ["code"],
+            "grant_types_supported": ["authorization_code", "refresh_token"],
+            "code_challenge_methods_supported": ["S256"],
+            "token_endpoint_auth_methods_supported": ["none", "private_key_jwt"],
+            "token_endpoint_auth_signing_alg_values_supported": ["ES256"],
+            "dpop_signing_alg_values_supported": ["ES256"],
+            "scopes_supported": ["atproto", "transition:generic"],
+            "authorization_response_iss_parameter_supported": true,
+            "require_pushed_authorization_requests": true,
+            "client_id_metadata_document_supported": true,
+        }))
+        .unwrap();
+        let account = Account {
+            did: did.clone(),
+            handle: Some("diag.load.example".parse().unwrap()),
+            pds: PDS_ORIGIN.to_owned(),
+            authorization_server: Some(as_meta),
+            expected_issuer: Some(PDS_ORIGIN.to_owned()),
+        };
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let session: Session = serde_json::from_value(json!({
+            "did": did,
+            "access_token": "access-0",
+            "refresh_token": "refresh-0",
+            "created_at": now,
+            "expires_in": 3600,
+            "scope": "atproto transition:generic",
+        }))
+        .unwrap();
+        store.save_account(&account).await.unwrap();
+        store
+            .save_session(&SessionRecord {
+                account,
+                session,
+                dpop_key_id: "key-diag".to_owned(),
+                dpop_jkt: jkt,
+            })
+            .await
+            .unwrap();
+        store.save_current_did(&did).await.unwrap();
+
+        let client = Arc::new(
+            AtProtoClient::new(
+                pds,
+                net.clone(),
+                store.clone(),
+                resolver,
+                Some(oauth_client),
+                AuthMode::PublicOAuth,
+                false,
+            )
+            .unwrap(),
+        );
+        (client, net, store, did)
+    }
+}
+
+#[tokio::test]
+async fn oauth_refresh_sequence_and_dpop_refresh_check_force_token_exchanges() {
+    use std::sync::atomic::Ordering;
+    let (client, net, store, did) =
+        oauth_diagnostics_support::setup_oauth_client("load-force-refresh").await;
+
+    // Even with a fresh 1-hour access token, `--oauth-test refresh-sequence` forces `count` (5)
+    // token exchanges.
+    petrel_load::run_cli_with_client(
+        &client,
+        &[
+            "petrel-load",
+            "--namespace",
+            "load-force-refresh",
+            "--endpoint",
+            "app.bsky.actor.getProfile",
+            "--client-id",
+            "https://client.example/oauth-client-metadata.json",
+            "--redirect-uri",
+            "https://client.example/callback",
+            "--oauth-test",
+            "refresh-sequence",
+        ],
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(net.token_calls.load(Ordering::SeqCst), 5);
+    assert_eq!(
+        store
+            .get_session(&did)
+            .await
+            .unwrap()
+            .unwrap()
+            .session
+            .refresh_token(),
+        Some("refresh-5")
+    );
+
+    // `--dpop-test refresh-check` also forces a real token exchange.
+    petrel_load::run_cli_with_client(
+        &client,
+        &[
+            "petrel-load",
+            "--namespace",
+            "load-force-refresh",
+            "--endpoint",
+            "app.bsky.actor.getProfile",
+            "--client-id",
+            "https://client.example/oauth-client-metadata.json",
+            "--redirect-uri",
+            "https://client.example/callback",
+            "--dpop-test",
+            "refresh-check",
+        ],
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(net.token_calls.load(Ordering::SeqCst), 6);
+    assert_eq!(
+        store
+            .get_session(&did)
+            .await
+            .unwrap()
+            .unwrap()
+            .session
+            .refresh_token(),
+        Some("refresh-6")
+    );
+}
+
+#[cfg(debug_assertions)]
+#[tokio::test]
+async fn simulate_ambiguous_timeout_injects_pending_refresh_recovers_and_verifies_api() {
+    use std::sync::atomic::Ordering;
+    let (client, net, store, did) =
+        oauth_diagnostics_support::setup_oauth_client("load-ambig-timeout").await;
+
+    // Step 1: Verify debug injection stores PendingRefresh without promoting SESSION.
+    client.simulate_ambiguous_refresh_timeout().await.unwrap();
+    assert_eq!(net.token_calls.load(Ordering::SeqCst), 1);
+    assert!(store.get_pending_refresh(&did).await.unwrap().is_some());
+    assert_eq!(
+        store
+            .get_session(&did)
+            .await
+            .unwrap()
+            .unwrap()
+            .session
+            .refresh_token(),
+        Some("refresh-0")
+    );
+
+    // Step 2: Recovery via `refresh_token(true)` promotes PendingRefresh WITHOUT double-spending.
+    assert!(client.refresh_token(true).await.unwrap());
+    assert_eq!(net.token_calls.load(Ordering::SeqCst), 1);
+    assert!(store.get_pending_refresh(&did).await.unwrap().is_none());
+    assert_eq!(
+        store
+            .get_session(&did)
+            .await
+            .unwrap()
+            .unwrap()
+            .session
+            .refresh_token(),
+        Some("refresh-1")
+    );
+
+    // Step 3: Full CLI `--simulate-ambiguous-timeout` path injects (`token_calls` 1 -> 2),
+    // promotes (`refresh-2`), and verifies `app.bsky.actor.getProfile` with `DPoP access-2`.
+    petrel_load::run_cli_with_client(
+        &client,
+        &[
+            "petrel-load",
+            "--namespace",
+            "load-ambig-timeout",
+            "--endpoint",
+            "app.bsky.actor.getProfile",
+            "--client-id",
+            "https://client.example/oauth-client-metadata.json",
+            "--redirect-uri",
+            "com.example.client:/callback",
+            "--simulate-ambiguous-timeout",
+        ],
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(net.token_calls.load(Ordering::SeqCst), 2);
+    assert_eq!(net.profile_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        net.seen_profile_auth.lock().unwrap().as_slice(),
+        &["DPoP access-2".to_owned()]
+    );
+    assert!(store.get_pending_refresh(&did).await.unwrap().is_none());
+    assert_eq!(
+        store
+            .get_session(&did)
+            .await
+            .unwrap()
+            .unwrap()
+            .session
+            .refresh_token(),
+        Some("refresh-2")
+    );
+
+    // Legacy mode rejects `--simulate-ambiguous-timeout` rather than silently succeeding.
+    client.switch_auth_mode(AuthMode::Legacy).await.unwrap();
+    assert!(client.simulate_ambiguous_refresh_timeout().await.is_err());
 }

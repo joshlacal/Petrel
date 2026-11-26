@@ -430,6 +430,23 @@ impl AtProtoClient {
         self.auth_manager.tokens_exist().await
     }
 
+    /// Refreshes the active account's credentials (`force` bypasses expiry/margin checks).
+    ///
+    /// Returns `true` when an exchange or pending-replacement promotion occurred.
+    pub async fn refresh_token(&self, force: bool) -> Result<bool, ClientError> {
+        Ok(self.auth_manager.refresh_token(force).await?)
+    }
+
+    /// Debug-only helper injecting an ambiguous OAuth refresh timeout state (`PendingRefresh`
+    /// persisted without committing `SESSION`) so recovery can be verified.
+    #[cfg(debug_assertions)]
+    pub async fn simulate_ambiguous_refresh_timeout(&self) -> Result<(), ClientError> {
+        Ok(self
+            .auth_manager
+            .simulate_ambiguous_refresh_timeout()
+            .await?)
+    }
+
     /// Returns the active account DID if signed in.
     pub async fn get_did(&self) -> Result<Option<Did>, ClientError> {
         Ok(self.account_manager.current_did().await?)

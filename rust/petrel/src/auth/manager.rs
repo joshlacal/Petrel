@@ -11,6 +11,7 @@ use url::Url;
 use super::{
     AccountStatus, AuthContinuitySnapshot, AuthContinuityState, AuthContinuityTransactionResult,
     AuthMode, GatewayAuthIdentity, LegacyPasswordStrategy, PasswordAuthError, PasswordLoginResult,
+    TokenRefreshResult,
 };
 use crate::{
     account::AccountManager,
@@ -323,6 +324,60 @@ impl AuthManager {
             self.invalidate_continuity().await;
         }
         Ok(())
+    }
+
+    /// Refreshes credentials for the active account (`force` bypasses expiry/margin checks).
+    ///
+    /// Returns `true` when an exchange or pending-replacement promotion took place.
+    pub async fn refresh_token(&self, force: bool) -> Result<bool, AuthManagerError> {
+        let (mode, strategy) = {
+            let inner = self.state.lock().await;
+            (inner.mode.clone(), inner.strategy.clone())
+        };
+        match strategy {
+            ActiveStrategy::Legacy(legacy) => {
+                let res = legacy.refresh_token_if_needed(force).await?;
+                Ok(res == TokenRefreshResult::RefreshedSuccessfully)
+            }
+            ActiveStrategy::OAuth { client, .. } => {
+                let did = self
+                    .account_manager
+                    .current_did()
+                    .await
+                    .map_err(PasswordAuthError::from)?
+                    .ok_or(PasswordAuthError::NoActiveAccount)?;
+                let (_, refreshed) = client.refresh_with_status(&did, force).await?;
+                Ok(refreshed)
+            }
+            ActiveStrategy::None | ActiveStrategy::Gateway { .. } => {
+                Err(AuthManagerError::UnsupportedInMode(mode))
+            }
+        }
+    }
+
+    /// Debug-only helper injecting an ambiguous OAuth refresh timeout state (`PendingRefresh`
+    /// saved while committed `SESSION` stays unpromoted) so recovery can be tested.
+    #[cfg(debug_assertions)]
+    pub async fn simulate_ambiguous_refresh_timeout(&self) -> Result<(), AuthManagerError> {
+        let (mode, strategy) = {
+            let inner = self.state.lock().await;
+            (inner.mode.clone(), inner.strategy.clone())
+        };
+        match strategy {
+            ActiveStrategy::OAuth { client, .. } => {
+                let did = self
+                    .account_manager
+                    .current_did()
+                    .await
+                    .map_err(PasswordAuthError::from)?
+                    .ok_or(PasswordAuthError::NoActiveAccount)?;
+                client.simulate_ambiguous_refresh_timeout(&did).await?;
+                Ok(())
+            }
+            ActiveStrategy::Legacy(_) | ActiveStrategy::None | ActiveStrategy::Gateway { .. } => {
+                Err(AuthManagerError::UnsupportedInMode(mode))
+            }
+        }
     }
 
     /// Returns `true` if credentials exist for the currently active account.

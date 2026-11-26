@@ -187,6 +187,15 @@ impl OAuthClient {
     /// Refreshes the account session if due, or immediately if `force` is set.
     /// Concurrent callers that observed the same session share one exchange.
     pub async fn refresh(&self, did: &Did, force: bool) -> Result<Session, OAuthError> {
+        let (session, _) = self.refresh_with_status(did, force).await?;
+        Ok(session)
+    }
+
+    pub(crate) async fn refresh_with_status(
+        &self,
+        did: &Did,
+        force: bool,
+    ) -> Result<(Session, bool), OAuthError> {
         // Read the observed generation before waiting for its refresh. A
         // caller that begins after a refresh started still sees the old one.
         let observed = self
@@ -194,7 +203,38 @@ impl OAuthClient {
             .get_session(did)
             .await?
             .ok_or_else(|| self.missing_session(did))?;
-        self.refresh_after(&observed, force).await
+        let before_gen = observed.generation();
+        let session = self.refresh_after(&observed, force).await?;
+        let changed = force
+            || self
+                .storage
+                .get_session(did)
+                .await?
+                .is_some_and(|after| after.generation() != before_gen);
+        Ok((session, changed))
+    }
+
+    /// Debug-only helper simulating an ambiguous refresh timeout: performs one real token
+    /// exchange and stores the replacement only in durable `PENDING_SESSION` storage (clearing
+    /// in-memory `pending`), leaving the old committed `SESSION` intact so subsequent calls
+    /// exercise `PendingRefresh` crash/timeout recovery.
+    #[cfg(debug_assertions)]
+    pub async fn simulate_ambiguous_refresh_timeout(&self, did: &Did) -> Result<(), OAuthError> {
+        let observed = self
+            .storage
+            .get_session(did)
+            .await?
+            .ok_or_else(|| self.missing_session(did))?;
+        let lock = self.account_lock(did);
+        let mut state = lock.lock().await;
+        let (current, lease) = self
+            .acquire_refresh_slot(did, &observed, true, &mut state)
+            .await?;
+        let outcome = self
+            .execute_refresh_inner(did, &current, true, &mut state, false)
+            .await;
+        self.release_lease(did, lease.as_ref()).await;
+        outcome.map(|_| ())
     }
 
     pub(super) async fn refresh_after(
@@ -307,6 +347,18 @@ impl OAuthClient {
         force: bool,
         state: &mut RefreshState,
     ) -> Result<Session, OAuthError> {
+        self.execute_refresh_inner(did, current, force, state, true)
+            .await
+    }
+
+    async fn execute_refresh_inner(
+        &self,
+        did: &Did,
+        current: &SessionRecord,
+        force: bool,
+        state: &mut RefreshState,
+        commit_replacement: bool,
+    ) -> Result<Session, OAuthError> {
         let now = unix_now()?;
         if state.pending.is_some() {
             // The active slot is still the predecessor. A second rotation
@@ -383,7 +435,17 @@ impl OAuthClient {
                 new.session = session.clone();
                 new.account.authorization_server = Some(server.metadata().clone());
                 new.account.expected_issuer = Some(server.issuer().to_owned());
-                self.persist_refresh(state, current, new).await?;
+                if commit_replacement {
+                    self.persist_refresh(state, current, new).await?;
+                } else {
+                    let pending = PendingRefresh {
+                        based_on: current.generation(),
+                        record: new,
+                    };
+                    self.storage.save_pending_refresh(&pending).await?;
+                    // Drop the in-memory copy so recovery must promote the durable pending entry.
+                    state.pending = None;
+                }
                 Ok(session)
             }
             Err(error) => {
