@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use petrel_core::Cid;
 use serde::{Deserialize, Serialize};
@@ -201,8 +201,16 @@ impl PlcAuditLogVerifier {
         signers.push(genesis_signer.did_key());
 
         let mut active: Vec<usize> = vec![0];
+        let mut active_index: HashMap<String, usize> = HashMap::with_capacity(entries.len());
+        active_index.insert(entries[0].cid.clone(), 0);
         for proposed_index in 1..entries.len() {
-            let signer_key = Self::replay_entry(entries, &timestamps, &mut active, proposed_index)?;
+            let signer_key = Self::replay_entry(
+                entries,
+                &timestamps,
+                &mut active,
+                &mut active_index,
+                proposed_index,
+            )?;
             signers.push(signer_key);
         }
 
@@ -269,6 +277,7 @@ impl PlcAuditLogVerifier {
         entries: &[PlcAuditEntry],
         timestamps: &[i64],
         active: &mut Vec<usize>,
+        active_index: &mut HashMap<String, usize>,
         proposed_index: usize,
     ) -> Result<String, PlcError> {
         let proposed = &entries[proposed_index];
@@ -277,10 +286,16 @@ impl PlcAuditLogVerifier {
                 "PLC audit operation prev is missing",
             ));
         };
-        let Some(parent_pos) = active
-            .iter()
-            .position(|&idx| Self::cids_match(&entries[idx].cid, proposed_prev))
-        else {
+        let head_pos = active.len() - 1;
+        let parent_pos = if entries[active[head_pos]].cid == proposed_prev {
+            head_pos
+        } else if let Some(&pos) = active_index.get(proposed_prev) {
+            pos
+        } else if let Some(canonical_prev) = Self::canonical_cid_if_noncanonical(proposed_prev)
+            && let Some(&pos) = active_index.get(&canonical_prev)
+        {
+            pos
+        } else {
             return Err(PlcError::unauthorized(
                 "PLC audit operation prev is not active",
             ));
@@ -291,10 +306,11 @@ impl PlcAuditLogVerifier {
             ));
         };
 
-        if parent_pos == active.len() - 1 {
+        if parent_pos == head_pos {
             let (_, key) =
                 PlcOperationCodec::verify_returning_key(&proposed.operation, &rotation_keys)?;
             active.push(proposed_index);
+            active_index.insert(entries[proposed_index].cid.clone(), parent_pos + 1);
             return Ok(key.did_key());
         }
 
@@ -319,8 +335,12 @@ impl PlcAuditLogVerifier {
                 "PLC recovery exceeds the 72-hour window",
             ));
         }
+        for &displaced_index in &active[parent_pos + 1..] {
+            active_index.remove(&entries[displaced_index].cid);
+        }
         active.truncate(parent_pos + 1);
         active.push(proposed_index);
+        active_index.insert(entries[proposed_index].cid.clone(), parent_pos + 1);
         Ok(recovery_key.did_key())
     }
 
@@ -361,11 +381,21 @@ impl PlcAuditLogVerifier {
 
     /// Compares a canonical lowercase CID against a candidate (tolerating uppercase base32 on read).
     pub(crate) fn cids_match(canonical: &str, candidate: &str) -> bool {
-        if canonical == candidate {
-            return true;
-        }
+        canonical == candidate
+            || Self::canonical_cid_if_noncanonical(candidate)
+                .is_some_and(|normalized| normalized == canonical)
+    }
+
+    fn canonical_cid_if_noncanonical(candidate: &str) -> Option<String> {
         let lower = candidate.to_ascii_lowercase();
-        Cid::parse(&lower).is_ok_and(|cid| cid.to_string() == canonical)
+        if lower == candidate {
+            // Already lowercase: a canonical match would have matched the fast exact-equality path.
+            let cid = Cid::parse(candidate).ok()?;
+            let canonical = cid.to_string();
+            (canonical != candidate).then_some(canonical)
+        } else {
+            Cid::parse(&lower).ok().map(|cid| cid.to_string())
+        }
     }
 }
 

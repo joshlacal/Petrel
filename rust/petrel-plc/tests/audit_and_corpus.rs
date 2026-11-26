@@ -383,3 +383,94 @@ fn corpus_all_12_audit_logs_and_recovery_identities_verify() {
         Some("https://localhost:4989")
     );
 }
+
+async fn make_upper_prev_update(
+    prev: &PlcOperation,
+    handle: &str,
+    signer: &dyn ATProtoSigner,
+) -> PlcOperation {
+    let mut op = make_update(prev, handle, signer).await;
+    if let PlcOperation::Regular(ref mut reg) = op {
+        reg.prev = reg.prev.as_deref().map(str::to_ascii_uppercase);
+    }
+    let signing_bytes = op.signing_dag_cbor();
+    let sig = signer.sign(&signing_bytes).await.unwrap();
+    if let PlcOperation::Regular(ref mut reg) = op {
+        reg.signature = petrel_crypto::JWTBase64URL::encode(&sig);
+    }
+    op
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn large_audit_log_indexed_lookup_uppercase_prev_and_displaced_parent_rejection() {
+    let signing = P256Keypair::generate().unwrap();
+    let high = K256Keypair::generate().unwrap();
+    let low = P256Keypair::generate().unwrap();
+
+    let (did, genesis_op) = make_genesis(
+        "alice.scale.example",
+        &signing,
+        vec![high.did_key(), low.did_key()],
+        &low,
+    )
+    .await;
+
+    let mut entries = vec![entry(&did, &genesis_op, "2026-01-01T00:00:00.000Z", false)];
+    let mut prev_op = genesis_op.clone();
+
+    #[cfg(target_arch = "wasm32")]
+    let linear_count = 150_usize;
+    #[cfg(not(target_arch = "wasm32"))]
+    let linear_count = 1_500_usize;
+
+    for i in 1..=linear_count {
+        let secs = i as u64;
+        let ts = format!(
+            "2026-01-01T{:02}:{:02}:{:02}.000Z",
+            secs / 3_600,
+            (secs / 60) % 60,
+            secs % 60
+        );
+        let next = make_update(&prev_op, &format!("h{i}.scale.example"), &low).await;
+        entries.push(entry(&did, &next, &ts, false));
+        prev_op = next;
+    }
+
+    // Uppercase `prev` CID referencing the active head verifies via the indexed normalized lookup.
+    let upper_head = make_upper_prev_update(&prev_op, "upper-head.scale.example", &high).await;
+    entries.push(entry(&did, &upper_head, "2026-01-01T01:00:00.000Z", false));
+
+    // Add two low-authority ops, then recover from `upper_head` using uppercase `prev`
+    // and verify the two displaced ops are removed from active_index.
+    let low1 = make_update(&upper_head, "low1.scale.example", &low).await;
+    let low2 = make_update(&low1, "low2.scale.example", &low).await;
+    let rec = make_upper_prev_update(&upper_head, "recovered.scale.example", &high).await;
+
+    entries.push(entry(&did, &low1, "2026-01-01T01:01:00.000Z", false));
+    entries.push(entry(&did, &low2, "2026-01-01T01:02:00.000Z", false));
+    entries.push(entry(&did, &rec, "2026-01-01T01:03:00.000Z", false));
+
+    let verified = PlcAuditLogVerifier::verify(&entries, &did).unwrap();
+    assert_eq!(verified.head.cid, rec.cid_string().unwrap());
+    assert_eq!(
+        verified.document_data().unwrap().handle(),
+        Some("recovered.scale.example")
+    );
+    assert!(verified.entries[entries.len() - 3].nullified);
+    assert!(verified.entries[entries.len() - 2].nullified);
+    assert!(!verified.entries[entries.len() - 1].nullified);
+
+    // Following a displaced (nullified) entry after truncation must fail with Unauthorized.
+    let after_displaced = make_update(&low2, "stale-branch.scale.example", &high).await;
+    entries.push(entry(
+        &did,
+        &after_displaced,
+        "2026-01-01T01:04:00.000Z",
+        false,
+    ));
+    assert!(matches!(
+        PlcAuditLogVerifier::verify(&entries, &did),
+        Err(PlcError::Unauthorized(_))
+    ));
+}
