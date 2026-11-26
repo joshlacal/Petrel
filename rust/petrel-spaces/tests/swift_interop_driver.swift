@@ -229,12 +229,12 @@ struct SwiftSpaceInteropDriver {
         let sigInput = "atproto-space-credential=\(rfcParams)"
         let signature = "atproto-space-credential=:\(rfcSigRaw.base64EncodedString()):"
 
-        // 5. Optional SpaceSTAR check if Swift SpaceRef already supports at:space/ (post-PR #90)
-        var starHex: String? = nil
-        if let spaceRef = try? SpaceRef(uriString: spaceUri) {
-            _ = spaceRef
-            starHex = nil
+        // 5. Require Swift SpaceRef to parse Nov 24 at:space/ URIs (PR #90 landed on main)
+        let spaceRef = try SpaceRef(uriString: spaceUri)
+        guard spaceRef.uriString() == spaceUri else {
+            throw InteropError.message("Swift SpaceRef roundtrip mismatch: \(spaceRef.uriString()) != \(spaceUri)")
         }
+        let starHex: String? = nil
 
         let manifest = SwiftEmitManifest(
             spaceUri: spaceUri,
@@ -308,42 +308,60 @@ struct SwiftSpaceInteropDriver {
             throw InteropError.message("Rust record MAC failed Swift HMAC check")
         }
 
-        // If Swift SpaceRef supports at:space/ (post-PR #90), also verify via SpaceMACHeader + SpaceSTAR
-        if let spaceRef = try? SpaceRef(uriString: m.spaceUri) {
-            let url = URL(string: "https://ds.catbird.blue/xrpc/com.atproto.space.getLatestCommit")!
-            let commitResp = HTTPURLResponse(
-                url: url,
-                statusCode: 200,
-                httpVersion: "HTTP/1.1",
-                headerFields: [
-                    "Atproto-Space-Commit": m.commitCoveredHeader,
-                    "Signature-Input": m.commitSignatureInput,
-                    "Signature": m.commitSignature,
-                ]
-            )!
-            let expectedData = try dataFromHex(m.dataHex)
-            try SpaceMACHeader.verifyCommit(
-                response: commitResp,
-                keyShare: m.keyShareDidKey,
-                sharedSecret: decapSecret,
-                space: spaceRef,
-                repo: m.repoDid,
-                revision: m.rev,
-                data: expectedData
-            )
+        // 3b. Un-gated SpaceMACHeader.verifyCommit, SpaceMACHeader.verifyRecord, and SpaceSTAR.verify (post-PR #90 at:space/)
+        let spaceRef = try SpaceRef(uriString: m.spaceUri)
+        let commitUrl = URL(string: "https://ds.catbird.blue/xrpc/com.atproto.space.getLatestCommit")!
+        let commitResp = HTTPURLResponse(
+            url: commitUrl,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: [
+                "Atproto-Space-Commit": m.commitCoveredHeader,
+                "Signature-Input": m.commitSignatureInput,
+                "Signature": m.commitSignature,
+            ]
+        )!
+        let expectedData = try dataFromHex(m.dataHex)
+        try SpaceMACHeader.verifyCommit(
+            response: commitResp,
+            keyShare: m.keyShareDidKey,
+            sharedSecret: decapSecret,
+            space: spaceRef,
+            repo: m.repoDid,
+            revision: m.rev,
+            data: expectedData
+        )
 
-            let starData = try dataFromHex(m.starArchiveHex)
-            let verifiedStar = try SpaceSTAR.verify(
-                archive: starData,
-                space: spaceRef,
-                repo: m.repoDid
-            )
-            guard !verifiedStar.records.isEmpty,
-                  verifiedStar.revision == m.rev,
-                  verifiedStar.data == expectedData
-            else {
-                throw InteropError.message("SpaceSTAR verified mismatch")
-            }
+        let recordUrl = URL(string: "https://ds.catbird.blue/xrpc/com.atproto.space.getRecord")!
+        let recordResp = HTTPURLResponse(
+            url: recordUrl,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: [
+                "Atproto-Space-Record": m.recordCoveredHeader,
+                "Signature-Input": m.recordSignatureInput,
+                "Signature": m.recordSignature,
+            ]
+        )!
+        try SpaceMACHeader.verifyRecord(
+            response: recordResp,
+            keyShare: m.keyShareDidKey,
+            sharedSecret: decapSecret,
+            uri: m.recordUri,
+            cid: try CID.parse(m.recordCid)
+        )
+
+        let starData = try dataFromHex(m.starArchiveHex)
+        let verifiedStar = try SpaceSTAR.verify(
+            archive: starData,
+            space: spaceRef,
+            repo: m.repoDid
+        )
+        guard !verifiedStar.records.isEmpty,
+              verifiedStar.revision == m.rev,
+              verifiedStar.data == expectedData
+        else {
+            throw InteropError.message("SpaceSTAR verified mismatch")
         }
 
         // 4. Verify Rust SpaceSetHash commitment from STAR archive entries using PetrelCrypto SpaceSetHash
