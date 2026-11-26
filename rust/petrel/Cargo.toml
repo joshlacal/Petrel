@@ -24,6 +24,7 @@ wasm = [
     "dep:web-sys",
     "getrandom/js",
     "petrel-core/wasm",
+    "petrel-crypto/wasm",
 ]
 # Encrypted on-disk SecretStore (native only in practice).
 file-store = ["dep:aes-gcm", "dep:rustix", "dep:fs4"]
@@ -31,6 +32,7 @@ file-store = ["dep:aes-gcm", "dep:rustix", "dep:fs4"]
 [dependencies]
 petrel-api = { workspace = true, features = ["com_atproto"] }
 petrel-core = { workspace = true }
+petrel-crypto = { workspace = true }
 petrel-oauth-scopes = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
