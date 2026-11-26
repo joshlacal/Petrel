@@ -477,6 +477,187 @@ impl FixedSigningKey {
             verifier: Arc::new(key),
         }
     }
+
+    pub fn from_crypto_public_key(key: petrel_crypto::PublicKey) -> Self {
+        Self {
+            verifier: Arc::new(key),
+        }
+    }
+}
+
+impl From<petrel_crypto::ATProtoKeyCurve> for SigningAlgorithm {
+    fn from(value: petrel_crypto::ATProtoKeyCurve) -> Self {
+        match value {
+            petrel_crypto::ATProtoKeyCurve::P256 => Self::P256,
+            petrel_crypto::ATProtoKeyCurve::Secp256k1 => Self::Secp256k1,
+        }
+    }
+}
+
+impl From<SigningAlgorithm> for petrel_crypto::ATProtoKeyCurve {
+    fn from(value: SigningAlgorithm) -> Self {
+        match value {
+            SigningAlgorithm::P256 => Self::P256,
+            SigningAlgorithm::Secp256k1 => Self::Secp256k1,
+        }
+    }
+}
+
+impl From<&petrel_crypto::PublicKey> for SigningPublicKey {
+    fn from(value: &petrel_crypto::PublicKey) -> Self {
+        Self {
+            algorithm: SigningAlgorithm::from(value.curve()),
+            compressed_sec1: *value.compressed_representation(),
+        }
+    }
+}
+
+impl From<petrel_crypto::PublicKey> for SigningPublicKey {
+    fn from(value: petrel_crypto::PublicKey) -> Self {
+        Self::from(&value)
+    }
+}
+
+impl TryFrom<&SigningPublicKey> for petrel_crypto::PublicKey {
+    type Error = CommitError;
+
+    fn try_from(value: &SigningPublicKey) -> Result<Self, Self::Error> {
+        Self::from_sec1(
+            petrel_crypto::ATProtoKeyCurve::from(value.algorithm()),
+            value.as_sec1(),
+        )
+        .map_err(|err| CommitError::InvalidPublicKey(err.to_string()))
+    }
+}
+
+impl TryFrom<SigningPublicKey> for petrel_crypto::PublicKey {
+    type Error = CommitError;
+
+    fn try_from(value: SigningPublicKey) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
+    }
+}
+
+fn sign_with_petrel_crypto<'a, S: petrel_crypto::ATProtoSigner>(
+    signer: &'a S,
+    unsigned_commit_bytes: &'a [u8],
+) -> BoxFuture<'a, Result<Vec<u8>, CommitError>> {
+    Box::pin(async move {
+        let sig = signer
+            .sign(unsigned_commit_bytes)
+            .await
+            .map_err(|err| CommitError::SigningFailed(err.to_string()))?;
+        Ok(sig.to_vec())
+    })
+}
+
+fn verify_with_petrel_crypto_key(
+    key: &petrel_crypto::PublicKey,
+    unsigned_commit_bytes: &[u8],
+    signature: &[u8],
+) -> Result<(), CommitError> {
+    let parsed = Signature::from_strict_bytes(SigningAlgorithm::from(key.curve()), signature)?;
+    if key.verify_strict(parsed.as_bytes(), unsigned_commit_bytes) {
+        Ok(())
+    } else {
+        Err(CommitError::InvalidSignature)
+    }
+}
+
+macro_rules! impl_crypto_commit_signer {
+    ($($ty:ty),+ $(,)?) => {
+        $(
+            impl CommitSigner for $ty {
+                fn algorithm(&self) -> SigningAlgorithm {
+                    SigningAlgorithm::from(<Self as petrel_crypto::ATProtoSigner>::curve(self))
+                }
+
+                fn sign<'a>(
+                    &'a self,
+                    unsigned_commit_bytes: &'a [u8],
+                ) -> BoxFuture<'a, Result<Vec<u8>, CommitError>> {
+                    sign_with_petrel_crypto(self, unsigned_commit_bytes)
+                }
+            }
+        )+
+    };
+}
+
+macro_rules! impl_crypto_keypair_commit_verifier {
+    ($($ty:ty),+ $(,)?) => {
+        $(
+            impl CommitVerifier for $ty {
+                fn verify<'a>(
+                    &'a self,
+                    unsigned_commit_bytes: &'a [u8],
+                    signature: &'a [u8],
+                ) -> BoxFuture<'a, Result<(), CommitError>> {
+                    Box::pin(async move {
+                        let key = <Self as petrel_crypto::ATProtoKeypair>::public_key(self);
+                        verify_with_petrel_crypto_key(key, unsigned_commit_bytes, signature)
+                    })
+                }
+            }
+        )+
+    };
+}
+
+impl_crypto_commit_signer!(
+    petrel_crypto::PrivateKey,
+    petrel_crypto::P256Keypair,
+    petrel_crypto::K256Keypair,
+    petrel_crypto::ATProtoExternalSigner,
+);
+
+impl_crypto_keypair_commit_verifier!(
+    petrel_crypto::PrivateKey,
+    petrel_crypto::P256Keypair,
+    petrel_crypto::K256Keypair,
+    petrel_crypto::ATProtoExternalSigner,
+);
+
+impl CommitVerifier for petrel_crypto::PublicKey {
+    fn verify<'a>(
+        &'a self,
+        unsigned_commit_bytes: &'a [u8],
+        signature: &'a [u8],
+    ) -> BoxFuture<'a, Result<(), CommitError>> {
+        Box::pin(
+            async move { verify_with_petrel_crypto_key(self, unsigned_commit_bytes, signature) },
+        )
+    }
+}
+
+impl CommitVerifier for petrel_crypto::ATProtoJWTVerificationKey {
+    fn verify<'a>(
+        &'a self,
+        unsigned_commit_bytes: &'a [u8],
+        signature: &'a [u8],
+    ) -> BoxFuture<'a, Result<(), CommitError>> {
+        Box::pin(async move {
+            let key = self
+                .public_key()
+                .map_err(|err| CommitError::InvalidPublicKey(err.to_string()))?;
+            verify_with_petrel_crypto_key(&key, unsigned_commit_bytes, signature)
+        })
+    }
+}
+
+impl CommitVerifier for petrel_crypto::PLCDIDVerificationKey {
+    fn verify<'a>(
+        &'a self,
+        unsigned_commit_bytes: &'a [u8],
+        signature: &'a [u8],
+    ) -> BoxFuture<'a, Result<(), CommitError>> {
+        Box::pin(async move {
+            let jwt_key = petrel_crypto::ATProtoJWTVerificationKey::from_plc_key(self)
+                .map_err(|err| CommitError::InvalidPublicKey(err.to_string()))?;
+            let key = jwt_key
+                .public_key()
+                .map_err(|err| CommitError::InvalidPublicKey(err.to_string()))?;
+            verify_with_petrel_crypto_key(&key, unsigned_commit_bytes, signature)
+        })
+    }
 }
 
 impl RepositorySigningKeyResolver for FixedSigningKey {

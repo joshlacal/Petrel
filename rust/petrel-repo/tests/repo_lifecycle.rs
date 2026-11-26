@@ -2540,3 +2540,138 @@ async fn unverified_streamable_and_bfs_export_dedup_shared_links_and_enforce_lim
         ));
     }
 }
+
+#[allow(clippy::too_many_lines, clippy::arc_with_non_send_sync)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+async fn petrel_crypto_key_types_sign_and_verify_repositories_end_to_end() {
+    use petrel_repo::crypto::{FixedSigningKey, SigningAlgorithm};
+
+    let did = common::test_did();
+    let limits = RepositoryLimits::standard();
+    let policy = RepositoryReadPolicy::strict();
+
+    // 1. P-256 and K-256 `petrel_crypto` keypairs sign & verify repositories without adapters.
+    let p256_pair = petrel_crypto::P256Keypair::generate().unwrap();
+    let secp256k1_pair = petrel_crypto::K256Keypair::generate().unwrap();
+    let p256_priv =
+        petrel_crypto::PrivateKey::generate(petrel_crypto::ATProtoKeyCurve::P256).unwrap();
+    let secp256k1_priv = petrel_crypto::PrivateKey::generate_k256().unwrap();
+
+    for (signer, public_key, expected_algo) in [
+        (
+            &p256_pair as &dyn petrel_repo::CommitSigner,
+            p256_pair.public_key().clone(),
+            SigningAlgorithm::P256,
+        ),
+        (
+            &secp256k1_pair as &dyn petrel_repo::CommitSigner,
+            secp256k1_pair.public_key().clone(),
+            SigningAlgorithm::Secp256k1,
+        ),
+        (
+            &p256_priv as &dyn petrel_repo::CommitSigner,
+            p256_priv.public_key().clone(),
+            SigningAlgorithm::P256,
+        ),
+        (
+            &secp256k1_priv as &dyn petrel_repo::CommitSigner,
+            secp256k1_priv.public_key().clone(),
+            SigningAlgorithm::Secp256k1,
+        ),
+    ] {
+        assert_eq!(signer.algorithm(), expected_algo);
+
+        let repo = Repository::create(did.clone(), signer).await.unwrap();
+        let batch = WriteBatch::new(vec![
+            create_op(
+                "app.bsky.feed.post",
+                "crypto1",
+                &post_record_value("signed with petrel-crypto"),
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let updated = repo.commit_writes(batch, signer).await.unwrap();
+        let car = updated.repository.export_car().await.unwrap();
+
+        // Verify with `OpenVerification::from_crypto_public_key`, `petrel_crypto::PublicKey`,
+        // `ATProtoJWTVerificationKey`, and `PLCDIDVerificationKey`.
+        let reopened_pk = Repository::open_car_with_options(
+            &car,
+            OpenVerification::from_crypto_public_key(public_key.clone()),
+            Some(&did),
+            limits,
+            policy,
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(reopened_pk.commit().cid, updated.commit.cid);
+
+        let jwt_vk = petrel_crypto::ATProtoJWTVerificationKey::from_public_key(&public_key);
+        let plc_vk = match public_key.curve() {
+            petrel_crypto::ATProtoKeyCurve::P256 => {
+                petrel_crypto::PLCDIDVerificationKey::P256(*public_key.compressed_representation())
+            }
+            petrel_crypto::ATProtoKeyCurve::Secp256k1 => {
+                petrel_crypto::PLCDIDVerificationKey::Secp256k1(
+                    public_key.compressed_representation().to_vec(),
+                )
+            }
+        };
+
+        for verifier in [
+            Arc::new(public_key.clone()) as Arc<dyn CommitVerifier>,
+            Arc::new(jwt_vk),
+            Arc::new(plc_vk),
+        ] {
+            let resolver = Arc::new(FixedSigningKey::new(verifier));
+            let reopened = Repository::open_car_with_options(
+                &car,
+                OpenVerification::Resolver(resolver),
+                Some(&did),
+                limits,
+                policy,
+                true,
+            )
+            .await
+            .unwrap();
+            assert_eq!(reopened.commit().cid, updated.commit.cid);
+        }
+
+        // Cross-check `SigningPublicKey <-> petrel_crypto::PublicKey` roundtrip.
+        let repo_pk = SigningPublicKey::from(&public_key);
+        let back = petrel_crypto::PublicKey::try_from(&repo_pk).unwrap();
+        assert_eq!(back, public_key);
+    }
+
+    // 2. External signer (`ATProtoExternalSigner`) signs commits directly.
+    let inner_p256 = petrel_crypto::P256Keypair::generate().unwrap();
+    let inner_for_cb = inner_p256.clone();
+    let ext =
+        petrel_crypto::ATProtoExternalSigner::new(inner_p256.public_key().clone(), move |req| {
+            let k = inner_for_cb.clone();
+            Box::pin(async move { Ok(k.sign_sync(&req.message)?.to_vec()) })
+        });
+    let ext_repo = Repository::create(did.clone(), &ext).await.unwrap();
+    let ext_car = ext_repo.export_car().await.unwrap();
+    let verified_ext = Repository::open_car_with_options(
+        &ext_car,
+        OpenVerification::Resolver(Arc::new(FixedSigningKey::new(Arc::new(ext)))),
+        Some(&did),
+        limits,
+        policy,
+        true,
+    )
+    .await
+    .unwrap();
+    assert_eq!(verified_ext.commit().cid, ext_repo.commit().cid);
+
+    // 3. Invalid SEC1 `PLCDIDVerificationKey` fails closed cleanly with `CommitError::InvalidPublicKey`.
+    let invalid_plc = petrel_crypto::PLCDIDVerificationKey::P256([0; 33]);
+    let err = <_ as CommitVerifier>::verify(&invalid_plc, b"msg", &[0_u8; 64])
+        .await
+        .unwrap_err();
+    assert!(matches!(err, CommitError::InvalidPublicKey(_)));
+}

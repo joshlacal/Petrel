@@ -30,6 +30,13 @@ pub enum OpenVerification {
     Resolver(Arc<dyn RepositorySigningKeyResolver>),
 }
 
+impl OpenVerification {
+    /// Verifies repository commits directly against a `petrel_crypto::PublicKey`.
+    pub fn from_crypto_public_key(key: petrel_crypto::PublicKey) -> Self {
+        Self::SigningKey(SigningPublicKey::from(key))
+    }
+}
+
 impl std::fmt::Debug for OpenVerification {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

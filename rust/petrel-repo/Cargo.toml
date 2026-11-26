@@ -9,11 +9,12 @@ repository.workspace = true
 
 [features]
 default = ["native"]
-native = ["petrel/native"]
-wasm = ["petrel/wasm", "petrel-core/wasm", "dep:getrandom", "getrandom/js"]
+native = ["petrel/native", "petrel-crypto/std"]
+wasm = ["petrel/wasm", "petrel-core/wasm", "petrel-crypto/wasm", "dep:getrandom", "getrandom/js"]
 
 [dependencies]
 petrel-core = { workspace = true }
+petrel-crypto = { workspace = true }
 petrel = { workspace = true }
 async-lock = { workspace = true }
 base64 = { workspace = true }
