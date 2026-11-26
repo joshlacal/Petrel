@@ -358,3 +358,54 @@ fn invalid_hand_built_plc_keys_propagate_errors_without_panicking() {
         );
     }
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+fn p256_jwt_key_variant_rejects_embedded_secp256k1_public_key() {
+    let k256_kp = K256Keypair::generate().unwrap();
+    let msg = b"cross-curve confusion probe";
+    let k256_sig = k256_kp.sign_sync(msg).unwrap();
+
+    // Hand-built mismatched variant: P256(...) holding a secp256k1 PublicKey.
+    let mismatched = ATProtoJWTVerificationKey::P256(k256_kp.public_key().clone());
+    assert!(mismatched.public_key().is_err());
+    assert_ne!(
+        mismatched,
+        ATProtoJWTVerificationKey::from_public_key(k256_kp.public_key())
+    );
+
+    for alg in ["ES256", "ES256K"] {
+        assert!(mismatched.verify(&k256_sig, msg, alg).is_err());
+        assert!(
+            mismatched
+                .verify_with_options(
+                    &k256_sig,
+                    msg,
+                    alg,
+                    petrel_crypto::ATProtoSignatureVerificationOptions::JWT,
+                )
+                .is_err()
+        );
+    }
+
+    // Even a real ServiceJWT signed by k256 fails under the mismatched P256 variant.
+    let mut opts = petrel_crypto::ServiceJWTMintOptions::new(
+        "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
+        "did:web:api.example.com#svc",
+        Some("app.bsky.feed.getTimeline"),
+    );
+    opts.nonce = Some("mismatched-p256-variant");
+    let k256_jwt = petrel_crypto::ServiceJWT::mint_sync(
+        &opts,
+        petrel_crypto::ServiceJWTSigningKey::K256(&k256_kp),
+    )
+    .unwrap();
+    let verify_opts = petrel_crypto::ServiceJWTVerifyOptions {
+        now: opts.now,
+        ..Default::default()
+    };
+    assert!(
+        petrel_crypto::ServiceJWT::verify_with_options(&k256_jwt, &mismatched, &verify_opts)
+            .is_err()
+    );
+}

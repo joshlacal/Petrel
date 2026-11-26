@@ -50,7 +50,14 @@ impl ATProtoJWTVerificationKey {
     /// Converts to a validated curve-tagged [`PublicKey`].
     pub fn public_key(&self) -> Result<PublicKey, PetrelCryptoError> {
         match self {
-            Self::P256(key) => Ok(key.clone()),
+            Self::P256(key) => {
+                if key.curve() != ATProtoKeyCurve::P256 {
+                    return Err(PetrelCryptoError::Malformed(
+                        "P-256 verification key must contain a P-256 public key".into(),
+                    ));
+                }
+                Ok(key.clone())
+            }
             Self::Secp256k1(encoded) => PublicKey::from_sec1(ATProtoKeyCurve::Secp256k1, encoded),
         }
     }
@@ -64,34 +71,11 @@ impl ATProtoJWTVerificationKey {
         signing_input: &[u8],
         algorithm: &str,
     ) -> Result<bool, PetrelCryptoError> {
-        match self {
-            Self::P256(key) => {
-                if algorithm != "ES256" {
-                    return Err(PetrelCryptoError::Unauthorized(
-                        "JWT algorithm does not match verification key".into(),
-                    ));
-                }
-                if !ATProtoSignature::is_canonical(signature, ATProtoKeyCurve::P256) {
-                    return Err(Self::non_canonical_signature_error());
-                }
-                Ok(key.verify_strict(signature, signing_input))
-            }
-            Self::Secp256k1(encoded) => {
-                if algorithm != "ES256K" {
-                    return Err(PetrelCryptoError::Unauthorized(
-                        "JWT algorithm or signature is invalid".into(),
-                    ));
-                }
-                if !Self::is_canonical_secp256k1_signature(signature) {
-                    return Err(Self::non_canonical_signature_error());
-                }
-                let key =
-                    PublicKey::from_sec1(ATProtoKeyCurve::Secp256k1, encoded).map_err(|_| {
-                        PetrelCryptoError::Unauthorized("secp256k1 public key is invalid".into())
-                    })?;
-                Ok(key.verify_strict(signature, signing_input))
-            }
+        let key = self.validated_key_for_algorithm(algorithm)?;
+        if !ATProtoSignature::is_canonical(signature, key.curve()) {
+            return Err(Self::non_canonical_signature_error());
         }
+        Ok(key.verify_strict(signature, signing_input))
     }
 
     /// Verifies a signature under an explicit encoding policy.
@@ -105,26 +89,44 @@ impl ATProtoJWTVerificationKey {
         if options == ATProtoSignatureVerificationOptions::STRICT {
             return self.verify(signature, signing_input, algorithm);
         }
-        let key = self.public_key().map_err(|_| {
-            PetrelCryptoError::Unauthorized("secp256k1 public key is invalid".into())
-        })?;
-        if algorithm != key.jwt_algorithm() {
-            return Err(match key.curve() {
-                ATProtoKeyCurve::P256 => PetrelCryptoError::Unauthorized(
-                    "JWT algorithm does not match verification key".into(),
-                ),
-                ATProtoKeyCurve::Secp256k1 => {
-                    PetrelCryptoError::Unauthorized("JWT algorithm or signature is invalid".into())
-                }
-            });
-        }
+        let key = self.validated_key_for_algorithm(algorithm)?;
         Ok(key.is_valid_signature(signature, signing_input, options))
+    }
+
+    fn validated_key_for_algorithm(&self, algorithm: &str) -> Result<PublicKey, PetrelCryptoError> {
+        match self {
+            Self::P256(key) => {
+                if key.curve() != ATProtoKeyCurve::P256 || algorithm != "ES256" {
+                    return Err(PetrelCryptoError::Unauthorized(
+                        "JWT algorithm does not match verification key".into(),
+                    ));
+                }
+                Ok(key.clone())
+            }
+            Self::Secp256k1(encoded) => {
+                if algorithm != "ES256K" {
+                    return Err(PetrelCryptoError::Unauthorized(
+                        "JWT algorithm or signature is invalid".into(),
+                    ));
+                }
+                PublicKey::from_sec1(ATProtoKeyCurve::Secp256k1, encoded).map_err(|_| {
+                    PetrelCryptoError::Unauthorized("secp256k1 public key is invalid".into())
+                })
+            }
+        }
     }
 
     /// Canonical key identity bytes (`0x01 || uncompressed_p256` or `0x02 || compressed_k256`).
     pub fn deterministic_identity(&self) -> Vec<u8> {
         match self {
             Self::P256(key) => {
+                if key.curve() != ATProtoKeyCurve::P256 {
+                    let mut out = Vec::with_capacity(36);
+                    out.push(0x00);
+                    out.extend_from_slice(&key.curve().public_key_multicodec_prefix());
+                    out.extend_from_slice(key.compressed_representation());
+                    return out;
+                }
                 let uncompressed = key.uncompressed_representation();
                 let mut out = Vec::with_capacity(66);
                 out.push(0x01);
