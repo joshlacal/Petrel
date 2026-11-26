@@ -91,6 +91,10 @@ impl ServiceAuthError {
     }
 
     /// A non-secret human-readable message suitable for the XRPC error body.
+    ///
+    /// Backend detail (key-resolution and replay-store failure reasons) is never
+    /// included: those strings can carry internal hostnames, DSNs, or resolver
+    /// errors. Use [`Self::internal_detail`] (or `{:?}`) to log them.
     pub fn message(&self) -> String {
         match self {
             Self::MissingAuthorization => "missing jwt".into(),
@@ -119,29 +123,62 @@ impl ServiceAuthError {
                 format!("jwt signing key {key_id} is not accepted by this service")
             }
             Self::UnsupportedAlgorithm(alg) => format!("unsupported jwt algorithm \"{alg}\""),
-            Self::KeyResolutionFailed {
-                did,
-                key_id,
-                reason,
-            } => format!("could not resolve signing key {key_id} of {did}: {reason}"),
+            Self::KeyResolutionFailed { did, key_id, .. } => {
+                format!("could not resolve signing key {key_id} of {did}")
+            }
             Self::InvalidSignature => "jwt signature does not match jwt issuer".into(),
             Self::MissingClaim(name) => format!("jwt is missing required claim \"{name}\""),
             Self::Replayed => "jwt was already used".into(),
-            Self::ReplayStoreFailed(reason) => {
-                format!("could not check jwt for reuse: {reason}")
+            Self::ReplayStoreFailed(_) => "could not check jwt for reuse".into(),
+        }
+    }
+
+    /// Server-side diagnostic detail withheld from [`Self::message`], for logging only.
+    pub fn internal_detail(&self) -> Option<&str> {
+        match self {
+            Self::KeyResolutionFailed { reason, .. } | Self::ReplayStoreFailed(reason) => {
+                Some(reason.as_str())
             }
+            _ => None,
         }
     }
 }
 
 impl fmt::Debug for ServiceAuthError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.xrpc_error_name(), self.message())
+        write!(f, "{}: {}", self.xrpc_error_name(), self.message())?;
+        if let Some(detail) = self.internal_detail() {
+            write!(f, " ({detail})")?;
+        }
+        Ok(())
     }
 }
 
 impl fmt::Display for ServiceAuthError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {}", self.xrpc_error_name(), self.message())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ServiceAuthError;
+
+    #[test]
+    fn message_withholds_backend_detail_but_debug_keeps_it() {
+        let key = ServiceAuthError::KeyResolutionFailed {
+            did: "did:plc:x".into(),
+            key_id: "#atproto".into(),
+            reason: "dns timeout at 10.0.0.53".into(),
+        };
+        assert!(!key.message().contains("10.0.0.53"));
+        assert!(!key.to_string().contains("10.0.0.53"));
+        assert!(format!("{key:?}").contains("10.0.0.53"));
+        assert_eq!(key.internal_detail(), Some("dns timeout at 10.0.0.53"));
+
+        let replay = ServiceAuthError::ReplayStoreFailed("pg: connection refused".into());
+        assert_eq!(replay.message(), "could not check jwt for reuse");
+        assert!(format!("{replay:?}").contains("connection refused"));
+        assert_eq!(ServiceAuthError::Expired.internal_detail(), None);
     }
 }
