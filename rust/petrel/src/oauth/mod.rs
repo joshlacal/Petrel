@@ -29,11 +29,14 @@ mod models;
 mod protocol;
 mod refresh;
 mod resource_auth;
+#[cfg(all(target_arch = "wasm32", target_os = "unknown", feature = "wasm"))]
+mod web_crypto_store;
 
 pub use client::{
     DpopKeyStore, OAuthClient, OAuthConfig, OAuthError, OAuthIdentity, OAuthIdentityError,
     OAuthIdentityResolver, OAuthStartOptions, OAuthTarget, PendingOAuthFlow,
 };
+pub(crate) use dpop::is_refreshable_token_rejection;
 pub use dpop::{DpopError, DpopNonces, dpop_proof, dpop_target};
 pub use identity_adapter::OAuthIdentityAdapter;
 pub use metadata::{
@@ -43,6 +46,8 @@ pub use metadata::{
 pub use models::{Account, Session, SessionRecord};
 pub use protocol::{AssertionBackendError, AssertionBackendErrorCode, OAuthProtocolError};
 pub use resource_auth::SessionAuth;
+#[cfg(all(target_arch = "wasm32", target_os = "unknown", feature = "wasm"))]
+pub use web_crypto_store::{MemoryWebCryptoKeyStorage, WebCryptoKeyStorage, WebCryptoKeyStore};
 
 use std::fmt;
 use std::sync::Arc;

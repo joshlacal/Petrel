@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
@@ -6,6 +7,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::value::RawValue;
 use zeroize::Zeroizing;
 
+use crate::crypto::random_bytes;
 use crate::oauth::SessionRecord;
 use crate::rt::{MaybeSend, MaybeSync};
 
@@ -18,10 +20,29 @@ mod catalog;
 
 const VERSION: u8 = 1;
 const MAX_FLOW_AGE_SECONDS: u64 = 600;
+const MAX_TRACKED_OAUTH_STATES: usize = 64;
 const SESSION: &str = "session";
 const PENDING_SESSION: &str = "session.pending";
+const REFRESH_LEASE: &str = "session.refreshLease";
 const DPOP_KEY: &str = "dpopKey";
 const OAUTH_STATE: &str = "oauthState";
+const OAUTH_STATE_INDEX: &str = "oauthStates";
+
+/// A short-lived compare-and-swap lease serializing token refresh across clients
+/// or tabs sharing one [`SessionStore`].
+#[derive(Clone, Deserialize, Serialize)]
+pub(crate) struct RefreshLease {
+    instance_id: [u8; 16],
+    holder: [u8; 16],
+    based_on: [u8; 32],
+    expires_at: u64,
+}
+
+pub(crate) enum RefreshLeaseAcquire {
+    Acquired(RefreshLease),
+    HeldByPeer,
+    Unsupported,
+}
 
 /// A replacement produced by refreshing a specific committed session generation.
 #[derive(Clone, Deserialize, Serialize)]
@@ -210,7 +231,61 @@ impl SessionStore {
         self.delete(PENDING_SESSION, did.as_str()).await
     }
 
-    /// Saves a software DPoP key scalar. Opaque platform keys live with the embedder.
+    pub(crate) async fn try_acquire_refresh_lease(
+        &self,
+        did: &Did,
+        instance_id: [u8; 16],
+        based_on: [u8; 32],
+        now: u64,
+        ttl_secs: u64,
+    ) -> Result<RefreshLeaseAcquire, StoreError> {
+        let key = item_key(REFRESH_LEASE, did.as_str())?;
+        let existing = self.secrets.get(&self.namespace, &key).await?;
+        if let Some(ref raw) = existing
+            && let Ok(lease) = payload(raw).and_then(decode::<RefreshLease>)
+            && lease.based_on == based_on
+            && lease.expires_at > now
+            && lease.instance_id != instance_id
+        {
+            return Ok(RefreshLeaseAcquire::HeldByPeer);
+        }
+        let holder =
+            random_bytes::<16>().map_err(|_| StoreError::Unavailable("randomness".into()))?;
+        let lease = RefreshLease {
+            instance_id,
+            holder,
+            based_on,
+            expires_at: now.saturating_add(ttl_secs),
+        };
+        let encoded = encode(&lease)?;
+        match self
+            .secrets
+            .compare_and_swap(&self.namespace, &key, existing.as_deref(), Some(&encoded))
+            .await
+        {
+            Ok(true) => Ok(RefreshLeaseAcquire::Acquired(lease)),
+            Ok(false) => Ok(RefreshLeaseAcquire::HeldByPeer),
+            Err(StoreError::Unsupported) => Ok(RefreshLeaseAcquire::Unsupported),
+            Err(error) => Err(error),
+        }
+    }
+
+    pub(crate) async fn release_refresh_lease(&self, did: &Did, lease: &RefreshLease) {
+        let Ok(key) = item_key(REFRESH_LEASE, did.as_str()) else {
+            return;
+        };
+        let Ok(encoded) = encode(lease) else {
+            return;
+        };
+        let _ = self
+            .secrets
+            .compare_and_swap(&self.namespace, &key, Some(&encoded), None)
+            .await;
+    }
+
+    /// Saves a software DPoP key scalar. Browser embedders should prefer
+    /// [`crate::oauth::WebCryptoKeyStore`] via [`crate::oauth::OAuthClient::with_key_store`]
+    /// so non-extractable WebCrypto private keys never touch byte storage.
     pub async fn save_dpop_key(&self, id: &str, scalar: &[u8; 32]) -> Result<(), StoreError> {
         self.save(DPOP_KEY, id, scalar).await
     }
@@ -225,7 +300,8 @@ impl SessionStore {
         self.delete(DPOP_KEY, id).await
     }
 
-    /// Stores a pending OAuth flow with its Unix issue time in seconds.
+    /// Stores a pending OAuth flow with its Unix issue time in seconds,
+    /// sweeping any previously tracked expired `oauthState.*` entries.
     pub async fn save_oauth_state<T: Serialize + MaybeSync>(
         &self,
         state: &str,
@@ -233,7 +309,14 @@ impl SessionStore {
         payload: &T,
     ) -> Result<(), StoreError> {
         self.save(OAUTH_STATE, state, &Timed { issued_at, payload })
-            .await
+            .await?;
+        let _guard = self.catalog_lock.lock().await;
+        let mut index = self.load_oauth_state_index().await;
+        self.prune_oauth_state_index(&mut index, issued_at, true)
+            .await;
+        index.insert(state.to_owned(), issued_at);
+        let _ = self.save_oauth_state_index(&index).await;
+        Ok(())
     }
 
     /// Consumes flow state before checking its age or decoding the payload.
@@ -248,8 +331,10 @@ impl SessionStore {
     ) -> Result<Option<T>, StoreError> {
         let key = item_key(OAUTH_STATE, state)?;
         let Some(bytes) = self.secrets.take(&self.namespace, &key).await? else {
+            let _ = self.remove_from_oauth_state_index(state, now).await;
             return Ok(None);
         };
+        let _ = self.remove_from_oauth_state_index(state, now).await;
         let bytes = Zeroizing::new(bytes);
         let state: BorrowedTimed<'_> = decode(payload(&bytes)?)?;
         if now
@@ -263,7 +348,98 @@ impl SessionStore {
 
     /// Discards a flow without decoding its payload, for cancellation.
     pub async fn delete_oauth_state(&self, state: &str) -> Result<(), StoreError> {
-        self.delete(OAUTH_STATE, state).await
+        self.delete(OAUTH_STATE, state).await?;
+        let _guard = self.catalog_lock.lock().await;
+        let mut index = self.load_oauth_state_index().await;
+        if index.remove(state).is_some() {
+            let _ = self.save_oauth_state_index(&index).await;
+        }
+        Ok(())
+    }
+
+    /// Deletes tracked `oauthState.*` entries whose age exceeds the flow window at `now`.
+    pub async fn sweep_expired_oauth_states(&self, now: u64) -> Result<usize, StoreError> {
+        let _guard = self.catalog_lock.lock().await;
+        let mut index = self.load_oauth_state_index().await;
+        let removed = self.prune_oauth_state_index(&mut index, now, false).await;
+        if removed > 0 {
+            self.save_oauth_state_index(&index).await?;
+        }
+        Ok(removed)
+    }
+
+    async fn remove_from_oauth_state_index(&self, state: &str, now: u64) -> Result<(), StoreError> {
+        let _guard = self.catalog_lock.lock().await;
+        let mut index = self.load_oauth_state_index().await;
+        let removed_entry = index.remove(state).is_some();
+        let swept = self.prune_oauth_state_index(&mut index, now, false).await;
+        if removed_entry || swept > 0 {
+            self.save_oauth_state_index(&index).await?;
+        }
+        Ok(())
+    }
+
+    async fn load_oauth_state_index(&self) -> BTreeMap<String, u64> {
+        self.secrets
+            .get(&self.namespace, OAUTH_STATE_INDEX)
+            .await
+            .ok()
+            .flatten()
+            .and_then(|bytes| payload(&bytes).ok().and_then(|raw| decode(raw).ok()))
+            .unwrap_or_default()
+    }
+
+    async fn save_oauth_state_index(
+        &self,
+        index: &BTreeMap<String, u64>,
+    ) -> Result<(), StoreError> {
+        if index.is_empty() {
+            self.secrets
+                .delete(&self.namespace, OAUTH_STATE_INDEX)
+                .await
+        } else {
+            let bytes = encode(index)?;
+            self.secrets
+                .put(&self.namespace, OAUTH_STATE_INDEX, &bytes)
+                .await
+        }
+    }
+
+    async fn prune_oauth_state_index(
+        &self,
+        index: &mut BTreeMap<String, u64>,
+        now: u64,
+        enforce_cap: bool,
+    ) -> usize {
+        let expired: Vec<String> = index
+            .iter()
+            .filter(|&(_, issued_at)| {
+                now.checked_sub(*issued_at)
+                    .is_some_and(|age| age > MAX_FLOW_AGE_SECONDS)
+            })
+            .map(|(state, _)| state.clone())
+            .collect();
+        let mut removed = 0;
+        for state in expired {
+            index.remove(&state);
+            let _ = self.delete(OAUTH_STATE, &state).await;
+            removed += 1;
+        }
+        if enforce_cap {
+            while index.len() >= MAX_TRACKED_OAUTH_STATES {
+                let Some(oldest) = index
+                    .iter()
+                    .min_by_key(|(_, issued_at)| **issued_at)
+                    .map(|(state, _)| state.clone())
+                else {
+                    break;
+                };
+                index.remove(&oldest);
+                let _ = self.delete(OAUTH_STATE, &oldest).await;
+                removed += 1;
+            }
+        }
+        removed
     }
 
     async fn get_record(&self, base: &str, did: &Did) -> Result<Option<SessionRecord>, StoreError> {

@@ -158,9 +158,19 @@ def rust_module_ident(segment: str) -> str:
     return sanitize_rust_ident(rust_snake_case(segment))
 
 
+def rust_module_file_stem(segment: str) -> str:
+    """Convert one NSID segment into its filesystem module stem (stripping `r#`)."""
+    return rust_module_ident(segment).removeprefix("r#")
+
+
 def rust_module_segments(lexicon_id: str) -> List[str]:
     """Return all Rust module segments for a lexicon NSID."""
     return [rust_module_ident(seg) for seg in lexicon_id.split(".")]
+
+
+def rust_module_file_segments(lexicon_id: str) -> List[str]:
+    """Return filesystem module path segments (without `r#`) for a lexicon NSID."""
+    return [rust_module_file_stem(seg) for seg in lexicon_id.split(".")]
 
 
 def rust_module_path(lexicon_id: str) -> str:
@@ -180,6 +190,59 @@ def _reserved_names_for_main(lexicon_id: str, main_def: Optional[Dict[str, Any]]
     return reserved
 
 
+def _extract_module_defs_from_registry(
+    lexicon_id: str,
+    registry: Optional[Dict[str, Dict[str, Any]]],
+) -> Optional[Dict[str, Any]]:
+    if registry is None:
+        return None
+    prefix = f"{lexicon_id}#"
+    defs: Dict[str, Any] = {}
+    if lexicon_id in registry:
+        defs["main"] = registry[lexicon_id]
+    for key, schema in registry.items():
+        if key.startswith(prefix):
+            defs[key[len(prefix):]] = schema
+    return defs or None
+
+
+def _resolve_module_def_names(lexicon_id: str, defs: Dict[str, Any]) -> Dict[str, str]:
+    main_def = defs.get("main")
+    reserved = _reserved_names_for_main(lexicon_id, main_def)
+    mapping: Dict[str, str] = {}
+    if "main" in defs:
+        mapping["main"] = rust_pascal_case(lexicon_id.rsplit(".", 1)[-1])
+
+    non_token_defs = [
+        def_name
+        for def_name, def_schema in defs.items()
+        if def_name != "main"
+        and not (isinstance(def_schema, dict) and def_schema.get("type") == "token")
+    ]
+
+    taken: Set[str] = set(reserved)
+    deferred: List[str] = []
+    for def_name in non_token_defs:
+        base_name = rust_pascal_case(def_name)
+        if base_name not in taken:
+            taken.add(base_name)
+            mapping[def_name] = base_name
+        else:
+            deferred.append(def_name)
+
+    for def_name in deferred:
+        base_name = rust_pascal_case(def_name)
+        candidate = f"{base_name}Def"
+        suffix = 2
+        while candidate in taken:
+            candidate = f"{base_name}Def{suffix}"
+            suffix += 1
+        taken.add(candidate)
+        mapping[def_name] = candidate
+
+    return mapping
+
+
 def resolve_rust_def_type_name(
     lexicon_id: str,
     def_name: str,
@@ -191,38 +254,30 @@ def resolve_rust_def_type_name(
 
     `main` always maps to `PascalCase(last_nsid_segment)`.
     Non-main defs map to `PascalCase(def_name)`, disambiguated with a `Def` suffix
-    if they collide with `main` (e.g. `app.bsky.embed.external#external` -> `ExternalDef`)
-    or endpoint helper types (`Parameters`/`Input`/`Output`/`Message`/`Error`).
-    Defs named `record` are NOT reserved globally because record mains use
-    `PascalCase(last_nsid_segment)`.
+    if they collide with `main` (e.g. `app.bsky.embed.external#external` -> `ExternalDef`),
+    endpoint helper types (`Parameters`/`Input`/`Output`/`Message`/`Error`), or another
+    definition in the same module (e.g. `externalDef` keeps `ExternalDef` while
+    colliding `external` becomes `ExternalDef2`). Both same-module and cross-module
+    callers consult the full module def set via `lexicon_defs` or `registry` so they
+    always agree.
     """
     if def_name == "main":
         return rust_pascal_case(lexicon_id.rsplit(".", 1)[-1])
 
-    main_def = None
-    if isinstance(lexicon_defs, dict):
-        main_def = lexicon_defs.get("main")
-    elif registry is not None:
-        main_def = registry.get(lexicon_id)
+    defs = lexicon_defs if isinstance(lexicon_defs, dict) else _extract_module_defs_from_registry(
+        lexicon_id, registry
+    )
+    if isinstance(defs, dict):
+        mapping = _resolve_module_def_names(lexicon_id, defs)
+        if def_name in mapping:
+            return mapping[def_name]
 
-    reserved = _reserved_names_for_main(lexicon_id, main_def)
     base_name = rust_pascal_case(def_name)
+    main_def = registry.get(lexicon_id) if registry is not None else None
+    reserved = _reserved_names_for_main(lexicon_id, main_def)
     if base_name not in reserved:
         return base_name
-
-    # Deterministic disambiguation when colliding with main or endpoint helper names.
-    other_names: Set[str] = set(reserved)
-    if isinstance(lexicon_defs, dict):
-        for other_def in lexicon_defs:
-            if other_def != "main" and other_def != def_name:
-                other_names.add(rust_pascal_case(other_def))
-
-    candidate = f"{base_name}Def"
-    suffix = 2
-    while candidate in other_names:
-        candidate = f"{base_name}Def{suffix}"
-        suffix += 1
-    return candidate
+    return f"{base_name}Def"
 
 
 def is_schemaless_json_body(body_obj: Optional[Dict[str, Any]]) -> bool:

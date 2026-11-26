@@ -74,6 +74,7 @@ pub struct SubscribeRepos;
 
 impl SubscribeRepos {
     pub const NSID: &'static str = "com.atproto.sync.subscribeRepos";
+    pub const SUBPROTOCOL: Option<&'static str> = None;
     pub const KNOWN_MESSAGE_TYPES: &'static [&'static str] = &[
         "com.atproto.sync.subscribeRepos#commit",
         "com.atproto.sync.subscribeRepos#sync",
@@ -81,6 +82,15 @@ impl SubscribeRepos {
         "com.atproto.sync.subscribeRepos#account",
         "com.atproto.sync.subscribeRepos#info",
     ];
+}
+
+impl petrel_core::XrpcSubscription for SubscribeRepos {
+    const NSID: &'static str = Self::NSID;
+    const SUBPROTOCOL: Option<&'static str> = Self::SUBPROTOCOL;
+    const KNOWN_MESSAGE_TYPES: &'static [&'static str] = Self::KNOWN_MESSAGE_TYPES;
+    type Params = Parameters;
+    type Message = Message;
+    type Error = Error;
 }
 
 /// Represents an update of repository state. Note that empty commits are allowed, which include no repo data changes, but an update to rev and signature.
@@ -189,6 +199,10 @@ impl petrel_core::XrpcInput for Commit {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
     }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
+    }
 }
 
 impl petrel_core::XrpcOutput for Commit {
@@ -282,6 +296,10 @@ impl petrel_core::XrpcInput for Sync {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
     }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
+    }
 }
 
 impl petrel_core::XrpcOutput for Sync {
@@ -366,6 +384,10 @@ impl petrel_core::FromValue for Identity {
 impl petrel_core::XrpcInput for Identity {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
     }
 }
 
@@ -457,6 +479,10 @@ impl petrel_core::XrpcInput for Account {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
     }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
+    }
 }
 
 impl petrel_core::XrpcOutput for Account {
@@ -531,6 +557,10 @@ impl petrel_core::FromValue for Info {
 impl petrel_core::XrpcInput for Info {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
     }
 }
 
@@ -618,6 +648,10 @@ impl petrel_core::XrpcInput for RepoOp {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
     }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
+    }
 }
 
 impl petrel_core::XrpcOutput for RepoOp {
@@ -687,6 +721,10 @@ impl petrel_core::FromValue for Message {
 impl petrel_core::XrpcInput for Message {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
     }
 }
 

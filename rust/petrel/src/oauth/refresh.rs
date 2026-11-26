@@ -10,8 +10,11 @@ use super::{
 use crate::{
     crypto::{random_bytes, sha256},
     net::TransportError,
-    storage::{AuthEvent, PendingRefresh, StoreError},
+    storage::{AuthEvent, PendingRefresh, RefreshLease, RefreshLeaseAcquire, StoreError},
 };
+
+const REFRESH_LEASE_TTL_SECS: u64 = 60;
+const MAX_LEASE_WAIT_MS: u32 = 5_000;
 
 #[derive(Default)]
 pub(super) struct RefreshState {
@@ -202,17 +205,109 @@ impl OAuthClient {
         let did = &observed.session.did;
         let lock = self.account_lock(did);
         let mut state = lock.lock().await;
-        let Some(current) = self.read_record(did, &mut state).await? else {
-            drop(state);
-            return Err(self.missing_session(did));
-        };
-        if current.generation() != observed.generation() {
+        let (mut current, lease) = self
+            .acquire_refresh_slot(did, observed, force, &mut state)
+            .await?;
+        if current.generation() != observed.generation()
+            || (!force && !current.session.needs_refresh(unix_now()?))
+        {
+            if let Some(lease) = lease.as_ref() {
+                self.storage.release_refresh_lease(did, lease).await;
+            }
             return Ok(current.session);
         }
+
+        // Re-check once more after acquiring a cross-instance lease in case
+        // a peer finished publishing a replacement just before handover.
+        if lease.is_some() {
+            let Some(latest) = self.read_record(did, &mut state).await? else {
+                self.release_lease(did, lease.as_ref()).await;
+                drop(state);
+                return Err(self.missing_session(did));
+            };
+            if latest.generation() != observed.generation() {
+                self.release_lease(did, lease.as_ref()).await;
+                return Ok(latest.session);
+            }
+            current = latest;
+        }
+
+        let outcome = self.execute_refresh(did, &current, force, &mut state).await;
+        self.release_lease(did, lease.as_ref()).await;
+        outcome
+    }
+
+    async fn release_lease(&self, did: &Did, lease: Option<&RefreshLease>) {
+        if let Some(lease) = lease {
+            self.storage.release_refresh_lease(did, lease).await;
+        }
+    }
+
+    async fn acquire_refresh_slot(
+        &self,
+        did: &Did,
+        observed: &SessionRecord,
+        force: bool,
+        state: &mut RefreshState,
+    ) -> Result<(SessionRecord, Option<RefreshLease>), OAuthError> {
+        let mut waited_ms: u32 = 0;
+        loop {
+            let Some(current) = self.read_record(did, state).await? else {
+                return Err(self.missing_session(did));
+            };
+            if current.generation() != observed.generation() {
+                return Ok((current, None));
+            }
+            let now = unix_now()?;
+            if !force && !current.session.needs_refresh(now) {
+                return Ok((current, None));
+            }
+            if state.pending.is_some() {
+                return Err(OAuthError::RefreshPersistencePending);
+            }
+            if current.session.refresh_token().is_none() {
+                if !force && now < current.session.expires_at() {
+                    return Ok((current, None));
+                }
+                return Err(OAuthError::ExpiredSession);
+            }
+            if now < state.retry_after {
+                return Err(OAuthError::RefreshBackoff);
+            }
+
+            match self
+                .storage
+                .try_acquire_refresh_lease(
+                    did,
+                    self.instance_id,
+                    current.generation(),
+                    now,
+                    REFRESH_LEASE_TTL_SECS,
+                )
+                .await?
+            {
+                RefreshLeaseAcquire::Acquired(lease) => return Ok((current, Some(lease))),
+                RefreshLeaseAcquire::Unsupported => return Ok((current, None)),
+                RefreshLeaseAcquire::HeldByPeer => {
+                    if waited_ms >= MAX_LEASE_WAIT_MS {
+                        return Err(OAuthError::RefreshBackoff);
+                    }
+                    let step = 50_u32.min(MAX_LEASE_WAIT_MS - waited_ms);
+                    retry_delay(step).await;
+                    waited_ms += step;
+                }
+            }
+        }
+    }
+
+    async fn execute_refresh(
+        &self,
+        did: &Did,
+        current: &SessionRecord,
+        force: bool,
+        state: &mut RefreshState,
+    ) -> Result<Session, OAuthError> {
         let now = unix_now()?;
-        if !force && !current.session.needs_refresh(now) {
-            return Ok(current.session);
-        }
         if state.pending.is_some() {
             // The active slot is still the predecessor. A second rotation
             // would create a replacement that cannot be safely published.
@@ -220,7 +315,7 @@ impl OAuthClient {
         }
         let Some(token) = current.session.refresh_token() else {
             if !force && now < current.session.expires_at() {
-                return Ok(current.session);
+                return Ok(current.session.clone());
             }
             return Err(OAuthError::ExpiredSession);
         };
@@ -243,7 +338,7 @@ impl OAuthClient {
         // the token loses that rotation either way; the next attempt then
         // gets `invalid_grant` instead of a local error.
         let burned = Burned {
-            state: &mut state,
+            state,
             digest,
             settled: false,
         };
@@ -288,7 +383,7 @@ impl OAuthClient {
                 new.session = session.clone();
                 new.account.authorization_server = Some(server.metadata().clone());
                 new.account.expected_issuer = Some(server.issuer().to_owned());
-                self.persist_refresh(&mut state, &current, new).await?;
+                self.persist_refresh(state, current, new).await?;
                 Ok(session)
             }
             Err(error) => {
@@ -296,7 +391,6 @@ impl OAuthClient {
                     state.used.retain(|used| *used != digest);
                 }
                 state.failure(unix_now().unwrap_or(now), &error);
-                drop(state);
                 if error == OAuthError::InvalidGrant {
                     self.storage
                         .emit_auth_event(&AuthEvent::RefreshTokenInvalid { did: did.clone() });

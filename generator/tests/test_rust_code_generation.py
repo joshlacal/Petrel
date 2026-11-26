@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import re
 import pathlib
 import sys
@@ -405,6 +406,215 @@ class RustCodeGenerationTests(unittest.TestCase):
         }
         sub_code = RustCodeGenerator(int_cursor_sub).convert()
         self.assertNotIn("CursorParams", sub_code)
+        self.assertIn("pub const SUBPROTOCOL: Option<&'static str> = None;", sub_code)
+
+        json_sub = {
+            "lexicon": 1,
+            "id": "com.example.subscribeJsonEvents",
+            "defs": {
+                "main": {
+                    "type": "subscription",
+                    "subprotocol": "xrpc.v1.json",
+                }
+            },
+        }
+        json_sub_code = RustCodeGenerator(json_sub).convert()
+        self.assertIn(
+            'pub const SUBPROTOCOL: Option<&\'static str> = Some("xrpc.v1.json");',
+            json_sub_code,
+        )
+        self.assertIn(
+            "const SUBPROTOCOL: Option<&'static str> = Self::SUBPROTOCOL;",
+            json_sub_code,
+        )
+
+    def test_keyword_namespace_segments_and_cross_module_def_collisions_compile(self):
+        import asyncio
+        import subprocess
+        import tempfile
+        from main import generate_rust_from_lexicons_recursive
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = pathlib.Path(tmp)
+            lex_root = tmp_path / "lexicons"
+            crate_root = tmp_path / "synthetic_crate"
+            gen_root = crate_root / "src" / "generated"
+            lex_root.mkdir(parents=True)
+            gen_root.mkdir(parents=True)
+
+            # Synthetic lexicons covering Rust keywords as NSID segments
+            # (`match`, `type`, `gen`, `self`, `super`, `crate`, `async`, `try`)
+            # AND cross-module `Def` suffix collisions (`item` vs `itemDef`).
+            synthetic_lexicons = [
+                {
+                    "lexicon": 1,
+                    "id": "com.example.item",
+                    "defs": {
+                        "main": {
+                            "type": "object",
+                            "required": ["label"],
+                            "properties": {"label": {"type": "string"}},
+                        },
+                        "item": {
+                            "type": "object",
+                            "required": ["kind"],
+                            "properties": {"kind": {"type": "string"}},
+                        },
+                        "itemDef": {
+                            "type": "object",
+                            "required": ["code"],
+                            "properties": {"code": {"type": "integer"}},
+                        },
+                    },
+                },
+                {
+                    "lexicon": 1,
+                    "id": "com.example.match.type",
+                    "defs": {
+                        "main": {
+                            "type": "object",
+                            "required": ["itemRef", "itemDefRef"],
+                            "properties": {
+                                "itemRef": {"type": "ref", "ref": "com.example.item#item"},
+                                "itemDefRef": {"type": "ref", "ref": "com.example.item#itemDef"},
+                            },
+                        }
+                    },
+                },
+                {
+                    "lexicon": 1,
+                    "id": "com.example.gen.self",
+                    "defs": {
+                        "main": {
+                            "type": "query",
+                            "parameters": {
+                                "type": "params",
+                                "properties": {"type": {"type": "string"}},
+                            },
+                            "output": {
+                                "encoding": "application/json",
+                                "schema": {"type": "ref", "ref": "com.example.match.type"},
+                            },
+                        }
+                    },
+                },
+                {
+                    "lexicon": 1,
+                    "id": "com.example.super.crate.async.try",
+                    "defs": {
+                        "main": {
+                            "type": "procedure",
+                            "input": {
+                                "encoding": "application/json",
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["colliding", "def", "kw"],
+                                    "properties": {
+                                        "colliding": {"type": "ref", "ref": "com.example.item#item"},
+                                        "def": {"type": "ref", "ref": "com.example.item#itemDef"},
+                                        "kw": {"type": "ref", "ref": "com.example.match.type"},
+                                    },
+                                },
+                            },
+                        }
+                    },
+                },
+            ]
+
+            for lex in synthetic_lexicons:
+                (lex_root / f"{lex['id']}.json").write_text(
+                    json.dumps(lex), encoding="utf-8"
+                )
+
+            asyncio.run(
+                generate_rust_from_lexicons_recursive(
+                    str(lex_root),
+                    str(gen_root),
+                    crate_path="crate::generated",
+                    features=False,
+                )
+            )
+
+            # Verify keyword files were written with raw stems (not `r#...`) and
+            # `mod.rs` declares escaped `r#...` / `_` identifiers.
+            self.assertTrue((gen_root / "com" / "example" / "match" / "type.rs").is_file())
+            self.assertTrue((gen_root / "com" / "example" / "gen" / "self_.rs").is_file())
+            self.assertTrue(
+                (gen_root / "com" / "example" / "super_" / "crate_" / "async" / "try.rs").is_file()
+            )
+            example_mod = (gen_root / "com" / "example" / "mod.rs").read_text(encoding="utf-8")
+            self.assertIn("pub mod r#match;", example_mod)
+            self.assertIn("pub mod r#gen;", example_mod)
+            self.assertIn("pub mod super_;", example_mod)
+
+            # Verify same-module and cross-module callers agree on `ItemDef` vs `ItemDef2`.
+            item_rs = (gen_root / "com" / "example" / "item.rs").read_text(encoding="utf-8")
+            self.assertIn("pub struct Item {", item_rs)
+            self.assertIn("pub struct ItemDef {", item_rs)
+            self.assertIn("pub struct ItemDef2 {", item_rs)
+            match_type_rs = (gen_root / "com" / "example" / "match" / "type.rs").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(
+                "pub item_ref: crate::generated::com::example::item::ItemDef2,",
+                match_type_rs,
+            )
+            self.assertIn(
+                "pub item_def_ref: crate::generated::com::example::item::ItemDef,",
+                match_type_rs,
+            )
+
+            (crate_root / "Cargo.toml").write_text(
+                "\n".join([
+                    "[package]",
+                    'name = "synthetic-lexicon-check"',
+                    'version = "0.0.0"',
+                    'edition = "2024"',
+                    "",
+                    "[dependencies]",
+                    f'petrel-core = {{ path = "{(REPO_ROOT / "rust" / "petrel-core").as_posix()}" }}',
+                    'serde = { version = "1", features = ["derive"] }',
+                    "",
+                    "[workspace]",
+                ]),
+                encoding="utf-8",
+            )
+            (crate_root / "src" / "lib.rs").write_text(
+                "pub mod generated;\n", encoding="utf-8"
+            )
+            lockfile = REPO_ROOT / "rust" / "Cargo.lock"
+            if lockfile.is_file():
+                (crate_root / "Cargo.lock").write_text(
+                    lockfile.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+
+            env = dict(os.environ)
+            env["CARGO_TARGET_DIR"] = str(tmp_path / "target")
+            manifest_path = str(crate_root / "Cargo.toml")
+            metadata = subprocess.run(
+                ["cargo", "metadata", "--offline", "--format-version", "1", "--manifest-path", manifest_path],
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            if metadata.returncode != 0:
+                if os.environ.get("PETREL_REQUIRE_CARGO_CODEGEN_CHECK") == "1":
+                    self.fail(
+                        f"offline cargo metadata failed with PETREL_REQUIRE_CARGO_CODEGEN_CHECK=1:\n{metadata.stderr}"
+                    )
+                return
+
+            result = subprocess.run(
+                ["cargo", "check", "--offline", "--manifest-path", manifest_path],
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                result.returncode,
+                0,
+                f"cargo check failed:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}",
+            )
 
 
 if __name__ == "__main__":

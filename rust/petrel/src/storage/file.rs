@@ -3,8 +3,9 @@ use std::fmt;
 use std::fs::File;
 use std::io::{self, ErrorKind, Read as _, Write as _};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
-use aes_gcm::aead::{Aead, KeyInit};
+use aes_gcm::aead::{Aead, KeyInit, Payload};
 use aes_gcm::{Aes256Gcm, Nonce};
 use base64::Engine as _;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
@@ -25,24 +26,33 @@ use windows::Directory;
 
 const KEY_CHECK_FILENAME: &str = ".petrel-key-check";
 const KEY_CHECK_PLAINTEXT: &[u8] = b"petrel.encrypted-files.key-check.v1";
+/// Magic header distinguishing v2 AAD-bound entries from v1 Swift-compatible entries.
+const V2_MAGIC: &[u8; 8] = b"PTLSECv2";
 
 /// An encrypted, file-backed secret store for native targets.
 ///
-/// The container matches the Swift AES-256-GCM file format. Unix operations
-/// use a held directory descriptor and require the owner to be the current
-/// user, with group and other access disabled. Windows inherits ACLs from
-/// the chosen private directory and rejects reparse points. Keep the
-/// directory private on Windows, where file data is flushed before an
-/// atomic rename but directory metadata cannot be explicitly flushed.
+/// New entries are written in the v2 AES-256-GCM envelope that binds
+/// `namespace + "\0" + key` as AAD, while v1 entries (matching Swift's
+/// `FileEncryptedStore`, including `.petrel-key-check`) remain readable
+/// transparently. Unix operations use a held directory descriptor and require
+/// the owner to be the current user, with group and other access disabled.
+/// Windows inherits ACLs from the chosen private directory and rejects reparse
+/// points. Keep the directory private on Windows, where file data is flushed
+/// before an atomic rename but directory metadata cannot be explicitly flushed.
 ///
 /// Container compatibility applies to raw secret bytes with supported
 /// names. A namespace cannot contain a period. The typed session records
 /// written by [`super::SessionStore`] have a separate Rust JSON format.
 ///
-/// Operations use blocking filesystem I/O. Rust instances serialize
+/// Under the `native` feature, async [`SecretStore`] methods offload blocking
+/// filesystem I/O onto `tokio::task::spawn_blocking`. Rust instances serialize
 /// mutations with an advisory lock. Coordinate independently running Swift
 /// and Rust writers externally when using a directory from both runtimes.
 pub struct FileSecretStore {
+    inner: Arc<FileSecretStoreInner>,
+}
+
+struct FileSecretStoreInner {
     directory: Directory,
     key: Zeroizing<[u8; 32]>,
 }
@@ -60,22 +70,22 @@ impl FileSecretStore {
     /// the store cannot be redirected. Pass a canonical path: system
     /// locations such as macOS's `/var` and `/tmp` are links.
     pub fn open(directory: impl AsRef<Path>, key: &[u8; 32]) -> Result<Self, StoreError> {
-        let store = Self {
+        let inner = Arc::new(FileSecretStoreInner {
             directory: Directory::open(directory.as_ref()).map_err(io_error)?,
             key: Zeroizing::new(*key),
-        };
+        });
         // Windows requires a regular file for locking. Reject an existing
         // different key before creating that file, then recheck under the lock.
         #[cfg(windows)]
-        store.validate_contents()?;
+        inner.validate_contents()?;
         {
-            let _lock = store.directory.lock().map_err(io_error)?;
-            if !store.validate_contents()? {
-                store.establish_key_check()?;
+            let _lock = inner.directory.lock().map_err(io_error)?;
+            if !inner.validate_contents()? {
+                inner.establish_key_check()?;
             }
-            store.clear_interrupted_files()?;
+            inner.clear_interrupted_files()?;
         }
-        Ok(store)
+        Ok(Self { inner })
     }
 
     /// Opens the directory configured by `PETREL_SECRETS_DIR` or
@@ -100,7 +110,26 @@ impl FileSecretStore {
         };
         Self::open(directory, key)
     }
+}
 
+async fn run_blocking<F, T>(operation: F) -> Result<T, StoreError>
+where
+    F: FnOnce() -> Result<T, StoreError> + Send + 'static,
+    T: Send + 'static,
+{
+    #[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
+    {
+        tokio::task::spawn_blocking(operation)
+            .await
+            .map_err(|_| StoreError::Unavailable("file store task cancelled".into()))?
+    }
+    #[cfg(not(all(not(target_arch = "wasm32"), feature = "native")))]
+    {
+        operation()
+    }
+}
+
+impl FileSecretStoreInner {
     /// Checks that `key` is this directory's key. Returns whether the
     /// directory already records one.
     ///
@@ -117,11 +146,12 @@ impl FileSecretStore {
         for name in self.directory.names().map_err(io_error)? {
             // Reading checks each entry's owner and mode, so a file someone
             // else could have written still refuses the whole directory.
-            if namespaced_key(&name).is_some()
+            if let Some(ns_key) = namespaced_key(&name)
                 && let Some(ciphertext) = self.read_encrypted(&name)?
                 && marker.is_none()
             {
-                self.decrypt(&ciphertext)
+                let (ns, key) = ns_key.split_once('.').ok_or_else(corrupt_file)?;
+                self.decrypt_entry(ns, key, &ciphertext)
                     .map_err(|_| StoreError::KeyMismatch)?;
             }
         }
@@ -130,7 +160,7 @@ impl FileSecretStore {
 
     fn verify_key_check(&self, combined: &[u8]) -> Result<(), StoreError> {
         let plaintext = self
-            .decrypt(combined)
+            .decrypt_v1(combined)
             .map_err(|_| StoreError::KeyMismatch)?;
         if plaintext.as_slice() != KEY_CHECK_PLAINTEXT {
             return Err(StoreError::KeyMismatch);
@@ -139,7 +169,7 @@ impl FileSecretStore {
     }
 
     fn establish_key_check(&self) -> Result<(), StoreError> {
-        let combined = self.encrypt(KEY_CHECK_PLAINTEXT)?;
+        let combined = self.encrypt_v1(KEY_CHECK_PLAINTEXT)?;
         let linked = self.publish(&combined, |staged| {
             match self.directory.link(staged, KEY_CHECK_FILENAME) {
                 Ok(()) => Ok(true),
@@ -178,7 +208,7 @@ impl FileSecretStore {
             .map_err(io_error)
     }
 
-    fn encrypt(&self, plaintext: &[u8]) -> Result<Vec<u8>, StoreError> {
+    fn encrypt_v1(&self, plaintext: &[u8]) -> Result<Vec<u8>, StoreError> {
         let mut nonce = [0; 12];
         getrandom::getrandom(&mut nonce)
             .map_err(|_| StoreError::Unavailable("randomness".into()))?;
@@ -191,7 +221,34 @@ impl FileSecretStore {
         Ok(combined)
     }
 
-    fn decrypt(&self, combined: &[u8]) -> Result<Zeroizing<Vec<u8>>, StoreError> {
+    fn encrypt_v2(
+        &self,
+        namespace: &str,
+        key: &str,
+        plaintext: &[u8],
+    ) -> Result<Vec<u8>, StoreError> {
+        let mut nonce = [0; 12];
+        getrandom::getrandom(&mut nonce)
+            .map_err(|_| StoreError::Unavailable("randomness".into()))?;
+        let aad = entry_aad(namespace, key);
+        let ciphertext = self
+            .cipher()?
+            .encrypt(
+                &Nonce::from(nonce),
+                Payload {
+                    msg: plaintext,
+                    aad: &aad,
+                },
+            )
+            .map_err(|_| StoreError::Other("file encryption failed".into()))?;
+        let mut envelope = Vec::with_capacity(V2_MAGIC.len() + nonce.len() + ciphertext.len());
+        envelope.extend_from_slice(V2_MAGIC);
+        envelope.extend_from_slice(&nonce);
+        envelope.extend_from_slice(&ciphertext);
+        Ok(envelope)
+    }
+
+    fn decrypt_v1(&self, combined: &[u8]) -> Result<Zeroizing<Vec<u8>>, StoreError> {
         let (nonce, encrypted) = combined
             .split_first_chunk::<12>()
             .ok_or_else(corrupt_file)?;
@@ -199,6 +256,30 @@ impl FileSecretStore {
             .decrypt(&Nonce::from(*nonce), encrypted)
             .map(Zeroizing::new)
             .map_err(|_| corrupt_file())
+    }
+
+    fn decrypt_entry(
+        &self,
+        namespace: &str,
+        key: &str,
+        combined: &[u8],
+    ) -> Result<Zeroizing<Vec<u8>>, StoreError> {
+        if let Some(rest) = combined.strip_prefix(V2_MAGIC) {
+            let (nonce, encrypted) = rest.split_first_chunk::<12>().ok_or_else(corrupt_file)?;
+            let aad = entry_aad(namespace, key);
+            self.cipher()?
+                .decrypt(
+                    &Nonce::from(*nonce),
+                    Payload {
+                        msg: encrypted,
+                        aad: &aad,
+                    },
+                )
+                .map(Zeroizing::new)
+                .map_err(|_| corrupt_file())
+        } else {
+            self.decrypt_v1(combined)
+        }
     }
 
     fn cipher(&self) -> Result<Aes256Gcm, StoreError> {
@@ -226,9 +307,15 @@ impl FileSecretStore {
         Ok(result)
     }
 
-    fn replace(&self, name: &str, plaintext: &[u8]) -> Result<(), StoreError> {
+    fn replace(
+        &self,
+        name: &str,
+        namespace: &str,
+        key: &str,
+        plaintext: &[u8],
+    ) -> Result<(), StoreError> {
         let _existing = self.directory.read_file(name).map_err(io_error)?;
-        let combined = self.encrypt(plaintext)?;
+        let combined = self.encrypt_v2(namespace, key, plaintext)?;
         self.publish(&combined, |source| self.directory.rename(source, name))
     }
 
@@ -249,7 +336,7 @@ impl FileSecretStore {
     ) -> Result<T, StoreError> {
         validate_namespace(namespace)?;
         validate_key(key)?;
-        let name = URL_SAFE_NO_PAD.encode(format!("{namespace}.{key}"));
+        let name = encoded_entry_name(namespace, key);
         let _lock = self.directory.lock().map_err(io_error)?;
         operation(&name)
     }
@@ -262,11 +349,24 @@ impl SecretStore for FileSecretStore {
         key: &'a str,
     ) -> BoxFuture<'a, Result<Option<Vec<u8>>, StoreError>> {
         Box::pin(async move {
-            self.with_entry(namespace, key, |name| {
-                self.read_encrypted(name)?
-                    .map(|ciphertext| self.decrypt(&ciphertext).map(|value| value.to_vec()))
-                    .transpose()
+            validate_namespace(namespace)?;
+            validate_key(key)?;
+            let inner = Arc::clone(&self.inner);
+            let namespace = namespace.to_owned();
+            let key = key.to_owned();
+            run_blocking(move || {
+                inner.with_entry(&namespace, &key, |name| {
+                    inner
+                        .read_encrypted(name)?
+                        .map(|ciphertext| {
+                            inner
+                                .decrypt_entry(&namespace, &key, &ciphertext)
+                                .map(|value| value.to_vec())
+                        })
+                        .transpose()
+                })
             })
+            .await
         })
     }
 
@@ -276,7 +376,20 @@ impl SecretStore for FileSecretStore {
         key: &'a str,
         value: &'a [u8],
     ) -> BoxFuture<'a, Result<(), StoreError>> {
-        Box::pin(async move { self.with_entry(namespace, key, |name| self.replace(name, value)) })
+        Box::pin(async move {
+            validate_namespace(namespace)?;
+            validate_key(key)?;
+            let inner = Arc::clone(&self.inner);
+            let namespace = namespace.to_owned();
+            let key = key.to_owned();
+            let value = Zeroizing::new(value.to_vec());
+            run_blocking(move || {
+                inner.with_entry(&namespace, &key, |name| {
+                    inner.replace(name, &namespace, &key, &value)
+                })
+            })
+            .await
+        })
     }
 
     fn delete<'a>(
@@ -284,7 +397,15 @@ impl SecretStore for FileSecretStore {
         namespace: &'a str,
         key: &'a str,
     ) -> BoxFuture<'a, Result<(), StoreError>> {
-        Box::pin(async move { self.with_entry(namespace, key, |name| self.remove_file(name)) })
+        Box::pin(async move {
+            validate_namespace(namespace)?;
+            validate_key(key)?;
+            let inner = Arc::clone(&self.inner);
+            let namespace = namespace.to_owned();
+            let key = key.to_owned();
+            run_blocking(move || inner.with_entry(&namespace, &key, |name| inner.remove_file(name)))
+                .await
+        })
     }
 
     fn take<'a>(
@@ -293,38 +414,51 @@ impl SecretStore for FileSecretStore {
         key: &'a str,
     ) -> BoxFuture<'a, Result<Option<Vec<u8>>, StoreError>> {
         Box::pin(async move {
-            self.with_entry(namespace, key, |name| {
-                let Some(file) = self.directory.read_file(name).map_err(io_error)? else {
-                    return Ok(None);
-                };
-                let claimed = unique_name("claim")?;
-                self.directory.rename(name, &claimed).map_err(io_error)?;
-                self.directory.sync().map_err(io_error)?;
-                let result = read_encrypted_file(file)
-                    .map_err(io_error)
-                    .and_then(|ciphertext| self.decrypt(&ciphertext));
-                let cleanup = self.remove_file(&claimed);
-                let plaintext = result?;
-                cleanup?;
-                Ok(Some(plaintext.to_vec()))
+            validate_namespace(namespace)?;
+            validate_key(key)?;
+            let inner = Arc::clone(&self.inner);
+            let namespace = namespace.to_owned();
+            let key = key.to_owned();
+            run_blocking(move || {
+                inner.with_entry(&namespace, &key, |name| {
+                    let Some(file) = inner.directory.read_file(name).map_err(io_error)? else {
+                        return Ok(None);
+                    };
+                    let claimed = unique_name("claim")?;
+                    inner.directory.rename(name, &claimed).map_err(io_error)?;
+                    inner.directory.sync().map_err(io_error)?;
+                    let result = read_encrypted_file(file)
+                        .map_err(io_error)
+                        .and_then(|ciphertext| inner.decrypt_entry(&namespace, &key, &ciphertext));
+                    let cleanup = inner.remove_file(&claimed);
+                    let plaintext = result?;
+                    cleanup?;
+                    Ok(Some(plaintext.to_vec()))
+                })
             })
+            .await
         })
     }
 
     fn delete_namespace<'a>(&'a self, namespace: &'a str) -> BoxFuture<'a, Result<(), StoreError>> {
         Box::pin(async move {
             validate_namespace(namespace)?;
-            let _lock = self.directory.lock().map_err(io_error)?;
-            let mut first_error = None;
-            for name in self.directory.names().map_err(io_error)? {
-                if namespaced_key(&name)
-                    .is_some_and(|key| key.split_once('.').is_some_and(|(ns, _)| ns == namespace))
-                    && let Err(error) = self.remove_file(&name)
-                {
-                    first_error.get_or_insert(error);
+            let inner = Arc::clone(&self.inner);
+            let namespace = namespace.to_owned();
+            run_blocking(move || {
+                let _lock = inner.directory.lock().map_err(io_error)?;
+                let mut first_error = None;
+                for name in inner.directory.names().map_err(io_error)? {
+                    if namespaced_key(&name).is_some_and(|key| {
+                        key.split_once('.').is_some_and(|(ns, _)| ns == namespace)
+                    }) && let Err(error) = inner.remove_file(&name)
+                    {
+                        first_error.get_or_insert(error);
+                    }
                 }
-            }
-            first_error.map_or(Ok(()), Err)
+                first_error.map_or(Ok(()), Err)
+            })
+            .await
         })
     }
 
@@ -336,22 +470,46 @@ impl SecretStore for FileSecretStore {
         new: Option<&'a [u8]>,
     ) -> BoxFuture<'a, Result<bool, StoreError>> {
         Box::pin(async move {
-            self.with_entry(namespace, key, |name| {
-                let existing = self
-                    .read_encrypted(name)?
-                    .map(|ciphertext| self.decrypt(&ciphertext))
-                    .transpose()?;
-                if existing.as_ref().map(|value| value.as_slice()) != expected {
-                    return Ok(false);
-                }
-                match new {
-                    Some(value) => self.replace(name, value)?,
-                    None => self.remove_file(name)?,
-                }
-                Ok(true)
+            validate_namespace(namespace)?;
+            validate_key(key)?;
+            let inner = Arc::clone(&self.inner);
+            let namespace = namespace.to_owned();
+            let key = key.to_owned();
+            let expected = expected.map(|bytes| Zeroizing::new(bytes.to_vec()));
+            let new = new.map(|bytes| Zeroizing::new(bytes.to_vec()));
+            run_blocking(move || {
+                inner.with_entry(&namespace, &key, |name| {
+                    let existing = inner
+                        .read_encrypted(name)?
+                        .map(|ciphertext| inner.decrypt_entry(&namespace, &key, &ciphertext))
+                        .transpose()?;
+                    if existing.as_ref().map(|value| value.as_slice())
+                        != expected.as_ref().map(|value| value.as_slice())
+                    {
+                        return Ok(false);
+                    }
+                    match new {
+                        Some(value) => inner.replace(name, &namespace, &key, &value)?,
+                        None => inner.remove_file(name)?,
+                    }
+                    Ok(true)
+                })
             })
+            .await
         })
     }
+}
+
+fn encoded_entry_name(namespace: &str, key: &str) -> String {
+    URL_SAFE_NO_PAD.encode(format!("{namespace}.{key}"))
+}
+
+fn entry_aad(namespace: &str, key: &str) -> Vec<u8> {
+    let mut aad = Vec::with_capacity(namespace.len() + 1 + key.len());
+    aad.extend_from_slice(namespace.as_bytes());
+    aad.push(0);
+    aad.extend_from_slice(key.as_bytes());
+    aad
 }
 
 fn read_encrypted_file(mut file: File) -> io::Result<Vec<u8>> {
@@ -406,8 +564,11 @@ mod tests {
         let store = FileSecretStore::open(&path, &[23; 32]).unwrap();
         store.put("test", "key", b"committed").await.unwrap();
 
-        let staged = store.encrypt(b"replacement").unwrap();
-        let failed = store.publish(&staged, |_| {
+        let staged = store
+            .inner
+            .encrypt_v2("test", "key", b"replacement")
+            .unwrap();
+        let failed = store.inner.publish(&staged, |_| {
             Err::<(), _>(ErrorKind::PermissionDenied.into())
         });
         assert!(matches!(failed, Err(StoreError::Unavailable(_))));
@@ -417,6 +578,7 @@ mod tests {
         );
         assert!(
             store
+                .inner
                 .directory
                 .names()
                 .unwrap()

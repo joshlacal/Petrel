@@ -7,6 +7,16 @@ use zeroize::Zeroizing;
 
 use crate::crypto::split_compact_jws;
 
+/// Default maximum accepted service-auth token lifetime (1 hour), matching
+/// Swift `ServiceJWT.defaultMaximumAcceptedLifetime`.
+pub(crate) const DEFAULT_MAX_LIFETIME_SECS: i64 = 3_600;
+/// Maximum caller-requested service-auth token lifetime (24 hours), matching
+/// Swift `ATProtoClient.getServiceAuthToken`.
+pub(crate) const MAX_REQUESTED_LIFETIME_SECS: i64 = 86_400;
+/// Default clock skew tolerance (5 seconds), matching Swift
+/// `ServiceJWT.defaultClockSkew`.
+pub(crate) const DEFAULT_CLOCK_SKEW_SECS: i64 = 5;
+
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum ServiceAuthRequestError {
     #[error("invalid service-auth request")]
@@ -127,12 +137,24 @@ impl ServiceAuthToken {
         Ok(header)
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn validate_claims(
         &self,
         session_did: &Did,
         audience: &ServiceRef,
         method: Option<&Nsid>,
         now: i64,
+    ) -> Result<(), ServiceAuthRequestError> {
+        self.validate_claims_for_lifetime(session_did, audience, method, now, None)
+    }
+
+    pub(crate) fn validate_claims_for_lifetime(
+        &self,
+        session_did: &Did,
+        audience: &ServiceRef,
+        method: Option<&Nsid>,
+        now: i64,
+        requested_lifetime: Option<Duration>,
     ) -> Result<(), ServiceAuthRequestError> {
         let issued = &self.claims;
         if issued.issuer.did() != session_did
@@ -143,6 +165,32 @@ impl ServiceAuthToken {
             || issued.expires_at <= now
         {
             return Err(ServiceAuthRequestError::UnexpectedClaims);
+        }
+
+        let max_lifetime = requested_lifetime
+            .and_then(|d| i64::try_from(d.as_secs()).ok())
+            .map_or(DEFAULT_MAX_LIFETIME_SECS, |secs| {
+                secs.clamp(DEFAULT_MAX_LIFETIME_SECS, MAX_REQUESTED_LIFETIME_SECS)
+            });
+        let Some(latest_expiration) = now
+            .checked_add(DEFAULT_CLOCK_SKEW_SECS)
+            .and_then(|t| t.checked_add(max_lifetime))
+        else {
+            return Err(ServiceAuthRequestError::UnexpectedClaims);
+        };
+        if issued.expires_at > latest_expiration {
+            return Err(ServiceAuthRequestError::UnexpectedClaims);
+        }
+        if let Some(iat) = issued.issued_at {
+            if issued.expires_at < iat {
+                return Err(ServiceAuthRequestError::UnexpectedClaims);
+            }
+            let Some(lifetime) = issued.expires_at.checked_sub(iat) else {
+                return Err(ServiceAuthRequestError::UnexpectedClaims);
+            };
+            if lifetime > max_lifetime {
+                return Err(ServiceAuthRequestError::UnexpectedClaims);
+            }
         }
         Ok(())
     }
@@ -303,6 +351,165 @@ mod tests {
         assert_eq!(
             requested_expiration(Some(Duration::from_secs(86_401)), 10),
             Err(ServiceAuthRequestError::InvalidRequest)
+        );
+    }
+
+    async fn sign_service_jwt(
+        key: &SoftwareDpopSigner,
+        claims: serde_json::Value,
+    ) -> ServiceAuthToken {
+        let input = jws_signing_input(&json!({"alg": "ES256", "typ": "JWT"}), &claims).unwrap();
+        let sig = key.sign(input.as_bytes()).await.unwrap();
+        let compact = finish_es256_jws(input, &sig).unwrap();
+        ServiceAuthToken::inspect(compact).unwrap()
+    }
+
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+    #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+    async fn validate_claims_enforces_default_exp_and_iat_bounds() {
+        let key = SoftwareDpopSigner::generate().unwrap();
+        let issuer = "did:plc:abcdefghijklmnopqrstuvwx";
+        let audience = "did:web:service.example";
+        let expected_audience: ServiceRef = format!("{audience}#atproto_service").parse().unwrap();
+        let issuer_did: Did = issuer.parse().unwrap();
+        let method: Nsid = "blue.example.service".parse().unwrap();
+        let now = 1_000_i64;
+
+        // With `iat` absent, clock skew (5s) is tolerated on `now + max_lifetime`.
+        let at_skew_limit_no_iat = sign_service_jwt(
+            &key,
+            json!({
+                "iss": issuer,
+                "aud": audience,
+                "lxm": method.as_str(),
+                "exp": now + DEFAULT_MAX_LIFETIME_SECS + DEFAULT_CLOCK_SKEW_SECS,
+            }),
+        )
+        .await;
+        assert_eq!(
+            at_skew_limit_no_iat.validate_claims(
+                &issuer_did,
+                &expected_audience,
+                Some(&method),
+                now
+            ),
+            Ok(())
+        );
+
+        // With `iat` present, `exp - iat` itself must not exceed `max_lifetime`.
+        let at_iat_limit = sign_service_jwt(
+            &key,
+            json!({
+                "iss": issuer,
+                "aud": audience,
+                "lxm": method.as_str(),
+                "iat": now,
+                "exp": now + DEFAULT_MAX_LIFETIME_SECS,
+            }),
+        )
+        .await;
+        assert_eq!(
+            at_iat_limit.validate_claims(&issuer_did, &expected_audience, Some(&method), now),
+            Ok(())
+        );
+
+        for claims in [
+            json!({
+                "iss": issuer,
+                "aud": audience,
+                "lxm": method.as_str(),
+                "exp": now + DEFAULT_MAX_LIFETIME_SECS + DEFAULT_CLOCK_SKEW_SECS + 1,
+            }),
+            json!({
+                "iss": issuer,
+                "aud": audience,
+                "lxm": method.as_str(),
+                "iat": now,
+                "exp": now + DEFAULT_MAX_LIFETIME_SECS + 1,
+            }),
+            json!({
+                "iss": issuer,
+                "aud": audience,
+                "lxm": method.as_str(),
+                "exp": i64::MAX,
+            }),
+            json!({
+                "iss": issuer,
+                "aud": audience,
+                "lxm": method.as_str(),
+                "iat": now + 200,
+                "exp": now + 100,
+            }),
+            json!({
+                "iss": issuer,
+                "aud": audience,
+                "lxm": method.as_str(),
+                "iat": 0,
+                "exp": now + 3_000,
+            }),
+        ] {
+            let token = sign_service_jwt(&key, claims).await;
+            assert_eq!(
+                token.validate_claims(&issuer_did, &expected_audience, Some(&method), now),
+                Err(ServiceAuthRequestError::UnexpectedClaims)
+            );
+        }
+    }
+
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+    #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+    async fn validate_claims_respects_requested_lifetime_bounds() {
+        let key = SoftwareDpopSigner::generate().unwrap();
+        let issuer = "did:plc:abcdefghijklmnopqrstuvwx";
+        let audience = "did:web:service.example";
+        let expected_audience: ServiceRef = format!("{audience}#atproto_service").parse().unwrap();
+        let issuer_did: Did = issuer.parse().unwrap();
+        let method: Nsid = "blue.example.service".parse().unwrap();
+        let now = 1_000_i64;
+        let requested = Some(Duration::from_secs(7_200));
+
+        let within_requested = sign_service_jwt(
+            &key,
+            json!({
+                "iss": issuer,
+                "aud": audience,
+                "lxm": method.as_str(),
+                "iat": now,
+                "exp": now + 7_200,
+            }),
+        )
+        .await;
+        assert_eq!(
+            within_requested.validate_claims_for_lifetime(
+                &issuer_did,
+                &expected_audience,
+                Some(&method),
+                now,
+                requested,
+            ),
+            Ok(())
+        );
+
+        let over_requested = sign_service_jwt(
+            &key,
+            json!({
+                "iss": issuer,
+                "aud": audience,
+                "lxm": method.as_str(),
+                "iat": now,
+                "exp": now + 7_200 + DEFAULT_CLOCK_SKEW_SECS + 1,
+            }),
+        )
+        .await;
+        assert_eq!(
+            over_requested.validate_claims_for_lifetime(
+                &issuer_did,
+                &expected_audience,
+                Some(&method),
+                now,
+                requested,
+            ),
+            Err(ServiceAuthRequestError::UnexpectedClaims)
         );
     }
 }

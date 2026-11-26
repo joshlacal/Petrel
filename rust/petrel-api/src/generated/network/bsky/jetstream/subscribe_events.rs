@@ -105,6 +105,7 @@ pub struct SubscribeEvents;
 
 impl SubscribeEvents {
     pub const NSID: &'static str = "network.bsky.jetstream.subscribeEvents";
+    pub const SUBPROTOCOL: Option<&'static str> = Some("xrpc.v1.json");
     pub const KNOWN_MESSAGE_TYPES: &'static [&'static str] = &[
         "network.bsky.jetstream.subscribeEvents#commit",
         "network.bsky.jetstream.subscribeEvents#identity",
@@ -112,6 +113,15 @@ impl SubscribeEvents {
         "network.bsky.jetstream.subscribeEvents#sync",
         "network.bsky.jetstream.subscribeEvents#info",
     ];
+}
+
+impl petrel_core::XrpcSubscription for SubscribeEvents {
+    const NSID: &'static str = Self::NSID;
+    const SUBPROTOCOL: Option<&'static str> = Self::SUBPROTOCOL;
+    const KNOWN_MESSAGE_TYPES: &'static [&'static str] = Self::KNOWN_MESSAGE_TYPES;
+    type Params = Parameters;
+    type Message = Message;
+    type Error = Error;
 }
 
 /// A single record mutation (create, update, or delete).
@@ -205,6 +215,10 @@ impl petrel_core::XrpcInput for Commit {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
     }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
+    }
 }
 
 impl petrel_core::XrpcOutput for Commit {
@@ -290,6 +304,10 @@ impl petrel_core::FromValue for Identity {
 impl petrel_core::XrpcInput for Identity {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
     }
 }
 
@@ -377,6 +395,10 @@ impl petrel_core::XrpcInput for Account {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
     }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
+    }
 }
 
 impl petrel_core::XrpcOutput for Account {
@@ -463,6 +485,10 @@ impl petrel_core::XrpcInput for Sync {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
     }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
+    }
 }
 
 impl petrel_core::XrpcOutput for Sync {
@@ -538,6 +564,10 @@ impl petrel_core::FromValue for Info {
 impl petrel_core::XrpcInput for Info {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
     }
 }
 
@@ -626,6 +656,10 @@ impl petrel_core::XrpcInput for ParametersKinds {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
     }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
+    }
 }
 
 impl petrel_core::XrpcOutput for ParametersKinds {
@@ -695,6 +729,10 @@ impl petrel_core::FromValue for Message {
 impl petrel_core::XrpcInput for Message {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
     }
 }
 

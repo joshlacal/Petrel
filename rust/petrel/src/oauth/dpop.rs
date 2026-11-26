@@ -173,15 +173,49 @@ pub(super) fn use_dpop_nonce<B: AsRef<[u8]>>(response: &http::Response<B>) -> bo
         return false;
     }
     oauth_error_code(response.body().as_ref()) == Some("use_dpop_nonce")
-        || response
-            .headers()
-            .get_all(WWW_AUTHENTICATE)
-            .iter()
-            .filter_map(|header| header.to_str().ok())
-            .any(www_authenticate_nonce)
+        || www_authenticate_has_error(response.headers(), "use_dpop_nonce")
 }
 
-fn www_authenticate_nonce(input: &str) -> bool {
+/// Returns whether a PDS resource response represents an expired or invalid
+/// access token that should trigger a single-flight OAuth refresh.
+///
+/// Only `invalid_token` / `ExpiredToken` / `InvalidToken` (from JSON `error`
+/// or `WWW-Authenticate` `error="invalid_token"` on `401`, or `ExpiredToken`
+/// on `400`) qualify. `insufficient_scope`, `invalid_dpop_proof`,
+/// `use_dpop_nonce`, account takedown errors, and generic 401s never burn or
+/// rotate the refresh token.
+pub(crate) fn is_refreshable_token_rejection<B: AsRef<[u8]>>(
+    response: &http::Response<B>,
+    code: Option<&str>,
+) -> bool {
+    match response.status() {
+        StatusCode::BAD_REQUEST => code == Some("ExpiredToken"),
+        StatusCode::UNAUTHORIZED => {
+            if www_authenticate_has_error(response.headers(), "insufficient_scope")
+                || www_authenticate_has_error(response.headers(), "invalid_dpop_proof")
+                || www_authenticate_has_error(response.headers(), "use_dpop_nonce")
+            {
+                return false;
+            }
+            match code {
+                Some("invalid_token" | "ExpiredToken" | "InvalidToken") => true,
+                Some(_) => false,
+                None => www_authenticate_has_error(response.headers(), "invalid_token"),
+            }
+        }
+        _ => false,
+    }
+}
+
+fn www_authenticate_has_error(headers: &HeaderMap, expected: &str) -> bool {
+    headers
+        .get_all(WWW_AUTHENTICATE)
+        .iter()
+        .filter_map(|header| header.to_str().ok())
+        .any(|header| www_authenticate_error_matches(header, expected))
+}
+
+fn www_authenticate_error_matches(input: &str, expected: &str) -> bool {
     let mut start = 0;
     let mut quoted = false;
     let mut escaped = false;
@@ -194,25 +228,30 @@ fn www_authenticate_nonce(input: &str) -> bool {
         } else if byte == b'"' {
             quoted = !quoted;
         } else if !quoted && byte == b',' {
-            if is_nonce_parameter(&input[start..index]) {
+            if is_error_parameter(&input[start..index], expected) {
                 return true;
             }
             start = index + 1;
         }
     }
-    !quoted && is_nonce_parameter(&input[start..])
+    !quoted && is_error_parameter(&input[start..], expected)
 }
 
-fn is_nonce_parameter(input: &str) -> bool {
+fn is_error_parameter(input: &str, expected: &str) -> bool {
     let input = input.trim();
     let parameter = input
         .split_once([' ', '\t'])
-        .filter(|(scheme, _)| scheme.eq_ignore_ascii_case("DPoP"))
+        .filter(|(scheme, _)| {
+            scheme.eq_ignore_ascii_case("DPoP") || scheme.eq_ignore_ascii_case("Bearer")
+        })
         .map_or(input, |(_, value)| value);
     parameter.split_once('=').is_some_and(|(key, value)| {
-        // An auth parameter value may be a token or a quoted string.
-        key.trim().eq_ignore_ascii_case("error")
-            && matches!(value.trim(), "\"use_dpop_nonce\"" | "use_dpop_nonce")
+        let value = value.trim();
+        let unquoted = value
+            .strip_prefix('"')
+            .and_then(|rest| rest.strip_suffix('"'))
+            .unwrap_or(value);
+        key.trim().eq_ignore_ascii_case("error") && unquoted == expected
     })
 }
 
@@ -287,15 +326,23 @@ mod tests {
             .unwrap();
         assert!(use_dpop_nonce(&challenge));
         assert_eq!(nonce_header(challenge.headers()).unwrap(), Some("fresh"));
-        assert!(!www_authenticate_nonce(
-            "DPoP error_description=\"error=\\\"use_dpop_nonce\\\"\""
+        assert!(!www_authenticate_error_matches(
+            "DPoP error_description=\"error=\\\"use_dpop_nonce\\\"\"",
+            "use_dpop_nonce",
         ));
-        assert!(!www_authenticate_nonce(
-            "DPoP error=\"use_dpop_nonce_extra\""
+        assert!(!www_authenticate_error_matches(
+            "DPoP error=\"use_dpop_nonce_extra\"",
+            "use_dpop_nonce",
         ));
         // The unquoted token form of the same parameter.
-        assert!(www_authenticate_nonce("DPoP error=use_dpop_nonce"));
-        assert!(!www_authenticate_nonce("DPoP error=use_dpop_nonce_extra"));
+        assert!(www_authenticate_error_matches(
+            "DPoP error=use_dpop_nonce",
+            "use_dpop_nonce",
+        ));
+        assert!(!www_authenticate_error_matches(
+            "DPoP error=use_dpop_nonce_extra",
+            "use_dpop_nonce",
+        ));
         assert!(!use_dpop_nonce(&http::Response::new(
             br#"{"error":"use_dpop_nonce"}"#.as_slice()
         )));

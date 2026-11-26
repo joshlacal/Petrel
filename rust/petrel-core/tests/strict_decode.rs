@@ -3,7 +3,11 @@
 
 use std::collections::BTreeMap;
 
-use petrel_core::{DecodeError, FromValue, Nullable, ObjectReader, Value, from_json};
+use petrel_core::{
+    Bytes, DecodeError, FromValue, Nullable, ObjectReader, Value, XrpcInput, dagcbor,
+    from_dag_cbor, from_dag_cbor_strict, from_json, from_json_strict,
+    serde_bridge::from_dag_cbor_with_strict, to_dag_cbor,
+};
 
 fn parse(json: &str) -> Value {
     from_json(json.as_bytes()).unwrap()
@@ -166,4 +170,39 @@ fn a_well_formed_object_decodes_the_same_either_way() {
 fn a_type_without_a_strict_path_decodes_as_usual() {
     assert_eq!(i64::from_value_strict(Value::Integer(4)), Ok(4));
     assert!(String::from_value_strict(Value::Integer(4)).is_err());
+}
+
+#[test]
+fn public_strict_json_and_dag_cbor_entry_points_reject_malformed_nested_fields() {
+    let raw_json = format!(r#"{{"required":{{}},"requiredNullable":null,"optional":{BAD_LEAF}}}"#);
+    assert!(from_json::<Parent>(raw_json.as_bytes()).is_ok());
+    let json_err = from_json_strict::<Parent>(raw_json.as_bytes()).unwrap_err();
+    assert!(json_err.to_string().contains("optional"), "{json_err}");
+    assert!(json_err.to_string().contains("note"), "{json_err}");
+
+    let value = parent_with("list", &format!("[{{}},{BAD_LEAF}]"));
+    let cbor = dagcbor::encode(&value);
+    assert!(from_dag_cbor::<Parent>(&cbor).is_ok());
+    let cbor_err = from_dag_cbor_strict::<Parent>(&cbor).unwrap_err();
+    assert!(cbor_err.to_string().contains("list"), "{cbor_err}");
+    assert!(cbor_err.to_string().contains("note"), "{cbor_err}");
+
+    let well_formed = parent_with("boxed", r#"{"note":42}"#);
+    let well_formed_cbor = to_dag_cbor(&well_formed).unwrap();
+    assert_eq!(
+        from_dag_cbor_strict::<Parent>(&well_formed_cbor),
+        from_dag_cbor::<Parent>(&well_formed_cbor)
+    );
+    assert_eq!(
+        from_dag_cbor_with_strict::<Parent>(&well_formed_cbor, dagcbor::Limits::STANDARD),
+        from_dag_cbor::<Parent>(&well_formed_cbor)
+    );
+}
+
+#[test]
+fn xrpc_input_from_body_for_unit_and_bytes() {
+    assert_eq!(<() as XrpcInput>::from_body(b""), Ok(()));
+    assert!(<() as XrpcInput>::from_body(b"{}").is_err());
+    let bytes = <Bytes as XrpcInput>::from_body(b"payload").unwrap();
+    assert_eq!(bytes.0, b"payload");
 }

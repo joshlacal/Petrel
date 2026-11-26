@@ -542,12 +542,12 @@ class RustCodeGenerator(BaseCodeGenerator):
         code = self.template_manager.errors_template.render(errors=error_entries)
         return code, "Error"
 
-    def _render_message(self, message_obj: Optional[Dict[str, Any]]) -> Tuple[str, List[str]]:
+    def _render_message(self, message_obj: Optional[Dict[str, Any]]) -> Tuple[str, List[str], str]:
         if not message_obj:
-            return "", []
+            return "", [], "()"
         schema = message_obj.get("schema")
         if not isinstance(schema, dict):
-            return "", []
+            return "", [], "()"
 
         schema_type = schema.get("type", "")
         if schema_type == "ref":
@@ -557,7 +557,7 @@ class RustCodeGenerator(BaseCodeGenerator):
                 target=target,
                 description=schema.get("description", ""),
             )
-            return alias, []
+            return alias, [], "Message"
         if schema_type == "union":
             raw_refs = schema.get("refs", [])
             self.enum_generator.generate_enum_for_union_def(
@@ -567,7 +567,7 @@ class RustCodeGenerator(BaseCodeGenerator):
             )
             union_meta = self.enum_generator.unions.get("Message", {})
             tags = [v["wire_tag"] for v in union_meta.get("variants", [])]
-            return "", tags
+            return "", tags, "Message"
         if schema_type == "object":
             code = self._render_struct(
                 "Message",
@@ -579,7 +579,7 @@ class RustCodeGenerator(BaseCodeGenerator):
                 lenient=True,
                 context_identity=("message",),
             )
-            return code, []
+            return code, [], "Message"
 
         raise ValueError(
             f"{self.lexicon_id}: unsupported subscription message schema type {schema_type!r}"
@@ -800,15 +800,27 @@ class RustCodeGenerator(BaseCodeGenerator):
                 error_type=error_type,
             )
         elif main_type == "subscription":
-            parameters_code, _ = self._render_parameters(
+            parameters_code, params_type = self._render_parameters(
                 self.main_def.get("parameters")
             )
-            message_code, known_tags = self._render_message(self.main_def.get("message"))
-            errors_code, _ = self._render_errors(self.main_def.get("errors"))
+            message_code, known_tags, message_type = self._render_message(
+                self.main_def.get("message")
+            )
+            errors_code, error_type = self._render_errors(self.main_def.get("errors"))
+            subprotocol = self.main_def.get("subprotocol")
+            subprotocol_expr = (
+                f"Some({rust_string_literal(subprotocol)})"
+                if isinstance(subprotocol, str) and subprotocol
+                else "None"
+            )
             endpoint_code = self.template_manager.subscription_template.render(
                 endpoint_name=self.main_name,
                 lexicon_id=self.lexicon_id,
+                subprotocol_expr=subprotocol_expr,
                 known_message_types=known_tags,
+                params_type=params_type,
+                message_type=message_type,
+                error_type=error_type,
             )
         elif main_type == "permission-set":
             # Permission-sets are metadata constants; non-main defs still emit below.

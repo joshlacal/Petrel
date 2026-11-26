@@ -84,6 +84,7 @@ pub struct SubscribeModEvents;
 
 impl SubscribeModEvents {
     pub const NSID: &'static str = "chat.bsky.moderation.subscribeModEvents";
+    pub const SUBPROTOCOL: Option<&'static str> = None;
     pub const KNOWN_MESSAGE_TYPES: &'static [&'static str] = &[
         "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage",
         "chat.bsky.moderation.subscribeModEvents#eventGroupChatCreated",
@@ -97,6 +98,15 @@ impl SubscribeModEvents {
         "chat.bsky.moderation.subscribeModEvents#eventGroupChatUpdated",
         "chat.bsky.moderation.subscribeModEvents#eventRateLimitExceeded",
     ];
+}
+
+impl petrel_core::XrpcSubscription for SubscribeModEvents {
+    const NSID: &'static str = Self::NSID;
+    const SUBPROTOCOL: Option<&'static str> = Self::SUBPROTOCOL;
+    const KNOWN_MESSAGE_TYPES: &'static [&'static str] = Self::KNOWN_MESSAGE_TYPES;
+    type Params = Parameters;
+    type Message = Message;
+    type Error = Error;
 }
 
 /// Fired when the first message was sent on a convo.
@@ -172,6 +182,10 @@ impl petrel_core::FromValue for EventConvoFirstMessage {
 impl petrel_core::XrpcInput for EventConvoFirstMessage {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
     }
 }
 
@@ -282,6 +296,10 @@ impl petrel_core::FromValue for EventGroupChatCreated {
 impl petrel_core::XrpcInput for EventGroupChatCreated {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
     }
 }
 
@@ -402,6 +420,10 @@ impl petrel_core::XrpcInput for EventGroupChatMemberAdded {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
     }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
+    }
 }
 
 impl petrel_core::XrpcOutput for EventGroupChatMemberAdded {
@@ -515,6 +537,10 @@ impl petrel_core::FromValue for EventGroupChatMemberJoined {
 impl petrel_core::XrpcInput for EventGroupChatMemberJoined {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
     }
 }
 
@@ -630,6 +656,10 @@ impl petrel_core::XrpcInput for EventGroupChatJoinRequest {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
     }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
+    }
 }
 
 impl petrel_core::XrpcOutput for EventGroupChatJoinRequest {
@@ -738,6 +768,10 @@ impl petrel_core::FromValue for EventGroupChatJoinRequestApproved {
 impl petrel_core::XrpcInput for EventGroupChatJoinRequestApproved {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
     }
 }
 
@@ -848,6 +882,10 @@ impl petrel_core::XrpcInput for EventGroupChatJoinRequestRejected {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
     }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
+    }
 }
 
 impl petrel_core::XrpcOutput for EventGroupChatJoinRequestRejected {
@@ -957,6 +995,10 @@ impl petrel_core::FromValue for EventChatAccepted {
 impl petrel_core::XrpcInput for EventChatAccepted {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
     }
 }
 
@@ -1071,6 +1113,10 @@ impl petrel_core::FromValue for EventGroupChatMemberLeft {
 impl petrel_core::XrpcInput for EventGroupChatMemberLeft {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
     }
 }
 
@@ -1212,6 +1258,10 @@ impl petrel_core::XrpcInput for EventGroupChatUpdated {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
     }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
+    }
 }
 
 impl petrel_core::XrpcOutput for EventGroupChatUpdated {
@@ -1297,6 +1347,10 @@ impl petrel_core::FromValue for EventRateLimitExceeded {
 impl petrel_core::XrpcInput for EventRateLimitExceeded {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
     }
 }
 
@@ -1385,6 +1439,10 @@ impl petrel_core::FromValue for Message {
 impl petrel_core::XrpcInput for Message {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
     }
 }
 

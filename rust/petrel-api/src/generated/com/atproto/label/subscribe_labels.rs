@@ -70,10 +70,20 @@ pub struct SubscribeLabels;
 
 impl SubscribeLabels {
     pub const NSID: &'static str = "com.atproto.label.subscribeLabels";
+    pub const SUBPROTOCOL: Option<&'static str> = None;
     pub const KNOWN_MESSAGE_TYPES: &'static [&'static str] = &[
         "com.atproto.label.subscribeLabels#labels",
         "com.atproto.label.subscribeLabels#info",
     ];
+}
+
+impl petrel_core::XrpcSubscription for SubscribeLabels {
+    const NSID: &'static str = Self::NSID;
+    const SUBPROTOCOL: Option<&'static str> = Self::SUBPROTOCOL;
+    const KNOWN_MESSAGE_TYPES: &'static [&'static str] = Self::KNOWN_MESSAGE_TYPES;
+    type Params = Parameters;
+    type Message = Message;
+    type Error = Error;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -130,6 +140,10 @@ impl petrel_core::FromValue for Labels {
 impl petrel_core::XrpcInput for Labels {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
     }
 }
 
@@ -206,6 +220,10 @@ impl petrel_core::XrpcInput for Info {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
     }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
+    }
 }
 
 impl petrel_core::XrpcOutput for Info {
@@ -266,6 +284,10 @@ impl petrel_core::FromValue for Message {
 impl petrel_core::XrpcInput for Message {
     fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {
         petrel_core::xrpc::json_body(&self)
+    }
+
+    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {
+        petrel_core::from_json_strict(body)
     }
 }
 

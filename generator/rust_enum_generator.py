@@ -336,6 +336,12 @@ class RustEnumGenerator:
         )
         lines.append("        petrel_core::xrpc::json_body(&self)")
         lines.append("    }")
+        lines.append("")
+        lines.append(
+            "    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {"
+        )
+        lines.append("        petrel_core::from_json_strict(body)")
+        lines.append("    }")
         lines.append("}")
         lines.append("")
         lines.append(f"impl petrel_core::XrpcOutput for {union_name} {{")
@@ -480,6 +486,12 @@ class RustEnumGenerator:
         )
         lines.append("        petrel_core::xrpc::json_body(&self)")
         lines.append("    }")
+        lines.append("")
+        lines.append(
+            "    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {"
+        )
+        lines.append("        petrel_core::from_json_strict(body)")
+        lines.append("    }")
         lines.append("}")
         lines.append("")
         lines.append(f"impl petrel_core::XrpcOutput for {enum_name} {{")
@@ -617,6 +629,12 @@ class RustEnumGenerator:
             "    fn into_body(self) -> Result<Option<Vec<u8>>, petrel_core::EncodeError> {"
         )
         lines.append("        petrel_core::xrpc::json_body(&self)")
+        lines.append("    }")
+        lines.append("")
+        lines.append(
+            "    fn from_body(body: &[u8]) -> Result<Self, petrel_core::DecodeError> {"
+        )
+        lines.append("        petrel_core::from_json_strict(body)")
         lines.append("    }")
         lines.append("}")
         lines.append("")

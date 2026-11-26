@@ -66,7 +66,7 @@ pub enum Error<E: fmt::Debug = UndeclaredError> {
 }
 
 /// Per-request transport and XRPC routing overrides.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CallOptions {
     pub headers: HeaderMap,
     pub proxy: Option<String>,
@@ -75,6 +75,23 @@ pub struct CallOptions {
     pub transport: SendOptions,
     pub redirects: RedirectPolicy,
     pub skip_token_refresh: bool,
+}
+
+impl fmt::Debug for CallOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CallOptions")
+            .field(
+                "headers",
+                &crate::net::policy::redacted_headers(&self.headers),
+            )
+            .field("proxy", &self.proxy)
+            .field("accept_labelers", &self.accept_labelers)
+            .field("service", &self.service)
+            .field("transport", &self.transport)
+            .field("redirects", &self.redirects)
+            .field("skip_token_refresh", &self.skip_token_refresh)
+            .finish()
+    }
 }
 
 impl Default for CallOptions {
@@ -520,7 +537,6 @@ impl XrpcClient {
         for attempt in 1..=MAX_ATTEMPTS {
             let ready = prepare(auth, call.request.clone(), options.skip_token_refresh).await?;
             let (request, auth_context) = ready;
-            let was_proxied = request.headers().contains_key(PROXY);
             let redirects =
                 if auth_context.is_some() || request.headers().contains_key("authorization") {
                     RedirectPolicy::Never
@@ -570,10 +586,9 @@ impl XrpcClient {
                         return Ok(response);
                     }
 
-                    let rejected_session = (status == StatusCode::UNAUTHORIZED
-                        && (!was_proxied || code.is_some_and(session_error)))
-                        || (status == StatusCode::BAD_REQUEST && code == Some("ExpiredToken"));
-                    if rejected_session
+                    // Proxied calls (`atproto-proxy`) still target the user's PDS, so explicit
+                    // session-token rejections must refresh while service-scoped codes stay excluded.
+                    if crate::oauth::is_refreshable_token_rejection(&response, code)
                         && !retried_auth
                         && !options.skip_token_refresh
                         && attempt < MAX_ATTEMPTS
@@ -745,19 +760,6 @@ fn nonce_challenge(response: &Response<Bytes>, code: Option<&str>) -> bool {
                     )
                 })
             })
-}
-
-fn session_error(code: &str) -> bool {
-    matches!(
-        code,
-        "AccountSessionExpired"
-            | "AuthenticationRequired"
-            | "ExpiredToken"
-            | "InvalidToken"
-            | "invalid_token"
-            | "use_dpop_nonce"
-            | "AuthMissing"
-    )
 }
 
 fn retryable_transport(error: &TransportError, safe_method: bool) -> bool {
