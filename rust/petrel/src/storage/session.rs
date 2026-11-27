@@ -38,9 +38,20 @@ pub(crate) struct RefreshLease {
     expires_at: u64,
 }
 
+#[cfg(test)]
+impl RefreshLease {
+    /// Unix time in seconds when a peer may take the lease over.
+    pub(crate) const fn expires_at(&self) -> u64 {
+        self.expires_at
+    }
+}
+
 pub(crate) enum RefreshLeaseAcquire {
     Acquired(RefreshLease),
-    HeldByPeer,
+    /// Another instance holds an unexpired lease until `expires_at`.
+    HeldByPeer {
+        expires_at: u64,
+    },
     Unsupported,
 }
 
@@ -259,7 +270,9 @@ impl SessionStore {
             && lease.expires_at > now
             && lease.instance_id != instance_id
         {
-            return Ok(RefreshLeaseAcquire::HeldByPeer);
+            return Ok(RefreshLeaseAcquire::HeldByPeer {
+                expires_at: lease.expires_at,
+            });
         }
         let holder =
             random_bytes::<16>().map_err(|_| StoreError::Unavailable("randomness".into()))?;
@@ -276,10 +289,44 @@ impl SessionStore {
             .await
         {
             Ok(true) => Ok(RefreshLeaseAcquire::Acquired(lease)),
-            Ok(false) => Ok(RefreshLeaseAcquire::HeldByPeer),
+            // Lost a race; the winner's lease is fresh.
+            Ok(false) => Ok(RefreshLeaseAcquire::HeldByPeer {
+                expires_at: now.saturating_add(ttl_secs),
+            }),
             Err(StoreError::Unsupported) => Ok(RefreshLeaseAcquire::Unsupported),
             Err(error) => Err(error),
         }
+    }
+
+    /// Extends a lease this instance still holds. Returns the renewed lease,
+    /// or `None` if a peer replaced it.
+    pub(crate) async fn renew_refresh_lease(
+        &self,
+        did: &Did,
+        lease: &RefreshLease,
+        now: u64,
+        ttl_secs: u64,
+    ) -> Result<Option<RefreshLease>, StoreError> {
+        let key = item_key(REFRESH_LEASE, did.as_str())?;
+        let expected = encode(lease)?;
+        let renewed = RefreshLease {
+            expires_at: now.saturating_add(ttl_secs).max(lease.expires_at),
+            ..lease.clone()
+        };
+        let encoded = encode(&renewed)?;
+        let swapped = self
+            .secrets
+            .compare_and_swap(&self.namespace, &key, Some(&expected), Some(&encoded))
+            .await?;
+        Ok(swapped.then_some(renewed))
+    }
+
+    /// The stored lease, for tests that observe renewal.
+    #[cfg(test)]
+    pub(crate) async fn refresh_lease(&self, did: &Did) -> Option<RefreshLease> {
+        let key = item_key(REFRESH_LEASE, did.as_str()).ok()?;
+        let raw = self.secrets.get(&self.namespace, &key).await.ok()??;
+        payload(&raw).and_then(decode::<RefreshLease>).ok()
     }
 
     pub(crate) async fn release_refresh_lease(&self, did: &Did, lease: &RefreshLease) {

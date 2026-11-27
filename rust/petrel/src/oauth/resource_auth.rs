@@ -179,7 +179,7 @@ impl AuthProvider for SessionAuth {
     }
 }
 
-fn auth_error(error: OAuthError) -> AuthError {
+pub(super) fn auth_error(error: OAuthError) -> AuthError {
     match error {
         OAuthError::Store(error) => AuthError::Store(error),
         OAuthError::Protocol(OAuthProtocolError::Transport(error)) => AuthError::Transport(error),

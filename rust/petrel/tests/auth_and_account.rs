@@ -197,6 +197,16 @@ impl FakePdsNetwork {
         }
     }
 
+    fn expire_all_refresh_tokens(&self, origin: &str) {
+        self.servers
+            .lock()
+            .unwrap()
+            .get_mut(origin)
+            .unwrap()
+            .refresh_tokens
+            .clear();
+    }
+
     fn set_refresh_delay_ms(&self, origin: &str, delay_ms: u64) {
         self.servers
             .lock()
@@ -1602,50 +1612,142 @@ async fn legacy_logout_preserves_concurrently_switched_account() {
 }
 
 #[tokio::test]
+async fn legacy_refresh_only_ends_the_session_when_the_pds_rejects_the_token() {
+    use petrel::auth::TokenRefreshResult;
+
+    let pds_url = Url::parse("https://pds.classify.test").unwrap();
+    let mut state = FakePdsState::new("https://pds.classify.test");
+    state.accounts.insert(ALICE_DID.to_owned(), alice_account());
+    let net = Arc::new(FakePdsNetwork::new(vec![state]));
+    let resolver = Arc::new(FakeResolver::new());
+    resolver.register(ALICE_DID, ALICE_HANDLE, &pds_url);
+    let store = SessionStore::new(Arc::new(MemorySecretStore::new()), "pw-classify").unwrap();
+    let strategy = Arc::new(LegacyPasswordStrategy::new(
+        Arc::new(AccountManager::new(store)),
+        net.clone(),
+        resolver,
+        pds_url,
+    ));
+    strategy
+        .login_with_password(ALICE_HANDLE, ALICE_PASSWORD, None)
+        .await
+        .unwrap();
+
+    // Proxy and unrelated 4xx replies: not terminal, and the token stays usable.
+    for status in [400, 403, 408, 413] {
+        net.set_forced_status(
+            "https://pds.classify.test",
+            Some(("com.atproto.server.refreshSession", status)),
+        );
+        // Reset the breaker each time: it rightly opens after repeated failures.
+        let error = strategy
+            .attempt_recovery_from_server_failures(None)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(error, PasswordAuthError::ServerError { status: s, .. } if s == status),
+            "HTTP {status}: {error:?}"
+        );
+        assert!(!matches!(
+            petrel::xrpc::AuthError::from(error),
+            petrel::xrpc::AuthError::SessionExpired(_)
+        ));
+    }
+    net.set_forced_status("https://pds.classify.test", None);
+    strategy
+        .attempt_recovery_from_server_failures(None)
+        .await
+        .unwrap();
+    assert_eq!(
+        strategy.refresh_token_if_needed(true).await.unwrap(),
+        TokenRefreshResult::RefreshedSuccessfully
+    );
+
+    // A rejected refresh token (`ExpiredToken`) is terminal.
+    net.expire_all_refresh_tokens("https://pds.classify.test");
+    assert_eq!(
+        strategy.refresh_token_if_needed(true).await.unwrap_err(),
+        PasswordAuthError::InvalidCredentials
+    );
+}
+
+/// Waits for a refresh abandoned by its callers to store its rotated token.
+async fn wait_for_rotation(strategy: &LegacyPasswordStrategy, did: &Did, before: &str) -> String {
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            let current = strategy.get_session(did).await.unwrap().unwrap();
+            if current.refresh_jwt() != before {
+                break current.refresh_jwt().to_owned();
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("the abandoned refresh must still store its rotation")
+}
+
+/// Waits for a background refresh to drop its strategy reference.
+async fn wait_until_released<T>(weak: &std::sync::Weak<T>) {
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while weak.strong_count() != 0 {
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("the background refresh must release the strategy when it finishes");
+}
+
+/// Blocks the first marked `refreshSession` and counts transport drops.
+struct SentinelTransport {
+    inner: FakePdsNetwork,
+    block_refresh: std::sync::atomic::AtomicBool,
+    entered: Arc<tokio::sync::Notify>,
+    gate: Arc<tokio::sync::Notify>,
+    refresh_calls: std::sync::atomic::AtomicUsize,
+    dropped_count: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl Drop for SentinelTransport {
+    fn drop(&mut self) {
+        self.dropped_count
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+impl petrel::net::HttpTransport for SentinelTransport {
+    fn send(
+        &self,
+        request: http::Request<bytes::Bytes>,
+        options: &petrel::net::SendOptions,
+    ) -> impl std::future::Future<
+        Output = Result<http::Response<bytes::Bytes>, petrel::net::TransportError>,
+    > + Send {
+        let is_refresh = request.uri().path() == "/xrpc/com.atproto.server.refreshSession";
+        let should_block = is_refresh
+            && self
+                .block_refresh
+                .swap(false, std::sync::atomic::Ordering::SeqCst);
+        if is_refresh {
+            self.refresh_calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+        let entered = Arc::clone(&self.entered);
+        let gate = Arc::clone(&self.gate);
+        let fut = self.inner.send(request, options);
+        async move {
+            if should_block {
+                entered.notify_one();
+                gate.notified().await;
+            }
+            fut.await
+        }
+    }
+}
+
+#[tokio::test]
 async fn legacy_refresh_cancellation_breaks_arc_cycle_and_releases_abandoned_refresh() {
     use petrel::auth::{LegacyPasswordStrategy, TokenRefreshResult};
-    use petrel::net::{HttpTransport, SendOptions, TransportError};
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-
-    struct SentinelTransport {
-        inner: FakePdsNetwork,
-        block_refresh: AtomicBool,
-        entered: Arc<tokio::sync::Notify>,
-        gate: Arc<tokio::sync::Notify>,
-        refresh_calls: AtomicUsize,
-        dropped_count: Arc<AtomicUsize>,
-    }
-
-    impl Drop for SentinelTransport {
-        fn drop(&mut self) {
-            self.dropped_count.fetch_add(1, Ordering::SeqCst);
-        }
-    }
-
-    impl HttpTransport for SentinelTransport {
-        fn send(
-            &self,
-            request: http::Request<bytes::Bytes>,
-            options: &SendOptions,
-        ) -> impl std::future::Future<Output = Result<http::Response<bytes::Bytes>, TransportError>> + Send
-        {
-            let is_refresh = request.uri().path() == "/xrpc/com.atproto.server.refreshSession";
-            let should_block = is_refresh && self.block_refresh.swap(false, Ordering::SeqCst);
-            if is_refresh {
-                self.refresh_calls.fetch_add(1, Ordering::SeqCst);
-            }
-            let entered = Arc::clone(&self.entered);
-            let gate = Arc::clone(&self.gate);
-            let fut = self.inner.send(request, options);
-            async move {
-                if should_block {
-                    entered.notify_one();
-                    gate.notified().await;
-                }
-                fut.await
-            }
-        }
-    }
 
     let pds = Url::parse("https://pds-cancel-refresh.test").unwrap();
     let mut state = FakePdsState::new("https://pds-cancel-refresh.test");
@@ -1680,8 +1782,19 @@ async fn legacy_refresh_cancellation_breaks_arc_cycle_and_releases_abandoned_ref
         .await
         .unwrap();
 
-    // 1. Cancel all concurrent waiters mid-refresh on a live strategy, then verify a retry
-    // runs a fresh refresh and succeeds instead of getting wedged on a burned token.
+    let alice: Did = ALICE_DID.parse().unwrap();
+    let before = strategy
+        .get_session(&alice)
+        .await
+        .unwrap()
+        .unwrap()
+        .refresh_jwt()
+        .to_owned();
+
+    // 1. Cancel all concurrent waiters while `refreshSession` is in flight. The
+    // exchange keeps running in the background and stores the rotated tokens,
+    // so the next refresh sends the new refresh token instead of replaying one
+    // the PDS already consumed.
     {
         let mut fut1 = Box::pin(strategy.refresh_token_if_needed(true));
         tokio::select! {
@@ -1696,13 +1809,26 @@ async fn legacy_refresh_cancellation_breaks_arc_cycle_and_releases_abandoned_ref
         drop(fut1);
         drop(fut2);
     }
+    gate.notify_one();
+    let rotated = wait_for_rotation(&strategy, &alice, &before).await;
+    assert_eq!(transport.refresh_calls.load(Ordering::SeqCst), 1);
 
     let retry = strategy.refresh_token_if_needed(true).await.unwrap();
     assert_eq!(retry, TokenRefreshResult::RefreshedSuccessfully);
     assert_eq!(transport.refresh_calls.load(Ordering::SeqCst), 2);
+    assert_ne!(
+        strategy
+            .get_session(&alice)
+            .await
+            .unwrap()
+            .unwrap()
+            .refresh_jwt(),
+        rotated
+    );
 
-    // 2. Abandon a suspended refresh and drop `Arc<LegacyPasswordStrategy>`:
-    // `Weak::strong_count` and `transport` drop immediately (no `Arc` ownership cycle).
+    // 2. Abandon a suspended refresh and drop `Arc<LegacyPasswordStrategy>`: once
+    // the background exchange finishes, the strategy and `transport` are freed
+    // (no `Arc` ownership cycle).
     transport.block_refresh.store(true, Ordering::SeqCst);
     {
         let mut fut = Box::pin(strategy.refresh_token_if_needed(true));
@@ -1715,6 +1841,8 @@ async fn legacy_refresh_cancellation_breaks_arc_cycle_and_releases_abandoned_ref
 
     let weak_strategy = Arc::downgrade(&strategy);
     drop(strategy);
+    gate.notify_one();
+    wait_until_released(&weak_strategy).await;
     drop(transport);
     assert_eq!(weak_strategy.strong_count(), 0);
     assert_eq!(dropped_count.load(Ordering::SeqCst), 1);
