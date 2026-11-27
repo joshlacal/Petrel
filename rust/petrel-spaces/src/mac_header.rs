@@ -55,6 +55,67 @@ pub struct AcceptSignatureRequest {
     pub keyid: String,
 }
 
+/// A profile-selected MAC request with its RFC 9421 dictionary label.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NamedMacRequest {
+    label: String,
+    request: AcceptSignatureRequest,
+}
+
+impl NamedMacRequest {
+    /// Ephemeral key from the negotiated request.
+    pub fn keyid(&self) -> &str {
+        &self.request.keyid
+    }
+
+    /// Sign a record response under the selected label.
+    pub fn sign_record(
+        &self,
+        secret: &[u8; 32],
+        uri: &AtUri,
+        cid: &Cid,
+    ) -> Result<SpaceMacHeaders> {
+        if self.request.profile != MacProfile::Record {
+            return Err(SpaceError::InvalidMacHeader(
+                "record MAC was not requested".into(),
+            ));
+        }
+        sign_record_mac_named(secret, uri, cid, self.keyid(), &self.label)
+    }
+
+    /// Sign a commit response under the selected label.
+    pub fn sign_commit(
+        &self,
+        secret: &[u8; 32],
+        space: &SpaceRef,
+        repo: &Did,
+        rev: &Tid,
+        data: &[u8; 32],
+    ) -> Result<SpaceMacHeaders> {
+        if self.request.profile != MacProfile::Commit {
+            return Err(SpaceError::InvalidMacHeader(
+                "commit MAC was not requested".into(),
+            ));
+        }
+        sign_commit_mac_named(secret, space, repo, rev, data, self.keyid(), &self.label)
+    }
+}
+
+/// Select the unique request tagged with the endpoint's profile. Retain the
+/// parsed structured-field label so the response echoes the client's choice.
+pub fn parse_accept_signature_for_profile(
+    header: &str,
+    expected: MacProfile,
+) -> Result<NamedMacRequest> {
+    let dict = parse_dictionary(header, DuplicatePolicy::Reject)
+        .map_err(|e| SpaceError::InvalidAcceptSignature(e.to_string()))?;
+    let (label, profile, keyid) = parse_mac_signature_input(&dict, Some(expected))?;
+    Ok(NamedMacRequest {
+        label,
+        request: AcceptSignatureRequest { profile, keyid },
+    })
+}
+
 /// Generated MAC response headers (`Covered-Signature`, `Signature-Input`, `Signature`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpaceMacHeaders {
@@ -111,6 +172,18 @@ pub fn sign_commit_mac(
     data: &[u8; 32],
     keyid_did_key: &str,
 ) -> Result<SpaceMacHeaders> {
+    sign_commit_mac_named(shared_secret, space, repo, rev, data, keyid_did_key, "mac")
+}
+
+fn sign_commit_mac_named(
+    shared_secret: &[u8; 32],
+    space: &SpaceRef,
+    repo: &Did,
+    rev: &Tid,
+    data: &[u8; 32],
+    keyid_did_key: &str,
+    label: &str,
+) -> Result<SpaceMacHeaders> {
     let _ =
         P256DIDKey::parse(keyid_did_key).map_err(|e| SpaceError::InvalidKemKey(e.to_string()))?;
     let covered_signature = format!(
@@ -125,6 +198,7 @@ pub fn sign_commit_mac(
         MacProfile::Commit,
         covered_signature,
         keyid_did_key,
+        label,
     )
 }
 
@@ -136,6 +210,16 @@ pub fn sign_record_mac(
     record_uri: &AtUri,
     cid: &Cid,
     keyid_did_key: &str,
+) -> Result<SpaceMacHeaders> {
+    sign_record_mac_named(shared_secret, record_uri, cid, keyid_did_key, "mac")
+}
+
+fn sign_record_mac_named(
+    shared_secret: &[u8; 32],
+    record_uri: &AtUri,
+    cid: &Cid,
+    keyid_did_key: &str,
+    label: &str,
 ) -> Result<SpaceMacHeaders> {
     validate_space_record_uri(record_uri)?;
     let _ =
@@ -150,6 +234,7 @@ pub fn sign_record_mac(
         MacProfile::Record,
         covered_signature,
         keyid_did_key,
+        label,
     )
 }
 
@@ -278,17 +363,18 @@ fn sign_mac_common(
     profile: MacProfile,
     covered_signature: String,
     keyid_did_key: &str,
+    label: &str,
 ) -> Result<SpaceMacHeaders> {
     let p = profile.as_str();
     let sig_params = format!(
         "(\"{p}\";sf);keyid=\"{}\";tag=\"{p}\"",
         escape_sf_string(keyid_did_key)
     );
-    let signature_input = format!("mac={sig_params}");
+    let signature_input = format!("{label}={sig_params}");
     let base = build_mac_signature_base(profile, &covered_signature, &sig_params);
     let mac = SpaceMAC::authentication_code(base.as_bytes(), shared_secret)
         .map_err(|e| SpaceError::KemError(e.to_string()))?;
-    let signature = format!("mac=:{}:", BASE64_STANDARD.encode(mac));
+    let signature = format!("{label}=:{}:", BASE64_STANDARD.encode(mac));
     Ok(SpaceMacHeaders {
         covered_signature,
         signature_input,
