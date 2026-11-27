@@ -210,17 +210,10 @@ impl CommitCodec {
             return Err(CommitError::InvalidCbor("commit must be a CBOR map".into()));
         };
 
-        for key in map.keys() {
-            if !matches!(
-                key.as_str(),
-                "did" | "version" | "data" | "rev" | "prev" | "sig"
-            ) {
-                return Err(CommitError::InvalidField {
-                    field: "unknown",
-                    reason: format!("unexpected commit field {key:?}"),
-                });
-            }
-        }
+        // Unknown top-level fields are tolerated, matching the reference implementation: the
+        // signature covers the canonical re-encoding of the whole map minus `sig` (built below
+        // from the decoded map, so unknown fields stay in the signed bytes). `decode_with`
+        // rejects non-canonical input, so that re-encoding equals the bytes that were signed.
 
         let version = match map.get("version") {
             Some(Value::Integer(3)) => 3,
@@ -593,5 +586,53 @@ async fn verify_with_retry(
             refreshed.verify(unsigned_commit_bytes, signature).await
         }
         Err(other) => Err(other),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::crypto::{FixedSigningKey, P256Keypair};
+
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+    #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+    async fn verify_tolerates_unknown_commit_fields_and_signs_over_them() {
+        let did = Did::parse("did:plc:abcdefghijklmnopqrstuvwx").unwrap();
+        let desc = CommitDescriptor {
+            did: did.clone(),
+            rev: RepositoryTid::parse("3jzfcijpj2z2a").unwrap(),
+            data_cid: Cid::parse(crate::CANONICAL_EMPTY_MST_CID).unwrap(),
+            prev_cid: None,
+        };
+        let key = P256Keypair::generate().unwrap();
+        let trusted_key = FixedSigningKey::from_public_key(key.public_key().clone());
+        let policy = RepositoryReadPolicy::strict();
+
+        // A future protocol revision adds a field that this implementation does not know.
+        let mut unsigned = build_unsigned_v3_map(&desc);
+        unsigned.insert("futureField".to_owned(), Value::String("v1".to_owned()));
+        let unsigned_bytes = dagcbor::encode(&Value::Object(unsigned.clone()));
+        let sig = key.sign(&unsigned_bytes).await.unwrap();
+        let mut signed = unsigned.clone();
+        signed.insert("sig".to_owned(), Value::Bytes(sig.clone()));
+        let signed_bytes = dagcbor::encode(&Value::Object(signed));
+        let cid = Cid::for_dag_cbor(&signed_bytes);
+
+        let verified =
+            CommitCodec::verify(&signed_bytes, Some(&cid), Some(&did), &trusted_key, &policy)
+                .await
+                .unwrap();
+        // Signature input is the original map minus `sig`, unknown fields included.
+        assert_eq!(verified.unsigned_commit_bytes, unsigned_bytes);
+
+        // The unknown field is covered by the signature: tampering with it fails verification.
+        let mut tampered = unsigned;
+        tampered.insert("futureField".to_owned(), Value::String("v2".to_owned()));
+        tampered.insert("sig".to_owned(), Value::Bytes(sig));
+        let tampered_bytes = dagcbor::encode(&Value::Object(tampered));
+        let err = CommitCodec::verify(&tampered_bytes, None, Some(&did), &trusted_key, &policy)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, CommitError::InvalidSignature), "{err:?}");
     }
 }

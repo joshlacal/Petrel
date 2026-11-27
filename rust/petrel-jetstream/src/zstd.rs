@@ -60,7 +60,10 @@ impl JetstreamZstd {
             });
         }
 
+        check_window_size(frame, max_decompressed_size)?;
+
         let mut decoder = FrameDecoder::new();
+        decoder.set_max_window_size(max_decompressed_size as u64);
         let mut slice = frame;
         decoder
             .init(&mut slice)
@@ -211,9 +214,12 @@ impl JetstreamZstdDictionaryDecoder {
             });
         }
 
+        check_window_size(frame, self.max_decompressed_size)?;
+
         let dict = Dictionary::decode_dict(&self.normalized_dict_bytes)
             .map_err(|_| JetstreamZstdError::DictionaryLoadFailed)?;
         let mut decoder = FrameDecoder::new();
+        decoder.set_max_window_size(self.max_decompressed_size as u64);
         decoder
             .add_dict(dict)
             .map_err(|e| JetstreamZstdError::DecompressionFailed(e.to_string()))?;
@@ -279,6 +285,34 @@ impl JetstreamZstdDictionaryDecoder {
 
         Ok(out)
     }
+}
+
+/// Rejects frames whose `Window_Descriptor` declares a window larger than `limit`.
+///
+/// `ruzstd` only releases decoded bytes once its buffer exceeds the window, so a frame declaring
+/// a huge window (up to `ruzstd`'s 128 MiB default) could buffer that much before the output
+/// limit is ever checked. Back-references never reach past the frame's own output, so a window
+/// larger than the maximum allowed output is never needed by a frame we would accept.
+/// Single-segment frames have no descriptor (their window is the content size, checked
+/// separately against the same limit).
+fn check_window_size(frame: &[u8], limit: usize) -> Result<(), JetstreamZstdError> {
+    if frame.len() < 6 || frame[..4] != ZSTD_FRAME_MAGIC {
+        return Err(JetstreamZstdError::InvalidFrame);
+    }
+    if frame[4] & 0x20 != 0 {
+        return Ok(());
+    }
+    let descriptor = frame[5];
+    let exponent = u32::from(descriptor >> 3);
+    let base = 1_u64 << (10 + exponent);
+    let window = base + (base / 8) * u64::from(descriptor & 0x07);
+    if window > limit as u64 {
+        return Err(JetstreamZstdError::FrameTooLarge {
+            declared: window,
+            limit,
+        });
+    }
+    Ok(())
 }
 
 /// Checks zstd frame header to extract `Frame_Content_Size` if present (`None` when unknown).

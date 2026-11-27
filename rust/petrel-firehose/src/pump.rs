@@ -9,7 +9,9 @@ use async_lock::Mutex;
 use futures_util::stream::{self, Stream};
 use petrel::rt::{BoxFuture, MaybeSend, MaybeSync};
 use url::Url;
+use web_time::Instant;
 
+use crate::decoder::{EventStreamIgnoredFrame, IgnoredFrameReason};
 use crate::limits::FirehoseFrameLimits;
 use crate::transport::{
     FirehoseSubscriptionError, FirehoseWebSocketSession, FirehoseWebSocketSessionFactory,
@@ -267,6 +269,8 @@ pub(crate) enum EventStreamStep<Output> {
     Deliver {
         output: Option<Output>,
         sequence: Option<i64>,
+        /// `sequence` was read leniently from a malformed frame: informational only, never a cursor.
+        sequence_is_hint: bool,
     },
     Fail(EventStreamError),
 }
@@ -276,6 +280,17 @@ impl<Output> EventStreamStep<Output> {
         Self::Deliver {
             output: Some(output),
             sequence,
+            sequence_is_hint: false,
+        }
+    }
+
+    /// Delivers `output` with a best-effort sequence that the pump uses only when it is valid
+    /// and newer than the last sequence seen (never failing the stream over it).
+    pub(crate) fn deliver_with_sequence_hint(output: Output, sequence: Option<i64>) -> Self {
+        Self::Deliver {
+            output: Some(output),
+            sequence,
+            sequence_is_hint: true,
         }
     }
 
@@ -291,6 +306,10 @@ pub(crate) struct EventStreamPumpConfiguration {
     pub(crate) session_factory: Arc<dyn FirehoseWebSocketSessionFactory>,
     pub(crate) auto_acknowledge: bool,
     pub(crate) reconnects_on_consumer_too_slow: bool,
+    /// At least 1.
+    pub(crate) oversize_frame_retry_limit: u32,
+    pub(crate) backoff_reset_after: Duration,
+    pub(crate) backoff_reset_after_frames: u64,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -306,6 +325,12 @@ pub(crate) type MakeGapFn<Output> = Arc<dyn Fn(i64, i64) -> Output + Send + Sync
 pub(crate) type MakeGapFn<Output> = Arc<dyn Fn(i64, i64) -> Output>;
 
 #[cfg(not(target_arch = "wasm32"))]
+pub(crate) type MakeIgnoredFn<Output> =
+    Arc<dyn Fn(EventStreamIgnoredFrame) -> Output + Send + Sync>;
+#[cfg(target_arch = "wasm32")]
+pub(crate) type MakeIgnoredFn<Output> = Arc<dyn Fn(EventStreamIgnoredFrame) -> Output>;
+
+#[cfg(not(target_arch = "wasm32"))]
 pub type BoxedEventStream<T> = Pin<Box<dyn Stream<Item = T> + Send>>;
 #[cfg(target_arch = "wasm32")]
 pub type BoxedEventStream<T> = Pin<Box<dyn Stream<Item = T>>>;
@@ -315,6 +340,7 @@ struct PumpInner<Output> {
     coordinator: Arc<EventStreamCursorCoordinator>,
     decode: DecodeFn<Output>,
     make_gap: MakeGapFn<Output>,
+    make_ignored: MakeIgnoredFn<Output>,
     session: Option<Arc<dyn FirehoseWebSocketSession>>,
     pending: VecDeque<(Option<Output>, Option<i64>)>,
     watermark: Option<i64>,
@@ -323,9 +349,42 @@ struct PumpInner<Output> {
     current_delay: Option<Duration>,
     pending_delay: Option<Duration>,
     finished: bool,
+    /// When the current (or just-ended) connection opened; `None` after a failed connect.
+    session_opened_at: Option<Instant>,
+    /// Frames handled on the current (or just-ended) connection.
+    session_frames: u64,
+    /// Watermark at the last oversize-frame failure and how many consecutive failures hit it.
+    oversize_strikes: Option<(Option<i64>, u32)>,
 }
 
 impl<Output> PumpInner<Output> {
+    fn new(
+        configuration: EventStreamPumpConfiguration,
+        coordinator: Arc<EventStreamCursorCoordinator>,
+        decode: DecodeFn<Output>,
+        make_gap: MakeGapFn<Output>,
+        make_ignored: MakeIgnoredFn<Output>,
+    ) -> Self {
+        Self {
+            configuration,
+            coordinator,
+            decode,
+            make_gap,
+            make_ignored,
+            session: None,
+            pending: VecDeque::new(),
+            watermark: None,
+            unacknowledged: None,
+            awaiting_first_sequence: true,
+            current_delay: None,
+            pending_delay: None,
+            finished: false,
+            session_opened_at: None,
+            session_frames: 0,
+            oversize_strikes: None,
+        }
+    }
+
     fn finish_sync(&mut self) -> Option<Arc<dyn FirehoseWebSocketSession>> {
         self.finished = true;
         self.pending.clear();
@@ -376,11 +435,14 @@ impl<Output> PumpInner<Output> {
         let opened: Arc<dyn FirehoseWebSocketSession> =
             Arc::from(self.configuration.session_factory.make_session(url).await?);
         self.session = Some(Arc::clone(&opened));
+        self.session_opened_at = Some(Instant::now());
+        self.session_frames = 0;
         Ok(opened)
     }
 
     async fn handle(&mut self, data: &[u8]) -> Result<(), FirehoseStreamError> {
         let step = (self.decode)(data)?;
+        self.session_frames = self.session_frames.saturating_add(1);
         match step {
             EventStreamStep::Fail(err) => {
                 self.close_session().await;
@@ -392,7 +454,18 @@ impl<Output> PumpInner<Output> {
                 }
                 Err(FirehoseStreamError::Stream(err))
             }
-            EventStreamStep::Deliver { output, sequence } => {
+            EventStreamStep::Deliver {
+                output,
+                mut sequence,
+                sequence_is_hint,
+            } => {
+                if sequence_is_hint {
+                    // A sequence read leniently from a malformed frame is untrusted: it is
+                    // reported on the ignored-frame event but never moves the cursor. Trusting
+                    // it would let one garbage value skip real events on resume, or turn every
+                    // later frame into a fatal cursor regression.
+                    sequence = None;
+                }
                 if let Some(seq) = sequence {
                     FirehoseFrameLimits::validate_sequence(seq)?;
                     if let Some(last) = self.watermark {
@@ -421,7 +494,6 @@ impl<Output> PumpInner<Output> {
                     self.awaiting_first_sequence = false;
                     self.watermark = Some(seq);
                 }
-                self.current_delay = None;
                 if output.is_some() || sequence.is_some() {
                     self.pending.push_back((output, sequence));
                 }
@@ -430,10 +502,48 @@ impl<Output> PumpInner<Output> {
         }
     }
 
+    /// Delay before the next reconnect. A connection that ended after being stable (open for
+    /// `backoff_reset_after`, or `backoff_reset_after_frames` frames) restarts the schedule at
+    /// the initial delay; otherwise the delay keeps growing, however many frames it delivered.
     fn next_backoff(&mut self) -> Duration {
+        if let Some(opened) = self.session_opened_at.take() {
+            let stable = self.session_frames >= self.configuration.backoff_reset_after_frames
+                || opened.elapsed() >= self.configuration.backoff_reset_after;
+            if stable {
+                self.current_delay = None;
+            }
+        }
+        self.session_frames = 0;
         let delay = self.configuration.backoff.next_delay(self.current_delay);
         self.current_delay = Some(delay);
         self.configuration.backoff.jittered(delay)
+    }
+
+    /// Counts an oversize-frame failure at the current position (the watermark) and queues an
+    /// [`IgnoredFrameReason::FrameTooLarge`] event, or returns the terminal error once
+    /// `oversize_frame_retry_limit` consecutive failures hit the same position.
+    fn record_oversize_frame(&mut self) -> Result<(), FirehoseSubscriptionError> {
+        let position = self.watermark;
+        let attempts = match self.oversize_strikes {
+            Some((at, n)) if at == position => n.saturating_add(1),
+            _ => 1,
+        };
+        self.oversize_strikes = Some((position, attempts));
+        if attempts >= self.configuration.oversize_frame_retry_limit {
+            return Err(FirehoseSubscriptionError::FrameTooLargeAtCursor {
+                cursor: position,
+                attempts,
+            });
+        }
+        let ignored = EventStreamIgnoredFrame {
+            operation: 0,
+            r#type: None,
+            sequence: None,
+            reason: IgnoredFrameReason::FrameTooLarge,
+        };
+        self.pending
+            .push_back((Some((self.make_ignored)(ignored)), None));
+        Ok(())
     }
 
     fn retry_delay(&mut self, err: &FirehoseSubscriptionError) -> Option<Duration> {
@@ -502,6 +612,15 @@ impl<Output> PumpInner<Output> {
 
             let data = match session.receive_message().await {
                 Ok(d) => d,
+                Err(FirehoseSubscriptionError::FrameTooLarge) => {
+                    self.close_session().await;
+                    if let Err(terminal) = self.record_oversize_frame() {
+                        self.finish().await;
+                        return Err(FirehoseStreamError::Subscription(terminal));
+                    }
+                    self.pending_delay = Some(self.next_backoff());
+                    continue;
+                }
                 Err(err) => {
                     self.close_session().await;
                     if let Some(delay) = self.retry_delay(&err) {
@@ -610,24 +729,18 @@ pub(crate) fn make_pump_stream<Output>(
     coordinator: Arc<EventStreamCursorCoordinator>,
     decode: DecodeFn<Output>,
     make_gap: MakeGapFn<Output>,
+    make_ignored: MakeIgnoredFn<Output>,
 ) -> BoxedEventStream<Result<Output, FirehoseStreamError>>
 where
     Output: MaybeSend + MaybeSync + 'static,
 {
-    let inner = Arc::new(Mutex::new(PumpInner {
+    let inner = Arc::new(Mutex::new(PumpInner::new(
         configuration,
         coordinator,
         decode,
         make_gap,
-        session: None,
-        pending: VecDeque::new(),
-        watermark: None,
-        unacknowledged: None,
-        awaiting_first_sequence: true,
-        current_delay: None,
-        pending_delay: None,
-        finished: false,
-    }));
+        make_ignored,
+    )));
 
     let handle = PumpHandle { inner };
 
@@ -769,12 +882,12 @@ mod tests {
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
     #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
     #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
-    async fn consumer_too_slow_does_not_reset_exponential_backoff_until_valid_frame() {
+    async fn backoff_resets_only_after_a_stable_connection() {
         let storage: Arc<dyn FirehoseCursorStorage> =
             Arc::new(InMemoryFirehoseCursorStorage::new());
         let mut backoff = FirehoseBackoffConfiguration::new();
         backoff.initial_delay = Duration::from_millis(10);
-        backoff.max_delay = Duration::from_millis(100);
+        backoff.max_delay = Duration::from_millis(1000);
         backoff.multiplier = 2.0;
         backoff.jitter = 0.0;
 
@@ -785,39 +898,68 @@ mod tests {
             session_factory: default_websocket_factory(FirehoseWebSocketOptions::new()),
             auto_acknowledge: true,
             reconnects_on_consumer_too_slow: true,
+            oversize_frame_retry_limit: 3,
+            backoff_reset_after: Duration::from_secs(3600),
+            backoff_reset_after_frames: 3,
         };
-        let decode: DecodeFn<()> = Arc::new(|raw| {
+        let seq = Arc::new(std::sync::atomic::AtomicI64::new(0));
+        let decode_seq = Arc::clone(&seq);
+        let decode: DecodeFn<()> = Arc::new(move |raw| {
             if raw == b"slow" {
                 Ok(EventStreamStep::fail(EventStreamError::ConsumerTooSlow(
                     None,
                 )))
             } else {
-                Ok(EventStreamStep::deliver((), Some(1)))
+                let next = decode_seq.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+                Ok(EventStreamStep::deliver((), Some(next)))
             }
         });
         let make_gap: MakeGapFn<()> = Arc::new(|_, _| ());
+        let make_ignored: MakeIgnoredFn<()> = Arc::new(|_| ());
 
-        let mut pump = PumpInner {
-            configuration: config,
-            coordinator: Arc::new(EventStreamCursorCoordinator::new(storage)),
+        let mut pump = PumpInner::new(
+            config,
+            Arc::new(EventStreamCursorCoordinator::new(storage)),
             decode,
             make_gap,
-            session: None,
-            pending: VecDeque::new(),
-            watermark: None,
-            unacknowledged: None,
-            awaiting_first_sequence: false,
-            current_delay: None,
-            pending_delay: None,
-            finished: false,
-        };
+            make_ignored,
+        );
+        pump.awaiting_first_sequence = false;
 
+        // ConsumerTooSlow escalates.
         pump.handle(b"slow").await.unwrap();
         assert_eq!(pump.current_delay, Some(Duration::from_millis(10)));
         pump.handle(b"slow").await.unwrap();
         assert_eq!(pump.current_delay, Some(Duration::from_millis(20)));
 
-        pump.handle(b"ok").await.unwrap();
-        assert_eq!(pump.current_delay, None);
+        // Accept-one-frame-then-close: one frame per connection keeps escalating.
+        for expected_ms in [40, 80, 160] {
+            pump.session_opened_at = Some(Instant::now());
+            pump.handle(b"ok").await.unwrap();
+            assert_eq!(
+                pump.current_delay,
+                Some(Duration::from_millis(expected_ms / 2))
+            );
+            pump.retry_delay(&FirehoseSubscriptionError::ConnectionClosed);
+            assert_eq!(pump.current_delay, Some(Duration::from_millis(expected_ms)));
+        }
+
+        // A failed connect (no session) also keeps escalating.
+        pump.retry_delay(&FirehoseSubscriptionError::Network("refused".into()));
+        assert_eq!(pump.current_delay, Some(Duration::from_millis(320)));
+
+        // A connection that delivered `backoff_reset_after_frames` frames is stable.
+        pump.session_opened_at = Some(Instant::now());
+        for _ in 0..3 {
+            pump.handle(b"ok").await.unwrap();
+        }
+        pump.retry_delay(&FirehoseSubscriptionError::ConnectionClosed);
+        assert_eq!(pump.current_delay, Some(Duration::from_millis(10)));
+
+        // A connection open for `backoff_reset_after` is stable too.
+        pump.configuration.backoff_reset_after = Duration::ZERO;
+        pump.session_opened_at = Some(Instant::now());
+        pump.retry_delay(&FirehoseSubscriptionError::ConnectionClosed);
+        assert_eq!(pump.current_delay, Some(Duration::from_millis(10)));
     }
 }

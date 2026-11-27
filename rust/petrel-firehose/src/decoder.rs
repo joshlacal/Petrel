@@ -37,6 +37,16 @@ pub enum IgnoredFrameReason {
     UnknownType,
     /// Well-formed CBOR with a known type, but the payload did not match its schema.
     UndecodablePayload(String),
+    /// The frame failed framing or canonical DAG-CBOR checks (non-canonical encoding, key
+    /// order, map or node limits, key collisions, trailing bytes, truncation). `operation`,
+    /// `type`, and `sequence` on the ignored frame are best-effort values read leniently from
+    /// the raw bytes (`operation` is `0` when the header is unreadable); the payload is the
+    /// decoder error.
+    MalformedFrame(String),
+    /// The transport refused a message larger than its configured maximum. Nothing of the
+    /// frame was read (`operation` is `0`, no type or sequence); the stream reconnects from
+    /// the same cursor with backoff (see `FirehoseSubscriptionConfiguration::oversize_frame_retry_limit`).
+    FrameTooLarge,
 }
 
 /// A frame the consumer skipped instead of failing on.
@@ -88,6 +98,9 @@ impl RelayFrameDecoder {
                 IgnoredFrameReason::UnknownType | IgnoredFrameReason::UndecodablePayload(_) => {
                     RelayVerifierError::UnknownEventKind
                 }
+                // Never produced by `decode_frame` (parse failures are returned as errors).
+                IgnoredFrameReason::MalformedFrame(_) => RelayVerifierError::InvalidCbor,
+                IgnoredFrameReason::FrameTooLarge => RelayVerifierError::FrameTooLarge,
             }),
         }
     }
@@ -224,6 +237,188 @@ impl RelayFrameDecoder {
                 }
             }
         }
+    }
+}
+
+/// Header and sequence values read from a frame that failed canonical parsing.
+///
+/// Best effort only: produced by a permissive CBOR walk that ignores canonical-form rules
+/// (minimal integers, key order, map caps, trailing bytes). Values are never used to decode
+/// an event, only to label an ignored frame and to move the cursor past it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct LenientFrameHints {
+    pub(crate) operation: Option<i64>,
+    pub(crate) r#type: Option<String>,
+    pub(crate) sequence: Option<i64>,
+}
+
+/// Reads `op`, `t`, and body `seq` from `frame` without canonical checks.
+///
+/// A key that appears twice with different values yields `None` for that field. The body
+/// `seq` is only read for `op: 1` and must be a valid relay sequence number.
+pub(crate) fn lenient_frame_hints(frame: &[u8]) -> LenientFrameHints {
+    let mut hints = LenientFrameHints::default();
+    let mut walker = LenientCbor {
+        bytes: frame,
+        offset: 0,
+    };
+    let mut op = Field::Unset;
+    let mut ty = Field::Unset;
+    let header_complete = walker
+        .map_entries(|key, value| match key {
+            "op" => op.observe(value.as_i64()),
+            "t" => ty.observe(value.into_text()),
+            _ => {}
+        })
+        .is_some();
+    hints.operation = op.into_option();
+    hints.r#type = ty.into_option();
+    if !header_complete || hints.operation != Some(1) {
+        return hints;
+    }
+    let mut seq = Field::Unset;
+    // A walk that fails after `seq` was seen still yields it: the failure is past that key.
+    let _ = walker.map_entries(|key, value| {
+        if key == "seq" {
+            seq.observe(value.as_i64());
+        }
+    });
+    hints.sequence = seq
+        .into_option()
+        .and_then(|s| validate_relay_sequence(s).ok());
+    hints
+}
+
+enum Field<T> {
+    Unset,
+    Set(T),
+    Conflict,
+}
+
+impl<T: PartialEq> Field<T> {
+    fn observe(&mut self, value: Option<T>) {
+        *self = match (std::mem::replace(self, Self::Conflict), value) {
+            (Self::Unset, Some(v)) => Self::Set(v),
+            (Self::Set(old), Some(v)) if old == v => Self::Set(old),
+            (Self::Unset, None) => Self::Unset,
+            _ => Self::Conflict,
+        };
+    }
+
+    fn into_option(self) -> Option<T> {
+        match self {
+            Self::Set(v) => Some(v),
+            Self::Unset | Self::Conflict => None,
+        }
+    }
+}
+
+enum LenientItem {
+    Integer(i128),
+    Text(String),
+    Other,
+}
+
+impl LenientItem {
+    fn as_i64(&self) -> Option<i64> {
+        match self {
+            Self::Integer(v) => i64::try_from(*v).ok(),
+            _ => None,
+        }
+    }
+
+    fn into_text(self) -> Option<String> {
+        match self {
+            Self::Text(s) => Some(s),
+            _ => None,
+        }
+    }
+}
+
+/// Permissive definite-length CBOR walker (no canonical-form checks, bounded nesting).
+struct LenientCbor<'a> {
+    bytes: &'a [u8],
+    offset: usize,
+}
+
+impl LenientCbor<'_> {
+    const MAX_DEPTH: usize = 64;
+
+    fn take(&mut self, n: u64) -> Option<&[u8]> {
+        let n = usize::try_from(n).ok()?;
+        let end = self.offset.checked_add(n)?;
+        let slice = self.bytes.get(self.offset..end)?;
+        self.offset = end;
+        Some(slice)
+    }
+
+    fn head(&mut self) -> Option<(u8, u64)> {
+        let initial = *self.take(1)?.first()?;
+        let width = match initial & 0x1f {
+            info @ 0..=23 => return Some((initial >> 5, u64::from(info))),
+            24 => 1,
+            25 => 2,
+            26 => 4,
+            27 => 8,
+            _ => return None,
+        };
+        let arg = self
+            .take(width)?
+            .iter()
+            .fold(0_u64, |acc, b| (acc << 8) | u64::from(*b));
+        Some((initial >> 5, arg))
+    }
+
+    fn item(&mut self, depth: usize) -> Option<LenientItem> {
+        if depth > Self::MAX_DEPTH {
+            return None;
+        }
+        let (major, arg) = self.head()?;
+        match major {
+            0 => Some(LenientItem::Integer(i128::from(arg))),
+            1 => Some(LenientItem::Integer(-1 - i128::from(arg))),
+            2 => self.take(arg).map(|_| LenientItem::Other),
+            3 => {
+                let raw = self.take(arg)?;
+                Some(
+                    std::str::from_utf8(raw)
+                        .map_or(LenientItem::Other, |s| LenientItem::Text(s.to_owned())),
+                )
+            }
+            4 => {
+                for _ in 0..arg {
+                    self.item(depth + 1)?;
+                }
+                Some(LenientItem::Other)
+            }
+            5 => {
+                for _ in 0..arg {
+                    self.item(depth + 1)?;
+                    self.item(depth + 1)?;
+                }
+                Some(LenientItem::Other)
+            }
+            6 => self.item(depth + 1).map(|_| LenientItem::Other),
+            // Simple values and floats: the argument bytes were consumed by `head`.
+            _ => Some(LenientItem::Other),
+        }
+    }
+
+    /// Walks one top-level map, passing text keys and their values to `visit`. Returns `None`
+    /// if the next item is not a map or the walk hits malformed or truncated input.
+    fn map_entries(&mut self, mut visit: impl FnMut(&str, LenientItem)) -> Option<()> {
+        let (major, entries) = self.head()?;
+        if major != 5 {
+            return None;
+        }
+        for _ in 0..entries {
+            let key = self.item(1)?;
+            let value = self.item(1)?;
+            if let LenientItem::Text(key) = key {
+                visit(&key, value);
+            }
+        }
+        Some(())
     }
 }
 

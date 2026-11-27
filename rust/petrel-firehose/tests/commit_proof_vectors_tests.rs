@@ -916,3 +916,80 @@ async fn verify_mst_inversion_handles_ancestor_create_and_non_spine_grandchild_o
         c_delete.prev_data_cid
     );
 }
+
+#[test]
+fn record_results_isolates_per_operation_failures() {
+    use petrel_firehose::RelayRecordOperationError;
+
+    let good_bytes = dagcbor::encode(&Value::Object(BTreeMap::from([
+        (
+            "$type".to_owned(),
+            Value::String("app.bsky.feed.post".to_owned()),
+        ),
+        ("text".to_owned(), Value::String("hi".to_owned())),
+    ])));
+    let good_cid = Cid::for_dag_cbor(&good_bytes);
+    // Valid DAG-CBOR block but not a record (no `$type`).
+    let bad_bytes = dagcbor::encode(&Value::Integer(5));
+    let bad_cid = Cid::for_dag_cbor(&bad_bytes);
+    let commit_bytes = dagcbor::encode(&Value::Object(BTreeMap::new()));
+    let commit_cid = Cid::for_dag_cbor(&commit_bytes);
+
+    let blocks = common::encode_car(
+        std::slice::from_ref(&commit_cid),
+        &[
+            (commit_cid.clone(), commit_bytes),
+            (good_cid.clone(), good_bytes),
+            (bad_cid.clone(), bad_bytes),
+        ],
+    );
+    let op = |path: &str, cid: &Cid| RelayRepoOp {
+        action: RelayRepoAction::Create,
+        path: path.to_owned(),
+        cid: Some(cid.clone()),
+        prev: None,
+    };
+    let event = RelayCommitEvent {
+        seq: 1,
+        repo: "did:plc:abcdefghijklmnopqrstuvwx".to_owned(),
+        commit_cid,
+        rev: "3jzfcijpj2z2a".to_owned(),
+        since: None,
+        blocks,
+        ops: vec![
+            op("app.bsky.feed.post/3k7good00001", &good_cid),
+            op("app.bsky.feed.post/3k7bad000001", &bad_cid),
+            op("no-slash-path", &good_cid),
+            op("app.bsky.feed.post/3k7good00002", &good_cid),
+        ],
+        prev_data_cid: None,
+        time: "2026-01-01T00:00:00.000Z".to_owned(),
+    };
+
+    let results = event.record_results().unwrap();
+    assert_eq!(results.len(), 4);
+    assert_eq!(
+        results[0].as_ref().unwrap().record_key,
+        "3k7good00001".to_owned()
+    );
+    assert_eq!(
+        results[1],
+        Err(RelayRecordOperationError {
+            index: 1,
+            action: RelayRepoAction::Create,
+            path: "app.bsky.feed.post/3k7bad000001".to_owned(),
+            error: RelayVerifierError::InvalidRepositoryCar,
+        })
+    );
+    assert_eq!(
+        results[2].as_ref().unwrap_err().error,
+        RelayVerifierError::InvalidRepositoryOperation
+    );
+    assert!(results[3].as_ref().unwrap().record.is_some());
+
+    // The all-or-nothing API keeps its behaviour: first failing op fails the commit.
+    assert_eq!(
+        event.records(),
+        Err(RelayVerifierError::InvalidRepositoryCar)
+    );
+}

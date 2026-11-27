@@ -7,11 +7,11 @@ use std::time::Duration;
 use futures_util::StreamExt;
 use petrel_core::{Value, dagcbor};
 use petrel_firehose::{
-    FirehoseBackoffConfiguration, FirehoseCursorStorage, FirehoseEndpoint, FirehoseFrameEncoder,
-    FirehoseStreamError, FirehoseSubscription, FirehoseSubscriptionConfiguration,
-    FirehoseSubscriptionError, FirehoseSubscriptionEvent, FirehoseWebSocketOptions,
-    InMemoryFirehoseCursorStorage, PublicFirehoseIdentityMaterial, RelayEvent,
-    bounded_firehose_channel,
+    EventStreamIgnoredFrame, FirehoseBackoffConfiguration, FirehoseCursorStorage, FirehoseEndpoint,
+    FirehoseFrameEncoder, FirehoseStreamError, FirehoseSubscription,
+    FirehoseSubscriptionConfiguration, FirehoseSubscriptionError, FirehoseSubscriptionEvent,
+    FirehoseWebSocketOptions, IgnoredFrameReason, InMemoryFirehoseCursorStorage,
+    PublicFirehoseIdentityMaterial, RelayEvent, bounded_firehose_channel,
 };
 use url::Url;
 
@@ -316,6 +316,282 @@ async fn lenient_stream_delivers_ignored_frame_for_invalid_commit_payload_withou
     tx.send(2).await.unwrap();
     assert_eq!(rx.recv().await, Some(1));
     assert_eq!(rx.recv().await, Some(2));
+}
+
+fn fast_config(
+    factory: Arc<common::ScriptedWebSocketFactory>,
+) -> FirehoseSubscriptionConfiguration {
+    let mut config = FirehoseSubscriptionConfiguration::new(
+        Url::parse("wss://bsky.network/xrpc/com.atproto.sync.subscribeRepos").unwrap(),
+    );
+    config.session_factory = factory;
+    config.backoff = FirehoseBackoffConfiguration {
+        initial_delay: Duration::from_millis(1),
+        max_delay: Duration::from_millis(5),
+        multiplier: 2.0,
+        jitter: 0.0,
+    };
+    config
+}
+
+fn identity_seq(event: &FirehoseSubscriptionEvent) -> Option<i64> {
+    match event {
+        FirehoseSubscriptionEvent::Event(RelayEvent::Identity(i)) => Some(i.seq),
+        _ => None,
+    }
+}
+
+#[async_test]
+async fn malformed_frame_is_ignored_and_never_moves_the_cursor() {
+    // Non-canonical body: `seq` encoded with a one-byte argument (0x18 0x02) instead of the
+    // minimal immediate form. Canonical parsing rejects the frame; seq 2 is still readable.
+    let mut hdr = BTreeMap::new();
+    hdr.insert("op".to_owned(), Value::Integer(1));
+    hdr.insert("t".to_owned(), Value::String("#identity".to_owned()));
+    let mut non_canonical = dagcbor::encode(&Value::Object(hdr.clone()));
+    non_canonical.extend_from_slice(&[0xA1, 0x63, b's', b'e', b'q', 0x18, 0x02]);
+    // Truncated body: nothing recoverable, delivered without advancing the cursor.
+    let mut garbage = dagcbor::encode(&Value::Object(hdr));
+    garbage.push(0xFF);
+
+    let s = Arc::new(common::ScriptedSession::from_actions(vec![
+        Ok(encode_identity(1, "did:plc:ok")),
+        Ok(non_canonical),
+        Ok(garbage),
+        Ok(encode_identity(3, "did:plc:ok")),
+        Ok(encode_error_frame("FutureCursor", None)),
+    ]));
+    let storage = Arc::new(InMemoryFirehoseCursorStorage::new());
+    let mut config = fast_config(Arc::new(common::ScriptedWebSocketFactory::new(vec![Ok(s)])));
+    config.cursor_storage = storage.clone();
+    config.auto_acknowledge = true;
+    let sub = FirehoseSubscription::new(config);
+    let mut stream = sub.events();
+
+    assert_eq!(
+        identity_seq(&stream.next().await.unwrap().unwrap()),
+        Some(1)
+    );
+    let ignored = stream.next().await.unwrap().unwrap();
+    assert!(
+        matches!(
+            ignored,
+            FirehoseSubscriptionEvent::IgnoredFrame(EventStreamIgnoredFrame {
+                operation: 1,
+                sequence: Some(2),
+                reason: IgnoredFrameReason::MalformedFrame(_),
+                ref r#type,
+            }) if r#type.as_deref() == Some("#identity")
+        ),
+        "{ignored:?}"
+    );
+    let unknown = stream.next().await.unwrap().unwrap();
+    assert!(
+        matches!(
+            unknown,
+            FirehoseSubscriptionEvent::IgnoredFrame(EventStreamIgnoredFrame {
+                sequence: None,
+                reason: IgnoredFrameReason::MalformedFrame(_),
+                ..
+            })
+        ),
+        "{unknown:?}"
+    );
+    // The malformed frame's self-reported sequence is untrusted, so the cursor stays at 1 and
+    // the skipped range is reported as a gap before the next good event.
+    assert_eq!(storage.load_cursor().await.unwrap(), Some(1));
+    assert!(matches!(
+        stream.next().await.unwrap().unwrap(),
+        FirehoseSubscriptionEvent::SequenceGap { .. }
+    ));
+    assert_eq!(
+        identity_seq(&stream.next().await.unwrap().unwrap()),
+        Some(3)
+    );
+    assert!(matches!(
+        stream.next().await.unwrap(),
+        Err(FirehoseStreamError::Stream(_))
+    ));
+    assert_eq!(storage.load_cursor().await.unwrap(), Some(3));
+}
+
+#[async_test]
+async fn oversize_frame_reconnects_with_backoff_then_fails_naming_the_cursor() {
+    let s1 = Arc::new(common::ScriptedSession::from_actions(vec![
+        Ok(encode_identity(1, "did:plc:big")),
+        Err(FirehoseSubscriptionError::FrameTooLarge),
+    ]));
+    let s2 = Arc::new(common::ScriptedSession::from_actions(vec![Err(
+        FirehoseSubscriptionError::FrameTooLarge,
+    )]));
+    let s3 = Arc::new(common::ScriptedSession::from_actions(vec![Err(
+        FirehoseSubscriptionError::FrameTooLarge,
+    )]));
+    let factory = Arc::new(common::ScriptedWebSocketFactory::new(vec![
+        Ok(s1),
+        Ok(s2),
+        Ok(s3),
+    ]));
+    let mut config = fast_config(factory.clone());
+    config.oversize_frame_retry_limit = 3;
+    let sub = FirehoseSubscription::new(config);
+    let mut stream = sub.events();
+
+    assert_eq!(
+        identity_seq(&stream.next().await.unwrap().unwrap()),
+        Some(1)
+    );
+    for _ in 0..2 {
+        assert!(matches!(
+            stream.next().await.unwrap().unwrap(),
+            FirehoseSubscriptionEvent::IgnoredFrame(EventStreamIgnoredFrame {
+                sequence: None,
+                reason: IgnoredFrameReason::FrameTooLarge,
+                ..
+            })
+        ));
+    }
+    assert_eq!(
+        stream.next().await.unwrap(),
+        Err(FirehoseStreamError::Subscription(
+            FirehoseSubscriptionError::FrameTooLargeAtCursor {
+                cursor: Some(1),
+                attempts: 3
+            }
+        ))
+    );
+    assert!(stream.next().await.is_none());
+    let urls = factory.requested_urls.lock().await;
+    assert_eq!(urls.len(), 3);
+    assert!(urls[1..].iter().all(|u| u.query() == Some("cursor=1")));
+}
+
+#[async_test]
+async fn oversize_frames_at_advancing_positions_do_not_accumulate() {
+    let mut outcomes = Vec::new();
+    for seq in 1..=4 {
+        outcomes.push(Ok(Arc::new(common::ScriptedSession::from_actions(vec![
+            Ok(encode_identity(seq, "did:plc:big")),
+            Err(FirehoseSubscriptionError::FrameTooLarge),
+        ]))));
+    }
+    outcomes.push(Ok(Arc::new(common::ScriptedSession::from_actions(vec![
+        Ok(encode_error_frame("FutureCursor", None)),
+    ]))));
+    let mut config = fast_config(Arc::new(common::ScriptedWebSocketFactory::new(outcomes)));
+    config.oversize_frame_retry_limit = 2;
+    let sub = FirehoseSubscription::new(config);
+    let mut stream = sub.events();
+
+    for seq in 1..=4 {
+        assert_eq!(
+            identity_seq(&stream.next().await.unwrap().unwrap()),
+            Some(seq)
+        );
+        assert!(matches!(
+            stream.next().await.unwrap().unwrap(),
+            FirehoseSubscriptionEvent::IgnoredFrame(_)
+        ));
+    }
+    assert!(matches!(
+        stream.next().await.unwrap(),
+        Err(FirehoseStreamError::Stream(_))
+    ));
+}
+
+/// Documents manual-acknowledgement redelivery: reconnects resume from the last acknowledged
+/// cursor, so unacknowledged events are delivered again.
+#[async_test]
+async fn manual_ack_reconnect_redelivers_unacknowledged_events() {
+    let s1 = Arc::new(common::ScriptedSession::from_actions(vec![
+        Ok(encode_identity(1, "did:plc:ack")),
+        Ok(encode_identity(2, "did:plc:ack")),
+        Err(FirehoseSubscriptionError::ConnectionClosed),
+    ]));
+    let s2 = Arc::new(common::ScriptedSession::from_actions(vec![
+        Ok(encode_identity(2, "did:plc:ack")),
+        Ok(encode_error_frame("FutureCursor", None)),
+    ]));
+    let factory = Arc::new(common::ScriptedWebSocketFactory::new(vec![Ok(s1), Ok(s2)]));
+    let sub = FirehoseSubscription::new(fast_config(factory.clone()));
+    let mut stream = sub.events();
+
+    assert_eq!(
+        identity_seq(&stream.next().await.unwrap().unwrap()),
+        Some(1)
+    );
+    sub.acknowledge(1).await.unwrap();
+    assert_eq!(
+        identity_seq(&stream.next().await.unwrap().unwrap()),
+        Some(2)
+    );
+    // 2 is never acknowledged, so it comes back after the reconnect.
+    assert_eq!(
+        identity_seq(&stream.next().await.unwrap().unwrap()),
+        Some(2)
+    );
+    assert!(stream.next().await.unwrap().is_err());
+    assert_eq!(
+        factory.requested_urls.lock().await[1].query(),
+        Some("cursor=1")
+    );
+}
+
+/// The keep-alive must not drop a healthy socket just because the consumer stopped pulling
+/// for longer than the ping interval, yet must still detect a peer that never answers.
+#[cfg(not(target_arch = "wasm32"))]
+#[tokio::test]
+async fn keep_alive_tolerates_slow_consumer_but_detects_dead_peer() {
+    use futures_util::SinkExt;
+    use petrel_firehose::{FirehoseWebSocketSessionFactory, TungsteniteWebSocketFactory};
+    use tokio::net::TcpListener;
+    use tokio_tungstenite::tungstenite::Message;
+
+    let mut opts = FirehoseWebSocketOptions::new();
+    opts.ping_interval = Some(Duration::from_millis(50));
+    let factory = TungsteniteWebSocketFactory::with_options(opts);
+
+    // 1. Healthy peer that answers pings, consumer idle for 8 ping intervals.
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let frame = encode_identity(1, "did:plc:idle");
+    let frame_c = frame.clone();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+        let (mut tx, mut rx) = ws.split();
+        // Reading answers pings (tungstenite queues and flushes the pong).
+        let reader = tokio::spawn(async move { while let Some(Ok(_)) = rx.next().await {} });
+        tokio::time::sleep(Duration::from_millis(400)).await;
+        tx.send(Message::Binary(frame_c.into())).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        reader.abort();
+    });
+    let session = factory
+        .make_session(Url::parse(&format!("ws://127.0.0.1:{}/xrpc", addr.port())).unwrap())
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    assert_eq!(session.receive_message().await, Ok(frame));
+    session.close().await;
+    server.await.unwrap();
+
+    // 2. Peer that never reads, so never answers pings: a waiting consumer is unblocked.
+    let dead_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let dead_addr = dead_listener.local_addr().unwrap();
+    let _dead = tokio::spawn(async move {
+        let (stream, _) = dead_listener.accept().await.unwrap();
+        let _ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+        tokio::time::sleep(Duration::from_secs(5)).await;
+    });
+    let session = factory
+        .make_session(Url::parse(&format!("ws://127.0.0.1:{}/xrpc", dead_addr.port())).unwrap())
+        .await
+        .unwrap();
+    let result = tokio::time::timeout(Duration::from_secs(2), session.receive_message())
+        .await
+        .expect("keep-alive must close an unresponsive connection");
+    assert_eq!(result, Err(FirehoseSubscriptionError::ConnectionClosed));
 }
 
 #[cfg(not(target_arch = "wasm32"))]

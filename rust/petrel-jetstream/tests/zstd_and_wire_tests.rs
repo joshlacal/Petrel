@@ -236,3 +236,52 @@ fn zstd_rejects_oversized_dictionary_and_default_bomb_caps() {
         }
     );
 }
+
+/// zstd frame (no checksum, not single-segment) declaring a 64 MiB window, followed by one raw
+/// last block of `content`.
+fn frame_with_huge_window(fhd: u8, fcs: &[u8], content: &[u8]) -> Vec<u8> {
+    let mut frame = vec![0x28, 0xB5, 0x2F, 0xFD, fhd];
+    // Window_Descriptor: exponent 16, mantissa 0 -> 1 << (10 + 16) = 64 MiB.
+    frame.push(16 << 3);
+    frame.extend_from_slice(fcs);
+    let header = (u32::try_from(content.len()).unwrap() << 3) | 1;
+    frame.extend_from_slice(&header.to_le_bytes()[..3]);
+    frame.extend_from_slice(content);
+    frame
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_compat_test)]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+fn zstd_rejects_declared_window_larger_than_output_limit() {
+    const WINDOW: u64 = 64 * 1024 * 1024;
+
+    // Standalone path: no Frame_Content_Size, so only the window bounds buffering.
+    let standalone = frame_with_huge_window(0x00, &[], b"0123456789abcdef");
+    assert_eq!(
+        JetstreamZstd::decompress_with_limit(&standalone, 1024 * 1024),
+        Err(JetstreamZstdError::FrameTooLarge {
+            declared: WINDOW,
+            limit: 1024 * 1024
+        })
+    );
+    // The same frame decodes when the limit admits its window.
+    assert_eq!(
+        JetstreamZstd::decompress_with_limit(&standalone, 64 * 1024 * 1024).unwrap(),
+        b"0123456789abcdef"
+    );
+
+    // Dictionary path: a small declared content size does not excuse a huge window.
+    let dict = base64::engine::general_purpose::STANDARD
+        .decode(RAW_DICT_B64)
+        .unwrap();
+    let decoder = JetstreamZstdDictionaryDecoder::with_max_size(&dict, 1024 * 1024).unwrap();
+    // FHD 0x40: 2-byte Frame_Content_Size (value + 256), no dictionary ID; FCS 0 -> 256 bytes.
+    let dict_frame = frame_with_huge_window(0x40, &[0, 0], &[b'a'; 256]);
+    assert_eq!(
+        decoder.decompress(&dict_frame),
+        Err(JetstreamZstdError::FrameTooLarge {
+            declared: WINDOW,
+            limit: 1024 * 1024
+        })
+    );
+}
