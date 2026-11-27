@@ -1,3 +1,11 @@
+//! The Rust test server the end-to-end suite runs clients against.
+//!
+//! Native only. On `wasm32` this binary is compiled out entirely, so that
+//! `cargo check --workspace --target wasm32-unknown-unknown` stays green; the
+//! `no_main` attribute is what lets an empty binary crate build there.
+#![cfg_attr(target_arch = "wasm32", no_main)]
+#![cfg(not(target_arch = "wasm32"))]
+
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
