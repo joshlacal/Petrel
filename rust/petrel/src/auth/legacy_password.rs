@@ -335,6 +335,47 @@ impl LegacyPasswordStrategy {
         store.secrets().delete(store.namespace(), &key).await
     }
 
+    /// Resumes a trusted, externally stored app-password session in an isolated
+    /// in-memory account store. Does not contact the PDS. The caller owns
+    /// persistence and must save the tokens returned by `get_session` after renewal.
+    pub async fn resume_in_memory(
+        transport: SharedTransport,
+        identity: Arc<dyn OAuthIdentityResolver>,
+        pds_url: Url,
+        credentials: create_session::Output,
+        allow_loopback: bool,
+    ) -> Result<Self, PasswordAuthError> {
+        crate::net::policy::validate_url_with_development(&pds_url, allow_loopback)
+            .map_err(|err| PasswordAuthError::InvalidResponse(err.to_string()))?;
+        if !matches!(pds_url.scheme(), "http" | "https")
+            || pds_url.path() != "/"
+            || pds_url.query().is_some()
+            || credentials.access_jwt.is_empty()
+            || credentials.refresh_jwt.is_empty()
+        {
+            return Err(PasswordAuthError::InvalidResponse(
+                "stored session requires a PDS origin and a nonempty token pair".to_owned(),
+            ));
+        }
+        let storage = crate::storage::SessionStore::new(
+            Arc::new(crate::storage::MemorySecretStore::new()),
+            "password-resume",
+        )?;
+        let strategy = Self::new(
+            Arc::new(AccountManager::new(storage)),
+            transport,
+            identity,
+            pds_url.clone(),
+        )
+        .with_loopback_development(allow_loopback);
+        // Issuance time may be absent from the old store. Imported sessions are
+        // immediately eligible for refresh when the caller checks token expiry.
+        strategy
+            .persist_password_session(credentials, pds_url, 0)
+            .await?;
+        Ok(strategy)
+    }
+
     /// Signs in using a handle, DID, or email address and an app password (plus optional 2FA code).
     pub async fn login_with_password(
         self: &Arc<Self>,
@@ -371,7 +412,8 @@ impl LegacyPasswordStrategy {
             login_server
         };
 
-        self.persist_login_session(output, pds_url).await
+        self.persist_password_session(output, pds_url, unix_now())
+            .await
     }
 
     async fn resolve_login_server(
@@ -457,10 +499,11 @@ impl LegacyPasswordStrategy {
             .map_err(|e| PasswordAuthError::InvalidResponse(e.to_string()))
     }
 
-    async fn persist_login_session(
+    async fn persist_password_session(
         &self,
         output: create_session::Output,
         pds_url: Url,
+        issued_at: u64,
     ) -> Result<PasswordLoginResult, PasswordAuthError> {
         let status = AccountStatus::from_api(output.active, output.status.as_deref());
         self.account_statuses
@@ -468,13 +511,16 @@ impl LegacyPasswordStrategy {
             .await
             .insert(output.did.clone(), status.clone());
 
-        let now = unix_now();
-        let expires_in = Self::jwt_lifetime(&output.access_jwt);
+        let expires_in = if issued_at == 0 {
+            0
+        } else {
+            Self::jwt_lifetime(&output.access_jwt)
+        };
         let session = LegacySession {
             did: output.did.clone(),
             access_jwt: output.access_jwt,
             refresh_jwt: output.refresh_jwt,
-            created_at: now,
+            created_at: issued_at,
             expires_in,
         };
 
@@ -1521,6 +1567,38 @@ mod tests {
             Url::parse(PDS_URL).expect("valid pds url"),
         ));
         (strategy, account_manager, transport)
+    }
+
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+    #[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+    async fn resume_saved_password_session_offline_then_rotate() {
+        let did: Did = A_DID.parse().unwrap();
+        let credentials = create_session::Output::new(
+            "saved-access".into(),
+            "a-refresh-old".into(),
+            "alice.example".parse().unwrap(),
+            did.clone(),
+        );
+        let network = Arc::new(MultiAccountRecoveryTransport::new());
+        let strategy = Arc::new(
+            LegacyPasswordStrategy::resume_in_memory(
+                network.clone(),
+                Arc::new(StaticRecoveryResolver),
+                Url::parse(PDS_URL).unwrap(),
+                credentials,
+                false,
+            )
+            .await
+            .unwrap(),
+        );
+        assert!(network.refresh_bearers.lock().unwrap().is_empty());
+        let saved = strategy.get_session(&did).await.unwrap().unwrap();
+        assert_eq!(saved.access_jwt(), "saved-access");
+        assert!(saved.is_expiring_soon(unix_now()));
+        strategy.refresh_token_for_did(&did, false).await.unwrap();
+        let rotated = strategy.get_session(&did).await.unwrap().unwrap();
+        assert_eq!(rotated.access_jwt(), "a-access-1");
+        assert_eq!(rotated.refresh_jwt(), "a-refresh-1");
     }
 
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]

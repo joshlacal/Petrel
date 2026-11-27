@@ -43,9 +43,10 @@ pub use kem::{
     encode_p256_did_key, generate_p256_keypair,
 };
 pub use mac_header::{
-    AcceptSignatureRequest, MacProfile, SpaceMacHeaders, VerifiedCommitMac, VerifiedRecordMac,
-    format_accept_signature, parse_accept_signature, sign_commit_mac, sign_record_mac,
-    verify_commit_mac, verify_record_mac,
+    AcceptSignatureRequest, MacProfile, NamedMacRequest, SpaceMacHeaders, VerifiedCommitMac,
+    VerifiedRecordMac, format_accept_signature, parse_accept_signature,
+    parse_accept_signature_for_profile, sign_commit_mac, sign_record_mac, verify_commit_mac,
+    verify_record_mac,
 };
 pub use resolver::{
     DEFAULT_DID_CACHE_MAX_ENTRIES, DEFAULT_DID_CACHE_TTL_SECS, DEFAULT_DID_NEGATIVE_CACHE_TTL_SECS,

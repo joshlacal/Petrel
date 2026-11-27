@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use petrel_core::{
     Bytes, Cid, DecodeError, Did, EncodeError, FromValue, Nsid, ObjectReader, ObjectWriter,
     RecordKey, SpaceRef, Tid, ToValue, Value,
-    dagcbor::{Limits, decode_with, encode},
+    dagcbor::{Limits, decode_with, encode, try_encode},
     from_dag_cbor,
 };
 use petrel_crypto::SpaceSetHash;
@@ -15,6 +15,9 @@ use crate::error::{Result, SpaceError, parse_space_ref};
 /// Magic header prefix (`*l`) + LE version `1` (`[0x2a, 0x6c, 0x01, 0x00]`).
 pub const STAR_MAGIC: [u8; 2] = *b"*l";
 pub const STAR_VERSION: u16 = 1;
+const MAX_HEADER_BYTES: usize = 64 * 1024;
+const MAX_PATH_BYTES: usize = 4096;
+const MAX_RECORD_BYTES: usize = 1024 * 1024;
 const TAG_END: u8 = 0x00;
 const TAG_RECORD: u8 = 0x01;
 const TAG_BLOB: u8 = 0x02;
@@ -112,7 +115,13 @@ pub fn write_star_repo(
                 "duplicate record path in archive: {path}"
             )));
         }
-        let cbor = encode(value);
+        if !matches!(value, Value::Object(_)) {
+            return Err(SpaceError::InvalidArchive(
+                "STAR record must be an object".into(),
+            ));
+        }
+        let cbor = try_encode(value).map_err(|e| SpaceError::InvalidCbor(e.to_string()))?;
+        check_frame_size(cbor.len(), MAX_RECORD_BYTES)?;
         let cid = Cid::for_dag_cbor(&cbor);
         set_hash.add(path, &cid.to_string());
         prepared.push((path.to_owned(), cbor, cid));
@@ -159,15 +168,29 @@ pub fn read_star_metadata(bytes: &[u8]) -> Result<StarRepoMetadata> {
 
 /// Decode and cryptographically verify a STAR archive (validating paths, DAG-CBOR limits, and `SpaceSetHash`).
 pub fn read_star_repo(bytes: &[u8], max_archive_bytes: usize) -> Result<StarRepo> {
+    let (metadata, cursor) = read_bounded_header(bytes, max_archive_bytes)?;
+    read_star_records(bytes, metadata, cursor)
+}
+
+fn read_bounded_header(
+    bytes: &[u8],
+    max_archive_bytes: usize,
+) -> Result<(StarRepoMetadata, usize)> {
     if bytes.len() > max_archive_bytes {
         return Err(SpaceError::ArchiveTooLarge {
             actual: bytes.len(),
             max: max_archive_bytes,
         });
     }
-    let (metadata, mut cursor) = decode_star_header(bytes)?;
-    let mut records = Vec::new();
-    let mut seen = BTreeSet::new();
+    decode_star_header(bytes)
+}
+
+fn read_star_records(
+    bytes: &[u8],
+    metadata: StarRepoMetadata,
+    mut cursor: usize,
+) -> Result<StarRepo> {
+    let mut records: Vec<StarRecordEntry> = Vec::new();
     let mut set_hash = SpaceSetHash::new();
 
     loop {
@@ -186,20 +209,27 @@ pub fn read_star_repo(bytes: &[u8], max_archive_bytes: usize) -> Result<StarRepo
             }
             TAG_RECORD => {
                 let path_len = read_uvarint_usize(bytes, &mut cursor)?;
+                check_frame_size(path_len, MAX_PATH_BYTES)?;
                 let path_bytes = take_slice(bytes, &mut cursor, path_len)?;
                 let path = std::str::from_utf8(path_bytes)
                     .map_err(|_| SpaceError::InvalidArchive("non-utf8 record path".into()))?
                     .to_owned();
                 let (collection, rkey) = parse_record_path(&path)?;
-                if !seen.insert(path.clone()) {
+                if records.last().is_some_and(|prev| prev.path >= path) {
                     return Err(SpaceError::InvalidArchive(format!(
-                        "duplicate record path '{path}'"
+                        "STAR paths must increase strictly at '{path}'"
                     )));
                 }
                 let cbor_len = read_uvarint_usize(bytes, &mut cursor)?;
+                check_frame_size(cbor_len, MAX_RECORD_BYTES)?;
                 let cbor_bytes = take_slice(bytes, &mut cursor, cbor_len)?.to_vec();
                 let value = decode_with(&cbor_bytes, Limits::REPOSITORY_BLOCK)
                     .map_err(|e| SpaceError::InvalidCbor(e.to_string()))?;
+                if !matches!(value, Value::Object(_)) {
+                    return Err(SpaceError::InvalidArchive(
+                        "STAR record must be an object".into(),
+                    ));
+                }
                 let cid = Cid::for_dag_cbor(&cbor_bytes);
                 set_hash.add(&path, &cid.to_string());
                 records.push(StarRecordEntry {
@@ -244,38 +274,38 @@ pub fn read_star_repo_authenticated(
     expected_data: Option<&[u8; 32]>,
     max_archive_bytes: usize,
 ) -> Result<StarRepo> {
-    let repo = read_star_repo(bytes, max_archive_bytes)?;
-    if &repo.metadata.space != expected_space {
+    let (metadata, cursor) = read_bounded_header(bytes, max_archive_bytes)?;
+    if &metadata.space != expected_space {
         return Err(SpaceError::InvalidArchive(format!(
             "STAR space mismatch: expected {expected_space}, got {}",
-            repo.metadata.space
+            metadata.space
         )));
     }
     if let Some(exp_repo) = expected_repo
-        && &repo.metadata.repo != exp_repo
+        && &metadata.repo != exp_repo
     {
         return Err(SpaceError::InvalidArchive(format!(
             "STAR repo mismatch: expected {exp_repo}, got {}",
-            repo.metadata.repo
+            metadata.repo
         )));
     }
     if let Some(exp_rev) = expected_rev
-        && &repo.metadata.rev != exp_rev
+        && &metadata.rev != exp_rev
     {
         return Err(SpaceError::InvalidArchive(format!(
             "STAR rev mismatch: expected {exp_rev}, got {}",
-            repo.metadata.rev
+            metadata.rev
         )));
     }
     if let Some(exp_data) = expected_data
-        && &repo.metadata.data != exp_data
+        && &metadata.data != exp_data
     {
         return Err(SpaceError::DataHashMismatch {
             expected: encode_hex(exp_data),
-            actual: encode_hex(&repo.metadata.data),
+            actual: encode_hex(&metadata.data),
         });
     }
-    Ok(repo)
+    read_star_records(bytes, metadata, cursor)
 }
 
 /// Convert JSON data model bytes into canonical DAG-CBOR `Value`, enforcing JS safe integers.
@@ -351,9 +381,20 @@ fn decode_star_header(bytes: &[u8]) -> Result<(StarRepoMetadata, usize)> {
     }
     let mut cursor = 4usize;
     let header_len = read_uvarint_usize(bytes, &mut cursor)?;
+    check_frame_size(header_len, MAX_HEADER_BYTES)?;
     let header_bytes = take_slice(bytes, &mut cursor, header_len)?;
     let header: StarRepoHeaderCbor =
         from_dag_cbor(header_bytes).map_err(|e| SpaceError::InvalidCbor(e.to_string()))?;
+    if encode(
+        &header
+            .to_value()
+            .map_err(|e| SpaceError::CborEncoding(e.to_string()))?,
+    ) != header_bytes
+    {
+        return Err(SpaceError::InvalidArchive(
+            "unexpected STAR metadata fields or encoding".into(),
+        ));
+    }
     if header.kind != HEADER_TYPE_TAG {
         return Err(SpaceError::InvalidArchive(format!(
             "unexpected STAR header $type '{}'",
@@ -388,7 +429,17 @@ fn decode_star_header(bytes: &[u8]) -> Result<(StarRepoMetadata, usize)> {
     ))
 }
 
+fn check_frame_size(actual: usize, max: usize) -> Result<()> {
+    if actual > max {
+        return Err(SpaceError::InvalidArchive(format!(
+            "STAR frame exceeds {max} bytes"
+        )));
+    }
+    Ok(())
+}
+
 fn parse_record_path(path: &str) -> Result<(Nsid, RecordKey)> {
+    check_frame_size(path.len(), MAX_PATH_BYTES)?;
     let mut parts = path.split('/');
     let col_str = parts
         .next()
@@ -429,6 +480,11 @@ fn read_uvarint_usize(bytes: &[u8], cursor: &mut usize) -> Result<usize> {
         }
         value |= u64::from(byte & 0x7f) << shift;
         if (byte & 0x80) == 0 {
+            if idx > 0 && byte == 0 {
+                return Err(SpaceError::InvalidArchive(
+                    "non-minimal STAR frame length".into(),
+                ));
+            }
             return usize::try_from(value)
                 .map_err(|_| SpaceError::InvalidArchive("uvarint exceeds usize".into()));
         }
