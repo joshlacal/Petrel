@@ -17,6 +17,7 @@ public enum ChatBskyModerationDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             id: String,
@@ -28,6 +29,7 @@ public enum ChatBskyModerationDefs {
             self.rev = rev
             self.kind = kind
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -49,6 +51,7 @@ public enum ChatBskyModerationDefs {
                 malformedFields.insert("kind")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -57,6 +60,7 @@ public enum ChatBskyModerationDefs {
             try container.encode(rev, forKey: .rev)
             try container.encodeIfPresent(kind, forKey: .kind)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -98,7 +102,7 @@ public enum ChatBskyModerationDefs {
                 let kindValue = try value.toCBORValue()
                 map = map.adding(key: "kind", value: kindValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "id", "rev", "kind"]
@@ -128,20 +132,24 @@ public enum ChatBskyModerationDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             _ = encoder.container(keyedBy: CodingKeys.self)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -159,7 +167,7 @@ public enum ChatBskyModerationDefs {
 
         public func toCBORValue() throws -> Any {
             let map = OrderedCBORMap()
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type"]
@@ -186,6 +194,7 @@ public enum ChatBskyModerationDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             createdAt: ATProtocolDate,
@@ -205,6 +214,7 @@ public enum ChatBskyModerationDefs {
             self.memberLimit = memberLimit
             self.name = name
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -230,6 +240,7 @@ public enum ChatBskyModerationDefs {
             memberLimit = try container.decode(Int.self, forKey: .memberLimit)
             name = try container.decode(String.self, forKey: .name)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -242,6 +253,7 @@ public enum ChatBskyModerationDefs {
             try container.encode(memberLimit, forKey: .memberLimit)
             try container.encode(name, forKey: .name)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -307,7 +319,7 @@ public enum ChatBskyModerationDefs {
             map = map.adding(key: "memberLimit", value: memberLimitValue)
             let nameValue = try name.toCBORValue()
             map = map.adding(key: "name", value: nameValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "createdAt", "joinLink", "joinRequestCount", "lockStatus", "memberCount", "memberLimit", "name"]
@@ -358,10 +370,10 @@ public enum ChatBskyModerationDefs {
 
             switch typeValue {
             case "chat.bsky.moderation.defs#directConvo":
-                let value = try ChatBskyModerationDefs.DirectConvo(from: decoder)
+                let value = try ChatBskyModerationDefs.DirectConvo(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyModerationDefsDirectConvo(value)
             case "chat.bsky.moderation.defs#groupConvo":
-                let value = try ChatBskyModerationDefs.GroupConvo(from: decoder)
+                let value = try ChatBskyModerationDefs.GroupConvo(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyModerationDefsGroupConvo(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -374,11 +386,11 @@ public enum ChatBskyModerationDefs {
 
             switch self {
             case let .chatBskyModerationDefsDirectConvo(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.moderation.defs#directConvo", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyModerationDefsGroupConvo(value):
-                try container.encode("chat.bsky.moderation.defs#groupConvo", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("chat.bsky.moderation.defs#groupConvo", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

@@ -17,6 +17,7 @@ public enum ComAtprotoSpaceAuthorizeSpaceSync {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             endpoint: URI,
@@ -26,6 +27,7 @@ public enum ComAtprotoSpaceAuthorizeSpaceSync {
             self.endpoint = endpoint
             self.token = token
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -33,6 +35,7 @@ public enum ComAtprotoSpaceAuthorizeSpaceSync {
             endpoint = try container.decode(URI.self, forKey: .endpoint)
             token = try container.decode(String.self, forKey: .token)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -40,6 +43,7 @@ public enum ComAtprotoSpaceAuthorizeSpaceSync {
             try container.encode(endpoint, forKey: .endpoint)
             try container.encode(token, forKey: .token)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -69,7 +73,7 @@ public enum ComAtprotoSpaceAuthorizeSpaceSync {
             map = map.adding(key: "endpoint", value: endpointValue)
             let tokenValue = try token.toCBORValue()
             map = map.adding(key: "token", value: tokenValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "endpoint", "token"]

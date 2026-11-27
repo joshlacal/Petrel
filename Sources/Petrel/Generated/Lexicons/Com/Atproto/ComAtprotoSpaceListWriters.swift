@@ -131,10 +131,10 @@ public enum ComAtprotoSpaceListWriters {
 
             switch typeValue {
             case "com.atproto.space.defs#repoWrite":
-                let value = try ComAtprotoSpaceDefs.RepoWrite(from: decoder)
+                let value = try ComAtprotoSpaceDefs.RepoWrite(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoSpaceDefsRepoWrite(value)
             case "com.atproto.space.defs#repoRemoved":
-                let value = try ComAtprotoSpaceDefs.RepoRemoved(from: decoder)
+                let value = try ComAtprotoSpaceDefs.RepoRemoved(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoSpaceDefsRepoRemoved(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -147,11 +147,11 @@ public enum ComAtprotoSpaceListWriters {
 
             switch self {
             case let .comAtprotoSpaceDefsRepoWrite(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.space.defs#repoWrite", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoSpaceDefsRepoRemoved(value):
-                try container.encode("com.atproto.space.defs#repoRemoved", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.space.defs#repoRemoved", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

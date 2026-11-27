@@ -171,7 +171,7 @@ public struct AppBskyActorStatus: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "app.bsky.embed.external":
-                let value = try AppBskyEmbedExternal(from: decoder)
+                let value = try AppBskyEmbedExternal(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedExternal(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -184,8 +184,8 @@ public struct AppBskyActorStatus: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .appBskyEmbedExternal(value):
-                try container.encode("app.bsky.embed.external", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.embed.external", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

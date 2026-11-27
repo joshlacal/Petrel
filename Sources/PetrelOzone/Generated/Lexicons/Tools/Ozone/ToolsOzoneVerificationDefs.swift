@@ -36,6 +36,7 @@ public enum ToolsOzoneVerificationDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             issuer: DID,
@@ -67,6 +68,7 @@ public enum ToolsOzoneVerificationDefs {
             self.subjectRepo = subjectRepo
             self.issuerRepo = issuerRepo
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -164,6 +166,7 @@ public enum ToolsOzoneVerificationDefs {
                 malformedFields.insert("issuerRepo")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -182,6 +185,7 @@ public enum ToolsOzoneVerificationDefs {
             try container.encodeIfPresent(subjectRepo, forKey: .subjectRepo)
             try container.encodeIfPresent(issuerRepo, forKey: .issuerRepo)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -319,7 +323,7 @@ public enum ToolsOzoneVerificationDefs {
                 let issuerRepoValue = try value.toCBORValue()
                 map = map.adding(key: "issuerRepo", value: issuerRepoValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "issuer", "uri", "subject", "handle", "displayName", "createdAt", "revokeReason", "revokedAt", "revokedBy", "subjectProfile", "issuerProfile", "subjectRepo", "issuerRepo"]
@@ -494,10 +498,10 @@ public enum ToolsOzoneVerificationDefs {
 
             switch typeValue {
             case "tools.ozone.moderation.defs#repoViewDetail":
-                let value = try ToolsOzoneModerationDefs.RepoViewDetail(from: decoder)
+                let value = try ToolsOzoneModerationDefs.RepoViewDetail(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsRepoViewDetail(value)
             case "tools.ozone.moderation.defs#repoViewNotFound":
-                let value = try ToolsOzoneModerationDefs.RepoViewNotFound(from: decoder)
+                let value = try ToolsOzoneModerationDefs.RepoViewNotFound(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsRepoViewNotFound(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -510,11 +514,11 @@ public enum ToolsOzoneVerificationDefs {
 
             switch self {
             case let .toolsOzoneModerationDefsRepoViewDetail(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#repoViewDetail", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsRepoViewNotFound(value):
-                try container.encode("tools.ozone.moderation.defs#repoViewNotFound", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("tools.ozone.moderation.defs#repoViewNotFound", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -628,10 +632,10 @@ public enum ToolsOzoneVerificationDefs {
 
             switch typeValue {
             case "tools.ozone.moderation.defs#repoViewDetail":
-                let value = try ToolsOzoneModerationDefs.RepoViewDetail(from: decoder)
+                let value = try ToolsOzoneModerationDefs.RepoViewDetail(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsRepoViewDetail(value)
             case "tools.ozone.moderation.defs#repoViewNotFound":
-                let value = try ToolsOzoneModerationDefs.RepoViewNotFound(from: decoder)
+                let value = try ToolsOzoneModerationDefs.RepoViewNotFound(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsRepoViewNotFound(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -644,11 +648,11 @@ public enum ToolsOzoneVerificationDefs {
 
             switch self {
             case let .toolsOzoneModerationDefsRepoViewDetail(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#repoViewDetail", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsRepoViewNotFound(value):
-                try container.encode("tools.ozone.moderation.defs#repoViewNotFound", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("tools.ozone.moderation.defs#repoViewNotFound", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

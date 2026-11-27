@@ -205,27 +205,105 @@ object AppBskyAgeassuranceDefsConfigRegionRulesUnionSerializer : kotlinx.seriali
     }
 }
 
-@Serializable
-enum class AppBskyAgeassuranceDefsAccess {
-    @SerialName("unknown")
-    UNKNOWN,
-    @SerialName("none")
-    NONE,
-    @SerialName("safe")
-    SAFE,
-    @SerialName("full")
-    FULL}
+/**
+ * A Lexicon `knownValues` string. The Lexicon names the values it knows, but a peer
+ * can send any other: such a value decodes as [Unknown] and is written back unchanged,
+ * instead of failing the object that holds it. Values are equal when their wire
+ * strings are.
+ */
+@Serializable(with = AppBskyAgeassuranceDefsAccessSerializer::class)
+sealed class AppBskyAgeassuranceDefsAccess(val value: String) {
+    object UNKNOWN : AppBskyAgeassuranceDefsAccess("unknown")
+    object NONE : AppBskyAgeassuranceDefsAccess("none")
+    object SAFE : AppBskyAgeassuranceDefsAccess("safe")
+    object FULL : AppBskyAgeassuranceDefsAccess("full")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : AppBskyAgeassuranceDefsAccess(value)
 
-@Serializable
-enum class AppBskyAgeassuranceDefsStatus {
-    @SerialName("unknown")
-    UNKNOWN,
-    @SerialName("pending")
-    PENDING,
-    @SerialName("assured")
-    ASSURED,
-    @SerialName("blocked")
-    BLOCKED}
+    override fun equals(other: Any?): Boolean = other is AppBskyAgeassuranceDefsAccess && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<AppBskyAgeassuranceDefsAccess> by lazy {
+            listOf(UNKNOWN, NONE, SAFE, FULL)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): AppBskyAgeassuranceDefsAccess = when (value) {
+            "unknown" -> UNKNOWN
+            "none" -> NONE
+            "safe" -> SAFE
+            "full" -> FULL
+            else -> Unknown(value)
+        }
+    }
+}
+
+object AppBskyAgeassuranceDefsAccessSerializer : kotlinx.serialization.KSerializer<AppBskyAgeassuranceDefsAccess> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("AppBskyAgeassuranceDefsAccess", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyAgeassuranceDefsAccess) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyAgeassuranceDefsAccess =
+        AppBskyAgeassuranceDefsAccess.fromValue(decoder.decodeString())
+}
+
+/**
+ * A Lexicon `knownValues` string. The Lexicon names the values it knows, but a peer
+ * can send any other: such a value decodes as [Unknown] and is written back unchanged,
+ * instead of failing the object that holds it. Values are equal when their wire
+ * strings are.
+ */
+@Serializable(with = AppBskyAgeassuranceDefsStatusSerializer::class)
+sealed class AppBskyAgeassuranceDefsStatus(val value: String) {
+    object UNKNOWN : AppBskyAgeassuranceDefsStatus("unknown")
+    object PENDING : AppBskyAgeassuranceDefsStatus("pending")
+    object ASSURED : AppBskyAgeassuranceDefsStatus("assured")
+    object BLOCKED : AppBskyAgeassuranceDefsStatus("blocked")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : AppBskyAgeassuranceDefsStatus(value)
+
+    override fun equals(other: Any?): Boolean = other is AppBskyAgeassuranceDefsStatus && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<AppBskyAgeassuranceDefsStatus> by lazy {
+            listOf(UNKNOWN, PENDING, ASSURED, BLOCKED)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): AppBskyAgeassuranceDefsStatus = when (value) {
+            "unknown" -> UNKNOWN
+            "pending" -> PENDING
+            "assured" -> ASSURED
+            "blocked" -> BLOCKED
+            else -> Unknown(value)
+        }
+    }
+}
+
+object AppBskyAgeassuranceDefsStatusSerializer : kotlinx.serialization.KSerializer<AppBskyAgeassuranceDefsStatus> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("AppBskyAgeassuranceDefsStatus", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyAgeassuranceDefsStatus) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyAgeassuranceDefsStatus =
+        AppBskyAgeassuranceDefsStatus.fromValue(decoder.decodeString())
+}
 
     /**
      * The user's computed Age Assurance state.

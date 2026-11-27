@@ -227,94 +227,94 @@ public enum ChatBskyConvoGetLog {
 
             switch typeValue {
             case "chat.bsky.convo.defs#logBeginConvo":
-                let value = try ChatBskyConvoDefs.LogBeginConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.LogBeginConvo(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogBeginConvo(value)
             case "chat.bsky.convo.defs#logAcceptConvo":
-                let value = try ChatBskyConvoDefs.LogAcceptConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.LogAcceptConvo(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogAcceptConvo(value)
             case "chat.bsky.convo.defs#logLeaveConvo":
-                let value = try ChatBskyConvoDefs.LogLeaveConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.LogLeaveConvo(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogLeaveConvo(value)
             case "chat.bsky.convo.defs#logMuteConvo":
-                let value = try ChatBskyConvoDefs.LogMuteConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.LogMuteConvo(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogMuteConvo(value)
             case "chat.bsky.convo.defs#logUnmuteConvo":
-                let value = try ChatBskyConvoDefs.LogUnmuteConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.LogUnmuteConvo(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogUnmuteConvo(value)
             case "chat.bsky.convo.defs#logCreateMessage":
-                let value = try ChatBskyConvoDefs.LogCreateMessage(from: decoder)
+                let value = try ChatBskyConvoDefs.LogCreateMessage(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogCreateMessage(value)
             case "chat.bsky.convo.defs#logDeleteMessage":
-                let value = try ChatBskyConvoDefs.LogDeleteMessage(from: decoder)
+                let value = try ChatBskyConvoDefs.LogDeleteMessage(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogDeleteMessage(value)
             case "chat.bsky.convo.defs#logReadMessage":
-                let value = try ChatBskyConvoDefs.LogReadMessage(from: decoder)
+                let value = try ChatBskyConvoDefs.LogReadMessage(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogReadMessage(value)
             case "chat.bsky.convo.defs#logAddReaction":
-                let value = try ChatBskyConvoDefs.LogAddReaction(from: decoder)
+                let value = try ChatBskyConvoDefs.LogAddReaction(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogAddReaction(value)
             case "chat.bsky.convo.defs#logRemoveReaction":
-                let value = try ChatBskyConvoDefs.LogRemoveReaction(from: decoder)
+                let value = try ChatBskyConvoDefs.LogRemoveReaction(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogRemoveReaction(value)
             case "chat.bsky.convo.defs#logReadConvo":
-                let value = try ChatBskyConvoDefs.LogReadConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.LogReadConvo(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogReadConvo(value)
             case "chat.bsky.convo.defs#logAddMember":
-                let value = try ChatBskyConvoDefs.LogAddMember(from: decoder)
+                let value = try ChatBskyConvoDefs.LogAddMember(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogAddMember(value)
             case "chat.bsky.convo.defs#logRemoveMember":
-                let value = try ChatBskyConvoDefs.LogRemoveMember(from: decoder)
+                let value = try ChatBskyConvoDefs.LogRemoveMember(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogRemoveMember(value)
             case "chat.bsky.convo.defs#logMemberJoin":
-                let value = try ChatBskyConvoDefs.LogMemberJoin(from: decoder)
+                let value = try ChatBskyConvoDefs.LogMemberJoin(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogMemberJoin(value)
             case "chat.bsky.convo.defs#logMemberLeave":
-                let value = try ChatBskyConvoDefs.LogMemberLeave(from: decoder)
+                let value = try ChatBskyConvoDefs.LogMemberLeave(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogMemberLeave(value)
             case "chat.bsky.convo.defs#logLockConvo":
-                let value = try ChatBskyConvoDefs.LogLockConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.LogLockConvo(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogLockConvo(value)
             case "chat.bsky.convo.defs#logUnlockConvo":
-                let value = try ChatBskyConvoDefs.LogUnlockConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.LogUnlockConvo(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogUnlockConvo(value)
             case "chat.bsky.convo.defs#logLockConvoPermanently":
-                let value = try ChatBskyConvoDefs.LogLockConvoPermanently(from: decoder)
+                let value = try ChatBskyConvoDefs.LogLockConvoPermanently(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogLockConvoPermanently(value)
             case "chat.bsky.convo.defs#logEditGroup":
-                let value = try ChatBskyConvoDefs.LogEditGroup(from: decoder)
+                let value = try ChatBskyConvoDefs.LogEditGroup(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogEditGroup(value)
             case "chat.bsky.convo.defs#logCreateJoinLink":
-                let value = try ChatBskyConvoDefs.LogCreateJoinLink(from: decoder)
+                let value = try ChatBskyConvoDefs.LogCreateJoinLink(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogCreateJoinLink(value)
             case "chat.bsky.convo.defs#logEditJoinLink":
-                let value = try ChatBskyConvoDefs.LogEditJoinLink(from: decoder)
+                let value = try ChatBskyConvoDefs.LogEditJoinLink(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogEditJoinLink(value)
             case "chat.bsky.convo.defs#logEnableJoinLink":
-                let value = try ChatBskyConvoDefs.LogEnableJoinLink(from: decoder)
+                let value = try ChatBskyConvoDefs.LogEnableJoinLink(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogEnableJoinLink(value)
             case "chat.bsky.convo.defs#logDisableJoinLink":
-                let value = try ChatBskyConvoDefs.LogDisableJoinLink(from: decoder)
+                let value = try ChatBskyConvoDefs.LogDisableJoinLink(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogDisableJoinLink(value)
             case "chat.bsky.convo.defs#logIncomingJoinRequest":
-                let value = try ChatBskyConvoDefs.LogIncomingJoinRequest(from: decoder)
+                let value = try ChatBskyConvoDefs.LogIncomingJoinRequest(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogIncomingJoinRequest(value)
             case "chat.bsky.convo.defs#logApproveJoinRequest":
-                let value = try ChatBskyConvoDefs.LogApproveJoinRequest(from: decoder)
+                let value = try ChatBskyConvoDefs.LogApproveJoinRequest(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogApproveJoinRequest(value)
             case "chat.bsky.convo.defs#logRejectJoinRequest":
-                let value = try ChatBskyConvoDefs.LogRejectJoinRequest(from: decoder)
+                let value = try ChatBskyConvoDefs.LogRejectJoinRequest(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogRejectJoinRequest(value)
             case "chat.bsky.convo.defs#logOutgoingJoinRequest":
-                let value = try ChatBskyConvoDefs.LogOutgoingJoinRequest(from: decoder)
+                let value = try ChatBskyConvoDefs.LogOutgoingJoinRequest(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogOutgoingJoinRequest(value)
             case "chat.bsky.convo.defs#logWithdrawIncomingJoinRequest":
-                let value = try ChatBskyConvoDefs.LogWithdrawIncomingJoinRequest(from: decoder)
+                let value = try ChatBskyConvoDefs.LogWithdrawIncomingJoinRequest(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogWithdrawIncomingJoinRequest(value)
             case "chat.bsky.convo.defs#logWithdrawOutgoingJoinRequest":
-                let value = try ChatBskyConvoDefs.LogWithdrawOutgoingJoinRequest(from: decoder)
+                let value = try ChatBskyConvoDefs.LogWithdrawOutgoingJoinRequest(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogWithdrawOutgoingJoinRequest(value)
             case "chat.bsky.convo.defs#logReadJoinRequests":
-                let value = try ChatBskyConvoDefs.LogReadJoinRequests(from: decoder)
+                let value = try ChatBskyConvoDefs.LogReadJoinRequests(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsLogReadJoinRequests(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -327,95 +327,95 @@ public enum ChatBskyConvoGetLog {
 
             switch self {
             case let .chatBskyConvoDefsLogBeginConvo(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logBeginConvo", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogAcceptConvo(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logAcceptConvo", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogLeaveConvo(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logLeaveConvo", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogMuteConvo(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logMuteConvo", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogUnmuteConvo(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logUnmuteConvo", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogCreateMessage(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logCreateMessage", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogDeleteMessage(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logDeleteMessage", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogReadMessage(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logReadMessage", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogAddReaction(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logAddReaction", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogRemoveReaction(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logRemoveReaction", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogReadConvo(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logReadConvo", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogAddMember(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logAddMember", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogRemoveMember(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logRemoveMember", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogMemberJoin(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logMemberJoin", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogMemberLeave(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logMemberLeave", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogLockConvo(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logLockConvo", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogUnlockConvo(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logUnlockConvo", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogLockConvoPermanently(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logLockConvoPermanently", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogEditGroup(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logEditGroup", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogCreateJoinLink(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logCreateJoinLink", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogEditJoinLink(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logEditJoinLink", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogEnableJoinLink(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logEnableJoinLink", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogDisableJoinLink(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logDisableJoinLink", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogIncomingJoinRequest(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logIncomingJoinRequest", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogApproveJoinRequest(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logApproveJoinRequest", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogRejectJoinRequest(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logRejectJoinRequest", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogOutgoingJoinRequest(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logOutgoingJoinRequest", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogWithdrawIncomingJoinRequest(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logWithdrawIncomingJoinRequest", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogWithdrawOutgoingJoinRequest(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#logWithdrawOutgoingJoinRequest", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogReadJoinRequests(value):
-                try container.encode("chat.bsky.convo.defs#logReadJoinRequests", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("chat.bsky.convo.defs#logReadJoinRequests", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

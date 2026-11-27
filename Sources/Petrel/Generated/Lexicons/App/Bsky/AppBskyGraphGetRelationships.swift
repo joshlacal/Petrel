@@ -103,10 +103,10 @@ public enum AppBskyGraphGetRelationships {
 
             switch typeValue {
             case "app.bsky.graph.defs#relationship":
-                let value = try AppBskyGraphDefs.Relationship(from: decoder)
+                let value = try AppBskyGraphDefs.Relationship(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyGraphDefsRelationship(value)
             case "app.bsky.graph.defs#notFoundActor":
-                let value = try AppBskyGraphDefs.NotFoundActor(from: decoder)
+                let value = try AppBskyGraphDefs.NotFoundActor(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyGraphDefsNotFoundActor(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -119,11 +119,11 @@ public enum AppBskyGraphGetRelationships {
 
             switch self {
             case let .appBskyGraphDefsRelationship(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.graph.defs#relationship", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyGraphDefsNotFoundActor(value):
-                try container.encode("app.bsky.graph.defs#notFoundActor", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.graph.defs#notFoundActor", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

@@ -166,6 +166,7 @@ public enum ExampleLexiconProcedure {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             a: Int? = nil,
@@ -175,6 +176,7 @@ public enum ExampleLexiconProcedure {
             self.a = a
             self.b = b
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -206,6 +208,7 @@ public enum ExampleLexiconProcedure {
                 malformedFields.insert("b")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -213,6 +216,7 @@ public enum ExampleLexiconProcedure {
             try container.encodeIfPresent(a, forKey: .a)
             try container.encodeIfPresent(b, forKey: .b)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -254,7 +258,7 @@ public enum ExampleLexiconProcedure {
                 let bValue = try value.toCBORValue()
                 map = map.adding(key: "b", value: bValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "a", "b"]

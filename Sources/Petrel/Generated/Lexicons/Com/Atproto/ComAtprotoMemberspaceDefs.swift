@@ -15,6 +15,7 @@ public enum ComAtprotoMemberspaceDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             did: DID,
@@ -26,6 +27,7 @@ public enum ComAtprotoMemberspaceDefs {
             self.read = read
             self.write = write
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -34,6 +36,7 @@ public enum ComAtprotoMemberspaceDefs {
             read = try container.decode(Bool.self, forKey: .read)
             write = try container.decode(Bool.self, forKey: .write)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -42,6 +45,7 @@ public enum ComAtprotoMemberspaceDefs {
             try container.encode(read, forKey: .read)
             try container.encode(write, forKey: .write)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -77,7 +81,7 @@ public enum ComAtprotoMemberspaceDefs {
             map = map.adding(key: "read", value: readValue)
             let writeValue = try write.toCBORValue()
             map = map.adding(key: "write", value: writeValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "did", "read", "write"]

@@ -1381,28 +1381,145 @@ object ChatBskyConvoDefsLogReadConvoMessageUnionSerializer : kotlinx.serializati
     }
 }
 
-@Serializable
-enum class ChatBskyConvoDefsConvoKind {
-    @SerialName("direct")
-    DIRECT,
-    @SerialName("group")
-    GROUP}
+/**
+ * A Lexicon `knownValues` string. The Lexicon names the values it knows, but a peer
+ * can send any other: such a value decodes as [Unknown] and is written back unchanged,
+ * instead of failing the object that holds it. Values are equal when their wire
+ * strings are.
+ */
+@Serializable(with = ChatBskyConvoDefsConvoKindSerializer::class)
+sealed class ChatBskyConvoDefsConvoKind(val value: String) {
+    object DIRECT : ChatBskyConvoDefsConvoKind("direct")
+    object GROUP : ChatBskyConvoDefsConvoKind("group")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : ChatBskyConvoDefsConvoKind(value)
 
-@Serializable
-enum class ChatBskyConvoDefsConvoLockStatus {
-    @SerialName("unlocked")
-    UNLOCKED,
-    @SerialName("locked")
-    LOCKED,
-    @SerialName("locked-permanently")
-    LOCKED_PERMANENTLY}
+    override fun equals(other: Any?): Boolean = other is ChatBskyConvoDefsConvoKind && other.value == value
 
-@Serializable
-enum class ChatBskyConvoDefsConvoStatus {
-    @SerialName("request")
-    REQUEST,
-    @SerialName("accepted")
-    ACCEPTED}
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<ChatBskyConvoDefsConvoKind> by lazy {
+            listOf(DIRECT, GROUP)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): ChatBskyConvoDefsConvoKind = when (value) {
+            "direct" -> DIRECT
+            "group" -> GROUP
+            else -> Unknown(value)
+        }
+    }
+}
+
+object ChatBskyConvoDefsConvoKindSerializer : kotlinx.serialization.KSerializer<ChatBskyConvoDefsConvoKind> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("ChatBskyConvoDefsConvoKind", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ChatBskyConvoDefsConvoKind) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ChatBskyConvoDefsConvoKind =
+        ChatBskyConvoDefsConvoKind.fromValue(decoder.decodeString())
+}
+
+/**
+ * A Lexicon `knownValues` string. The Lexicon names the values it knows, but a peer
+ * can send any other: such a value decodes as [Unknown] and is written back unchanged,
+ * instead of failing the object that holds it. Values are equal when their wire
+ * strings are.
+ */
+@Serializable(with = ChatBskyConvoDefsConvoLockStatusSerializer::class)
+sealed class ChatBskyConvoDefsConvoLockStatus(val value: String) {
+    object UNLOCKED : ChatBskyConvoDefsConvoLockStatus("unlocked")
+    object LOCKED : ChatBskyConvoDefsConvoLockStatus("locked")
+    object LOCKED_PERMANENTLY : ChatBskyConvoDefsConvoLockStatus("locked-permanently")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : ChatBskyConvoDefsConvoLockStatus(value)
+
+    override fun equals(other: Any?): Boolean = other is ChatBskyConvoDefsConvoLockStatus && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<ChatBskyConvoDefsConvoLockStatus> by lazy {
+            listOf(UNLOCKED, LOCKED, LOCKED_PERMANENTLY)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): ChatBskyConvoDefsConvoLockStatus = when (value) {
+            "unlocked" -> UNLOCKED
+            "locked" -> LOCKED
+            "locked-permanently" -> LOCKED_PERMANENTLY
+            else -> Unknown(value)
+        }
+    }
+}
+
+object ChatBskyConvoDefsConvoLockStatusSerializer : kotlinx.serialization.KSerializer<ChatBskyConvoDefsConvoLockStatus> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("ChatBskyConvoDefsConvoLockStatus", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ChatBskyConvoDefsConvoLockStatus) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ChatBskyConvoDefsConvoLockStatus =
+        ChatBskyConvoDefsConvoLockStatus.fromValue(decoder.decodeString())
+}
+
+/**
+ * A Lexicon `knownValues` string. The Lexicon names the values it knows, but a peer
+ * can send any other: such a value decodes as [Unknown] and is written back unchanged,
+ * instead of failing the object that holds it. Values are equal when their wire
+ * strings are.
+ */
+@Serializable(with = ChatBskyConvoDefsConvoStatusSerializer::class)
+sealed class ChatBskyConvoDefsConvoStatus(val value: String) {
+    object REQUEST : ChatBskyConvoDefsConvoStatus("request")
+    object ACCEPTED : ChatBskyConvoDefsConvoStatus("accepted")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : ChatBskyConvoDefsConvoStatus(value)
+
+    override fun equals(other: Any?): Boolean = other is ChatBskyConvoDefsConvoStatus && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<ChatBskyConvoDefsConvoStatus> by lazy {
+            listOf(REQUEST, ACCEPTED)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): ChatBskyConvoDefsConvoStatus = when (value) {
+            "request" -> REQUEST
+            "accepted" -> ACCEPTED
+            else -> Unknown(value)
+        }
+    }
+}
+
+object ChatBskyConvoDefsConvoStatusSerializer : kotlinx.serialization.KSerializer<ChatBskyConvoDefsConvoStatus> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("ChatBskyConvoDefsConvoStatus", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ChatBskyConvoDefsConvoStatus) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ChatBskyConvoDefsConvoStatus =
+        ChatBskyConvoDefsConvoStatus.fromValue(decoder.decodeString())
+}
 
     @Serializable
     data class ChatBskyConvoDefsConvoRef(

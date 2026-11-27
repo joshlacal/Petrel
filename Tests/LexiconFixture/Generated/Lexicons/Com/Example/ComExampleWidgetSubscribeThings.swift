@@ -16,6 +16,7 @@ public enum ComExampleWidgetSubscribeThings {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             seq: Int,
@@ -25,6 +26,7 @@ public enum ComExampleWidgetSubscribeThings {
             self.seq = seq
             self.gadget = gadget
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -32,6 +34,7 @@ public enum ComExampleWidgetSubscribeThings {
             seq = try container.decode(Int.self, forKey: .seq)
             gadget = try container.decode(ComExampleWidgetDefs.GadgetRef.self, forKey: .gadget)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -39,6 +42,7 @@ public enum ComExampleWidgetSubscribeThings {
             try container.encode(seq, forKey: .seq)
             try container.encode(gadget, forKey: .gadget)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -68,7 +72,7 @@ public enum ComExampleWidgetSubscribeThings {
             map = map.adding(key: "seq", value: seqValue)
             let gadgetValue = try gadget.toCBORValue()
             map = map.adding(key: "gadget", value: gadgetValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "seq", "gadget"]
@@ -86,6 +90,7 @@ public enum ComExampleWidgetSubscribeThings {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             seq: Int,
@@ -93,18 +98,21 @@ public enum ComExampleWidgetSubscribeThings {
         ) {
             self.seq = seq
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             seq = try container.decode(Int.self, forKey: .seq)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(seq, forKey: .seq)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -128,7 +136,7 @@ public enum ComExampleWidgetSubscribeThings {
             var map = OrderedCBORMap()
             let seqValue = try seq.toCBORValue()
             map = map.adding(key: "seq", value: seqValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "seq"]

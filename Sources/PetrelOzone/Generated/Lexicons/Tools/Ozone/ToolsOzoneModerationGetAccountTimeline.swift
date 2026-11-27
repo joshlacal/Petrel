@@ -16,6 +16,7 @@ public enum ToolsOzoneModerationGetAccountTimeline {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             day: String,
@@ -25,6 +26,7 @@ public enum ToolsOzoneModerationGetAccountTimeline {
             self.day = day
             self.summary = summary
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -32,6 +34,7 @@ public enum ToolsOzoneModerationGetAccountTimeline {
             day = try container.decode(String.self, forKey: .day)
             summary = try container.decode([TimelineItemSummary].self, forKey: .summary)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -39,6 +42,7 @@ public enum ToolsOzoneModerationGetAccountTimeline {
             try container.encode(day, forKey: .day)
             try container.encode(summary, forKey: .summary)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -68,7 +72,7 @@ public enum ToolsOzoneModerationGetAccountTimeline {
             map = map.adding(key: "day", value: dayValue)
             let summaryValue = try summary.toCBORValue()
             map = map.adding(key: "summary", value: summaryValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "day", "summary"]
@@ -88,6 +92,7 @@ public enum ToolsOzoneModerationGetAccountTimeline {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             eventSubjectType: String,
@@ -99,6 +104,7 @@ public enum ToolsOzoneModerationGetAccountTimeline {
             self.eventType = eventType
             self.count = count
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -107,6 +113,7 @@ public enum ToolsOzoneModerationGetAccountTimeline {
             eventType = try container.decode(String.self, forKey: .eventType)
             count = try container.decode(Int.self, forKey: .count)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -115,6 +122,7 @@ public enum ToolsOzoneModerationGetAccountTimeline {
             try container.encode(eventType, forKey: .eventType)
             try container.encode(count, forKey: .count)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -150,7 +158,7 @@ public enum ToolsOzoneModerationGetAccountTimeline {
             map = map.adding(key: "eventType", value: eventTypeValue)
             let countValue = try count.toCBORValue()
             map = map.adding(key: "count", value: countValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "eventSubjectType", "eventType", "count"]

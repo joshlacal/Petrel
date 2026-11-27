@@ -16,6 +16,7 @@ public enum ChatBskyModerationGetActorMetadata {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             messagesSent: Int,
@@ -29,6 +30,7 @@ public enum ChatBskyModerationGetActorMetadata {
             self.convos = convos
             self.convosStarted = convosStarted
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -38,6 +40,7 @@ public enum ChatBskyModerationGetActorMetadata {
             convos = try container.decode(Int.self, forKey: .convos)
             convosStarted = try container.decode(Int.self, forKey: .convosStarted)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -47,6 +50,7 @@ public enum ChatBskyModerationGetActorMetadata {
             try container.encode(convos, forKey: .convos)
             try container.encode(convosStarted, forKey: .convosStarted)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -88,7 +92,7 @@ public enum ChatBskyModerationGetActorMetadata {
             map = map.adding(key: "convos", value: convosValue)
             let convosStartedValue = try convosStarted.toCBORValue()
             map = map.adding(key: "convosStarted", value: convosStartedValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "messagesSent", "messagesReceived", "convos", "convosStarted"]

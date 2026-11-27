@@ -16,6 +16,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             items: [ArticleItem],
@@ -25,6 +26,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             self.items = items
             self.recIdStr = recIdStr
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -45,6 +47,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 malformedFields.insert("recIdStr")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -52,6 +55,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             try container.encode(items, forKey: .items)
             try container.encodeIfPresent(recIdStr, forKey: .recIdStr)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -87,7 +91,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 let recIdStrValue = try value.toCBORValue()
                 map = map.adding(key: "recIdStr", value: recIdStrValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "items", "recIdStr"]
@@ -117,6 +121,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             items: [PublicationItem],
@@ -126,6 +131,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             self.items = items
             self.recIdStr = recIdStr
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -146,6 +152,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 malformedFields.insert("recIdStr")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -153,6 +160,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             try container.encode(items, forKey: .items)
             try container.encodeIfPresent(recIdStr, forKey: .recIdStr)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -188,7 +196,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 let recIdStrValue = try value.toCBORValue()
                 map = map.adding(key: "recIdStr", value: recIdStrValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "items", "recIdStr"]
@@ -218,6 +226,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             items: [GalleryItem],
@@ -227,6 +236,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             self.items = items
             self.recIdStr = recIdStr
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -247,6 +257,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 malformedFields.insert("recIdStr")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -254,6 +265,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             try container.encode(items, forKey: .items)
             try container.encodeIfPresent(recIdStr, forKey: .recIdStr)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -289,7 +301,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 let recIdStrValue = try value.toCBORValue()
                 map = map.adding(key: "recIdStr", value: recIdStrValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "items", "recIdStr"]
@@ -319,6 +331,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             items: [LivestreamItem],
@@ -328,6 +341,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             self.items = items
             self.recIdStr = recIdStr
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -348,6 +362,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 malformedFields.insert("recIdStr")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -355,6 +370,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             try container.encode(items, forKey: .items)
             try container.encodeIfPresent(recIdStr, forKey: .recIdStr)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -390,7 +406,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 let recIdStrValue = try value.toCBORValue()
                 map = map.adding(key: "recIdStr", value: recIdStrValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "items", "recIdStr"]
@@ -419,6 +435,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             featured: Bool,
@@ -428,6 +445,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             self.featured = featured
             self.view = view
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -435,6 +453,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             featured = try container.decode(Bool.self, forKey: .featured)
             view = try container.decode(AppBskyEmbedExternal.ViewArticle.self, forKey: .view)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -442,6 +461,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             try container.encode(featured, forKey: .featured)
             try container.encode(view, forKey: .view)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -471,7 +491,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             map = map.adding(key: "featured", value: featuredValue)
             let viewValue = try view.toCBORValue()
             map = map.adding(key: "view", value: viewValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "featured", "view"]
@@ -490,6 +510,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             featured: Bool,
@@ -499,6 +520,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             self.featured = featured
             self.view = view
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -506,6 +528,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             featured = try container.decode(Bool.self, forKey: .featured)
             view = try container.decode(AppBskyEmbedExternal.ViewArticlePublication.self, forKey: .view)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -513,6 +536,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             try container.encode(featured, forKey: .featured)
             try container.encode(view, forKey: .view)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -542,7 +566,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             map = map.adding(key: "featured", value: featuredValue)
             let viewValue = try view.toCBORValue()
             map = map.adding(key: "view", value: viewValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "featured", "view"]
@@ -561,6 +585,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             featured: Bool,
@@ -570,6 +595,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             self.featured = featured
             self.view = view
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -577,6 +603,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             featured = try container.decode(Bool.self, forKey: .featured)
             view = try container.decode(AppBskyEmbedExternal.ViewGallery.self, forKey: .view)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -584,6 +611,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             try container.encode(featured, forKey: .featured)
             try container.encode(view, forKey: .view)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -613,7 +641,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             map = map.adding(key: "featured", value: featuredValue)
             let viewValue = try view.toCBORValue()
             map = map.adding(key: "view", value: viewValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "featured", "view"]
@@ -632,6 +660,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             featured: Bool,
@@ -641,6 +670,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             self.featured = featured
             self.view = view
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -648,6 +678,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             featured = try container.decode(Bool.self, forKey: .featured)
             view = try container.decode(AppBskyEmbedExternal.ViewLivestream.self, forKey: .view)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -655,6 +686,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             try container.encode(featured, forKey: .featured)
             try container.encode(view, forKey: .view)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -684,7 +716,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             map = map.adding(key: "featured", value: featuredValue)
             let viewValue = try view.toCBORValue()
             map = map.adding(key: "view", value: viewValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "featured", "view"]
@@ -708,6 +740,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             id: String? = nil,
@@ -727,6 +760,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             self.overlayColor = overlayColor
             self.textColor = textColor
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -818,6 +852,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 malformedFields.insert("textColor")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -830,6 +865,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             try container.encodeIfPresent(overlayColor, forKey: .overlayColor)
             try container.encodeIfPresent(textColor, forKey: .textColor)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -931,7 +967,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 let textColorValue = try value.toCBORValue()
                 map = map.adding(key: "textColor", value: textColorValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "id", "title", "description", "url", "image", "overlayColor", "textColor"]
@@ -977,6 +1013,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             id: String? = nil,
@@ -1000,6 +1037,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             self.url = url
             self.category = category
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1115,6 +1153,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 malformedFields.insert("category")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1129,6 +1168,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             try container.encodeIfPresent(url, forKey: .url)
             try container.encodeIfPresent(category, forKey: .category)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1254,7 +1294,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 let categoryValue = try value.toCBORValue()
                 map = map.adding(key: "category", value: categoryValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "id", "title", "description", "logo", "backgroundImage", "overlayColor", "textColor", "url", "category"]

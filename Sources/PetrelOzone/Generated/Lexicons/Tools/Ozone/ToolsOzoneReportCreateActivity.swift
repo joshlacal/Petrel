@@ -194,22 +194,22 @@ public enum ToolsOzoneReportCreateActivity {
 
             switch typeValue {
             case "tools.ozone.report.defs#queueActivity":
-                let value = try ToolsOzoneReportDefs.QueueActivity(from: decoder)
+                let value = try ToolsOzoneReportDefs.QueueActivity(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneReportDefsQueueActivity(value)
             case "tools.ozone.report.defs#assignmentActivity":
-                let value = try ToolsOzoneReportDefs.AssignmentActivity(from: decoder)
+                let value = try ToolsOzoneReportDefs.AssignmentActivity(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneReportDefsAssignmentActivity(value)
             case "tools.ozone.report.defs#escalationActivity":
-                let value = try ToolsOzoneReportDefs.EscalationActivity(from: decoder)
+                let value = try ToolsOzoneReportDefs.EscalationActivity(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneReportDefsEscalationActivity(value)
             case "tools.ozone.report.defs#closeActivity":
-                let value = try ToolsOzoneReportDefs.CloseActivity(from: decoder)
+                let value = try ToolsOzoneReportDefs.CloseActivity(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneReportDefsCloseActivity(value)
             case "tools.ozone.report.defs#reopenActivity":
-                let value = try ToolsOzoneReportDefs.ReopenActivity(from: decoder)
+                let value = try ToolsOzoneReportDefs.ReopenActivity(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneReportDefsReopenActivity(value)
             case "tools.ozone.report.defs#noteActivity":
-                let value = try ToolsOzoneReportDefs.NoteActivity(from: decoder)
+                let value = try ToolsOzoneReportDefs.NoteActivity(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneReportDefsNoteActivity(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -222,23 +222,23 @@ public enum ToolsOzoneReportCreateActivity {
 
             switch self {
             case let .toolsOzoneReportDefsQueueActivity(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.report.defs#queueActivity", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneReportDefsAssignmentActivity(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.report.defs#assignmentActivity", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneReportDefsEscalationActivity(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.report.defs#escalationActivity", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneReportDefsCloseActivity(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.report.defs#closeActivity", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneReportDefsReopenActivity(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.report.defs#reopenActivity", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneReportDefsNoteActivity(value):
-                try container.encode("tools.ozone.report.defs#noteActivity", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("tools.ozone.report.defs#noteActivity", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

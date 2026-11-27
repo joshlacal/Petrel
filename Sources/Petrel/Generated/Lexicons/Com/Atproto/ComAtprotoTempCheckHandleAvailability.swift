@@ -14,20 +14,24 @@ public enum ComAtprotoTempCheckHandleAvailability {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             _ = encoder.container(keyedBy: CodingKeys.self)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -45,7 +49,7 @@ public enum ComAtprotoTempCheckHandleAvailability {
 
         public func toCBORValue() throws -> Any {
             let map = OrderedCBORMap()
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type"]
@@ -62,6 +66,7 @@ public enum ComAtprotoTempCheckHandleAvailability {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             suggestions: [Suggestion],
@@ -69,18 +74,21 @@ public enum ComAtprotoTempCheckHandleAvailability {
         ) {
             self.suggestions = suggestions
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             suggestions = try container.decode([Suggestion].self, forKey: .suggestions)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(suggestions, forKey: .suggestions)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -104,7 +112,7 @@ public enum ComAtprotoTempCheckHandleAvailability {
             var map = OrderedCBORMap()
             let suggestionsValue = try suggestions.toCBORValue()
             map = map.adding(key: "suggestions", value: suggestionsValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "suggestions"]
@@ -123,6 +131,7 @@ public enum ComAtprotoTempCheckHandleAvailability {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             handle: Handle,
@@ -132,6 +141,7 @@ public enum ComAtprotoTempCheckHandleAvailability {
             self.handle = handle
             self.method = method
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -139,6 +149,7 @@ public enum ComAtprotoTempCheckHandleAvailability {
             handle = try container.decode(Handle.self, forKey: .handle)
             method = try container.decode(String.self, forKey: .method)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -146,6 +157,7 @@ public enum ComAtprotoTempCheckHandleAvailability {
             try container.encode(handle, forKey: .handle)
             try container.encode(method, forKey: .method)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -175,7 +187,7 @@ public enum ComAtprotoTempCheckHandleAvailability {
             map = map.adding(key: "handle", value: handleValue)
             let methodValue = try method.toCBORValue()
             map = map.adding(key: "method", value: methodValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "handle", "method"]
@@ -274,10 +286,10 @@ public enum ComAtprotoTempCheckHandleAvailability {
 
             switch typeValue {
             case "com.atproto.temp.checkHandleAvailability#resultAvailable":
-                let value = try ComAtprotoTempCheckHandleAvailability.ResultAvailable(from: decoder)
+                let value = try ComAtprotoTempCheckHandleAvailability.ResultAvailable(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoTempCheckHandleAvailabilityResultAvailable(value)
             case "com.atproto.temp.checkHandleAvailability#resultUnavailable":
-                let value = try ComAtprotoTempCheckHandleAvailability.ResultUnavailable(from: decoder)
+                let value = try ComAtprotoTempCheckHandleAvailability.ResultUnavailable(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoTempCheckHandleAvailabilityResultUnavailable(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -290,11 +302,11 @@ public enum ComAtprotoTempCheckHandleAvailability {
 
             switch self {
             case let .comAtprotoTempCheckHandleAvailabilityResultAvailable(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.temp.checkHandleAvailability#resultAvailable", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoTempCheckHandleAvailabilityResultUnavailable(value):
-                try container.encode("com.atproto.temp.checkHandleAvailability#resultUnavailable", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.temp.checkHandleAvailability#resultUnavailable", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

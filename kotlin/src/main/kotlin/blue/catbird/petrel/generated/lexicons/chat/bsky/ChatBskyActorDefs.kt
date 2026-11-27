@@ -121,12 +121,51 @@ object ChatBskyActorDefsProfileViewBasicKindUnionSerializer : kotlinx.serializat
     }
 }
 
-@Serializable
-enum class ChatBskyActorDefsMemberRole {
-    @SerialName("owner")
-    OWNER,
-    @SerialName("standard")
-    STANDARD}
+/**
+ * A Lexicon `knownValues` string. The Lexicon names the values it knows, but a peer
+ * can send any other: such a value decodes as [Unknown] and is written back unchanged,
+ * instead of failing the object that holds it. Values are equal when their wire
+ * strings are.
+ */
+@Serializable(with = ChatBskyActorDefsMemberRoleSerializer::class)
+sealed class ChatBskyActorDefsMemberRole(val value: String) {
+    object OWNER : ChatBskyActorDefsMemberRole("owner")
+    object STANDARD : ChatBskyActorDefsMemberRole("standard")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : ChatBskyActorDefsMemberRole(value)
+
+    override fun equals(other: Any?): Boolean = other is ChatBskyActorDefsMemberRole && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<ChatBskyActorDefsMemberRole> by lazy {
+            listOf(OWNER, STANDARD)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): ChatBskyActorDefsMemberRole = when (value) {
+            "owner" -> OWNER
+            "standard" -> STANDARD
+            else -> Unknown(value)
+        }
+    }
+}
+
+object ChatBskyActorDefsMemberRoleSerializer : kotlinx.serialization.KSerializer<ChatBskyActorDefsMemberRole> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("ChatBskyActorDefsMemberRole", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ChatBskyActorDefsMemberRole) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ChatBskyActorDefsMemberRole =
+        ChatBskyActorDefsMemberRole.fromValue(decoder.decodeString())
+}
 
     @Serializable
     data class ChatBskyActorDefsProfileViewBasic(

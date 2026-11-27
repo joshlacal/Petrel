@@ -12,6 +12,7 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
     /// Wire fields this Lexicon revision does not declare. They are kept on decode and
     /// written back on encode, so re-serializing data never drops them.
     public let extraFields: [String: ATProtocolValueContainer]
+    private let wireTypeTag: String?
 
     public init(
         items: [AppBskyEmbedGalleryItemsUnion],
@@ -19,18 +20,21 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
     ) {
         self.items = items
         self.extraFields = extraFields
+        wireTypeTag = nil
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         items = try container.decode([AppBskyEmbedGalleryItemsUnion].self, forKey: .items)
         extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+        wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(items, forKey: .items)
         try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+        try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -54,7 +58,7 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
         var map = OrderedCBORMap()
         let itemsValue = try items.toCBORValue()
         map = map.adding(key: "items", value: itemsValue)
-        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+        return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
     }
 
     private static let knownFieldKeys: Swift.Set<String> = ["$type", "items"]
@@ -73,6 +77,7 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             image: Blob,
@@ -84,6 +89,7 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
             self.alt = alt
             self.aspectRatio = aspectRatio
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -92,6 +98,7 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
             alt = try container.decode(String.self, forKey: .alt)
             aspectRatio = try container.decode(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -100,6 +107,7 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
             try container.encode(alt, forKey: .alt)
             try container.encode(aspectRatio, forKey: .aspectRatio)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -135,7 +143,7 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
             map = map.adding(key: "alt", value: altValue)
             let aspectRatioValue = try aspectRatio.toCBORValue()
             map = map.adding(key: "aspectRatio", value: aspectRatioValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "image", "alt", "aspectRatio"]
@@ -154,6 +162,7 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             items: [ViewItemsUnion],
@@ -161,18 +170,21 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
         ) {
             self.items = items
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             items = try container.decode([ViewItemsUnion].self, forKey: .items)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(items, forKey: .items)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -196,7 +208,7 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
             var map = OrderedCBORMap()
             let itemsValue = try items.toCBORValue()
             map = map.adding(key: "items", value: itemsValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "items"]
@@ -219,6 +231,7 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             thumbnail: URI,
@@ -232,6 +245,7 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
             self.alt = alt
             self.aspectRatio = aspectRatio
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -241,6 +255,7 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
             alt = try container.decode(String.self, forKey: .alt)
             aspectRatio = try container.decode(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -250,6 +265,7 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
             try container.encode(alt, forKey: .alt)
             try container.encode(aspectRatio, forKey: .aspectRatio)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -291,7 +307,7 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
             map = map.adding(key: "alt", value: altValue)
             let aspectRatioValue = try aspectRatio.toCBORValue()
             map = map.adding(key: "aspectRatio", value: aspectRatioValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "thumbnail", "fullsize", "alt", "aspectRatio"]
@@ -319,7 +335,7 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "app.bsky.embed.gallery#image":
-                let value = try AppBskyEmbedGallery.Image(from: decoder)
+                let value = try AppBskyEmbedGallery.Image(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedGalleryImage(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -332,8 +348,8 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .appBskyEmbedGalleryImage(value):
-                try container.encode("app.bsky.embed.gallery#image", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.embed.gallery#image", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -417,7 +433,7 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "app.bsky.embed.gallery#viewImage":
-                let value = try AppBskyEmbedGallery.ViewImage(from: decoder)
+                let value = try AppBskyEmbedGallery.ViewImage(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedGalleryViewImage(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -430,8 +446,8 @@ public struct AppBskyEmbedGallery: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .appBskyEmbedGalleryViewImage(value):
-                try container.encode("app.bsky.embed.gallery#viewImage", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.embed.gallery#viewImage", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

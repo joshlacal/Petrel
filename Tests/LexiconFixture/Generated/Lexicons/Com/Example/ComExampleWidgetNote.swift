@@ -238,10 +238,10 @@ public struct ComExampleWidgetNote: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "com.example.widget.defs#gadget":
-                let value = try ComExampleWidgetDefs.Gadget(from: decoder)
+                let value = try ComExampleWidgetDefs.Gadget(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comExampleWidgetDefsGadget(value)
             case "com.example.widget.defs#gadgetRef":
-                let value = try ComExampleWidgetDefs.GadgetRef(from: decoder)
+                let value = try ComExampleWidgetDefs.GadgetRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comExampleWidgetDefsGadgetRef(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -254,11 +254,11 @@ public struct ComExampleWidgetNote: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .comExampleWidgetDefsGadget(value):
+                try value.encode(to: encoder)
                 try container.encode("com.example.widget.defs#gadget", forKey: .type)
-                try value.encode(to: encoder)
             case let .comExampleWidgetDefsGadgetRef(value):
-                try container.encode("com.example.widget.defs#gadgetRef", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.example.widget.defs#gadgetRef", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

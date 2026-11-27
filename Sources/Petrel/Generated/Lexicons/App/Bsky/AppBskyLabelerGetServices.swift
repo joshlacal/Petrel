@@ -71,10 +71,10 @@ public enum AppBskyLabelerGetServices {
 
             switch typeValue {
             case "app.bsky.labeler.defs#labelerView":
-                let value = try AppBskyLabelerDefs.LabelerView(from: decoder)
+                let value = try AppBskyLabelerDefs.LabelerView(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyLabelerDefsLabelerView(value)
             case "app.bsky.labeler.defs#labelerViewDetailed":
-                let value = try AppBskyLabelerDefs.LabelerViewDetailed(from: decoder)
+                let value = try AppBskyLabelerDefs.LabelerViewDetailed(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyLabelerDefsLabelerViewDetailed(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -87,11 +87,11 @@ public enum AppBskyLabelerGetServices {
 
             switch self {
             case let .appBskyLabelerDefsLabelerView(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.labeler.defs#labelerView", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyLabelerDefsLabelerViewDetailed(value):
-                try container.encode("app.bsky.labeler.defs#labelerViewDetailed", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.labeler.defs#labelerViewDetailed", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

@@ -879,6 +879,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             did: DID? = nil,
@@ -906,6 +907,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
             self.tid = tid
             self.recordkey = recordkey
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1045,6 +1047,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
                 malformedFields.insert("recordkey")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1061,6 +1064,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
             try container.encodeIfPresent(tid, forKey: .tid)
             try container.encodeIfPresent(recordkey, forKey: .recordkey)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1210,7 +1214,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
                 let recordkeyValue = try value.toCBORValue()
                 map = map.adding(key: "recordkey", value: recordkeyValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "did", "handle", "atidentifier", "nsid", "aturi", "cid", "datetime", "language", "uri", "tid", "recordkey"]
@@ -1258,6 +1262,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             a: Int? = nil,
@@ -1267,6 +1272,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
             self.a = a
             self.b = b
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1298,6 +1304,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
                 malformedFields.insert("b")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1305,6 +1312,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
             try container.encodeIfPresent(a, forKey: .a)
             try container.encodeIfPresent(b, forKey: .b)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1346,7 +1354,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
                 let bValue = try value.toCBORValue()
                 map = map.adding(key: "b", value: bValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "a", "b"]
@@ -1376,6 +1384,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             c: Int? = nil,
@@ -1385,6 +1394,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
             self.c = c
             self.d = d
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1416,6 +1426,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
                 malformedFields.insert("d")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1423,6 +1434,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
             try container.encodeIfPresent(c, forKey: .c)
             try container.encodeIfPresent(d, forKey: .d)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1464,7 +1476,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
                 let dValue = try value.toCBORValue()
                 map = map.adding(key: "d", value: dValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "c", "d"]
@@ -1492,6 +1504,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             a: Int? = nil,
@@ -1501,6 +1514,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
             self.a = a
             self.b = b
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1532,6 +1546,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
                 malformedFields.insert("b")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1539,6 +1554,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
             try container.encodeIfPresent(a, forKey: .a)
             try container.encodeIfPresent(b, forKey: .b)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1580,7 +1596,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
                 let bValue = try value.toCBORValue()
                 map = map.adding(key: "b", value: bValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "a", "b"]
@@ -1621,10 +1637,10 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "example.lexicon.record#demoObject":
-                let value = try ExampleLexiconRecord.DemoObject(from: decoder)
+                let value = try ExampleLexiconRecord.DemoObject(from: ATProtoUnionMemberDecoder(decoder))
                 self = .exampleLexiconRecordDemoObject(value)
             case "example.lexicon.record#demoObjectTwo":
-                let value = try ExampleLexiconRecord.DemoObjectTwo(from: decoder)
+                let value = try ExampleLexiconRecord.DemoObjectTwo(from: ATProtoUnionMemberDecoder(decoder))
                 self = .exampleLexiconRecordDemoObjectTwo(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -1637,11 +1653,11 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .exampleLexiconRecordDemoObject(value):
+                try value.encode(to: encoder)
                 try container.encode("example.lexicon.record#demoObject", forKey: .type)
-                try value.encode(to: encoder)
             case let .exampleLexiconRecordDemoObjectTwo(value):
-                try container.encode("example.lexicon.record#demoObjectTwo", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("example.lexicon.record#demoObjectTwo", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -1735,10 +1751,59 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-    public enum ExampleLexiconRecordEnumString: String, Codable, ATProtocolCodable, ATProtocolValue, Sendable {
-        case value_fish = "fish"
-        case value_tree = "tree"
-        case value_rock = "rock"
+    /// A Lexicon `enum` string. The Lexicon lists every value, but a newer peer can add one
+    /// before this build knows it: such a value decodes as `.unknown` and is written back
+    /// unchanged, instead of failing the object that holds it.
+    public enum ExampleLexiconRecordEnumString: RawRepresentable, Codable, Hashable, ATProtocolCodable, ATProtocolValue, Sendable {
+        case value_fish
+        case value_tree
+        case value_rock
+        /// A value this build does not know (a newer peer added it), kept verbatim.
+        case unknown(String)
+
+        /// Never returns `nil`: a value this build does not know is `.unknown`. The
+        /// initializer stays failable to keep the shape of `RawRepresentable`.
+        public init?(rawValue: String) {
+            self = Self.parse(rawValue)
+        }
+
+        public var rawValue: String {
+            switch self {
+            case .value_fish: return "fish"
+            case .value_tree: return "tree"
+            case .value_rock: return "rock"
+            case let .unknown(value): return value
+            }
+        }
+
+        private static func parse(_ value: String) -> Self {
+            switch value {
+            case "fish": return .value_fish
+            case "tree": return .value_tree
+            case "rock": return .value_rock
+            default: return .unknown(value)
+            }
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            self = try Self.parse(container.decode(String.self))
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
+
+        /// Values are equal when their wire strings are, so `.unknown` holding a known
+        /// value equals that value's case.
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.rawValue == rhs.rawValue
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(rawValue)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let otherValue = other as? ExampleLexiconRecordEnumString else { return false }
@@ -1762,7 +1827,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "example.lexicon.record#demoObject":
-                let value = try ExampleLexiconRecord.DemoObject(from: decoder)
+                let value = try ExampleLexiconRecord.DemoObject(from: ATProtoUnionMemberDecoder(decoder))
                 self = .exampleLexiconRecordDemoObject(value)
             default:
                 throw DecodingError.dataCorruptedError(
@@ -1778,8 +1843,8 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .exampleLexiconRecordDemoObject(value):
-                try container.encode("example.lexicon.record#demoObject", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("example.lexicon.record#demoObject", forKey: .type)
             }
         }
 

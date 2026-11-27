@@ -14,20 +14,24 @@ public enum ComAtprotoSpaceNotifySpaceUpdate {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             _ = encoder.container(keyedBy: CodingKeys.self)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -45,7 +49,7 @@ public enum ComAtprotoSpaceNotifySpaceUpdate {
 
         public func toCBORValue() throws -> Any {
             let map = OrderedCBORMap()
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type"]
@@ -61,6 +65,7 @@ public enum ComAtprotoSpaceNotifySpaceUpdate {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             spaceRev: TID,
@@ -68,18 +73,21 @@ public enum ComAtprotoSpaceNotifySpaceUpdate {
         ) {
             self.spaceRev = spaceRev
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             spaceRev = try container.decode(TID.self, forKey: .spaceRev)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(spaceRev, forKey: .spaceRev)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -103,7 +111,7 @@ public enum ComAtprotoSpaceNotifySpaceUpdate {
             var map = OrderedCBORMap()
             let spaceRevValue = try spaceRev.toCBORValue()
             map = map.adding(key: "spaceRev", value: spaceRevValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "spaceRev"]
@@ -212,16 +220,16 @@ public enum ComAtprotoSpaceNotifySpaceUpdate {
 
             switch typeValue {
             case "com.atproto.space.defs#repoWrite":
-                let value = try ComAtprotoSpaceDefs.RepoWrite(from: decoder)
+                let value = try ComAtprotoSpaceDefs.RepoWrite(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoSpaceDefsRepoWrite(value)
             case "com.atproto.space.defs#repoRemoved":
-                let value = try ComAtprotoSpaceDefs.RepoRemoved(from: decoder)
+                let value = try ComAtprotoSpaceDefs.RepoRemoved(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoSpaceDefsRepoRemoved(value)
             case "com.atproto.space.notifySpaceUpdate#spaceDeleted":
-                let value = try ComAtprotoSpaceNotifySpaceUpdate.SpaceDeleted(from: decoder)
+                let value = try ComAtprotoSpaceNotifySpaceUpdate.SpaceDeleted(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoSpaceNotifySpaceUpdateSpaceDeleted(value)
             case "com.atproto.space.notifySpaceUpdate#registrationExpired":
-                let value = try ComAtprotoSpaceNotifySpaceUpdate.RegistrationExpired(from: decoder)
+                let value = try ComAtprotoSpaceNotifySpaceUpdate.RegistrationExpired(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoSpaceNotifySpaceUpdateRegistrationExpired(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -234,17 +242,17 @@ public enum ComAtprotoSpaceNotifySpaceUpdate {
 
             switch self {
             case let .comAtprotoSpaceDefsRepoWrite(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.space.defs#repoWrite", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoSpaceDefsRepoRemoved(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.space.defs#repoRemoved", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoSpaceNotifySpaceUpdateSpaceDeleted(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.space.notifySpaceUpdate#spaceDeleted", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoSpaceNotifySpaceUpdateRegistrationExpired(value):
-                try container.encode("com.atproto.space.notifySpaceUpdate#registrationExpired", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.space.notifySpaceUpdate#registrationExpired", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

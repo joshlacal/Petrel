@@ -130,13 +130,13 @@ public enum ChatBskyConvoGetMessages {
 
             switch typeValue {
             case "chat.bsky.convo.defs#messageView":
-                let value = try ChatBskyConvoDefs.MessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.MessageView(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsMessageView(value)
             case "chat.bsky.convo.defs#deletedMessageView":
-                let value = try ChatBskyConvoDefs.DeletedMessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.DeletedMessageView(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsDeletedMessageView(value)
             case "chat.bsky.convo.defs#systemMessageView":
-                let value = try ChatBskyConvoDefs.SystemMessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageView(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsSystemMessageView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -149,14 +149,14 @@ public enum ChatBskyConvoGetMessages {
 
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#messageView", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsDeletedMessageView(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#deletedMessageView", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsSystemMessageView(value):
-                try container.encode("chat.bsky.convo.defs#systemMessageView", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("chat.bsky.convo.defs#systemMessageView", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

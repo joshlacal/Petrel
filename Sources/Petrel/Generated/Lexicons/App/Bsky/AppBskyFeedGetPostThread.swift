@@ -110,13 +110,13 @@ public enum AppBskyFeedGetPostThread {
 
             switch typeValue {
             case "app.bsky.feed.defs#threadViewPost":
-                let value = try AppBskyFeedDefs.ThreadViewPost(from: decoder)
+                let value = try AppBskyFeedDefs.ThreadViewPost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsThreadViewPost(value)
             case "app.bsky.feed.defs#notFoundPost":
-                let value = try AppBskyFeedDefs.NotFoundPost(from: decoder)
+                let value = try AppBskyFeedDefs.NotFoundPost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsNotFoundPost(value)
             case "app.bsky.feed.defs#blockedPost":
-                let value = try AppBskyFeedDefs.BlockedPost(from: decoder)
+                let value = try AppBskyFeedDefs.BlockedPost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsBlockedPost(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -129,14 +129,14 @@ public enum AppBskyFeedGetPostThread {
 
             switch self {
             case let .appBskyFeedDefsThreadViewPost(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.feed.defs#threadViewPost", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyFeedDefsNotFoundPost(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.feed.defs#notFoundPost", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyFeedDefsBlockedPost(value):
-                try container.encode("app.bsky.feed.defs#blockedPost", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.feed.defs#blockedPost", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

@@ -163,20 +163,24 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             _ = encoder.container(keyedBy: CodingKeys.self)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -194,7 +198,7 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             let map = OrderedCBORMap()
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type"]
@@ -217,7 +221,7 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "app.bsky.feed.postgate#disableRule":
-                let value = try AppBskyFeedPostgate.DisableRule(from: decoder)
+                let value = try AppBskyFeedPostgate.DisableRule(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedPostgateDisableRule(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -230,8 +234,8 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .appBskyFeedPostgateDisableRule(value):
-                try container.encode("app.bsky.feed.postgate#disableRule", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.feed.postgate#disableRule", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

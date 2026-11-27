@@ -31,6 +31,7 @@ public enum ComAtprotoLabelDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             ver: Int? = nil,
@@ -54,6 +55,7 @@ public enum ComAtprotoLabelDefs {
             self.exp = exp
             self.sig = sig
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -125,6 +127,7 @@ public enum ComAtprotoLabelDefs {
                 malformedFields.insert("sig")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -139,6 +142,7 @@ public enum ComAtprotoLabelDefs {
             try container.encodeIfPresent(exp, forKey: .exp)
             try container.encodeIfPresent(sig, forKey: .sig)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -240,7 +244,7 @@ public enum ComAtprotoLabelDefs {
                 let sigValue = try value.toCBORValue()
                 map = map.adding(key: "sig", value: sigValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "ver", "src", "uri", "cid", "val", "neg", "cts", "exp", "sig"]
@@ -283,6 +287,7 @@ public enum ComAtprotoLabelDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             values: [SelfLabel],
@@ -290,18 +295,21 @@ public enum ComAtprotoLabelDefs {
         ) {
             self.values = values
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             values = try container.decode([SelfLabel].self, forKey: .values)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(values, forKey: .values)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -325,7 +333,7 @@ public enum ComAtprotoLabelDefs {
             var map = OrderedCBORMap()
             let valuesValue = try values.toCBORValue()
             map = map.adding(key: "values", value: valuesValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "values"]
@@ -344,6 +352,7 @@ public enum ComAtprotoLabelDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             val: String,
@@ -351,18 +360,21 @@ public enum ComAtprotoLabelDefs {
         ) {
             self.val = val
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             val = try container.decode(String.self, forKey: .val)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(val, forKey: .val)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -386,7 +398,7 @@ public enum ComAtprotoLabelDefs {
             var map = OrderedCBORMap()
             let valValue = try val.toCBORValue()
             map = map.adding(key: "val", value: valValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "val"]
@@ -414,6 +426,7 @@ public enum ComAtprotoLabelDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             identifier: String,
@@ -431,6 +444,7 @@ public enum ComAtprotoLabelDefs {
             self.adultOnly = adultOnly
             self.locales = locales
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -466,6 +480,7 @@ public enum ComAtprotoLabelDefs {
             }
             locales = try container.decode([LabelValueDefinitionStrings].self, forKey: .locales)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -477,6 +492,7 @@ public enum ComAtprotoLabelDefs {
             try container.encodeIfPresent(adultOnly, forKey: .adultOnly)
             try container.encode(locales, forKey: .locales)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -542,7 +558,7 @@ public enum ComAtprotoLabelDefs {
             }
             let localesValue = try locales.toCBORValue()
             map = map.adding(key: "locales", value: localesValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "identifier", "severity", "blurs", "defaultSetting", "adultOnly", "locales"]
@@ -584,6 +600,7 @@ public enum ComAtprotoLabelDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             lang: LanguageCodeContainer,
@@ -595,6 +612,7 @@ public enum ComAtprotoLabelDefs {
             self.name = name
             self.description = description
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -603,6 +621,7 @@ public enum ComAtprotoLabelDefs {
             name = try container.decode(String.self, forKey: .name)
             description = try container.decode(String.self, forKey: .description)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -611,6 +630,7 @@ public enum ComAtprotoLabelDefs {
             try container.encode(name, forKey: .name)
             try container.encode(description, forKey: .description)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -646,7 +666,7 @@ public enum ComAtprotoLabelDefs {
             map = map.adding(key: "name", value: nameValue)
             let descriptionValue = try description.toCBORValue()
             map = map.adding(key: "description", value: descriptionValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "lang", "name", "description"]

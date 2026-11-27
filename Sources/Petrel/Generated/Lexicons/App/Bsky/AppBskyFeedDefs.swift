@@ -28,6 +28,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             uri: ATProtocolURI,
@@ -63,6 +64,7 @@ public enum AppBskyFeedDefs {
             self.threadgate = threadgate
             self.debug = debug
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -195,6 +197,7 @@ public enum AppBskyFeedDefs {
                 malformedFields.insert("debug")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -215,6 +218,7 @@ public enum AppBskyFeedDefs {
             try container.encodeIfPresent(threadgate, forKey: .threadgate)
             try container.encodeIfPresent(debug, forKey: .debug)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -382,7 +386,7 @@ public enum AppBskyFeedDefs {
                 let debugValue = try value.toCBORValue()
                 map = map.adding(key: "debug", value: debugValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "cid", "author", "record", "embed", "bookmarkCount", "replyCount", "repostCount", "likeCount", "quoteCount", "indexedAt", "viewer", "labels", "threadgate", "debug"]
@@ -445,6 +449,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             repost: ATProtocolURI? = nil,
@@ -466,6 +471,7 @@ public enum AppBskyFeedDefs {
             self.pinned = pinned
             self.knownLikers = knownLikers
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -569,6 +575,7 @@ public enum AppBskyFeedDefs {
                 malformedFields.insert("knownLikers")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -582,6 +589,7 @@ public enum AppBskyFeedDefs {
             try container.encodeIfPresent(pinned, forKey: .pinned)
             try container.encodeIfPresent(knownLikers, forKey: .knownLikers)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -695,7 +703,7 @@ public enum AppBskyFeedDefs {
                 let knownLikersValue = try value.toCBORValue()
                 map = map.adding(key: "knownLikers", value: knownLikersValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "repost", "like", "bookmarked", "threadMuted", "replyDisabled", "embeddingDisabled", "pinned", "knownLikers"]
@@ -737,6 +745,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             count: Int,
@@ -746,6 +755,7 @@ public enum AppBskyFeedDefs {
             self.count = count
             self.actors = actors
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -753,6 +763,7 @@ public enum AppBskyFeedDefs {
             count = try container.decode(Int.self, forKey: .count)
             actors = try container.decode([AppBskyActorDefs.ProfileViewBasic].self, forKey: .actors)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -760,6 +771,7 @@ public enum AppBskyFeedDefs {
             try container.encode(count, forKey: .count)
             try container.encode(actors, forKey: .actors)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -789,7 +801,7 @@ public enum AppBskyFeedDefs {
             map = map.adding(key: "count", value: countValue)
             let actorsValue = try actors.toCBORValue()
             map = map.adding(key: "actors", value: actorsValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "count", "actors"]
@@ -808,6 +820,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             rootAuthorLike: ATProtocolURI? = nil,
@@ -815,6 +828,7 @@ public enum AppBskyFeedDefs {
         ) {
             self.rootAuthorLike = rootAuthorLike
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -834,12 +848,14 @@ public enum AppBskyFeedDefs {
                 malformedFields.insert("rootAuthorLike")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encodeIfPresent(rootAuthorLike, forKey: .rootAuthorLike)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -869,7 +885,7 @@ public enum AppBskyFeedDefs {
                 let rootAuthorLikeValue = try value.toCBORValue()
                 map = map.adding(key: "rootAuthorLike", value: rootAuthorLikeValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "rootAuthorLike"]
@@ -905,6 +921,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             post: PostView,
@@ -924,6 +941,7 @@ public enum AppBskyFeedDefs {
             self.feedContext = feedContext
             self.reqId = reqId
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1004,6 +1022,7 @@ public enum AppBskyFeedDefs {
                 malformedFields.insert("reqId")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1016,6 +1035,7 @@ public enum AppBskyFeedDefs {
             try container.encodeIfPresent(feedContext, forKey: .feedContext)
             try container.encodeIfPresent(reqId, forKey: .reqId)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1111,7 +1131,7 @@ public enum AppBskyFeedDefs {
                 let reqIdValue = try value.toCBORValue()
                 map = map.adding(key: "reqId", value: reqIdValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "post", "reply", "opThreadPostIndex", "opThreadPostCount", "reason", "feedContext", "reqId"]
@@ -1152,6 +1172,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             root: ReplyRefRootUnion,
@@ -1163,6 +1184,7 @@ public enum AppBskyFeedDefs {
             self.parent = parent
             self.grandparentAuthor = grandparentAuthor
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1184,6 +1206,7 @@ public enum AppBskyFeedDefs {
                 malformedFields.insert("grandparentAuthor")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1192,6 +1215,7 @@ public enum AppBskyFeedDefs {
             try container.encode(parent, forKey: .parent)
             try container.encodeIfPresent(grandparentAuthor, forKey: .grandparentAuthor)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1233,7 +1257,7 @@ public enum AppBskyFeedDefs {
                 let grandparentAuthorValue = try value.toCBORValue()
                 map = map.adding(key: "grandparentAuthor", value: grandparentAuthorValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "root", "parent", "grandparentAuthor"]
@@ -1266,6 +1290,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             by: AppBskyActorDefs.ProfileViewBasic,
@@ -1279,6 +1304,7 @@ public enum AppBskyFeedDefs {
             self.cid = cid
             self.indexedAt = indexedAt
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1312,6 +1338,7 @@ public enum AppBskyFeedDefs {
             }
             indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1321,6 +1348,7 @@ public enum AppBskyFeedDefs {
             try container.encodeIfPresent(cid, forKey: .cid)
             try container.encode(indexedAt, forKey: .indexedAt)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1374,7 +1402,7 @@ public enum AppBskyFeedDefs {
             }
             let indexedAtValue = try indexedAt.toCBORValue()
             map = map.adding(key: "indexedAt", value: indexedAtValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "by", "uri", "cid", "indexedAt"]
@@ -1405,20 +1433,24 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             _ = encoder.container(keyedBy: CodingKeys.self)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1436,7 +1468,7 @@ public enum AppBskyFeedDefs {
 
         public func toCBORValue() throws -> Any {
             let map = OrderedCBORMap()
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type"]
@@ -1454,6 +1486,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             post: PostView,
@@ -1467,6 +1500,7 @@ public enum AppBskyFeedDefs {
             self.replies = replies
             self.threadContext = threadContext
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1511,6 +1545,7 @@ public enum AppBskyFeedDefs {
                 malformedFields.insert("threadContext")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1520,6 +1555,7 @@ public enum AppBskyFeedDefs {
             try container.encodeIfPresent(replies, forKey: .replies)
             try container.encodeIfPresent(threadContext, forKey: .threadContext)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1579,7 +1615,7 @@ public enum AppBskyFeedDefs {
                 let threadContextValue = try value.toCBORValue()
                 map = map.adding(key: "threadContext", value: threadContextValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "post", "parent", "replies", "threadContext"]
@@ -1612,6 +1648,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             uri: ATProtocolURI,
@@ -1621,6 +1658,7 @@ public enum AppBskyFeedDefs {
             self.uri = uri
             self.notFound = notFound
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1628,6 +1666,7 @@ public enum AppBskyFeedDefs {
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
             notFound = try container.decode(Bool.self, forKey: .notFound)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1635,6 +1674,7 @@ public enum AppBskyFeedDefs {
             try container.encode(uri, forKey: .uri)
             try container.encode(notFound, forKey: .notFound)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1664,7 +1704,7 @@ public enum AppBskyFeedDefs {
             map = map.adding(key: "uri", value: uriValue)
             let notFoundValue = try notFound.toCBORValue()
             map = map.adding(key: "notFound", value: notFoundValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "notFound"]
@@ -1684,6 +1724,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             uri: ATProtocolURI,
@@ -1695,6 +1736,7 @@ public enum AppBskyFeedDefs {
             self.blocked = blocked
             self.author = author
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1703,6 +1745,7 @@ public enum AppBskyFeedDefs {
             blocked = try container.decode(Bool.self, forKey: .blocked)
             author = try container.decode(BlockedAuthor.self, forKey: .author)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1711,6 +1754,7 @@ public enum AppBskyFeedDefs {
             try container.encode(blocked, forKey: .blocked)
             try container.encode(author, forKey: .author)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1746,7 +1790,7 @@ public enum AppBskyFeedDefs {
             map = map.adding(key: "blocked", value: blockedValue)
             let authorValue = try author.toCBORValue()
             map = map.adding(key: "author", value: authorValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "blocked", "author"]
@@ -1766,6 +1810,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             did: DID,
@@ -1775,6 +1820,7 @@ public enum AppBskyFeedDefs {
             self.did = did
             self.viewer = viewer
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1795,6 +1841,7 @@ public enum AppBskyFeedDefs {
                 malformedFields.insert("viewer")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1802,6 +1849,7 @@ public enum AppBskyFeedDefs {
             try container.encode(did, forKey: .did)
             try container.encodeIfPresent(viewer, forKey: .viewer)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1837,7 +1885,7 @@ public enum AppBskyFeedDefs {
                 let viewerValue = try value.toCBORValue()
                 map = map.adding(key: "viewer", value: viewerValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "did", "viewer"]
@@ -1878,6 +1926,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             uri: ATProtocolURI,
@@ -1911,6 +1960,7 @@ public enum AppBskyFeedDefs {
             self.contentMode = contentMode
             self.indexedAt = indexedAt
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -2020,6 +2070,7 @@ public enum AppBskyFeedDefs {
             }
             indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -2039,6 +2090,7 @@ public enum AppBskyFeedDefs {
             try container.encodeIfPresent(contentMode, forKey: .contentMode)
             try container.encode(indexedAt, forKey: .indexedAt)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2188,7 +2240,7 @@ public enum AppBskyFeedDefs {
             }
             let indexedAtValue = try indexedAt.toCBORValue()
             map = map.adding(key: "indexedAt", value: indexedAtValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "cid", "did", "creator", "displayName", "description", "descriptionFacets", "avatar", "likeCount", "acceptsInteractions", "labels", "viewer", "contentMode", "indexedAt"]
@@ -2240,6 +2292,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             like: ATProtocolURI? = nil,
@@ -2247,6 +2300,7 @@ public enum AppBskyFeedDefs {
         ) {
             self.like = like
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -2266,12 +2320,14 @@ public enum AppBskyFeedDefs {
                 malformedFields.insert("like")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encodeIfPresent(like, forKey: .like)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2301,7 +2357,7 @@ public enum AppBskyFeedDefs {
                 let likeValue = try value.toCBORValue()
                 map = map.adding(key: "like", value: likeValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "like"]
@@ -2330,6 +2386,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             post: ATProtocolURI,
@@ -2341,6 +2398,7 @@ public enum AppBskyFeedDefs {
             self.reason = reason
             self.feedContext = feedContext
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -2373,6 +2431,7 @@ public enum AppBskyFeedDefs {
                 malformedFields.insert("feedContext")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -2381,6 +2440,7 @@ public enum AppBskyFeedDefs {
             try container.encodeIfPresent(reason, forKey: .reason)
             try container.encodeIfPresent(feedContext, forKey: .feedContext)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2428,7 +2488,7 @@ public enum AppBskyFeedDefs {
                 let feedContextValue = try value.toCBORValue()
                 map = map.adding(key: "feedContext", value: feedContextValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "post", "reason", "feedContext"]
@@ -2458,6 +2518,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             repost: ATProtocolURI,
@@ -2465,18 +2526,21 @@ public enum AppBskyFeedDefs {
         ) {
             self.repost = repost
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             repost = try container.decode(ATProtocolURI.self, forKey: .repost)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(repost, forKey: .repost)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2500,7 +2564,7 @@ public enum AppBskyFeedDefs {
             var map = OrderedCBORMap()
             let repostValue = try repost.toCBORValue()
             map = map.adding(key: "repost", value: repostValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "repost"]
@@ -2516,20 +2580,24 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             _ = encoder.container(keyedBy: CodingKeys.self)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2547,7 +2615,7 @@ public enum AppBskyFeedDefs {
 
         public func toCBORValue() throws -> Any {
             let map = OrderedCBORMap()
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type"]
@@ -2565,6 +2633,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             uri: ATProtocolURI? = nil,
@@ -2578,6 +2647,7 @@ public enum AppBskyFeedDefs {
             self.record = record
             self.lists = lists
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -2633,6 +2703,7 @@ public enum AppBskyFeedDefs {
                 malformedFields.insert("lists")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -2642,6 +2713,7 @@ public enum AppBskyFeedDefs {
             try container.encodeIfPresent(record, forKey: .record)
             try container.encodeIfPresent(lists, forKey: .lists)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2707,7 +2779,7 @@ public enum AppBskyFeedDefs {
                 let listsValue = try value.toCBORValue()
                 map = map.adding(key: "lists", value: listsValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "cid", "record", "lists"]
@@ -2744,6 +2816,7 @@ public enum AppBskyFeedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             item: ATProtocolURI? = nil,
@@ -2757,6 +2830,7 @@ public enum AppBskyFeedDefs {
             self.feedContext = feedContext
             self.reqId = reqId
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -2812,6 +2886,7 @@ public enum AppBskyFeedDefs {
                 malformedFields.insert("reqId")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -2821,6 +2896,7 @@ public enum AppBskyFeedDefs {
             try container.encodeIfPresent(feedContext, forKey: .feedContext)
             try container.encodeIfPresent(reqId, forKey: .reqId)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2886,7 +2962,7 @@ public enum AppBskyFeedDefs {
                 let reqIdValue = try value.toCBORValue()
                 map = map.adding(key: "reqId", value: reqIdValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "item", "event", "feedContext", "reqId"]
@@ -2951,22 +3027,22 @@ public enum AppBskyFeedDefs {
 
             switch typeValue {
             case "app.bsky.embed.images#view":
-                let value = try AppBskyEmbedImages.View(from: decoder)
+                let value = try AppBskyEmbedImages.View(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedImagesView(value)
             case "app.bsky.embed.video#view":
-                let value = try AppBskyEmbedVideo.View(from: decoder)
+                let value = try AppBskyEmbedVideo.View(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedVideoView(value)
             case "app.bsky.embed.gallery#view":
-                let value = try AppBskyEmbedGallery.View(from: decoder)
+                let value = try AppBskyEmbedGallery.View(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedGalleryView(value)
             case "app.bsky.embed.external#view":
-                let value = try AppBskyEmbedExternal.View(from: decoder)
+                let value = try AppBskyEmbedExternal.View(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedExternalView(value)
             case "app.bsky.embed.record#view":
-                let value = try AppBskyEmbedRecord.View(from: decoder)
+                let value = try AppBskyEmbedRecord.View(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedRecordView(value)
             case "app.bsky.embed.recordWithMedia#view":
-                let value = try AppBskyEmbedRecordWithMedia.View(from: decoder)
+                let value = try AppBskyEmbedRecordWithMedia.View(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedRecordWithMediaView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -2979,23 +3055,23 @@ public enum AppBskyFeedDefs {
 
             switch self {
             case let .appBskyEmbedImagesView(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.embed.images#view", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyEmbedVideoView(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.embed.video#view", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyEmbedGalleryView(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.embed.gallery#view", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyEmbedExternalView(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.embed.external#view", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyEmbedRecordView(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.embed.record#view", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyEmbedRecordWithMediaView(value):
-                try container.encode("app.bsky.embed.recordWithMedia#view", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.embed.recordWithMedia#view", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -3209,10 +3285,10 @@ public enum AppBskyFeedDefs {
 
             switch typeValue {
             case "app.bsky.feed.defs#reasonRepost":
-                let value = try AppBskyFeedDefs.ReasonRepost(from: decoder)
+                let value = try AppBskyFeedDefs.ReasonRepost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsReasonRepost(value)
             case "app.bsky.feed.defs#reasonPin":
-                let value = try AppBskyFeedDefs.ReasonPin(from: decoder)
+                let value = try AppBskyFeedDefs.ReasonPin(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsReasonPin(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -3225,11 +3301,11 @@ public enum AppBskyFeedDefs {
 
             switch self {
             case let .appBskyFeedDefsReasonRepost(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.feed.defs#reasonRepost", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyFeedDefsReasonPin(value):
-                try container.encode("app.bsky.feed.defs#reasonPin", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.feed.defs#reasonPin", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -3348,13 +3424,13 @@ public enum AppBskyFeedDefs {
 
             switch typeValue {
             case "app.bsky.feed.defs#postView":
-                let value = try AppBskyFeedDefs.PostView(from: decoder)
+                let value = try AppBskyFeedDefs.PostView(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsPostView(value)
             case "app.bsky.feed.defs#notFoundPost":
-                let value = try AppBskyFeedDefs.NotFoundPost(from: decoder)
+                let value = try AppBskyFeedDefs.NotFoundPost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsNotFoundPost(value)
             case "app.bsky.feed.defs#blockedPost":
-                let value = try AppBskyFeedDefs.BlockedPost(from: decoder)
+                let value = try AppBskyFeedDefs.BlockedPost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsBlockedPost(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -3367,14 +3443,14 @@ public enum AppBskyFeedDefs {
 
             switch self {
             case let .appBskyFeedDefsPostView(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.feed.defs#postView", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyFeedDefsNotFoundPost(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.feed.defs#notFoundPost", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyFeedDefsBlockedPost(value):
-                try container.encode("app.bsky.feed.defs#blockedPost", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.feed.defs#blockedPost", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -3518,13 +3594,13 @@ public enum AppBskyFeedDefs {
 
             switch typeValue {
             case "app.bsky.feed.defs#postView":
-                let value = try AppBskyFeedDefs.PostView(from: decoder)
+                let value = try AppBskyFeedDefs.PostView(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsPostView(value)
             case "app.bsky.feed.defs#notFoundPost":
-                let value = try AppBskyFeedDefs.NotFoundPost(from: decoder)
+                let value = try AppBskyFeedDefs.NotFoundPost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsNotFoundPost(value)
             case "app.bsky.feed.defs#blockedPost":
-                let value = try AppBskyFeedDefs.BlockedPost(from: decoder)
+                let value = try AppBskyFeedDefs.BlockedPost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsBlockedPost(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -3537,14 +3613,14 @@ public enum AppBskyFeedDefs {
 
             switch self {
             case let .appBskyFeedDefsPostView(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.feed.defs#postView", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyFeedDefsNotFoundPost(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.feed.defs#notFoundPost", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyFeedDefsBlockedPost(value):
-                try container.encode("app.bsky.feed.defs#blockedPost", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.feed.defs#blockedPost", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -3688,13 +3764,13 @@ public enum AppBskyFeedDefs {
 
             switch typeValue {
             case "app.bsky.feed.defs#threadViewPost":
-                let value = try AppBskyFeedDefs.ThreadViewPost(from: decoder)
+                let value = try AppBskyFeedDefs.ThreadViewPost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsThreadViewPost(value)
             case "app.bsky.feed.defs#notFoundPost":
-                let value = try AppBskyFeedDefs.NotFoundPost(from: decoder)
+                let value = try AppBskyFeedDefs.NotFoundPost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsNotFoundPost(value)
             case "app.bsky.feed.defs#blockedPost":
-                let value = try AppBskyFeedDefs.BlockedPost(from: decoder)
+                let value = try AppBskyFeedDefs.BlockedPost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsBlockedPost(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -3707,14 +3783,14 @@ public enum AppBskyFeedDefs {
 
             switch self {
             case let .appBskyFeedDefsThreadViewPost(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.feed.defs#threadViewPost", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyFeedDefsNotFoundPost(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.feed.defs#notFoundPost", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyFeedDefsBlockedPost(value):
-                try container.encode("app.bsky.feed.defs#blockedPost", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.feed.defs#blockedPost", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -3858,13 +3934,13 @@ public enum AppBskyFeedDefs {
 
             switch typeValue {
             case "app.bsky.feed.defs#threadViewPost":
-                let value = try AppBskyFeedDefs.ThreadViewPost(from: decoder)
+                let value = try AppBskyFeedDefs.ThreadViewPost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsThreadViewPost(value)
             case "app.bsky.feed.defs#notFoundPost":
-                let value = try AppBskyFeedDefs.NotFoundPost(from: decoder)
+                let value = try AppBskyFeedDefs.NotFoundPost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsNotFoundPost(value)
             case "app.bsky.feed.defs#blockedPost":
-                let value = try AppBskyFeedDefs.BlockedPost(from: decoder)
+                let value = try AppBskyFeedDefs.BlockedPost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsBlockedPost(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -3877,14 +3953,14 @@ public enum AppBskyFeedDefs {
 
             switch self {
             case let .appBskyFeedDefsThreadViewPost(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.feed.defs#threadViewPost", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyFeedDefsNotFoundPost(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.feed.defs#notFoundPost", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyFeedDefsBlockedPost(value):
-                try container.encode("app.bsky.feed.defs#blockedPost", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.feed.defs#blockedPost", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -4023,10 +4099,10 @@ public enum AppBskyFeedDefs {
 
             switch typeValue {
             case "app.bsky.feed.defs#skeletonReasonRepost":
-                let value = try AppBskyFeedDefs.SkeletonReasonRepost(from: decoder)
+                let value = try AppBskyFeedDefs.SkeletonReasonRepost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsSkeletonReasonRepost(value)
             case "app.bsky.feed.defs#skeletonReasonPin":
-                let value = try AppBskyFeedDefs.SkeletonReasonPin(from: decoder)
+                let value = try AppBskyFeedDefs.SkeletonReasonPin(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsSkeletonReasonPin(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -4039,11 +4115,11 @@ public enum AppBskyFeedDefs {
 
             switch self {
             case let .appBskyFeedDefsSkeletonReasonRepost(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.feed.defs#skeletonReasonRepost", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyFeedDefsSkeletonReasonPin(value):
-                try container.encode("app.bsky.feed.defs#skeletonReasonPin", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.feed.defs#skeletonReasonPin", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

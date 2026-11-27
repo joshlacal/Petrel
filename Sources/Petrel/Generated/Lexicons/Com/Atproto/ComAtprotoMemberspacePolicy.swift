@@ -20,6 +20,7 @@ public struct ComAtprotoMemberspacePolicy: ATProtocolCodable, ATProtocolValue {
     /// Wire fields this Lexicon revision does not declare. They are kept on decode and
     /// written back on encode, so re-serializing data never drops them.
     public let extraFields: [String: ATProtocolValueContainer]
+    private let wireTypeTag: String?
 
     public init(
         publicRead: Bool? = nil,
@@ -35,6 +36,7 @@ public struct ComAtprotoMemberspacePolicy: ATProtocolCodable, ATProtocolValue {
         self.publishPolicy = publishPolicy
         self.publishMembers = publishMembers
         self.extraFields = extraFields
+        wireTypeTag = nil
     }
 
     public init(from decoder: Decoder) throws {
@@ -46,6 +48,7 @@ public struct ComAtprotoMemberspacePolicy: ATProtocolCodable, ATProtocolValue {
         publishPolicy = try container.decodeIfPresent(Bool.self, forKey: .publishPolicy, rejectingNull: strict)
         publishMembers = try container.decodeIfPresent(Bool.self, forKey: .publishMembers, rejectingNull: strict)
         extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+        wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -56,6 +59,7 @@ public struct ComAtprotoMemberspacePolicy: ATProtocolCodable, ATProtocolValue {
         try container.encodeIfPresent(publishPolicy, forKey: .publishPolicy)
         try container.encodeIfPresent(publishMembers, forKey: .publishMembers)
         try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+        try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -133,7 +137,7 @@ public struct ComAtprotoMemberspacePolicy: ATProtocolCodable, ATProtocolValue {
             let publishMembersValue = try value.toCBORValue()
             map = map.adding(key: "publishMembers", value: publishMembersValue)
         }
-        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+        return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
     }
 
     private static let knownFieldKeys: Swift.Set<String> = ["$type", "publicRead", "publicWrite", "allowedApps", "publishPolicy", "publishMembers"]

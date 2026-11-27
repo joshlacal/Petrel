@@ -27,6 +27,7 @@ public enum ToolsOzoneInboxGetReport {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             src: DID,
@@ -50,6 +51,7 @@ public enum ToolsOzoneInboxGetReport {
             self.createdAt = createdAt
             self.updatedAt = updatedAt
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -88,6 +90,7 @@ public enum ToolsOzoneInboxGetReport {
             createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -102,6 +105,7 @@ public enum ToolsOzoneInboxGetReport {
             try container.encode(createdAt, forKey: .createdAt)
             try container.encode(updatedAt, forKey: .updatedAt)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -185,7 +189,7 @@ public enum ToolsOzoneInboxGetReport {
             map = map.adding(key: "createdAt", value: createdAtValue)
             let updatedAtValue = try updatedAt.toCBORValue()
             map = map.adding(key: "updatedAt", value: updatedAtValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "src", "id", "reasonType", "reason", "subject", "record", "status", "createdAt", "updatedAt"]
@@ -231,6 +235,7 @@ public enum ToolsOzoneInboxGetReport {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             outcome: String,
@@ -244,6 +249,7 @@ public enum ToolsOzoneInboxGetReport {
             self.scope = scope
             self.resolvedAt = resolvedAt
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -277,6 +283,7 @@ public enum ToolsOzoneInboxGetReport {
             }
             resolvedAt = try container.decode(ATProtocolDate.self, forKey: .resolvedAt)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -286,6 +293,7 @@ public enum ToolsOzoneInboxGetReport {
             try container.encodeIfPresent(scope, forKey: .scope)
             try container.encode(resolvedAt, forKey: .resolvedAt)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -339,7 +347,7 @@ public enum ToolsOzoneInboxGetReport {
             }
             let resolvedAtValue = try resolvedAt.toCBORValue()
             map = map.adding(key: "resolvedAt", value: resolvedAtValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "outcome", "actionTaken", "scope", "resolvedAt"]
@@ -471,16 +479,16 @@ public enum ToolsOzoneInboxGetReport {
 
             switch typeValue {
             case "com.atproto.admin.defs#repoRef":
-                let value = try ComAtprotoAdminDefs.RepoRef(from: decoder)
+                let value = try ComAtprotoAdminDefs.RepoRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoAdminDefsRepoRef(value)
             case "com.atproto.repo.strongRef":
-                let value = try ComAtprotoRepoStrongRef(from: decoder)
+                let value = try ComAtprotoRepoStrongRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoRepoStrongRef(value)
             case "chat.bsky.convo.defs#messageRef":
-                let value = try ChatBskyConvoDefs.MessageRef(from: decoder)
+                let value = try ChatBskyConvoDefs.MessageRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsMessageRef(value)
             case "chat.bsky.convo.defs#convoRef":
-                let value = try ChatBskyConvoDefs.ConvoRef(from: decoder)
+                let value = try ChatBskyConvoDefs.ConvoRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsConvoRef(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -493,17 +501,17 @@ public enum ToolsOzoneInboxGetReport {
 
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.admin.defs#repoRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoRepoStrongRef(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.repo.strongRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsMessageRef(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#messageRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyConvoDefsConvoRef(value):
-                try container.encode("chat.bsky.convo.defs#convoRef", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("chat.bsky.convo.defs#convoRef", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

@@ -12,6 +12,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
     /// Wire fields this Lexicon revision does not declare. They are kept on decode and
     /// written back on encode, so re-serializing data never drops them.
     public let extraFields: [String: ATProtocolValueContainer]
+    private let wireTypeTag: String?
 
     public init(
         record: AppBskyEmbedRecord,
@@ -21,6 +22,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         self.record = record
         self.media = media
         self.extraFields = extraFields
+        wireTypeTag = nil
     }
 
     public init(from decoder: Decoder) throws {
@@ -28,6 +30,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         record = try container.decode(AppBskyEmbedRecord.self, forKey: .record)
         media = try container.decode(AppBskyEmbedRecordWithMediaMediaUnion.self, forKey: .media)
         extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+        wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -35,6 +38,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         try container.encode(record, forKey: .record)
         try container.encode(media, forKey: .media)
         try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+        try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -64,7 +68,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "record", value: recordValue)
         let mediaValue = try media.toCBORValue()
         map = map.adding(key: "media", value: mediaValue)
-        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+        return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
     }
 
     private static let knownFieldKeys: Swift.Set<String> = ["$type", "record", "media"]
@@ -82,6 +86,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             record: AppBskyEmbedRecord.View,
@@ -91,6 +96,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             self.record = record
             self.media = media
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -98,6 +104,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             record = try container.decode(AppBskyEmbedRecord.View.self, forKey: .record)
             media = try container.decode(ViewMediaUnion.self, forKey: .media)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -105,6 +112,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             try container.encode(record, forKey: .record)
             try container.encode(media, forKey: .media)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -134,7 +142,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             map = map.adding(key: "record", value: recordValue)
             let mediaValue = try media.toCBORValue()
             map = map.adding(key: "media", value: mediaValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "record", "media"]
@@ -175,16 +183,16 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "app.bsky.embed.images":
-                let value = try AppBskyEmbedImages(from: decoder)
+                let value = try AppBskyEmbedImages(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedImages(value)
             case "app.bsky.embed.video":
-                let value = try AppBskyEmbedVideo(from: decoder)
+                let value = try AppBskyEmbedVideo(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedVideo(value)
             case "app.bsky.embed.gallery":
-                let value = try AppBskyEmbedGallery(from: decoder)
+                let value = try AppBskyEmbedGallery(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedGallery(value)
             case "app.bsky.embed.external":
-                let value = try AppBskyEmbedExternal(from: decoder)
+                let value = try AppBskyEmbedExternal(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedExternal(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -197,17 +205,17 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .appBskyEmbedImages(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.embed.images", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyEmbedVideo(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.embed.video", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyEmbedGallery(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.embed.gallery", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyEmbedExternal(value):
-                try container.encode("app.bsky.embed.external", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.embed.external", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -381,16 +389,16 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "app.bsky.embed.images#view":
-                let value = try AppBskyEmbedImages.View(from: decoder)
+                let value = try AppBskyEmbedImages.View(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedImagesView(value)
             case "app.bsky.embed.video#view":
-                let value = try AppBskyEmbedVideo.View(from: decoder)
+                let value = try AppBskyEmbedVideo.View(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedVideoView(value)
             case "app.bsky.embed.gallery#view":
-                let value = try AppBskyEmbedGallery.View(from: decoder)
+                let value = try AppBskyEmbedGallery.View(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedGalleryView(value)
             case "app.bsky.embed.external#view":
-                let value = try AppBskyEmbedExternal.View(from: decoder)
+                let value = try AppBskyEmbedExternal.View(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedExternalView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -403,17 +411,17 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .appBskyEmbedImagesView(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.embed.images#view", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyEmbedVideoView(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.embed.video#view", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyEmbedGalleryView(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.embed.gallery#view", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyEmbedExternalView(value):
-                try container.encode("app.bsky.embed.external#view", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.embed.external#view", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

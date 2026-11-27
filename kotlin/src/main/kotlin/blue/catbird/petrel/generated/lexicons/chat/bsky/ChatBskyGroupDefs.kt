@@ -16,19 +16,97 @@ object ChatBskyGroupDefsDefs {
     const val TYPE_IDENTIFIER = "chat.bsky.group.defs"
 }
 
-@Serializable
-enum class ChatBskyGroupDefsLinkEnabledStatus {
-    @SerialName("enabled")
-    ENABLED,
-    @SerialName("disabled")
-    DISABLED}
+/**
+ * A Lexicon `knownValues` string. The Lexicon names the values it knows, but a peer
+ * can send any other: such a value decodes as [Unknown] and is written back unchanged,
+ * instead of failing the object that holds it. Values are equal when their wire
+ * strings are.
+ */
+@Serializable(with = ChatBskyGroupDefsLinkEnabledStatusSerializer::class)
+sealed class ChatBskyGroupDefsLinkEnabledStatus(val value: String) {
+    object ENABLED : ChatBskyGroupDefsLinkEnabledStatus("enabled")
+    object DISABLED : ChatBskyGroupDefsLinkEnabledStatus("disabled")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : ChatBskyGroupDefsLinkEnabledStatus(value)
 
-@Serializable
-enum class ChatBskyGroupDefsJoinRule {
-    @SerialName("anyone")
-    ANYONE,
-    @SerialName("followedByOwner")
-    FOLLOWEDBYOWNER}
+    override fun equals(other: Any?): Boolean = other is ChatBskyGroupDefsLinkEnabledStatus && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<ChatBskyGroupDefsLinkEnabledStatus> by lazy {
+            listOf(ENABLED, DISABLED)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): ChatBskyGroupDefsLinkEnabledStatus = when (value) {
+            "enabled" -> ENABLED
+            "disabled" -> DISABLED
+            else -> Unknown(value)
+        }
+    }
+}
+
+object ChatBskyGroupDefsLinkEnabledStatusSerializer : kotlinx.serialization.KSerializer<ChatBskyGroupDefsLinkEnabledStatus> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("ChatBskyGroupDefsLinkEnabledStatus", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ChatBskyGroupDefsLinkEnabledStatus) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ChatBskyGroupDefsLinkEnabledStatus =
+        ChatBskyGroupDefsLinkEnabledStatus.fromValue(decoder.decodeString())
+}
+
+/**
+ * A Lexicon `knownValues` string. The Lexicon names the values it knows, but a peer
+ * can send any other: such a value decodes as [Unknown] and is written back unchanged,
+ * instead of failing the object that holds it. Values are equal when their wire
+ * strings are.
+ */
+@Serializable(with = ChatBskyGroupDefsJoinRuleSerializer::class)
+sealed class ChatBskyGroupDefsJoinRule(val value: String) {
+    object ANYONE : ChatBskyGroupDefsJoinRule("anyone")
+    object FOLLOWEDBYOWNER : ChatBskyGroupDefsJoinRule("followedByOwner")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : ChatBskyGroupDefsJoinRule(value)
+
+    override fun equals(other: Any?): Boolean = other is ChatBskyGroupDefsJoinRule && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<ChatBskyGroupDefsJoinRule> by lazy {
+            listOf(ANYONE, FOLLOWEDBYOWNER)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): ChatBskyGroupDefsJoinRule = when (value) {
+            "anyone" -> ANYONE
+            "followedByOwner" -> FOLLOWEDBYOWNER
+            else -> Unknown(value)
+        }
+    }
+}
+
+object ChatBskyGroupDefsJoinRuleSerializer : kotlinx.serialization.KSerializer<ChatBskyGroupDefsJoinRule> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("ChatBskyGroupDefsJoinRule", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ChatBskyGroupDefsJoinRule) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ChatBskyGroupDefsJoinRule =
+        ChatBskyGroupDefsJoinRule.fromValue(decoder.decodeString())
+}
 
     /**
      * Join link view to be used within a group view, so the convo is surrounding, not specified inside this view.

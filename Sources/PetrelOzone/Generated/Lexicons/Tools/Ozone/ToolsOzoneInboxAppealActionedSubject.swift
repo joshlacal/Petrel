@@ -16,6 +16,7 @@ public enum ToolsOzoneInboxAppealActionedSubject {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             id: Int,
@@ -23,18 +24,21 @@ public enum ToolsOzoneInboxAppealActionedSubject {
         ) {
             self.id = id
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             id = try container.decode(Int.self, forKey: .id)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(id, forKey: .id)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -58,7 +62,7 @@ public enum ToolsOzoneInboxAppealActionedSubject {
             var map = OrderedCBORMap()
             let idValue = try id.toCBORValue()
             map = map.adding(key: "id", value: idValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "id"]
@@ -76,6 +80,7 @@ public enum ToolsOzoneInboxAppealActionedSubject {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             val: String,
@@ -83,18 +88,21 @@ public enum ToolsOzoneInboxAppealActionedSubject {
         ) {
             self.val = val
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             val = try container.decode(String.self, forKey: .val)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(val, forKey: .val)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -118,7 +126,7 @@ public enum ToolsOzoneInboxAppealActionedSubject {
             var map = OrderedCBORMap()
             let valValue = try val.toCBORValue()
             map = map.adding(key: "val", value: valValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "val"]
@@ -134,20 +142,24 @@ public enum ToolsOzoneInboxAppealActionedSubject {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             _ = encoder.container(keyedBy: CodingKeys.self)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -165,7 +177,7 @@ public enum ToolsOzoneInboxAppealActionedSubject {
 
         public func toCBORValue() throws -> Any {
             let map = OrderedCBORMap()
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type"]
@@ -280,13 +292,13 @@ public enum ToolsOzoneInboxAppealActionedSubject {
 
             switch typeValue {
             case "tools.ozone.inbox.appealActionedSubject#actionRef":
-                let value = try ToolsOzoneInboxAppealActionedSubject.ActionRef(from: decoder)
+                let value = try ToolsOzoneInboxAppealActionedSubject.ActionRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneInboxAppealActionedSubjectActionRef(value)
             case "tools.ozone.inbox.appealActionedSubject#labelRef":
-                let value = try ToolsOzoneInboxAppealActionedSubject.LabelRef(from: decoder)
+                let value = try ToolsOzoneInboxAppealActionedSubject.LabelRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneInboxAppealActionedSubjectLabelRef(value)
             case "tools.ozone.inbox.appealActionedSubject#takedownRef":
-                let value = try ToolsOzoneInboxAppealActionedSubject.TakedownRef(from: decoder)
+                let value = try ToolsOzoneInboxAppealActionedSubject.TakedownRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneInboxAppealActionedSubjectTakedownRef(value)
             default:
                 throw DecodingError.dataCorruptedError(
@@ -302,14 +314,14 @@ public enum ToolsOzoneInboxAppealActionedSubject {
 
             switch self {
             case let .toolsOzoneInboxAppealActionedSubjectActionRef(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.inbox.appealActionedSubject#actionRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneInboxAppealActionedSubjectLabelRef(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.inbox.appealActionedSubject#labelRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneInboxAppealActionedSubjectTakedownRef(value):
-                try container.encode("tools.ozone.inbox.appealActionedSubject#takedownRef", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("tools.ozone.inbox.appealActionedSubject#takedownRef", forKey: .type)
             }
         }
 
@@ -439,10 +451,10 @@ public enum ToolsOzoneInboxAppealActionedSubject {
 
             switch typeValue {
             case "com.atproto.admin.defs#repoRef":
-                let value = try ComAtprotoAdminDefs.RepoRef(from: decoder)
+                let value = try ComAtprotoAdminDefs.RepoRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoAdminDefsRepoRef(value)
             case "com.atproto.repo.strongRef":
-                let value = try ComAtprotoRepoStrongRef(from: decoder)
+                let value = try ComAtprotoRepoStrongRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoRepoStrongRef(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -455,11 +467,11 @@ public enum ToolsOzoneInboxAppealActionedSubject {
 
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.admin.defs#repoRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoRepoStrongRef(value):
-                try container.encode("com.atproto.repo.strongRef", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.repo.strongRef", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

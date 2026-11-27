@@ -15,6 +15,7 @@ public enum AppBskyUnspeccedGetConfig {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             did: DID,
@@ -24,6 +25,7 @@ public enum AppBskyUnspeccedGetConfig {
             self.did = did
             self.domains = domains
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -31,6 +33,7 @@ public enum AppBskyUnspeccedGetConfig {
             did = try container.decode(DID.self, forKey: .did)
             domains = try container.decode([String].self, forKey: .domains)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -38,6 +41,7 @@ public enum AppBskyUnspeccedGetConfig {
             try container.encode(did, forKey: .did)
             try container.encode(domains, forKey: .domains)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -67,7 +71,7 @@ public enum AppBskyUnspeccedGetConfig {
             map = map.adding(key: "did", value: didValue)
             let domainsValue = try domains.toCBORValue()
             map = map.adding(key: "domains", value: domainsValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "did", "domains"]

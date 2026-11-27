@@ -123,7 +123,7 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "site.standard.theme.color#rgb":
-                let value = try SiteStandardThemeColor.Rgb(from: decoder)
+                let value = try SiteStandardThemeColor.Rgb(from: ATProtoUnionMemberDecoder(decoder))
                 self = .siteStandardThemeColorRgb(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -136,8 +136,8 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .siteStandardThemeColorRgb(value):
-                try container.encode("site.standard.theme.color#rgb", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("site.standard.theme.color#rgb", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -221,7 +221,7 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "site.standard.theme.color#rgb":
-                let value = try SiteStandardThemeColor.Rgb(from: decoder)
+                let value = try SiteStandardThemeColor.Rgb(from: ATProtoUnionMemberDecoder(decoder))
                 self = .siteStandardThemeColorRgb(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -234,8 +234,8 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .siteStandardThemeColorRgb(value):
-                try container.encode("site.standard.theme.color#rgb", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("site.standard.theme.color#rgb", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -319,7 +319,7 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "site.standard.theme.color#rgb":
-                let value = try SiteStandardThemeColor.Rgb(from: decoder)
+                let value = try SiteStandardThemeColor.Rgb(from: ATProtoUnionMemberDecoder(decoder))
                 self = .siteStandardThemeColorRgb(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -332,8 +332,8 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .siteStandardThemeColorRgb(value):
-                try container.encode("site.standard.theme.color#rgb", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("site.standard.theme.color#rgb", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -417,7 +417,7 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "site.standard.theme.color#rgb":
-                let value = try SiteStandardThemeColor.Rgb(from: decoder)
+                let value = try SiteStandardThemeColor.Rgb(from: ATProtoUnionMemberDecoder(decoder))
                 self = .siteStandardThemeColorRgb(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -430,8 +430,8 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .siteStandardThemeColorRgb(value):
-                try container.encode("site.standard.theme.color#rgb", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("site.standard.theme.color#rgb", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

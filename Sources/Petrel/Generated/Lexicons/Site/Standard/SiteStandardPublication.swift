@@ -258,6 +258,7 @@ public struct SiteStandardPublication: ATProtocolCodable, ATProtocolValue {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             showInDiscover: Bool? = nil,
@@ -265,6 +266,7 @@ public struct SiteStandardPublication: ATProtocolCodable, ATProtocolValue {
         ) {
             self.showInDiscover = showInDiscover
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -284,12 +286,14 @@ public struct SiteStandardPublication: ATProtocolCodable, ATProtocolValue {
                 malformedFields.insert("showInDiscover")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encodeIfPresent(showInDiscover, forKey: .showInDiscover)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -319,7 +323,7 @@ public struct SiteStandardPublication: ATProtocolCodable, ATProtocolValue {
                 let showInDiscoverValue = try value.toCBORValue()
                 map = map.adding(key: "showInDiscover", value: showInDiscoverValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "showInDiscover"]
@@ -353,7 +357,7 @@ public struct SiteStandardPublication: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "com.atproto.label.defs#selfLabels":
-                let value = try ComAtprotoLabelDefs.SelfLabels(from: decoder)
+                let value = try ComAtprotoLabelDefs.SelfLabels(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoLabelDefsSelfLabels(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -366,8 +370,8 @@ public struct SiteStandardPublication: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .comAtprotoLabelDefsSelfLabels(value):
-                try container.encode("com.atproto.label.defs#selfLabels", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.label.defs#selfLabels", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

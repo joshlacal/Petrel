@@ -118,13 +118,13 @@ public enum ComAtprotoAdminGetSubjectStatus {
 
             switch typeValue {
             case "com.atproto.admin.defs#repoRef":
-                let value = try ComAtprotoAdminDefs.RepoRef(from: decoder)
+                let value = try ComAtprotoAdminDefs.RepoRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoAdminDefsRepoRef(value)
             case "com.atproto.repo.strongRef":
-                let value = try ComAtprotoRepoStrongRef(from: decoder)
+                let value = try ComAtprotoRepoStrongRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoRepoStrongRef(value)
             case "com.atproto.admin.defs#repoBlobRef":
-                let value = try ComAtprotoAdminDefs.RepoBlobRef(from: decoder)
+                let value = try ComAtprotoAdminDefs.RepoBlobRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoAdminDefsRepoBlobRef(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -137,14 +137,14 @@ public enum ComAtprotoAdminGetSubjectStatus {
 
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.admin.defs#repoRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoRepoStrongRef(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.repo.strongRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoAdminDefsRepoBlobRef(value):
-                try container.encode("com.atproto.admin.defs#repoBlobRef", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.admin.defs#repoBlobRef", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

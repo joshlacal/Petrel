@@ -243,7 +243,7 @@ public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "com.atproto.label.defs#selfLabels":
-                let value = try ComAtprotoLabelDefs.SelfLabels(from: decoder)
+                let value = try ComAtprotoLabelDefs.SelfLabels(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoLabelDefsSelfLabels(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -256,8 +256,8 @@ public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .comAtprotoLabelDefsSelfLabels(value):
-                try container.encode("com.atproto.label.defs#selfLabels", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.label.defs#selfLabels", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

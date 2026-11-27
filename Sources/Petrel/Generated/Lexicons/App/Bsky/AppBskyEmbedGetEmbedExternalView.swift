@@ -195,16 +195,16 @@ public enum AppBskyEmbedGetEmbedExternalView {
 
             switch typeValue {
             case "app.bsky.embed.external#viewArticle":
-                let value = try AppBskyEmbedExternal.ViewArticle(from: decoder)
+                let value = try AppBskyEmbedExternal.ViewArticle(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedExternalViewArticle(value)
             case "app.bsky.embed.external#viewArticlePublication":
-                let value = try AppBskyEmbedExternal.ViewArticlePublication(from: decoder)
+                let value = try AppBskyEmbedExternal.ViewArticlePublication(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedExternalViewArticlePublication(value)
             case "app.bsky.embed.external#viewGallery":
-                let value = try AppBskyEmbedExternal.ViewGallery(from: decoder)
+                let value = try AppBskyEmbedExternal.ViewGallery(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedExternalViewGallery(value)
             case "app.bsky.embed.external#viewLivestream":
-                let value = try AppBskyEmbedExternal.ViewLivestream(from: decoder)
+                let value = try AppBskyEmbedExternal.ViewLivestream(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyEmbedExternalViewLivestream(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -217,17 +217,17 @@ public enum AppBskyEmbedGetEmbedExternalView {
 
             switch self {
             case let .appBskyEmbedExternalViewArticle(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.embed.external#viewArticle", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyEmbedExternalViewArticlePublication(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.embed.external#viewArticlePublication", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyEmbedExternalViewGallery(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.embed.external#viewGallery", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyEmbedExternalViewLivestream(value):
-                try container.encode("app.bsky.embed.external#viewLivestream", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.embed.external#viewLivestream", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

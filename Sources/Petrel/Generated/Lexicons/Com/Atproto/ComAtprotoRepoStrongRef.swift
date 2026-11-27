@@ -12,6 +12,7 @@ public struct ComAtprotoRepoStrongRef: ATProtocolCodable, ATProtocolValue {
     /// Wire fields this Lexicon revision does not declare. They are kept on decode and
     /// written back on encode, so re-serializing data never drops them.
     public let extraFields: [String: ATProtocolValueContainer]
+    private let wireTypeTag: String?
 
     public init(
         uri: ATProtocolURI,
@@ -21,6 +22,7 @@ public struct ComAtprotoRepoStrongRef: ATProtocolCodable, ATProtocolValue {
         self.uri = uri
         self.cid = cid
         self.extraFields = extraFields
+        wireTypeTag = nil
     }
 
     public init(from decoder: Decoder) throws {
@@ -28,6 +30,7 @@ public struct ComAtprotoRepoStrongRef: ATProtocolCodable, ATProtocolValue {
         uri = try container.decode(ATProtocolURI.self, forKey: .uri)
         cid = try container.decode(CIDString.self, forKey: .cid)
         extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+        wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -35,6 +38,7 @@ public struct ComAtprotoRepoStrongRef: ATProtocolCodable, ATProtocolValue {
         try container.encode(uri, forKey: .uri)
         try container.encode(cid, forKey: .cid)
         try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+        try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -64,7 +68,7 @@ public struct ComAtprotoRepoStrongRef: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "uri", value: uriValue)
         let cidValue = try cid.toCBORValue()
         map = map.adding(key: "cid", value: cidValue)
-        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+        return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
     }
 
     private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "cid"]

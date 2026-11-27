@@ -16,6 +16,7 @@ public enum ToolsOzoneTeamListOnlineMembers {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             did: DID,
@@ -25,6 +26,7 @@ public enum ToolsOzoneTeamListOnlineMembers {
             self.did = did
             self.lastActive = lastActive
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -32,6 +34,7 @@ public enum ToolsOzoneTeamListOnlineMembers {
             did = try container.decode(DID.self, forKey: .did)
             lastActive = try container.decode(ATProtocolDate.self, forKey: .lastActive)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -39,6 +42,7 @@ public enum ToolsOzoneTeamListOnlineMembers {
             try container.encode(did, forKey: .did)
             try container.encode(lastActive, forKey: .lastActive)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -68,7 +72,7 @@ public enum ToolsOzoneTeamListOnlineMembers {
             map = map.adding(key: "did", value: didValue)
             let lastActiveValue = try lastActive.toCBORValue()
             map = map.adding(key: "lastActive", value: lastActiveValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "did", "lastActive"]

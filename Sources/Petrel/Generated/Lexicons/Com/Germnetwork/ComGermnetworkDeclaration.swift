@@ -198,6 +198,7 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             messageMeUrl: URI,
@@ -207,6 +208,7 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
             self.messageMeUrl = messageMeUrl
             self.showButtonTo = showButtonTo
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -214,6 +216,7 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
             messageMeUrl = try container.decode(URI.self, forKey: .messageMeUrl)
             showButtonTo = try container.decode(String.self, forKey: .showButtonTo)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -221,6 +224,7 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
             try container.encode(messageMeUrl, forKey: .messageMeUrl)
             try container.encode(showButtonTo, forKey: .showButtonTo)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -250,7 +254,7 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
             map = map.adding(key: "messageMeUrl", value: messageMeUrlValue)
             let showButtonToValue = try showButtonTo.toCBORValue()
             map = map.adding(key: "showButtonTo", value: showButtonToValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "messageMeUrl", "showButtonTo"]

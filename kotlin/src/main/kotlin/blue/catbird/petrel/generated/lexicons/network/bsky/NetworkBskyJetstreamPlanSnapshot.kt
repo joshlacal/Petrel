@@ -16,16 +16,55 @@ object NetworkBskyJetstreamPlanSnapshotDefs {
     const val TYPE_IDENTIFIER = "network.bsky.jetstream.planSnapshot"
 }
 
-@Serializable
-enum class NetworkBskyJetstreamPlanSnapshotInputKinds {
-    @SerialName("commit")
-    value_commit,
-    @SerialName("identity")
-    value_identity,
-    @SerialName("account")
-    value_account,
-    @SerialName("sync")
-    value_sync}
+/**
+ * A Lexicon `enum` string. The Lexicon lists every value, but a newer peer can add one
+ * before this build knows it: such a value decodes as [Unknown] and is written back
+ * unchanged, instead of failing the object that holds it. Values are equal when their
+ * wire strings are.
+ */
+@Serializable(with = NetworkBskyJetstreamPlanSnapshotInputKindsSerializer::class)
+sealed class NetworkBskyJetstreamPlanSnapshotInputKinds(val value: String) {
+    object value_commit : NetworkBskyJetstreamPlanSnapshotInputKinds("commit")
+    object value_identity : NetworkBskyJetstreamPlanSnapshotInputKinds("identity")
+    object value_account : NetworkBskyJetstreamPlanSnapshotInputKinds("account")
+    object value_sync : NetworkBskyJetstreamPlanSnapshotInputKinds("sync")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : NetworkBskyJetstreamPlanSnapshotInputKinds(value)
+
+    override fun equals(other: Any?): Boolean = other is NetworkBskyJetstreamPlanSnapshotInputKinds && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<NetworkBskyJetstreamPlanSnapshotInputKinds> by lazy {
+            listOf(value_commit, value_identity, value_account, value_sync)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): NetworkBskyJetstreamPlanSnapshotInputKinds = when (value) {
+            "commit" -> value_commit
+            "identity" -> value_identity
+            "account" -> value_account
+            "sync" -> value_sync
+            else -> Unknown(value)
+        }
+    }
+}
+
+object NetworkBskyJetstreamPlanSnapshotInputKindsSerializer : kotlinx.serialization.KSerializer<NetworkBskyJetstreamPlanSnapshotInputKinds> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("NetworkBskyJetstreamPlanSnapshotInputKinds", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: NetworkBskyJetstreamPlanSnapshotInputKinds) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): NetworkBskyJetstreamPlanSnapshotInputKinds =
+        NetworkBskyJetstreamPlanSnapshotInputKinds.fromValue(decoder.decodeString())
+}
 
     @Serializable
     data class NetworkBskyJetstreamPlanSnapshotSegment(
