@@ -29,6 +29,19 @@ pub fn type_of(value: &Value) -> Result<&str, DecodeError> {
         .ok_or(DecodeError::InvalidType)
 }
 
+/// Removes `$type` from a union member before it is decoded as its typed
+/// member. The union writes the tag back itself, so the member's own
+/// `extra_data` does not need to keep it.
+pub fn untagged(value: Value) -> Value {
+    match value {
+        Value::Object(mut map) => {
+            map.remove("$type");
+            Value::Object(map)
+        }
+        other => other,
+    }
+}
+
 /// Sets `$type` on an encoded union member.
 ///
 /// If the object already carries a tag, it must be the expected one.

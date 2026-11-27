@@ -209,7 +209,7 @@ impl Commit {
             rkey: reader.required("rkey")?,
             record: reader.optional("record")?,
             cid: reader.optional("cid")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -299,7 +299,7 @@ impl Identity {
             did: reader.required("did")?,
             time: reader.required("time")?,
             identity: reader.required("identity")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -389,7 +389,7 @@ impl Account {
             did: reader.required("did")?,
             time: reader.required("time")?,
             account: reader.required("account")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -479,7 +479,7 @@ impl Sync {
             did: reader.required("did")?,
             time: reader.required("time")?,
             sync: reader.required("sync")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -559,7 +559,7 @@ impl Info {
         Ok(Self {
             name: reader.required("name")?,
             message: reader.optional("message")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -602,21 +602,25 @@ impl<'de> serde::Deserialize<'de> for Info {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ParametersKinds {
     Commit,
     Identity,
     Account,
     Sync,
+    /// A value this build does not know (a newer peer added it), kept
+    /// verbatim so it is written back unchanged.
+    Unknown(String),
 }
 
 impl ParametersKinds {
-    pub const fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::Commit => "commit",
             Self::Identity => "identity",
             Self::Account => "account",
             Self::Sync => "sync",
+            Self::Unknown(value) => value.as_str(),
         }
     }
 }
@@ -628,15 +632,15 @@ impl core::fmt::Display for ParametersKinds {
 }
 
 impl core::str::FromStr for ParametersKinds {
-    type Err = &'static str;
+    type Err = core::convert::Infallible;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "commit" => Ok(Self::Commit),
-            "identity" => Ok(Self::Identity),
-            "account" => Ok(Self::Account),
-            "sync" => Ok(Self::Sync),
-            _ => Err("unknown variant for ParametersKinds"),
-        }
+        Ok(match s {
+            "commit" => Self::Commit,
+            "identity" => Self::Identity,
+            "account" => Self::Account,
+            "sync" => Self::Sync,
+            other => Self::Unknown(other.to_owned()),
+        })
     }
 }
 
@@ -649,13 +653,13 @@ impl petrel_core::ToValue for ParametersKinds {
 impl petrel_core::FromValue for ParametersKinds {
     fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
         let raw = String::from_value(value)?;
-        match raw.as_str() {
-            "commit" => Ok(Self::Commit),
-            "identity" => Ok(Self::Identity),
-            "account" => Ok(Self::Account),
-            "sync" => Ok(Self::Sync),
-            other => Err(petrel_core::DecodeError::Custom(format!("unknown variant `{other}` for ParametersKinds"))),
-        }
+        Ok(match raw.as_str() {
+            "commit" => Self::Commit,
+            "identity" => Self::Identity,
+            "account" => Self::Account,
+            "sync" => Self::Sync,
+            _ => Self::Unknown(raw),
+        })
     }
 }
 
@@ -667,7 +671,10 @@ impl petrel_core::xrpc::QueryValue for ParametersKinds {
 
 impl petrel_core::xrpc::FromQueryValue for ParametersKinds {
     fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
-        value.parse::<Self>().map_err(|err| petrel_core::DecodeError::Custom(err.to_owned()))
+        Ok(match value.parse::<Self>() {
+            Ok(parsed) => parsed,
+            Err(never) => match never {},
+        })
     }
 }
 
@@ -725,11 +732,11 @@ impl petrel_core::ToValue for Message {
 impl Message {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "network.bsky.jetstream.subscribeEvents#commit" => petrel_core::decode_value(value, strict).map(Self::Commit),
-            "network.bsky.jetstream.subscribeEvents#identity" => petrel_core::decode_value(value, strict).map(Self::Identity),
-            "network.bsky.jetstream.subscribeEvents#account" => petrel_core::decode_value(value, strict).map(Self::Account),
-            "network.bsky.jetstream.subscribeEvents#sync" => petrel_core::decode_value(value, strict).map(Self::Sync),
-            "network.bsky.jetstream.subscribeEvents#info" => petrel_core::decode_value(value, strict).map(Self::Info),
+            "network.bsky.jetstream.subscribeEvents#commit" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Commit),
+            "network.bsky.jetstream.subscribeEvents#identity" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Identity),
+            "network.bsky.jetstream.subscribeEvents#account" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Account),
+            "network.bsky.jetstream.subscribeEvents#sync" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Sync),
+            "network.bsky.jetstream.subscribeEvents#info" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Info),
             _ => Ok(Self::Unknown(value)),
         }
     }

@@ -136,8 +136,8 @@ impl petrel_core::ToValue for OutputRepos {
 impl OutputRepos {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "tools.ozone.moderation.defs#repoViewDetail" => petrel_core::decode_value(value, strict).map(Self::RepoViewDetail),
-            "tools.ozone.moderation.defs#repoViewNotFound" => petrel_core::decode_value(value, strict).map(Self::RepoViewNotFound),
+            "tools.ozone.moderation.defs#repoViewDetail" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoViewDetail),
+            "tools.ozone.moderation.defs#repoViewNotFound" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoViewNotFound),
             _ => Ok(Self::Unknown(value)),
         }
     }

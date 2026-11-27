@@ -45,7 +45,7 @@ impl ConvoView {
             id: reader.required("id")?,
             rev: reader.required("rev")?,
             kind: reader.optional("kind")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -123,7 +123,7 @@ impl DirectConvo {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -228,7 +228,7 @@ impl GroupConvo {
             member_count: reader.required("memberCount")?,
             member_limit: reader.required("memberLimit")?,
             name: reader.required("name")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -291,8 +291,8 @@ impl petrel_core::ToValue for ConvoViewKind {
 impl ConvoViewKind {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.moderation.defs#directConvo" => petrel_core::decode_value(value, strict).map(Self::DirectConvo),
-            "chat.bsky.moderation.defs#groupConvo" => petrel_core::decode_value(value, strict).map(Self::GroupConvo),
+            "chat.bsky.moderation.defs#directConvo" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DirectConvo),
+            "chat.bsky.moderation.defs#groupConvo" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::GroupConvo),
             _ => Ok(Self::Unknown(value)),
         }
     }

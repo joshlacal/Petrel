@@ -54,7 +54,7 @@ impl Commit {
             space: reader.required("space")?,
             rev: reader.required("rev")?,
             data: reader.required("data")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -148,7 +148,7 @@ impl RepoWrite {
             data: reader.required("data")?,
             space_rev: reader.required("spaceRev")?,
             prev_space_rev: reader.optional("prevSpaceRev")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -234,7 +234,7 @@ impl RepoRemoved {
             repo: reader.required("repo")?,
             space_rev: reader.required("spaceRev")?,
             prev_space_rev: reader.optional("prevSpaceRev")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

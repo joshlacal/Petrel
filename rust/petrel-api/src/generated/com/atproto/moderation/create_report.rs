@@ -230,7 +230,7 @@ impl ModTool {
         Ok(Self {
             name: reader.required("name")?,
             meta: reader.optional("meta")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -293,8 +293,8 @@ impl petrel_core::ToValue for InputSubject {
 impl InputSubject {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(value, strict).map(Self::RepoRef),
-            "com.atproto.repo.strongRef" => petrel_core::decode_value(value, strict).map(Self::StrongRef),
+            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoRef),
+            "com.atproto.repo.strongRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::StrongRef),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -358,8 +358,8 @@ impl petrel_core::ToValue for OutputSubject {
 impl OutputSubject {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(value, strict).map(Self::RepoRef),
-            "com.atproto.repo.strongRef" => petrel_core::decode_value(value, strict).map(Self::StrongRef),
+            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoRef),
+            "com.atproto.repo.strongRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::StrongRef),
             _ => Ok(Self::Unknown(value)),
         }
     }

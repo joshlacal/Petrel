@@ -71,7 +71,7 @@ impl OptionDef {
             scope: reader.required("scope")?,
             created_by: reader.required("createdBy")?,
             last_updated_by: reader.required("lastUpdatedBy")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

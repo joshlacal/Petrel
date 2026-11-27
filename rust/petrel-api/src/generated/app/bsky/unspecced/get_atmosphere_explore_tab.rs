@@ -192,7 +192,7 @@ impl ArticleList {
         Ok(Self {
             items: reader.required("items")?,
             rec_id_str: reader.optional("recIdStr")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -272,7 +272,7 @@ impl PublicationList {
         Ok(Self {
             items: reader.required("items")?,
             rec_id_str: reader.optional("recIdStr")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -352,7 +352,7 @@ impl GalleryList {
         Ok(Self {
             items: reader.required("items")?,
             rec_id_str: reader.optional("recIdStr")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -432,7 +432,7 @@ impl LivestreamList {
         Ok(Self {
             items: reader.required("items")?,
             rec_id_str: reader.optional("recIdStr")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -511,7 +511,7 @@ impl ArticleItem {
         Ok(Self {
             featured: reader.required("featured")?,
             view: reader.required("view")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -590,7 +590,7 @@ impl PublicationItem {
         Ok(Self {
             featured: reader.required("featured")?,
             view: reader.required("view")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -669,7 +669,7 @@ impl GalleryItem {
         Ok(Self {
             featured: reader.required("featured")?,
             view: reader.required("view")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -748,7 +748,7 @@ impl LivestreamItem {
         Ok(Self {
             featured: reader.required("featured")?,
             view: reader.required("view")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -853,7 +853,7 @@ impl AnnouncementBanner {
             image: reader.optional("image")?,
             overlay_color: reader.optional("overlayColor")?,
             text_color: reader.optional("textColor")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -966,7 +966,7 @@ impl AppCard {
             text_color: reader.optional("textColor")?,
             url: reader.optional("url")?,
             category: reader.optional("category")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

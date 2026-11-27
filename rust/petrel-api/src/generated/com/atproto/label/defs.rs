@@ -77,7 +77,7 @@ impl Label {
             cts: reader.required("cts")?,
             exp: reader.optional("exp")?,
             sig: reader.optional("sig")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -153,7 +153,7 @@ impl SelfLabels {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             values: reader.required("values")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -230,7 +230,7 @@ impl SelfLabel {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             val: reader.required("val")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -331,7 +331,7 @@ impl LabelValueDefinition {
             default_setting: reader.optional("defaultSetting")?,
             adult_only: reader.optional("adultOnly")?,
             locales: reader.required("locales")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -418,7 +418,7 @@ impl LabelValueDefinitionStrings {
             lang: reader.required("lang")?,
             name: reader.required("name")?,
             description: reader.required("description")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

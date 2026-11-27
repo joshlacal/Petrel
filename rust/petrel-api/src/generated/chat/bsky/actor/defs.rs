@@ -77,7 +77,7 @@ impl ProfileViewBasic {
             chat_disabled: reader.optional("chatDisabled")?,
             verification: reader.optional("verification")?,
             kind: reader.optional("kind")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -154,7 +154,7 @@ impl DirectConvoMember {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -236,7 +236,7 @@ impl GroupConvoMember {
         Ok(Self {
             added_by: reader.optional("addedBy")?,
             role: reader.required("role")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -314,7 +314,7 @@ impl PastGroupConvoMember {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -485,9 +485,9 @@ impl petrel_core::ToValue for ProfileViewBasicKind {
 impl ProfileViewBasicKind {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.actor.defs#directConvoMember" => petrel_core::decode_value(value, strict).map(Self::DirectConvoMember),
-            "chat.bsky.actor.defs#groupConvoMember" => petrel_core::decode_value(value, strict).map(Self::GroupConvoMember),
-            "chat.bsky.actor.defs#pastGroupConvoMember" => petrel_core::decode_value(value, strict).map(Self::PastGroupConvoMember),
+            "chat.bsky.actor.defs#directConvoMember" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DirectConvoMember),
+            "chat.bsky.actor.defs#groupConvoMember" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::GroupConvoMember),
+            "chat.bsky.actor.defs#pastGroupConvoMember" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::PastGroupConvoMember),
             _ => Ok(Self::Unknown(value)),
         }
     }

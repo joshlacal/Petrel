@@ -13,7 +13,7 @@
 use std::collections::BTreeMap;
 
 use crate::cid::Cid;
-use crate::error::DagCborError;
+use crate::error::{DagCborError, EncodeError};
 use crate::value::Value;
 
 /// Bounds on recursive work when decoding a DAG-CBOR value.
@@ -52,10 +52,26 @@ impl Default for Limits {
 }
 
 /// Encodes a value as canonical DAG-CBOR.
+///
+/// A [`Value::Float`] (which only lenient JSON decoding produces, and which is
+/// not AT Protocol data) is written as a CBOR float64, so the bytes are never
+/// those of a data-model value and [`decode`] refuses them. Use [`try_encode`]
+/// to refuse such a value instead.
 pub fn encode(value: &Value) -> Vec<u8> {
     let mut out = Vec::new();
     encode_into(value, &mut out);
     out
+}
+
+/// Encodes a data-model value as canonical DAG-CBOR, refusing a value that
+/// holds a [`Value::Float`]: the AT Protocol data model has no floats.
+pub fn try_encode(value: &Value) -> Result<Vec<u8>, EncodeError> {
+    if value.contains_float() {
+        return Err(EncodeError::Custom(
+            "floats are not allowed in the AT Protocol data model".into(),
+        ));
+    }
+    Ok(encode(value))
 }
 
 fn write_head(major: u8, arg: u64, out: &mut Vec<u8>) {
@@ -119,6 +135,10 @@ fn encode_into(value: &Value, out: &mut Vec<u8>) {
                 out.extend_from_slice(key.as_bytes());
                 encode_into(item, out);
             }
+        }
+        Value::Float(number) => {
+            out.push(0xfb);
+            out.extend_from_slice(&number.get().to_bits().to_be_bytes());
         }
     }
 }

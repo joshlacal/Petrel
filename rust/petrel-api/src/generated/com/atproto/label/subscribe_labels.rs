@@ -130,7 +130,7 @@ impl Labels {
         Ok(Self {
             seq: reader.required("seq")?,
             labels: reader.required("labels")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -209,7 +209,7 @@ impl Info {
         Ok(Self {
             name: reader.required("name")?,
             message: reader.optional("message")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -272,8 +272,8 @@ impl petrel_core::ToValue for Message {
 impl Message {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.label.subscribeLabels#labels" => petrel_core::decode_value(value, strict).map(Self::Labels),
-            "com.atproto.label.subscribeLabels#info" => petrel_core::decode_value(value, strict).map(Self::Info),
+            "com.atproto.label.subscribeLabels#labels" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Labels),
+            "com.atproto.label.subscribeLabels#info" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Info),
             _ => Ok(Self::Unknown(value)),
         }
     }

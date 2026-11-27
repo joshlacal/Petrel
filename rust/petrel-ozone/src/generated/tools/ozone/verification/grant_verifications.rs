@@ -210,7 +210,7 @@ impl VerificationInput {
             handle: reader.required("handle")?,
             display_name: reader.required("displayName")?,
             created_at: reader.optional("createdAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -292,7 +292,7 @@ impl GrantError {
         Ok(Self {
             error: reader.required("error")?,
             subject: reader.required("subject")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

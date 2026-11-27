@@ -219,7 +219,7 @@ impl Segment {
             max_seq: reader.required("maxSeq")?,
             min_witnessed_at: reader.required("minWitnessedAt")?,
             max_witnessed_at: reader.required("maxWitnessedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

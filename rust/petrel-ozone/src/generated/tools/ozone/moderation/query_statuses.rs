@@ -307,23 +307,27 @@ impl petrel_core::XrpcRequest for QueryStatuses {
     type Error = petrel_core::xrpc::UndeclaredError;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ParametersSortField {
     LastReviewedAt,
     LastReportedAt,
     PriorityScore,
     ReportedRecordsCount,
     TakendownRecordsCount,
+    /// A value this build does not know (a newer peer added it), kept
+    /// verbatim so it is written back unchanged.
+    Unknown(String),
 }
 
 impl ParametersSortField {
-    pub const fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::LastReviewedAt => "lastReviewedAt",
             Self::LastReportedAt => "lastReportedAt",
             Self::PriorityScore => "priorityScore",
             Self::ReportedRecordsCount => "reportedRecordsCount",
             Self::TakendownRecordsCount => "takendownRecordsCount",
+            Self::Unknown(value) => value.as_str(),
         }
     }
 }
@@ -335,16 +339,16 @@ impl core::fmt::Display for ParametersSortField {
 }
 
 impl core::str::FromStr for ParametersSortField {
-    type Err = &'static str;
+    type Err = core::convert::Infallible;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "lastReviewedAt" => Ok(Self::LastReviewedAt),
-            "lastReportedAt" => Ok(Self::LastReportedAt),
-            "priorityScore" => Ok(Self::PriorityScore),
-            "reportedRecordsCount" => Ok(Self::ReportedRecordsCount),
-            "takendownRecordsCount" => Ok(Self::TakendownRecordsCount),
-            _ => Err("unknown variant for ParametersSortField"),
-        }
+        Ok(match s {
+            "lastReviewedAt" => Self::LastReviewedAt,
+            "lastReportedAt" => Self::LastReportedAt,
+            "priorityScore" => Self::PriorityScore,
+            "reportedRecordsCount" => Self::ReportedRecordsCount,
+            "takendownRecordsCount" => Self::TakendownRecordsCount,
+            other => Self::Unknown(other.to_owned()),
+        })
     }
 }
 
@@ -357,14 +361,14 @@ impl petrel_core::ToValue for ParametersSortField {
 impl petrel_core::FromValue for ParametersSortField {
     fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
         let raw = String::from_value(value)?;
-        match raw.as_str() {
-            "lastReviewedAt" => Ok(Self::LastReviewedAt),
-            "lastReportedAt" => Ok(Self::LastReportedAt),
-            "priorityScore" => Ok(Self::PriorityScore),
-            "reportedRecordsCount" => Ok(Self::ReportedRecordsCount),
-            "takendownRecordsCount" => Ok(Self::TakendownRecordsCount),
-            other => Err(petrel_core::DecodeError::Custom(format!("unknown variant `{other}` for ParametersSortField"))),
-        }
+        Ok(match raw.as_str() {
+            "lastReviewedAt" => Self::LastReviewedAt,
+            "lastReportedAt" => Self::LastReportedAt,
+            "priorityScore" => Self::PriorityScore,
+            "reportedRecordsCount" => Self::ReportedRecordsCount,
+            "takendownRecordsCount" => Self::TakendownRecordsCount,
+            _ => Self::Unknown(raw),
+        })
     }
 }
 
@@ -376,7 +380,10 @@ impl petrel_core::xrpc::QueryValue for ParametersSortField {
 
 impl petrel_core::xrpc::FromQueryValue for ParametersSortField {
     fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
-        value.parse::<Self>().map_err(|err| petrel_core::DecodeError::Custom(err.to_owned()))
+        Ok(match value.parse::<Self>() {
+            Ok(parsed) => parsed,
+            Err(never) => match never {},
+        })
     }
 }
 
@@ -408,17 +415,21 @@ impl<'de> serde::Deserialize<'de> for ParametersSortField {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ParametersSortDirection {
     Asc,
     Desc,
+    /// A value this build does not know (a newer peer added it), kept
+    /// verbatim so it is written back unchanged.
+    Unknown(String),
 }
 
 impl ParametersSortDirection {
-    pub const fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::Asc => "asc",
             Self::Desc => "desc",
+            Self::Unknown(value) => value.as_str(),
         }
     }
 }
@@ -430,13 +441,13 @@ impl core::fmt::Display for ParametersSortDirection {
 }
 
 impl core::str::FromStr for ParametersSortDirection {
-    type Err = &'static str;
+    type Err = core::convert::Infallible;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "asc" => Ok(Self::Asc),
-            "desc" => Ok(Self::Desc),
-            _ => Err("unknown variant for ParametersSortDirection"),
-        }
+        Ok(match s {
+            "asc" => Self::Asc,
+            "desc" => Self::Desc,
+            other => Self::Unknown(other.to_owned()),
+        })
     }
 }
 
@@ -449,11 +460,11 @@ impl petrel_core::ToValue for ParametersSortDirection {
 impl petrel_core::FromValue for ParametersSortDirection {
     fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
         let raw = String::from_value(value)?;
-        match raw.as_str() {
-            "asc" => Ok(Self::Asc),
-            "desc" => Ok(Self::Desc),
-            other => Err(petrel_core::DecodeError::Custom(format!("unknown variant `{other}` for ParametersSortDirection"))),
-        }
+        Ok(match raw.as_str() {
+            "asc" => Self::Asc,
+            "desc" => Self::Desc,
+            _ => Self::Unknown(raw),
+        })
     }
 }
 
@@ -465,7 +476,10 @@ impl petrel_core::xrpc::QueryValue for ParametersSortDirection {
 
 impl petrel_core::xrpc::FromQueryValue for ParametersSortDirection {
     fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
-        value.parse::<Self>().map_err(|err| petrel_core::DecodeError::Custom(err.to_owned()))
+        Ok(match value.parse::<Self>() {
+            Ok(parsed) => parsed,
+            Err(never) => match never {},
+        })
     }
 }
 

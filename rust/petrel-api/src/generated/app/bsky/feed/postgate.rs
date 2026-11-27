@@ -135,7 +135,7 @@ impl DisableRule {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -196,7 +196,7 @@ impl petrel_core::ToValue for PostgateEmbeddingRules {
 impl PostgateEmbeddingRules {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.postgate#disableRule" => petrel_core::decode_value(value, strict).map(Self::DisableRule),
+            "app.bsky.feed.postgate#disableRule" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DisableRule),
             _ => Ok(Self::Unknown(value)),
         }
     }

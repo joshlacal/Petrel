@@ -211,7 +211,7 @@ impl Group {
             indexed_at: reader.required("indexedAt")?,
             count: reader.required("count")?,
             kind: reader.required("kind")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -291,7 +291,7 @@ impl LikeGroup {
         Ok(Self {
             post: reader.required("post")?,
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -367,7 +367,7 @@ impl LikeItem {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor: reader.required("actor")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -447,7 +447,7 @@ impl MultiPostLikeGroup {
         Ok(Self {
             actor: reader.required("actor")?,
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -523,7 +523,7 @@ impl MultiPostLikeItem {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             post: reader.required("post")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -603,7 +603,7 @@ impl MultiPostRepostGroup {
         Ok(Self {
             actor: reader.required("actor")?,
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -679,7 +679,7 @@ impl MultiPostRepostItem {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             post: reader.required("post")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -759,7 +759,7 @@ impl MultiPostLikeViaRepostGroup {
         Ok(Self {
             actor: reader.required("actor")?,
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -839,7 +839,7 @@ impl MultiPostLikeViaRepostItem {
         Ok(Self {
             post: reader.required("post")?,
             via_repost: reader.required("viaRepost")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -919,7 +919,7 @@ impl MultiPostRepostViaRepostGroup {
         Ok(Self {
             actor: reader.required("actor")?,
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -999,7 +999,7 @@ impl MultiPostRepostViaRepostItem {
         Ok(Self {
             post: reader.required("post")?,
             via_repost: reader.required("viaRepost")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1079,7 +1079,7 @@ impl RepostGroup {
         Ok(Self {
             post: reader.required("post")?,
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1155,7 +1155,7 @@ impl RepostItem {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor: reader.required("actor")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1239,7 +1239,7 @@ impl LikeViaRepostGroup {
             post: reader.required("post")?,
             via_repost: reader.required("viaRepost")?,
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1315,7 +1315,7 @@ impl LikeViaRepostItem {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor: reader.required("actor")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1399,7 +1399,7 @@ impl RepostViaRepostGroup {
             post: reader.required("post")?,
             via_repost: reader.required("viaRepost")?,
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1475,7 +1475,7 @@ impl RepostViaRepostItem {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor: reader.required("actor")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1551,7 +1551,7 @@ impl FollowGroup {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1631,7 +1631,7 @@ impl FollowItem {
         Ok(Self {
             actor: reader.required("actor")?,
             starter_pack: reader.optional("starterPack")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1707,7 +1707,7 @@ impl SubscribedPostGroup {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1792,7 +1792,7 @@ impl SubscribedPostItem {
             actor: reader.required("actor")?,
             post: reader.required("post")?,
             parent: reader.optional("parent")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1872,7 +1872,7 @@ impl GeneratorLikeGroup {
         Ok(Self {
             generator: reader.required("generator")?,
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1948,7 +1948,7 @@ impl GeneratorLikeItem {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor: reader.required("actor")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2028,7 +2028,7 @@ impl ReplyNotification {
         Ok(Self {
             post: reader.required("post")?,
             parent: reader.required("parent")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2108,7 +2108,7 @@ impl QuoteNotification {
         Ok(Self {
             post: reader.required("post")?,
             parent: reader.optional("parent")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2188,7 +2188,7 @@ impl MentionNotification {
         Ok(Self {
             post: reader.required("post")?,
             parent: reader.optional("parent")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2268,7 +2268,7 @@ impl FollowBackNotification {
         Ok(Self {
             actor: reader.required("actor")?,
             starter_pack: reader.optional("starterPack")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2344,7 +2344,7 @@ impl VerifiedNotification {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor: reader.required("actor")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2420,7 +2420,7 @@ impl UnverifiedNotification {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor: reader.required("actor")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2500,7 +2500,7 @@ impl StarterPackJoinedNotification {
         Ok(Self {
             actor: reader.required("actor")?,
             starter_pack: reader.required("starterPack")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2576,7 +2576,7 @@ impl ContactMatchNotification {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             actor: reader.required("actor")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2647,12 +2647,12 @@ impl petrel_core::ToValue for OutputRelatedViews {
 impl OutputRelatedViews {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.actor.defs#profileViewBasic" => petrel_core::decode_value(value, strict).map(Self::ProfileViewBasic),
-            "app.bsky.feed.defs#blockedPost" => petrel_core::decode_value(value, strict).map(Self::BlockedPost),
-            "app.bsky.feed.defs#generatorView" => petrel_core::decode_value(value, strict).map(Self::GeneratorView),
-            "app.bsky.feed.defs#notFoundPost" => petrel_core::decode_value(value, strict).map(Self::NotFoundPost),
-            "app.bsky.feed.defs#postView" => petrel_core::decode_value(value, strict).map(Self::PostView),
-            "app.bsky.graph.defs#starterPackViewBasic" => petrel_core::decode_value(value, strict).map(Self::StarterPackViewBasic),
+            "app.bsky.actor.defs#profileViewBasic" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ProfileViewBasic),
+            "app.bsky.feed.defs#blockedPost" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::BlockedPost),
+            "app.bsky.feed.defs#generatorView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::GeneratorView),
+            "app.bsky.feed.defs#notFoundPost" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::NotFoundPost),
+            "app.bsky.feed.defs#postView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::PostView),
+            "app.bsky.graph.defs#starterPackViewBasic" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::StarterPackViewBasic),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -2750,25 +2750,25 @@ impl petrel_core::ToValue for GroupKind {
 impl GroupKind {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.notification.getGroupedNotifications#likeGroup" => petrel_core::decode_value(value, strict).map(Self::LikeGroup),
-            "app.bsky.notification.getGroupedNotifications#multiPostLikeGroup" => petrel_core::decode_value(value, strict).map(Self::MultiPostLikeGroup),
-            "app.bsky.notification.getGroupedNotifications#multiPostRepostGroup" => petrel_core::decode_value(value, strict).map(Self::MultiPostRepostGroup),
-            "app.bsky.notification.getGroupedNotifications#multiPostLikeViaRepostGroup" => petrel_core::decode_value(value, strict).map(Self::MultiPostLikeViaRepostGroup),
-            "app.bsky.notification.getGroupedNotifications#multiPostRepostViaRepostGroup" => petrel_core::decode_value(value, strict).map(Self::MultiPostRepostViaRepostGroup),
-            "app.bsky.notification.getGroupedNotifications#repostGroup" => petrel_core::decode_value(value, strict).map(Self::RepostGroup),
-            "app.bsky.notification.getGroupedNotifications#likeViaRepostGroup" => petrel_core::decode_value(value, strict).map(Self::LikeViaRepostGroup),
-            "app.bsky.notification.getGroupedNotifications#repostViaRepostGroup" => petrel_core::decode_value(value, strict).map(Self::RepostViaRepostGroup),
-            "app.bsky.notification.getGroupedNotifications#followGroup" => petrel_core::decode_value(value, strict).map(Self::FollowGroup),
-            "app.bsky.notification.getGroupedNotifications#subscribedPostGroup" => petrel_core::decode_value(value, strict).map(Self::SubscribedPostGroup),
-            "app.bsky.notification.getGroupedNotifications#generatorLikeGroup" => petrel_core::decode_value(value, strict).map(Self::GeneratorLikeGroup),
-            "app.bsky.notification.getGroupedNotifications#replyNotification" => petrel_core::decode_value(value, strict).map(Self::ReplyNotification),
-            "app.bsky.notification.getGroupedNotifications#quoteNotification" => petrel_core::decode_value(value, strict).map(Self::QuoteNotification),
-            "app.bsky.notification.getGroupedNotifications#mentionNotification" => petrel_core::decode_value(value, strict).map(Self::MentionNotification),
-            "app.bsky.notification.getGroupedNotifications#followBackNotification" => petrel_core::decode_value(value, strict).map(Self::FollowBackNotification),
-            "app.bsky.notification.getGroupedNotifications#verifiedNotification" => petrel_core::decode_value(value, strict).map(Self::VerifiedNotification),
-            "app.bsky.notification.getGroupedNotifications#unverifiedNotification" => petrel_core::decode_value(value, strict).map(Self::UnverifiedNotification),
-            "app.bsky.notification.getGroupedNotifications#starterPackJoinedNotification" => petrel_core::decode_value(value, strict).map(Self::StarterPackJoinedNotification),
-            "app.bsky.notification.getGroupedNotifications#contactMatchNotification" => petrel_core::decode_value(value, strict).map(Self::ContactMatchNotification),
+            "app.bsky.notification.getGroupedNotifications#likeGroup" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::LikeGroup),
+            "app.bsky.notification.getGroupedNotifications#multiPostLikeGroup" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MultiPostLikeGroup),
+            "app.bsky.notification.getGroupedNotifications#multiPostRepostGroup" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MultiPostRepostGroup),
+            "app.bsky.notification.getGroupedNotifications#multiPostLikeViaRepostGroup" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MultiPostLikeViaRepostGroup),
+            "app.bsky.notification.getGroupedNotifications#multiPostRepostViaRepostGroup" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MultiPostRepostViaRepostGroup),
+            "app.bsky.notification.getGroupedNotifications#repostGroup" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepostGroup),
+            "app.bsky.notification.getGroupedNotifications#likeViaRepostGroup" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::LikeViaRepostGroup),
+            "app.bsky.notification.getGroupedNotifications#repostViaRepostGroup" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepostViaRepostGroup),
+            "app.bsky.notification.getGroupedNotifications#followGroup" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::FollowGroup),
+            "app.bsky.notification.getGroupedNotifications#subscribedPostGroup" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SubscribedPostGroup),
+            "app.bsky.notification.getGroupedNotifications#generatorLikeGroup" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::GeneratorLikeGroup),
+            "app.bsky.notification.getGroupedNotifications#replyNotification" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ReplyNotification),
+            "app.bsky.notification.getGroupedNotifications#quoteNotification" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::QuoteNotification),
+            "app.bsky.notification.getGroupedNotifications#mentionNotification" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MentionNotification),
+            "app.bsky.notification.getGroupedNotifications#followBackNotification" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::FollowBackNotification),
+            "app.bsky.notification.getGroupedNotifications#verifiedNotification" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::VerifiedNotification),
+            "app.bsky.notification.getGroupedNotifications#unverifiedNotification" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::UnverifiedNotification),
+            "app.bsky.notification.getGroupedNotifications#starterPackJoinedNotification" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::StarterPackJoinedNotification),
+            "app.bsky.notification.getGroupedNotifications#contactMatchNotification" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ContactMatchNotification),
             _ => Ok(Self::Unknown(value)),
         }
     }

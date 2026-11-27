@@ -32,7 +32,7 @@ generator/
 |---|---|---|
 | `string` | `String` | Plain string or inline `knownValues` |
 | `string` (`did`, `handle`, `at-identifier`, `nsid`, `at-uri`, `space-ref`, `uri`, `tid`, `record-key`, `datetime`, `language`, `cid`) | `petrel_core::{Did, Handle, AtIdentifier, Nsid, AtUri, SpaceRef, Uri, Tid, RecordKey, Datetime, Language, CidString}` | Owned validated newtypes preserving original wire string |
-| `string` (`enum`) | `enum` | Closed enum with hand-written serde; unknown values fail |
+| `string` (`enum`) | `enum` | Known values as variants plus `Unknown(String)`, which keeps a value a newer peer added verbatim (decoding never fails on it) |
 | `string` (`knownValues`, named def) | `enum` with `Other(String)` | Open enum implementing `Display`, `FromStr`, `ToValue`, `FromValue`, `QueryValue`, `Serialize`, `Deserialize` |
 | `integer` | `i64` | Always 64-bit signed integer |
 | `boolean` | `bool` | Primitive boolean |
@@ -42,6 +42,8 @@ generator/
 | `unknown` | `petrel_core::Value` | Data-model value (floats rejected) |
 | `array` | `Vec<T>` | Heap-allocated sequence |
 | `union` | `enum` with `Box<T>` arms | Open unions include `Unknown(petrel_core::Value)`; closed unions reject unknown `$type` |
+
+A named or inline object def does not write `$type` itself, but one it was decoded with is kept in `extra_data` and written back (`ObjectReader::finish_preserving_type`), so decode then encode never changes a record's DAG-CBOR bytes or CID; an absent `$type` is never added. A union strips the tag before decoding its member and writes it back itself.
 | `object` (no `properties`) | `std::collections::BTreeMap<String, petrel_core::Value>` | Untyped map |
 | `number` / unknown type | Generator `ValueError` | Rejected at generation time |
 

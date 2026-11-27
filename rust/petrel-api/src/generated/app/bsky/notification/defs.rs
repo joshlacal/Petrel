@@ -37,7 +37,7 @@ impl RecordDeleted {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -117,7 +117,7 @@ impl ChatPreference {
         Ok(Self {
             include: reader.required("include")?,
             push: reader.required("push")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -200,7 +200,7 @@ impl FilterablePreference {
             include: reader.required("include")?,
             list: reader.required("list")?,
             push: reader.required("push")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -279,7 +279,7 @@ impl Preference {
         Ok(Self {
             list: reader.required("list")?,
             push: reader.required("push")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -403,7 +403,7 @@ impl Preferences {
             subscribed_post: reader.required("subscribedPost")?,
             unverified: reader.required("unverified")?,
             verified: reader.required("verified")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -482,7 +482,7 @@ impl ActivitySubscription {
         Ok(Self {
             post: reader.required("post")?,
             reply: reader.required("reply")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -562,7 +562,7 @@ impl SubjectActivitySubscription {
         Ok(Self {
             subject: reader.required("subject")?,
             activity_subscription: reader.required("activitySubscription")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

@@ -237,7 +237,7 @@ impl SpaceView {
             repo_rev: reader.optional("repoRev")?,
             data: reader.optional("data")?,
             space_rev: reader.optional("spaceRev")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

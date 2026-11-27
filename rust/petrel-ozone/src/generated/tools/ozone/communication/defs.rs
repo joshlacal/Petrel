@@ -72,7 +72,7 @@ impl TemplateView {
             last_updated_by: reader.required("lastUpdatedBy")?,
             created_at: reader.required("createdAt")?,
             updated_at: reader.required("updatedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

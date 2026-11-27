@@ -35,7 +35,7 @@ impl SkeletonSearchPost {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -110,7 +110,7 @@ impl SkeletonSearchActor {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             did: reader.required("did")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -185,7 +185,7 @@ impl SkeletonSearchStarterPack {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -272,7 +272,7 @@ impl TrendingTopic {
             display_name: reader.optional("displayName")?,
             description: reader.optional("description")?,
             link: reader.required("link")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -379,7 +379,7 @@ impl SkeletonTrend {
             status: reader.optional("status")?,
             category: reader.optional("category")?,
             dids: reader.required("dids")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -486,7 +486,7 @@ impl TrendView {
             status: reader.optional("status")?,
             category: reader.optional("category")?,
             actors: reader.required("actors")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -596,7 +596,7 @@ impl ThreadItemPost {
             op_thread_post_count: reader.optional("opThreadPostCount")?,
             hidden_by_threadgate: reader.required("hiddenByThreadgate")?,
             muted_by_viewer: reader.required("mutedByViewer")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -673,7 +673,7 @@ impl ThreadItemNoUnauthenticated {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -750,7 +750,7 @@ impl ThreadItemNotFound {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -825,7 +825,7 @@ impl ThreadItemBlocked {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             author: reader.required("author")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -907,7 +907,7 @@ impl AgeAssuranceState {
         Ok(Self {
             last_initiated_at: reader.optional("lastInitiatedAt")?,
             status: reader.required("status")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1019,7 +1019,7 @@ impl AgeAssuranceEvent {
             init_ua: reader.optional("initUa")?,
             complete_ip: reader.optional("completeIp")?,
             complete_ua: reader.optional("completeUa")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

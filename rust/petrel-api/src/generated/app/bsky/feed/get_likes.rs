@@ -198,7 +198,7 @@ impl Like {
             indexed_at: reader.required("indexedAt")?,
             created_at: reader.required("createdAt")?,
             actor: reader.required("actor")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

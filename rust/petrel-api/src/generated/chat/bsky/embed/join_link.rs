@@ -38,7 +38,7 @@ impl JoinLink {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             code: reader.required("code")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -113,7 +113,7 @@ impl View {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             join_link_preview: reader.required("joinLinkPreview")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -178,9 +178,9 @@ impl petrel_core::ToValue for ViewJoinLinkPreview {
 impl ViewJoinLinkPreview {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "chat.bsky.group.defs#joinLinkPreviewView" => petrel_core::decode_value(value, strict).map(Self::JoinLinkPreviewView),
-            "chat.bsky.group.defs#disabledJoinLinkPreviewView" => petrel_core::decode_value(value, strict).map(Self::DisabledJoinLinkPreviewView),
-            "chat.bsky.group.defs#invalidJoinLinkPreviewView" => petrel_core::decode_value(value, strict).map(Self::InvalidJoinLinkPreviewView),
+            "chat.bsky.group.defs#joinLinkPreviewView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::JoinLinkPreviewView),
+            "chat.bsky.group.defs#disabledJoinLinkPreviewView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DisabledJoinLinkPreviewView),
+            "chat.bsky.group.defs#invalidJoinLinkPreviewView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::InvalidJoinLinkPreviewView),
             _ => Ok(Self::Unknown(value)),
         }
     }

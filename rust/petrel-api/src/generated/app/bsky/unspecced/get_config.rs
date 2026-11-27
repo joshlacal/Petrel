@@ -135,7 +135,7 @@ impl LiveNowConfig {
         Ok(Self {
             did: reader.required("did")?,
             domains: reader.required("domains")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

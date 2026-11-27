@@ -144,7 +144,7 @@ impl MessageMe {
         Ok(Self {
             message_me_url: reader.required("messageMeUrl")?,
             show_button_to: reader.required("showButtonTo")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

@@ -111,7 +111,7 @@ impl {{ name }} {
 {% endif %}
 {% endfor %}
 {% if has_extra %}
-            {{ extra_name }}: reader.finish(),
+            {{ extra_name }}: reader.{% if encodes_type %}finish(){% else %}finish_preserving_type(){% endif %},
 {% endif %}
         })
     }

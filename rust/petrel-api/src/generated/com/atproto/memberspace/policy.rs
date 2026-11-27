@@ -64,7 +64,7 @@ impl Policy {
             allowed_apps: reader.optional("allowedApps")?,
             publish_policy: reader.optional("publishPolicy")?,
             publish_members: reader.optional("publishMembers")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

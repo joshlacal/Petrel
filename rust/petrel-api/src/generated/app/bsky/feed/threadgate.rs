@@ -135,7 +135,7 @@ impl MentionRule {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -213,7 +213,7 @@ impl FollowerRule {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -291,7 +291,7 @@ impl FollowingRule {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -367,7 +367,7 @@ impl ListRule {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             list: reader.required("list")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -434,10 +434,10 @@ impl petrel_core::ToValue for ThreadgateAllow {
 impl ThreadgateAllow {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.threadgate#mentionRule" => petrel_core::decode_value(value, strict).map(Self::MentionRule),
-            "app.bsky.feed.threadgate#followerRule" => petrel_core::decode_value(value, strict).map(Self::FollowerRule),
-            "app.bsky.feed.threadgate#followingRule" => petrel_core::decode_value(value, strict).map(Self::FollowingRule),
-            "app.bsky.feed.threadgate#listRule" => petrel_core::decode_value(value, strict).map(Self::ListRule),
+            "app.bsky.feed.threadgate#mentionRule" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MentionRule),
+            "app.bsky.feed.threadgate#followerRule" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::FollowerRule),
+            "app.bsky.feed.threadgate#followingRule" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::FollowingRule),
+            "app.bsky.feed.threadgate#listRule" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ListRule),
             _ => Ok(Self::Unknown(value)),
         }
     }

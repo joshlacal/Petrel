@@ -67,7 +67,7 @@ impl ListViewBasic {
             labels: reader.optional("labels")?,
             viewer: reader.optional("viewer")?,
             indexed_at: reader.optional("indexedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -186,7 +186,7 @@ impl ListView {
             labels: reader.optional("labels")?,
             viewer: reader.optional("viewer")?,
             indexed_at: reader.required("indexedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -270,7 +270,7 @@ impl ListItemView {
             uri: reader.required("uri")?,
             subject: reader.required("subject")?,
             subject_opted_out: reader.optional("subjectOptedOut")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -385,7 +385,7 @@ impl StarterPackView {
             joined_all_time_count: reader.optional("joinedAllTimeCount")?,
             labels: reader.optional("labels")?,
             indexed_at: reader.required("indexedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -492,7 +492,7 @@ impl StarterPackViewBasic {
             joined_all_time_count: reader.optional("joinedAllTimeCount")?,
             labels: reader.optional("labels")?,
             indexed_at: reader.required("indexedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -591,7 +591,7 @@ impl ListViewerState {
             muted: reader.optional("muted")?,
             blocked: reader.optional("blocked")?,
             reference_list_opt_out: reader.optional("referenceListOptOut")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -671,7 +671,7 @@ impl NotFoundActor {
         Ok(Self {
             actor: reader.required("actor")?,
             not_found: reader.required("notFound")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -777,7 +777,7 @@ impl Relationship {
             blocked_by: reader.optional("blockedBy")?,
             blocking_by_list: reader.optional("blockingByList")?,
             blocked_by_list: reader.optional("blockedByList")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

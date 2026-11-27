@@ -182,7 +182,7 @@ impl RecordBlob {
         Ok(Self {
             cid: reader.required("cid")?,
             record_uri: reader.required("recordUri")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

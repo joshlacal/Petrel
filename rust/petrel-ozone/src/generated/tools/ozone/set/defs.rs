@@ -39,7 +39,7 @@ impl Set {
         Ok(Self {
             name: reader.required("name")?,
             description: reader.optional("description")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -130,7 +130,7 @@ impl SetView {
             set_size: reader.required("setSize")?,
             created_at: reader.required("createdAt")?,
             updated_at: reader.required("updatedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

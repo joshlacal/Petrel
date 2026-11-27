@@ -234,7 +234,7 @@ impl BatchItem {
         Ok(Self {
             convo_id: reader.required("convoId")?,
             message: reader.required("message")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

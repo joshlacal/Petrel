@@ -37,7 +37,7 @@ impl Record {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             record: reader.required("record")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -112,7 +112,7 @@ impl View {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             record: reader.required("record")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -238,7 +238,7 @@ impl ViewRecord {
             op_thread_post_count: reader.optional("opThreadPostCount")?,
             embeds: reader.optional("embeds")?,
             indexed_at: reader.required("indexedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -317,7 +317,7 @@ impl ViewNotFound {
         Ok(Self {
             uri: reader.required("uri")?,
             not_found: reader.required("notFound")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -400,7 +400,7 @@ impl ViewBlocked {
             uri: reader.required("uri")?,
             blocked: reader.required("blocked")?,
             author: reader.required("author")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -479,7 +479,7 @@ impl ViewDetached {
         Ok(Self {
             uri: reader.required("uri")?,
             detached: reader.required("detached")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -554,14 +554,14 @@ impl petrel_core::ToValue for ViewRecordUnion {
 impl ViewRecordUnion {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.record#viewRecord" => petrel_core::decode_value(value, strict).map(Self::ViewRecord),
-            "app.bsky.embed.record#viewNotFound" => petrel_core::decode_value(value, strict).map(Self::ViewNotFound),
-            "app.bsky.embed.record#viewBlocked" => petrel_core::decode_value(value, strict).map(Self::ViewBlocked),
-            "app.bsky.embed.record#viewDetached" => petrel_core::decode_value(value, strict).map(Self::ViewDetached),
-            "app.bsky.feed.defs#generatorView" => petrel_core::decode_value(value, strict).map(Self::GeneratorView),
-            "app.bsky.graph.defs#listView" => petrel_core::decode_value(value, strict).map(Self::ListView),
-            "app.bsky.labeler.defs#labelerView" => petrel_core::decode_value(value, strict).map(Self::LabelerView),
-            "app.bsky.graph.defs#starterPackViewBasic" => petrel_core::decode_value(value, strict).map(Self::StarterPackViewBasic),
+            "app.bsky.embed.record#viewRecord" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ViewRecord),
+            "app.bsky.embed.record#viewNotFound" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ViewNotFound),
+            "app.bsky.embed.record#viewBlocked" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ViewBlocked),
+            "app.bsky.embed.record#viewDetached" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ViewDetached),
+            "app.bsky.feed.defs#generatorView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::GeneratorView),
+            "app.bsky.graph.defs#listView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ListView),
+            "app.bsky.labeler.defs#labelerView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::LabelerView),
+            "app.bsky.graph.defs#starterPackViewBasic" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::StarterPackViewBasic),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -633,12 +633,12 @@ impl petrel_core::ToValue for ViewRecordEmbeds {
 impl ViewRecordEmbeds {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.images#view" => petrel_core::decode_value(value, strict).map(Self::ImagesView),
-            "app.bsky.embed.video#view" => petrel_core::decode_value(value, strict).map(Self::VideoView),
-            "app.bsky.embed.gallery#view" => petrel_core::decode_value(value, strict).map(Self::GalleryView),
-            "app.bsky.embed.external#view" => petrel_core::decode_value(value, strict).map(Self::ExternalView),
-            "app.bsky.embed.record#view" => petrel_core::decode_value(value, strict).map(Self::RecordView),
-            "app.bsky.embed.recordWithMedia#view" => petrel_core::decode_value(value, strict).map(Self::RecordWithMediaView),
+            "app.bsky.embed.images#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ImagesView),
+            "app.bsky.embed.video#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::VideoView),
+            "app.bsky.embed.gallery#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::GalleryView),
+            "app.bsky.embed.external#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ExternalView),
+            "app.bsky.embed.record#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RecordView),
+            "app.bsky.embed.recordWithMedia#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RecordWithMediaView),
             _ => Ok(Self::Unknown(value)),
         }
     }

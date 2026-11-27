@@ -203,7 +203,7 @@ impl ResultAvailable {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -280,7 +280,7 @@ impl ResultUnavailable {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             suggestions: reader.required("suggestions")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -360,7 +360,7 @@ impl Suggestion {
         Ok(Self {
             handle: reader.required("handle")?,
             method: reader.required("method")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -423,8 +423,8 @@ impl petrel_core::ToValue for OutputResult {
 impl OutputResult {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.temp.checkHandleAvailability#resultAvailable" => petrel_core::decode_value(value, strict).map(Self::ResultAvailable),
-            "com.atproto.temp.checkHandleAvailability#resultUnavailable" => petrel_core::decode_value(value, strict).map(Self::ResultUnavailable),
+            "com.atproto.temp.checkHandleAvailability#resultAvailable" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ResultAvailable),
+            "com.atproto.temp.checkHandleAvailability#resultUnavailable" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ResultUnavailable),
             _ => Ok(Self::Unknown(value)),
         }
     }

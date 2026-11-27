@@ -59,7 +59,7 @@ impl Member {
             updated_at: reader.optional("updatedAt")?,
             last_updated_by: reader.optional("lastUpdatedBy")?,
             role: reader.required("role")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

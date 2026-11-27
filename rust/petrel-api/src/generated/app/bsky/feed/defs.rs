@@ -92,7 +92,7 @@ impl PostView {
             labels: reader.optional("labels")?,
             threadgate: reader.optional("threadgate")?,
             debug: reader.optional("debug")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -203,7 +203,7 @@ impl ViewerState {
             embedding_disabled: reader.optional("embeddingDisabled")?,
             pinned: reader.optional("pinned")?,
             known_likers: reader.optional("knownLikers")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -283,7 +283,7 @@ impl KnownLikers {
         Ok(Self {
             count: reader.required("count")?,
             actors: reader.required("actors")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -365,7 +365,7 @@ impl ThreadContext {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             root_author_like: reader.optional("rootAuthorLike")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -468,7 +468,7 @@ impl FeedViewPost {
             reason: reader.optional("reason")?,
             feed_context: reader.optional("feedContext")?,
             req_id: reader.optional("reqId")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -552,7 +552,7 @@ impl ReplyRef {
             root: reader.required("root")?,
             parent: reader.required("parent")?,
             grandparent_author: reader.optional("grandparentAuthor")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -639,7 +639,7 @@ impl ReasonRepost {
             uri: reader.optional("uri")?,
             cid: reader.optional("cid")?,
             indexed_at: reader.required("indexedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -716,7 +716,7 @@ impl ReasonPin {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -803,7 +803,7 @@ impl ThreadViewPost {
             parent: reader.optional("parent")?,
             replies: reader.optional("replies")?,
             thread_context: reader.optional("threadContext")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -882,7 +882,7 @@ impl NotFoundPost {
         Ok(Self {
             uri: reader.required("uri")?,
             not_found: reader.required("notFound")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -965,7 +965,7 @@ impl BlockedPost {
             uri: reader.required("uri")?,
             blocked: reader.required("blocked")?,
             author: reader.required("author")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1044,7 +1044,7 @@ impl BlockedAuthor {
         Ok(Self {
             did: reader.required("did")?,
             viewer: reader.optional("viewer")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1171,7 +1171,7 @@ impl GeneratorView {
             viewer: reader.optional("viewer")?,
             content_mode: reader.optional("contentMode")?,
             indexed_at: reader.required("indexedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1252,7 +1252,7 @@ impl GeneratorViewerState {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             like: reader.optional("like")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1336,7 +1336,7 @@ impl SkeletonFeedPost {
             post: reader.required("post")?,
             reason: reader.optional("reason")?,
             feed_context: reader.optional("feedContext")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1411,7 +1411,7 @@ impl SkeletonReasonRepost {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             repost: reader.required("repost")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1488,7 +1488,7 @@ impl SkeletonReasonPin {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1581,7 +1581,7 @@ impl ThreadgateView {
             cid: reader.optional("cid")?,
             record: reader.optional("record")?,
             lists: reader.optional("lists")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1676,7 +1676,7 @@ impl Interaction {
             event: reader.optional("event")?,
             feed_context: reader.optional("feedContext")?,
             req_id: reader.optional("reqId")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1789,12 +1789,12 @@ impl petrel_core::ToValue for PostViewEmbed {
 impl PostViewEmbed {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.images#view" => petrel_core::decode_value(value, strict).map(Self::ImagesView),
-            "app.bsky.embed.video#view" => petrel_core::decode_value(value, strict).map(Self::VideoView),
-            "app.bsky.embed.gallery#view" => petrel_core::decode_value(value, strict).map(Self::GalleryView),
-            "app.bsky.embed.external#view" => petrel_core::decode_value(value, strict).map(Self::ExternalView),
-            "app.bsky.embed.record#view" => petrel_core::decode_value(value, strict).map(Self::RecordView),
-            "app.bsky.embed.recordWithMedia#view" => petrel_core::decode_value(value, strict).map(Self::RecordWithMediaView),
+            "app.bsky.embed.images#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ImagesView),
+            "app.bsky.embed.video#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::VideoView),
+            "app.bsky.embed.gallery#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::GalleryView),
+            "app.bsky.embed.external#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ExternalView),
+            "app.bsky.embed.record#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RecordView),
+            "app.bsky.embed.recordWithMedia#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RecordWithMediaView),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -1858,8 +1858,8 @@ impl petrel_core::ToValue for FeedViewPostReason {
 impl FeedViewPostReason {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.defs#reasonRepost" => petrel_core::decode_value(value, strict).map(Self::ReasonRepost),
-            "app.bsky.feed.defs#reasonPin" => petrel_core::decode_value(value, strict).map(Self::ReasonPin),
+            "app.bsky.feed.defs#reasonRepost" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ReasonRepost),
+            "app.bsky.feed.defs#reasonPin" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ReasonPin),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -1925,9 +1925,9 @@ impl petrel_core::ToValue for ReplyRefRoot {
 impl ReplyRefRoot {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.defs#postView" => petrel_core::decode_value(value, strict).map(Self::PostView),
-            "app.bsky.feed.defs#notFoundPost" => petrel_core::decode_value(value, strict).map(Self::NotFoundPost),
-            "app.bsky.feed.defs#blockedPost" => petrel_core::decode_value(value, strict).map(Self::BlockedPost),
+            "app.bsky.feed.defs#postView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::PostView),
+            "app.bsky.feed.defs#notFoundPost" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::NotFoundPost),
+            "app.bsky.feed.defs#blockedPost" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::BlockedPost),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -1993,9 +1993,9 @@ impl petrel_core::ToValue for ReplyRefParent {
 impl ReplyRefParent {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.defs#postView" => petrel_core::decode_value(value, strict).map(Self::PostView),
-            "app.bsky.feed.defs#notFoundPost" => petrel_core::decode_value(value, strict).map(Self::NotFoundPost),
-            "app.bsky.feed.defs#blockedPost" => petrel_core::decode_value(value, strict).map(Self::BlockedPost),
+            "app.bsky.feed.defs#postView" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::PostView),
+            "app.bsky.feed.defs#notFoundPost" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::NotFoundPost),
+            "app.bsky.feed.defs#blockedPost" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::BlockedPost),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -2061,9 +2061,9 @@ impl petrel_core::ToValue for ThreadViewPostParent {
 impl ThreadViewPostParent {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.defs#threadViewPost" => petrel_core::decode_value(value, strict).map(Self::ThreadViewPost),
-            "app.bsky.feed.defs#notFoundPost" => petrel_core::decode_value(value, strict).map(Self::NotFoundPost),
-            "app.bsky.feed.defs#blockedPost" => petrel_core::decode_value(value, strict).map(Self::BlockedPost),
+            "app.bsky.feed.defs#threadViewPost" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ThreadViewPost),
+            "app.bsky.feed.defs#notFoundPost" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::NotFoundPost),
+            "app.bsky.feed.defs#blockedPost" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::BlockedPost),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -2129,9 +2129,9 @@ impl petrel_core::ToValue for ThreadViewPostReplies {
 impl ThreadViewPostReplies {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.defs#threadViewPost" => petrel_core::decode_value(value, strict).map(Self::ThreadViewPost),
-            "app.bsky.feed.defs#notFoundPost" => petrel_core::decode_value(value, strict).map(Self::NotFoundPost),
-            "app.bsky.feed.defs#blockedPost" => petrel_core::decode_value(value, strict).map(Self::BlockedPost),
+            "app.bsky.feed.defs#threadViewPost" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ThreadViewPost),
+            "app.bsky.feed.defs#notFoundPost" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::NotFoundPost),
+            "app.bsky.feed.defs#blockedPost" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::BlockedPost),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -2195,8 +2195,8 @@ impl petrel_core::ToValue for SkeletonFeedPostReason {
 impl SkeletonFeedPostReason {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.defs#skeletonReasonRepost" => petrel_core::decode_value(value, strict).map(Self::SkeletonReasonRepost),
-            "app.bsky.feed.defs#skeletonReasonPin" => petrel_core::decode_value(value, strict).map(Self::SkeletonReasonPin),
+            "app.bsky.feed.defs#skeletonReasonRepost" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SkeletonReasonRepost),
+            "app.bsky.feed.defs#skeletonReasonPin" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SkeletonReasonPin),
             _ => Ok(Self::Unknown(value)),
         }
     }

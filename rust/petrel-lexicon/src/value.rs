@@ -1092,6 +1092,16 @@ fn write_json_value(value: &Value, out: &mut String) {
             let _ = write!(out, "{n}");
         }
         Value::String(s) => write_json_string(s, out),
+        // Only lenient JSON decoding makes one; JSON can still spell it.
+        Value::Float(number) => {
+            use std::fmt::Write as _;
+            let _ = write!(
+                out,
+                "{}",
+                serde_json::Number::from_f64(number.get())
+                    .map_or_else(|| "null".to_owned(), |n| n.to_string())
+            );
+        }
         Value::Bytes(bytes) => {
             out.push_str("{\"$bytes\":\"");
             out.push_str(&STANDARD_NO_PAD.encode(bytes));

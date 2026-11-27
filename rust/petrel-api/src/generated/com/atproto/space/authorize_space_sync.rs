@@ -286,7 +286,7 @@ impl Notify {
         Ok(Self {
             endpoint: reader.required("endpoint")?,
             token: reader.required("token")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

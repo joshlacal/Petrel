@@ -184,8 +184,8 @@ impl petrel_core::ToValue for OutputRelationships {
 impl OutputRelationships {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.graph.defs#relationship" => petrel_core::decode_value(value, strict).map(Self::Relationship),
-            "app.bsky.graph.defs#notFoundActor" => petrel_core::decode_value(value, strict).map(Self::NotFoundActor),
+            "app.bsky.graph.defs#relationship" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Relationship),
+            "app.bsky.graph.defs#notFoundActor" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::NotFoundActor),
             _ => Ok(Self::Unknown(value)),
         }
     }

@@ -45,7 +45,7 @@ impl IdentityInfo {
             did: reader.required("did")?,
             handle: reader.required("handle")?,
             did_doc: reader.required("didDoc")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

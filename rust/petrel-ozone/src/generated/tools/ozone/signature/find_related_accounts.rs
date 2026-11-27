@@ -180,7 +180,7 @@ impl RelatedAccount {
         Ok(Self {
             account: reader.required("account")?,
             similarities: reader.optional("similarities")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

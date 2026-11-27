@@ -170,7 +170,7 @@ impl UnreadCounts {
             reports: reader.optional("reports")?,
             subjects: reader.optional("subjects")?,
             account_status: reader.optional("accountStatus")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

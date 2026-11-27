@@ -52,7 +52,7 @@ impl JoinLinkView {
             require_approval: reader.required("requireApproval")?,
             join_rule: reader.required("joinRule")?,
             created_at: reader.required("createdAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -165,7 +165,7 @@ impl JoinLinkPreviewView {
             join_rule: reader.required("joinRule")?,
             convo: reader.optional("convo")?,
             viewer: reader.optional("viewer")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -241,7 +241,7 @@ impl DisabledJoinLinkPreviewView {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             code: reader.required("code")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -317,7 +317,7 @@ impl InvalidJoinLinkPreviewView {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             code: reader.required("code")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -398,7 +398,7 @@ impl JoinLinkViewerState {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             requested_at: reader.optional("requestedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -482,7 +482,7 @@ impl JoinRequestView {
             convo_id: reader.required("convoId")?,
             requested_by: reader.required("requestedBy")?,
             requested_at: reader.required("requestedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -578,7 +578,7 @@ impl JoinRequestConvoView {
             member_count: reader.required("memberCount")?,
             member_limit: reader.required("memberLimit")?,
             viewer: reader.required("viewer")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

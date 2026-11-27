@@ -39,7 +39,7 @@ impl Preferences {
         Ok(Self {
             chat: reader.required("chat")?,
             chat_request: reader.required("chatRequest")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -118,7 +118,7 @@ impl ChatPreference {
         Ok(Self {
             include: reader.required("include")?,
             push: reader.required("push")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

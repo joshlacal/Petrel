@@ -182,7 +182,7 @@ impl StarterPackWithMembership {
         Ok(Self {
             starter_pack: reader.required("starterPack")?,
             list_item: reader.optional("listItem")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

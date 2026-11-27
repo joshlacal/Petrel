@@ -80,7 +80,7 @@ impl ProfileViewBasic {
             verification: reader.optional("verification")?,
             status: reader.optional("status")?,
             debug: reader.optional("debug")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -208,7 +208,7 @@ impl ProfileView {
             verification: reader.optional("verification")?,
             status: reader.optional("status")?,
             debug: reader.optional("debug")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -370,7 +370,7 @@ impl ProfileViewDetailed {
             verification: reader.optional("verification")?,
             status: reader.optional("status")?,
             debug: reader.optional("debug")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -475,7 +475,7 @@ impl ProfileAssociated {
             chat: reader.optional("chat")?,
             activity_subscription: reader.optional("activitySubscription")?,
             germ: reader.optional("germ")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -554,7 +554,7 @@ impl ProfileAssociatedChat {
         Ok(Self {
             allow_incoming: reader.required("allowIncoming")?,
             allow_group_invites: reader.optional("allowGroupInvites")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -633,7 +633,7 @@ impl ProfileAssociatedGerm {
         Ok(Self {
             message_me_url: reader.required("messageMeUrl")?,
             show_button_to: reader.required("showButtonTo")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -731,7 +731,7 @@ impl ProfileLinkView {
             title: reader.optional("title")?,
             icon: reader.optional("icon")?,
             labels: reader.optional("labels")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -806,7 +806,7 @@ impl ProfileAssociatedActivitySubscription {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             allow_subscriptions: reader.required("allowSubscriptions")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -933,7 +933,7 @@ impl ViewerState {
             followed_by: reader.optional("followedBy")?,
             known_followers: reader.optional("knownFollowers")?,
             activity_subscription: reader.optional("activitySubscription")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1013,7 +1013,7 @@ impl KnownFollowers {
         Ok(Self {
             count: reader.required("count")?,
             followers: reader.required("followers")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1100,7 +1100,7 @@ impl VerificationState {
             verifications: reader.required("verifications")?,
             verified_status: reader.required("verifiedStatus")?,
             trusted_verifier_status: reader.required("trustedVerifierStatus")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1202,7 +1202,7 @@ impl VerificationView {
             uri: reader.required("uri")?,
             is_valid: reader.required("isValid")?,
             created_at: reader.required("createdAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1279,7 +1279,7 @@ impl AdultContentPref {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             enabled: reader.required("enabled")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1363,7 +1363,7 @@ impl ContentLabelPref {
             labeler_did: reader.optional("labelerDid")?,
             label: reader.required("label")?,
             visibility: reader.required("visibility")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1450,7 +1450,7 @@ impl SavedFeed {
             r#type: reader.required("type")?,
             value: reader.required("value")?,
             pinned: reader.required("pinned")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1525,7 +1525,7 @@ impl SavedFeedsPrefV2 {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1608,7 +1608,7 @@ impl SavedFeedsPref {
             pinned: reader.required("pinned")?,
             saved: reader.required("saved")?,
             timeline_index: reader.optional("timelineIndex")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1690,7 +1690,7 @@ impl PersonalDetailsPref {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             birth_date: reader.optional("birthDate")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1783,7 +1783,7 @@ impl DeclaredAgePref {
             is_over_age13: reader.optional("isOverAge13")?,
             is_over_age16: reader.optional("isOverAge16")?,
             is_over_age18: reader.optional("isOverAge18")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1884,7 +1884,7 @@ impl FeedViewPref {
             hide_replies_by_like_count: reader.optional("hideRepliesByLikeCount")?,
             hide_reposts: reader.optional("hideReposts")?,
             hide_quote_posts: reader.optional("hideQuotePosts")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -1966,7 +1966,7 @@ impl ThreadViewPref {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             sort: reader.optional("sort")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2047,7 +2047,7 @@ impl InterestsPref {
         Ok(Self {
             updated_at: reader.optional("updatedAt")?,
             tags: reader.required("tags")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2143,7 +2143,7 @@ impl MutedWord {
             targets: reader.required("targets")?,
             actor_target: reader.optional("actorTarget")?,
             expires_at: reader.optional("expiresAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2219,7 +2219,7 @@ impl MutedWordsPref {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2295,7 +2295,7 @@ impl HiddenPostsPref {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2370,7 +2370,7 @@ impl LabelersPref {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             labelers: reader.required("labelers")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2445,7 +2445,7 @@ impl LabelerPrefItem {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             did: reader.required("did")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2542,7 +2542,7 @@ impl BskyAppStatePref {
             is_beta_user: reader.optional("isBetaUser")?,
             queued_nudges: reader.optional("queuedNudges")?,
             nuxs: reader.optional("nuxs")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2618,7 +2618,7 @@ impl BskyAppProgressGuide {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             guide: reader.required("guide")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2708,7 +2708,7 @@ impl Nux {
             completed: reader.required("completed")?,
             data: reader.optional("data")?,
             expires_at: reader.optional("expiresAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2791,7 +2791,7 @@ impl VerificationPrefs {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             hide_badges: reader.optional("hideBadges")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2879,7 +2879,7 @@ impl LiveEventPreferences {
         Ok(Self {
             hidden_feed_ids: reader.optional("hiddenFeedIds")?,
             hide_all_feeds: reader.optional("hideAllFeeds")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -2967,7 +2967,7 @@ impl PostInteractionSettingsPref {
         Ok(Self {
             threadgate_allow_rules: reader.optional("threadgateAllowRules")?,
             postgate_embedding_rules: reader.optional("postgateEmbeddingRules")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -3079,7 +3079,7 @@ impl StatusView {
             expires_at: reader.optional("expiresAt")?,
             is_active: reader.optional("isActive")?,
             is_disabled: reader.optional("isDisabled")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -3170,22 +3170,22 @@ impl petrel_core::ToValue for PreferencesItem {
 impl PreferencesItem {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.actor.defs#adultContentPref" => petrel_core::decode_value(value, strict).map(Self::AdultContentPref),
-            "app.bsky.actor.defs#contentLabelPref" => petrel_core::decode_value(value, strict).map(Self::ContentLabelPref),
-            "app.bsky.actor.defs#savedFeedsPref" => petrel_core::decode_value(value, strict).map(Self::SavedFeedsPref),
-            "app.bsky.actor.defs#savedFeedsPrefV2" => petrel_core::decode_value(value, strict).map(Self::SavedFeedsPrefV2),
-            "app.bsky.actor.defs#personalDetailsPref" => petrel_core::decode_value(value, strict).map(Self::PersonalDetailsPref),
-            "app.bsky.actor.defs#declaredAgePref" => petrel_core::decode_value(value, strict).map(Self::DeclaredAgePref),
-            "app.bsky.actor.defs#feedViewPref" => petrel_core::decode_value(value, strict).map(Self::FeedViewPref),
-            "app.bsky.actor.defs#threadViewPref" => petrel_core::decode_value(value, strict).map(Self::ThreadViewPref),
-            "app.bsky.actor.defs#interestsPref" => petrel_core::decode_value(value, strict).map(Self::InterestsPref),
-            "app.bsky.actor.defs#mutedWordsPref" => petrel_core::decode_value(value, strict).map(Self::MutedWordsPref),
-            "app.bsky.actor.defs#hiddenPostsPref" => petrel_core::decode_value(value, strict).map(Self::HiddenPostsPref),
-            "app.bsky.actor.defs#bskyAppStatePref" => petrel_core::decode_value(value, strict).map(Self::BskyAppStatePref),
-            "app.bsky.actor.defs#labelersPref" => petrel_core::decode_value(value, strict).map(Self::LabelersPref),
-            "app.bsky.actor.defs#postInteractionSettingsPref" => petrel_core::decode_value(value, strict).map(Self::PostInteractionSettingsPref),
-            "app.bsky.actor.defs#verificationPrefs" => petrel_core::decode_value(value, strict).map(Self::VerificationPrefs),
-            "app.bsky.actor.defs#liveEventPreferences" => petrel_core::decode_value(value, strict).map(Self::LiveEventPreferences),
+            "app.bsky.actor.defs#adultContentPref" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::AdultContentPref),
+            "app.bsky.actor.defs#contentLabelPref" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ContentLabelPref),
+            "app.bsky.actor.defs#savedFeedsPref" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SavedFeedsPref),
+            "app.bsky.actor.defs#savedFeedsPrefV2" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SavedFeedsPrefV2),
+            "app.bsky.actor.defs#personalDetailsPref" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::PersonalDetailsPref),
+            "app.bsky.actor.defs#declaredAgePref" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DeclaredAgePref),
+            "app.bsky.actor.defs#feedViewPref" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::FeedViewPref),
+            "app.bsky.actor.defs#threadViewPref" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ThreadViewPref),
+            "app.bsky.actor.defs#interestsPref" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::InterestsPref),
+            "app.bsky.actor.defs#mutedWordsPref" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MutedWordsPref),
+            "app.bsky.actor.defs#hiddenPostsPref" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::HiddenPostsPref),
+            "app.bsky.actor.defs#bskyAppStatePref" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::BskyAppStatePref),
+            "app.bsky.actor.defs#labelersPref" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::LabelersPref),
+            "app.bsky.actor.defs#postInteractionSettingsPref" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::PostInteractionSettingsPref),
+            "app.bsky.actor.defs#verificationPrefs" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::VerificationPrefs),
+            "app.bsky.actor.defs#liveEventPreferences" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::LiveEventPreferences),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -3359,10 +3359,10 @@ impl petrel_core::ToValue for PostInteractionSettingsPrefThreadgateAllowRules {
 impl PostInteractionSettingsPrefThreadgateAllowRules {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.threadgate#mentionRule" => petrel_core::decode_value(value, strict).map(Self::MentionRule),
-            "app.bsky.feed.threadgate#followerRule" => petrel_core::decode_value(value, strict).map(Self::FollowerRule),
-            "app.bsky.feed.threadgate#followingRule" => petrel_core::decode_value(value, strict).map(Self::FollowingRule),
-            "app.bsky.feed.threadgate#listRule" => petrel_core::decode_value(value, strict).map(Self::ListRule),
+            "app.bsky.feed.threadgate#mentionRule" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MentionRule),
+            "app.bsky.feed.threadgate#followerRule" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::FollowerRule),
+            "app.bsky.feed.threadgate#followingRule" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::FollowingRule),
+            "app.bsky.feed.threadgate#listRule" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ListRule),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -3424,7 +3424,7 @@ impl petrel_core::ToValue for PostInteractionSettingsPrefPostgateEmbeddingRules 
 impl PostInteractionSettingsPrefPostgateEmbeddingRules {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.postgate#disableRule" => petrel_core::decode_value(value, strict).map(Self::DisableRule),
+            "app.bsky.feed.postgate#disableRule" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DisableRule),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -3486,7 +3486,7 @@ impl petrel_core::ToValue for StatusViewEmbed {
 impl StatusViewEmbed {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.external#view" => petrel_core::decode_value(value, strict).map(Self::View),
+            "app.bsky.embed.external#view" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::View),
             _ => Ok(Self::Unknown(value)),
         }
     }

@@ -190,7 +190,7 @@ impl Event {
             details: reader.required("details")?,
             created_by: reader.required("createdBy")?,
             created_at: reader.required("createdAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -275,7 +275,7 @@ impl AccountCreated {
         Ok(Self {
             email: reader.optional("email")?,
             handle: reader.optional("handle")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -350,7 +350,7 @@ impl EmailUpdated {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             email: reader.required("email")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -425,7 +425,7 @@ impl EmailConfirmed {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             email: reader.required("email")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -502,7 +502,7 @@ impl PasswordUpdated {
     /// field is an error (an XRPC input) or is kept as raw data.
     fn decode_fields(reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -577,7 +577,7 @@ impl HandleUpdated {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             handle: reader.required("handle")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -646,11 +646,11 @@ impl petrel_core::ToValue for EventDetails {
 impl EventDetails {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "tools.ozone.hosting.getAccountHistory#accountCreated" => petrel_core::decode_value(value, strict).map(Self::AccountCreated),
-            "tools.ozone.hosting.getAccountHistory#emailUpdated" => petrel_core::decode_value(value, strict).map(Self::EmailUpdated),
-            "tools.ozone.hosting.getAccountHistory#emailConfirmed" => petrel_core::decode_value(value, strict).map(Self::EmailConfirmed),
-            "tools.ozone.hosting.getAccountHistory#passwordUpdated" => petrel_core::decode_value(value, strict).map(Self::PasswordUpdated),
-            "tools.ozone.hosting.getAccountHistory#handleUpdated" => petrel_core::decode_value(value, strict).map(Self::HandleUpdated),
+            "tools.ozone.hosting.getAccountHistory#accountCreated" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::AccountCreated),
+            "tools.ozone.hosting.getAccountHistory#emailUpdated" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::EmailUpdated),
+            "tools.ozone.hosting.getAccountHistory#emailConfirmed" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::EmailConfirmed),
+            "tools.ozone.hosting.getAccountHistory#passwordUpdated" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::PasswordUpdated),
+            "tools.ozone.hosting.getAccountHistory#handleUpdated" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::HandleUpdated),
             _ => Ok(Self::Unknown(value)),
         }
     }

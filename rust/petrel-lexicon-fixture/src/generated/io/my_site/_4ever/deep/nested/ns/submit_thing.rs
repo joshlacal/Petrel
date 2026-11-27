@@ -58,7 +58,7 @@ impl Thing {
         Ok(Self {
             name: reader.required("name")?,
             count: reader.optional("count")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -121,8 +121,8 @@ impl petrel_core::ToValue for OutputUnion {
 impl OutputUnion {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "io.my-site.4ever.deep.nested.ns.submitThing#thing" => petrel_core::decode_value(value, strict).map(Self::Thing),
-            "com.example.widget.defs#gadget" => petrel_core::decode_value(value, strict).map(Self::Gadget),
+            "io.my-site.4ever.deep.nested.ns.submitThing#thing" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Thing),
+            "com.example.widget.defs#gadget" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Gadget),
             _ => Ok(Self::Unknown(value)),
         }
     }

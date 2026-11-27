@@ -59,7 +59,7 @@ impl InviteCode {
             created_by: reader.required("createdBy")?,
             created_at: reader.required("createdAt")?,
             uses: reader.required("uses")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -138,7 +138,7 @@ impl InviteCodeUse {
         Ok(Self {
             used_by: reader.required("usedBy")?,
             used_at: reader.required("usedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

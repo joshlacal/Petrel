@@ -39,7 +39,7 @@ impl StatusAttr {
         Ok(Self {
             applied: reader.required("applied")?,
             r#ref: reader.optional("ref")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -158,7 +158,7 @@ impl AccountView {
             invite_note: reader.optional("inviteNote")?,
             deactivated_at: reader.optional("deactivatedAt")?,
             threat_signatures: reader.optional("threatSignatures")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -233,7 +233,7 @@ impl RepoRef {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             did: reader.required("did")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -316,7 +316,7 @@ impl RepoBlobRef {
             did: reader.required("did")?,
             cid: reader.required("cid")?,
             record_uri: reader.optional("recordUri")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -395,7 +395,7 @@ impl ThreatSignature {
         Ok(Self {
             property: reader.required("property")?,
             value: reader.required("value")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

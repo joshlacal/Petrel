@@ -286,7 +286,7 @@ impl StringFormats {
             uri: reader.optional("uri")?,
             tid: reader.optional("tid")?,
             recordkey: reader.optional("recordkey")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -375,7 +375,7 @@ impl DemoObject {
         Ok(Self {
             a: reader.optional("a")?,
             b: reader.optional("b")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -461,7 +461,7 @@ impl DemoObjectTwo {
         Ok(Self {
             c: reader.optional("c")?,
             d: reader.optional("d")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -547,7 +547,7 @@ impl RecordObject {
         Ok(Self {
             a: reader.optional("a")?,
             b: reader.optional("b")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -610,8 +610,8 @@ impl petrel_core::ToValue for RecordUnion {
 impl RecordUnion {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "example.lexicon.record#demoObject" => petrel_core::decode_value(value, strict).map(Self::DemoObject),
-            "example.lexicon.record#demoObjectTwo" => petrel_core::decode_value(value, strict).map(Self::DemoObjectTwo),
+            "example.lexicon.record#demoObject" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DemoObject),
+            "example.lexicon.record#demoObjectTwo" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DemoObjectTwo),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -655,19 +655,23 @@ impl<'de> serde::Deserialize<'de> for RecordUnion {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RecordEnumString {
     Fish,
     Tree,
     Rock,
+    /// A value this build does not know (a newer peer added it), kept
+    /// verbatim so it is written back unchanged.
+    Unknown(String),
 }
 
 impl RecordEnumString {
-    pub const fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::Fish => "fish",
             Self::Tree => "tree",
             Self::Rock => "rock",
+            Self::Unknown(value) => value.as_str(),
         }
     }
 }
@@ -679,14 +683,14 @@ impl core::fmt::Display for RecordEnumString {
 }
 
 impl core::str::FromStr for RecordEnumString {
-    type Err = &'static str;
+    type Err = core::convert::Infallible;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "fish" => Ok(Self::Fish),
-            "tree" => Ok(Self::Tree),
-            "rock" => Ok(Self::Rock),
-            _ => Err("unknown variant for RecordEnumString"),
-        }
+        Ok(match s {
+            "fish" => Self::Fish,
+            "tree" => Self::Tree,
+            "rock" => Self::Rock,
+            other => Self::Unknown(other.to_owned()),
+        })
     }
 }
 
@@ -699,12 +703,12 @@ impl petrel_core::ToValue for RecordEnumString {
 impl petrel_core::FromValue for RecordEnumString {
     fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
         let raw = String::from_value(value)?;
-        match raw.as_str() {
-            "fish" => Ok(Self::Fish),
-            "tree" => Ok(Self::Tree),
-            "rock" => Ok(Self::Rock),
-            other => Err(petrel_core::DecodeError::Custom(format!("unknown variant `{other}` for RecordEnumString"))),
-        }
+        Ok(match raw.as_str() {
+            "fish" => Self::Fish,
+            "tree" => Self::Tree,
+            "rock" => Self::Rock,
+            _ => Self::Unknown(raw),
+        })
     }
 }
 
@@ -716,7 +720,10 @@ impl petrel_core::xrpc::QueryValue for RecordEnumString {
 
 impl petrel_core::xrpc::FromQueryValue for RecordEnumString {
     fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
-        value.parse::<Self>().map_err(|err| petrel_core::DecodeError::Custom(err.to_owned()))
+        Ok(match value.parse::<Self>() {
+            Ok(parsed) => parsed,
+            Err(never) => match never {},
+        })
     }
 }
 
@@ -764,7 +771,7 @@ impl petrel_core::ToValue for RecordClosedUnion {
 impl RecordClosedUnion {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "example.lexicon.record#demoObject" => petrel_core::decode_value(value, strict).map(Self::DemoObject),
+            "example.lexicon.record#demoObject" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DemoObject),
             other => Err(petrel_core::DecodeError::UnknownType(other.to_owned())),
         }
     }

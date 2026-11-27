@@ -41,7 +41,7 @@ impl DraftWithId {
         Ok(Self {
             id: reader.required("id")?,
             draft: reader.required("draft")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -143,7 +143,7 @@ impl Draft {
             langs: reader.optional("langs")?,
             postgate_embedding_rules: reader.optional("postgateEmbeddingRules")?,
             threadgate_allow: reader.optional("threadgateAllow")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -245,7 +245,7 @@ impl DraftPost {
             embed_videos: reader.optional("embedVideos")?,
             embed_externals: reader.optional("embedExternals")?,
             embed_records: reader.optional("embedRecords")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -336,7 +336,7 @@ impl DraftView {
             draft: reader.required("draft")?,
             created_at: reader.required("createdAt")?,
             updated_at: reader.required("updatedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -412,7 +412,7 @@ impl DraftEmbedLocalRef {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             path: reader.required("path")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -491,7 +491,7 @@ impl DraftEmbedCaption {
         Ok(Self {
             lang: reader.required("lang")?,
             content: reader.required("content")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -566,7 +566,7 @@ impl DraftEmbedGallery {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             items: reader.required("items")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -648,7 +648,7 @@ impl DraftEmbedImage {
         Ok(Self {
             local_ref: reader.required("localRef")?,
             alt: reader.optional("alt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -731,7 +731,7 @@ impl DraftEmbedVideo {
             local_ref: reader.required("localRef")?,
             alt: reader.optional("alt")?,
             captions: reader.optional("captions")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -806,7 +806,7 @@ impl DraftEmbedExternal {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -881,7 +881,7 @@ impl DraftEmbedRecord {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             record: reader.required("record")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -942,7 +942,7 @@ impl petrel_core::ToValue for DraftPostgateEmbeddingRules {
 impl DraftPostgateEmbeddingRules {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.postgate#disableRule" => petrel_core::decode_value(value, strict).map(Self::DisableRule),
+            "app.bsky.feed.postgate#disableRule" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DisableRule),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -1010,10 +1010,10 @@ impl petrel_core::ToValue for DraftThreadgateAllow {
 impl DraftThreadgateAllow {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.feed.threadgate#mentionRule" => petrel_core::decode_value(value, strict).map(Self::MentionRule),
-            "app.bsky.feed.threadgate#followerRule" => petrel_core::decode_value(value, strict).map(Self::FollowerRule),
-            "app.bsky.feed.threadgate#followingRule" => petrel_core::decode_value(value, strict).map(Self::FollowingRule),
-            "app.bsky.feed.threadgate#listRule" => petrel_core::decode_value(value, strict).map(Self::ListRule),
+            "app.bsky.feed.threadgate#mentionRule" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::MentionRule),
+            "app.bsky.feed.threadgate#followerRule" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::FollowerRule),
+            "app.bsky.feed.threadgate#followingRule" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::FollowingRule),
+            "app.bsky.feed.threadgate#listRule" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ListRule),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -1075,7 +1075,7 @@ impl petrel_core::ToValue for DraftPostLabels {
 impl DraftPostLabels {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.label.defs#selfLabels" => petrel_core::decode_value(value, strict).map(Self::SelfLabels),
+            "com.atproto.label.defs#selfLabels" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SelfLabels),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -1137,7 +1137,7 @@ impl petrel_core::ToValue for DraftEmbedGalleryItemsItem {
 impl DraftEmbedGalleryItemsItem {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.draft.defs#draftEmbedImage" => petrel_core::decode_value(value, strict).map(Self::DraftEmbedImage),
+            "app.bsky.draft.defs#draftEmbedImage" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::DraftEmbedImage),
             _ => Ok(Self::Unknown(value)),
         }
     }

@@ -100,7 +100,7 @@ impl Gadget {
             decision: reader.optional("decision")?,
             sizes: reader.optional("sizes")?,
             extra: reader.optional("extra")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -175,7 +175,7 @@ impl GadgetRef {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             uri: reader.required("uri")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -256,7 +256,7 @@ impl Approved {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             by: reader.optional("by")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -331,7 +331,7 @@ impl Rejected {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             reason: reader.required("reason")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -425,7 +425,7 @@ impl GadgetMetaOrigin {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             country: reader.optional("country")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -510,7 +510,7 @@ impl GadgetMeta {
             label: reader.required("label")?,
             weight: reader.optional("weight")?,
             origin: reader.optional("origin")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -589,7 +589,7 @@ impl GadgetParts {
         Ok(Self {
             sku: reader.required("sku")?,
             quantity: reader.optional("quantity")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -652,8 +652,8 @@ impl petrel_core::ToValue for GadgetAttachment {
 impl GadgetAttachment {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.example.widget.note" => petrel_core::decode_value(value, strict).map(Self::Note),
-            "com.example.widget.defs#gadgetRef" => petrel_core::decode_value(value, strict).map(Self::GadgetRef),
+            "com.example.widget.note" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Note),
+            "com.example.widget.defs#gadgetRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::GadgetRef),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -715,8 +715,8 @@ impl petrel_core::ToValue for GadgetDecision {
 impl GadgetDecision {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.example.widget.defs#approved" => petrel_core::decode_value(value, strict).map(Self::Approved),
-            "com.example.widget.defs#rejected" => petrel_core::decode_value(value, strict).map(Self::Rejected),
+            "com.example.widget.defs#approved" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Approved),
+            "com.example.widget.defs#rejected" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Rejected),
             other => Err(petrel_core::DecodeError::UnknownType(other.to_owned())),
         }
     }
@@ -866,19 +866,23 @@ impl<'de> serde::Deserialize<'de> for Status {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Grade {
     A,
     B,
     C,
+    /// A value this build does not know (a newer peer added it), kept
+    /// verbatim so it is written back unchanged.
+    Unknown(String),
 }
 
 impl Grade {
-    pub const fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::A => "a",
             Self::B => "b",
             Self::C => "c",
+            Self::Unknown(value) => value.as_str(),
         }
     }
 }
@@ -890,14 +894,14 @@ impl core::fmt::Display for Grade {
 }
 
 impl core::str::FromStr for Grade {
-    type Err = &'static str;
+    type Err = core::convert::Infallible;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "a" => Ok(Self::A),
-            "b" => Ok(Self::B),
-            "c" => Ok(Self::C),
-            _ => Err("unknown variant for Grade"),
-        }
+        Ok(match s {
+            "a" => Self::A,
+            "b" => Self::B,
+            "c" => Self::C,
+            other => Self::Unknown(other.to_owned()),
+        })
     }
 }
 
@@ -910,12 +914,12 @@ impl petrel_core::ToValue for Grade {
 impl petrel_core::FromValue for Grade {
     fn from_value(value: petrel_core::Value) -> Result<Self, petrel_core::DecodeError> {
         let raw = String::from_value(value)?;
-        match raw.as_str() {
-            "a" => Ok(Self::A),
-            "b" => Ok(Self::B),
-            "c" => Ok(Self::C),
-            other => Err(petrel_core::DecodeError::Custom(format!("unknown variant `{other}` for Grade"))),
-        }
+        Ok(match raw.as_str() {
+            "a" => Self::A,
+            "b" => Self::B,
+            "c" => Self::C,
+            _ => Self::Unknown(raw),
+        })
     }
 }
 
@@ -927,7 +931,10 @@ impl petrel_core::xrpc::QueryValue for Grade {
 
 impl petrel_core::xrpc::FromQueryValue for Grade {
     fn from_query_value(value: &str) -> Result<Self, petrel_core::DecodeError> {
-        value.parse::<Self>().map_err(|err| petrel_core::DecodeError::Custom(err.to_owned()))
+        Ok(match value.parse::<Self>() {
+            Ok(parsed) => parsed,
+            Err(never) => match never {},
+        })
     }
 }
 

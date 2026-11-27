@@ -158,7 +158,7 @@ impl OnlineMember {
         Ok(Self {
             did: reader.required("did")?,
             last_active: reader.required("lastActive")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

@@ -189,7 +189,7 @@ impl ListWithMembership {
         Ok(Self {
             list: reader.required("list")?,
             list_item: reader.optional("listItem")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

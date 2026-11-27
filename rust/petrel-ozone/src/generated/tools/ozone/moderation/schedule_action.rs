@@ -185,7 +185,7 @@ impl Takedown {
             strike_expires_at: reader.optional("strikeExpiresAt")?,
             email_content: reader.optional("emailContent")?,
             email_subject: reader.optional("emailSubject")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -278,7 +278,7 @@ impl SchedulingConfig {
             execute_at: reader.optional("executeAt")?,
             execute_after: reader.optional("executeAfter")?,
             execute_until: reader.optional("executeUntil")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -357,7 +357,7 @@ impl ScheduledActionResults {
         Ok(Self {
             succeeded: reader.required("succeeded")?,
             failed: reader.required("failed")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -440,7 +440,7 @@ impl FailedScheduling {
             subject: reader.required("subject")?,
             error: reader.required("error")?,
             error_code: reader.optional("errorCode")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -501,7 +501,7 @@ impl petrel_core::ToValue for InputAction {
 impl InputAction {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "tools.ozone.moderation.scheduleAction#takedown" => petrel_core::decode_value(value, strict).map(Self::Takedown),
+            "tools.ozone.moderation.scheduleAction#takedown" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Takedown),
             _ => Ok(Self::Unknown(value)),
         }
     }

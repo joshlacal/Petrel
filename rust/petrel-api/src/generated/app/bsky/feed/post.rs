@@ -160,7 +160,7 @@ impl ReplyRef {
         Ok(Self {
             root: reader.required("root")?,
             parent: reader.required("parent")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -245,7 +245,7 @@ impl Entity {
             index: reader.required("index")?,
             r#type: reader.required("type")?,
             value: reader.required("value")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -325,7 +325,7 @@ impl TextSlice {
         Ok(Self {
             start: reader.required("start")?,
             end: reader.required("end")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -396,12 +396,12 @@ impl petrel_core::ToValue for PostEmbed {
 impl PostEmbed {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "app.bsky.embed.images" => petrel_core::decode_value(value, strict).map(Self::Images),
-            "app.bsky.embed.video" => petrel_core::decode_value(value, strict).map(Self::Video),
-            "app.bsky.embed.gallery" => petrel_core::decode_value(value, strict).map(Self::Gallery),
-            "app.bsky.embed.external" => petrel_core::decode_value(value, strict).map(Self::External),
-            "app.bsky.embed.record" => petrel_core::decode_value(value, strict).map(Self::Record),
-            "app.bsky.embed.recordWithMedia" => petrel_core::decode_value(value, strict).map(Self::RecordWithMedia),
+            "app.bsky.embed.images" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Images),
+            "app.bsky.embed.video" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Video),
+            "app.bsky.embed.gallery" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Gallery),
+            "app.bsky.embed.external" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::External),
+            "app.bsky.embed.record" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Record),
+            "app.bsky.embed.recordWithMedia" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RecordWithMedia),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -463,7 +463,7 @@ impl petrel_core::ToValue for PostLabels {
 impl PostLabels {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.label.defs#selfLabels" => petrel_core::decode_value(value, strict).map(Self::SelfLabels),
+            "com.atproto.label.defs#selfLabels" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SelfLabels),
             _ => Ok(Self::Unknown(value)),
         }
     }

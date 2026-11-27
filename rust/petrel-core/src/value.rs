@@ -1,13 +1,21 @@
 //! The AT Protocol data model: [`Value`] and the wire wrapper types.
 //!
 //! [`Value`] is the type for lexicon `unknown`, for the `Unknown(Value)` arm
-//! of open unions, and for `extra_data` on objects and records. It has no
-//! float variant: floats are rejected at every entry point.
+//! of open unions, and for `extra_data` on objects and records.
+//!
+//! The data model has no floats. A JSON number with a fractional part is
+//! refused by strict and data-model decoding, and by DAG-CBOR in both
+//! directions. Lenient (output) JSON decoding keeps one found in an untyped
+//! position as [`Value::Float`] instead of failing the whole body, so JSON
+//! re-encoding stays faithful; [`to_dag_cbor`](crate::to_dag_cbor) refuses
+//! it. A JSON number that is an exact integer (`1.0`, `2e2`) reads as
+//! [`Value::Integer`] on every path.
 //!
 //! JSON spelling of the two non-JSON kinds follows the data model: a link is
 //! `{"$link": "<cid>"}` and bytes are `{"$bytes": "<base64>"}`. An object with
 //! exactly that one key is read as a link or bytes; with any extra key it
-//! stays a plain object.
+//! stays a plain object. Lenient decoding keeps a one-key lookalike whose
+//! payload is malformed as a plain object; strict decoding refuses it.
 //!
 //! Record validation uses [`Value::from_json_data_model`], which enforces
 //! reserved-key shapes and recognizes exact signed integers in decimal syntax.
@@ -27,27 +35,96 @@ use crate::dagcbor;
 use crate::error::{CidError, DecodeError, EncodeError};
 use crate::serde_bridge::{FromValue, ObjectReader, ObjectWriter, ToValue};
 
-/// Decodes padded or unpadded standard base64 and ignores non-zero trailing
-/// bits, matching the Swift `Bytes` decoder. The URL-safe alphabet is refused.
-const BASE64_PADDED: GeneralPurpose = GeneralPurpose::new(
-    &alphabet::STANDARD,
-    GeneralPurposeConfig::new().with_decode_allow_trailing_bits(true),
-);
-const BASE64_UNPADDED: GeneralPurpose = GeneralPurpose::new(
-    &alphabet::STANDARD,
-    GeneralPurposeConfig::new()
-        .with_decode_padding_mode(DecodePaddingMode::RequireNone)
-        .with_decode_allow_trailing_bits(true),
-);
+/// Decodes canonically padded or unpadded base64 and ignores non-zero
+/// trailing bits, as the Swift `Bytes` decoder and the reference
+/// implementations do. Either alphabet is accepted (standard, or URL-safe as
+/// some peers emit), but not a mix of the two. Encoding is always unpadded
+/// standard base64, the reference PDS form.
+const fn base64_engine(
+    alphabet: &alphabet::Alphabet,
+    padding: DecodePaddingMode,
+) -> GeneralPurpose {
+    GeneralPurpose::new(
+        alphabet,
+        GeneralPurposeConfig::new()
+            .with_decode_padding_mode(padding)
+            .with_decode_allow_trailing_bits(true),
+    )
+}
+const BASE64_STANDARD_PADDED: GeneralPurpose =
+    base64_engine(&alphabet::STANDARD, DecodePaddingMode::RequireCanonical);
+const BASE64_STANDARD_UNPADDED: GeneralPurpose =
+    base64_engine(&alphabet::STANDARD, DecodePaddingMode::RequireNone);
+const BASE64_URL_SAFE_PADDED: GeneralPurpose =
+    base64_engine(&alphabet::URL_SAFE, DecodePaddingMode::RequireCanonical);
+const BASE64_URL_SAFE_UNPADDED: GeneralPurpose =
+    base64_engine(&alphabet::URL_SAFE, DecodePaddingMode::RequireNone);
+/// Nested containers allowed in a JSON document. Typed decoding recurses once
+/// per level and large generated structs cost tens of kilobytes of stack each,
+/// so a deeper cap would let a remote peer overflow a 2 MiB worker stack.
 const MAX_JSON_DEPTH: usize = 64;
+/// Every integer of at most this magnitude is exact as an `f64`.
+const MAX_EXACT_F64_INTEGER: f64 = 9_007_199_254_740_992.0;
 
 fn decode_base64(text: &str) -> Result<Vec<u8>, DecodeError> {
-    let engine = if text.ends_with('=') {
-        &BASE64_PADDED
-    } else {
-        &BASE64_UNPADDED
+    let url_safe = text.bytes().any(|byte| matches!(byte, b'-' | b'_'));
+    let engine = match (url_safe, text.ends_with('=')) {
+        (false, true) => &BASE64_STANDARD_PADDED,
+        (false, false) => &BASE64_STANDARD_UNPADDED,
+        (true, true) => &BASE64_URL_SAFE_PADDED,
+        (true, false) => &BASE64_URL_SAFE_UNPADDED,
     };
     engine.decode(text).map_err(|_| DecodeError::MalformedBytes)
+}
+
+/// A JSON number with a fractional part, kept from a lenient decode of an
+/// untyped position. It is not part of the AT Protocol data model: it has a
+/// JSON form but no DAG-CBOR one. See the [module docs](self).
+#[derive(Debug, Clone, Copy)]
+pub struct Float(f64);
+
+impl Float {
+    /// Wraps a finite number. `None` for NaN and the infinities, which JSON
+    /// cannot spell.
+    pub fn new(number: f64) -> Option<Self> {
+        number.is_finite().then_some(Self(number))
+    }
+
+    /// The number.
+    pub fn get(self) -> f64 {
+        self.0
+    }
+}
+
+/// Bitwise: `0.0` and `-0.0` differ, as their JSON spellings do.
+impl PartialEq for Float {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.to_bits() == other.0.to_bits()
+    }
+}
+
+impl Eq for Float {}
+
+impl std::hash::Hash for Float {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.to_bits().hash(state);
+    }
+}
+
+impl fmt::Display for Float {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
+/// How JSON is read: strictly against the data model
+/// ([`Value::from_json_data_model`]), strictly through serde (XRPC inputs),
+/// or leniently through serde (outputs and everything reached from them).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum JsonMode {
+    DataModel,
+    Strict,
+    Lenient,
 }
 
 /// A value in the AT Protocol data model.
@@ -69,6 +146,9 @@ pub enum Value {
     Array(Vec<Value>),
     /// A map with string keys.
     Object(BTreeMap<String, Value>),
+    /// A JSON number with a fractional part, only ever produced by lenient
+    /// JSON decoding. Not data-model: it has no DAG-CBOR form. See [`Float`].
+    Float(Float),
 }
 
 impl Value {
@@ -83,6 +163,7 @@ impl Value {
             Self::Link(_) => "link",
             Self::Array(_) => "array",
             Self::Object(_) => "object",
+            Self::Float(_) => "float",
         }
     }
 
@@ -102,7 +183,21 @@ impl Value {
         }
     }
 
+    /// Whether a [`Value::Float`] appears anywhere in the value.
+    pub fn contains_float(&self) -> bool {
+        match self {
+            Self::Float(_) => true,
+            Self::Array(items) => items.iter().any(Self::contains_float),
+            Self::Object(fields) => fields.values().any(Self::contains_float),
+            _ => false,
+        }
+    }
+
     /// The CID obtained by hashing the canonical DAG-CBOR representation.
+    ///
+    /// For a value holding a [`Value::Float`], which is not data-model, see
+    /// [`dagcbor::encode`] for the bytes hashed; [`crate::serde_bridge::cid_of`]
+    /// refuses such a value instead.
     pub fn cid(&self) -> Cid {
         Cid::for_dag_cbor(&dagcbor::encode(self))
     }
@@ -182,27 +277,62 @@ impl Value {
 
     /// Reads the JSON spelling of a link or bytes out of a freshly parsed
     /// object. The permissive codec preserves lookalikes for unknown fields.
-    fn from_json_object(map: BTreeMap<String, Value>, strict: bool) -> Result<Self, DecodeError> {
+    ///
+    /// A lenient read keeps a one-key lookalike whose payload is malformed as
+    /// a plain object: it sits in an untyped position (a typed `cid-link` or
+    /// `bytes` field still refuses an object), and it reads back the same way.
+    fn from_json_object(map: BTreeMap<String, Value>, mode: JsonMode) -> Result<Self, DecodeError> {
+        let strict = mode == JsonMode::DataModel;
         if strict || map.len() == 1 {
             if let Some(link) = map.get("$link") {
                 if map.len() != 1 {
                     return Err(DecodeError::MalformedLink);
                 }
-                let text = link.as_str().ok_or(DecodeError::MalformedLink)?;
-                return Ok(Self::Link(Cid::parse(text)?));
+                let parsed = link
+                    .as_str()
+                    .ok_or(DecodeError::MalformedLink)
+                    .and_then(|text| Cid::parse(text).map_err(DecodeError::from));
+                return match parsed {
+                    Ok(cid) => Ok(Self::Link(cid)),
+                    Err(_) if mode == JsonMode::Lenient => Ok(Self::Object(map)),
+                    Err(error) => Err(error),
+                };
             }
             if let Some(bytes) = map.get("$bytes") {
                 if map.len() != 1 {
                     return Err(DecodeError::MalformedBytes);
                 }
-                return decode_base64(bytes.as_str().ok_or(DecodeError::MalformedBytes)?)
-                    .map(Self::Bytes);
+                let decoded = bytes
+                    .as_str()
+                    .ok_or(DecodeError::MalformedBytes)
+                    .and_then(decode_base64);
+                return match decoded {
+                    Ok(bytes) => Ok(Self::Bytes(bytes)),
+                    Err(_) if mode == JsonMode::Lenient => Ok(Self::Object(map)),
+                    Err(error) => Err(error),
+                };
             }
         }
         if strict {
             Self::validate_type(&map)?;
         }
         Ok(Self::Object(map))
+    }
+
+    /// The key of a one-key map that would read back from JSON as a link or
+    /// bytes, which would make its JSON form a different value.
+    fn wrapper_lookalike_key(map: &BTreeMap<String, Self>) -> Option<&str> {
+        if map.len() != 1 {
+            return None;
+        }
+        let (key, value) = map.iter().next()?;
+        let text = value.as_str()?;
+        let reads_back = match key.as_str() {
+            "$link" => Cid::parse(text).is_ok(),
+            "$bytes" => decode_base64(text).is_ok(),
+            _ => false,
+        };
+        reads_back.then_some(key.as_str())
     }
 }
 
@@ -233,11 +363,9 @@ impl Serialize for Value {
             Self::Object(map) => {
                 // DAG-CBOR can hold a map whose only key is `$link` or
                 // `$bytes`. Written as JSON it would read back as a link or
-                // as bytes, so it has no JSON form.
-                if map.len() == 1
-                    && let Some((key, Self::String(_))) = map.iter().next()
-                    && matches!(key.as_str(), "$link" | "$bytes")
-                {
+                // as bytes, so it has no JSON form. One whose payload is not
+                // a valid link or base64 reads back as the same map.
+                if let Some(key) = Self::wrapper_lookalike_key(map) {
                     return Err(serde::ser::Error::custom(format!(
                         "an object whose only field is `{key}` cannot be written as JSON"
                     )));
@@ -248,12 +376,17 @@ impl Serialize for Value {
                 }
                 out.end()
             }
+            Self::Float(number) => serializer.serialize_f64(number.get()),
         }
     }
 }
 
+/// Reads a [`Value`] through serde, counting depth, in one mode.
 #[derive(Clone, Copy)]
-struct ValueVisitor(usize);
+pub(crate) struct ValueVisitor {
+    depth: usize,
+    mode: JsonMode,
+}
 
 impl<'de> DeserializeSeed<'de> for ValueVisitor {
     type Value = Value;
@@ -264,9 +397,23 @@ impl<'de> DeserializeSeed<'de> for ValueVisitor {
 }
 
 impl ValueVisitor {
+    /// The reader for outputs: see the [module docs](self).
+    pub(crate) const LENIENT: Self = Self {
+        depth: 0,
+        mode: JsonMode::Lenient,
+    };
+    /// The reader for XRPC inputs.
+    pub(crate) const STRICT: Self = Self {
+        depth: 0,
+        mode: JsonMode::Strict,
+    };
+
     fn descend<E: de::Error>(self) -> Result<Self, E> {
-        if self.0 < MAX_JSON_DEPTH {
-            Ok(Self(self.0 + 1))
+        if self.depth < MAX_JSON_DEPTH {
+            Ok(Self {
+                depth: self.depth + 1,
+                ..self
+            })
         } else {
             Err(E::custom(DecodeError::JsonDepthExceeded(MAX_JSON_DEPTH)))
         }
@@ -294,10 +441,20 @@ impl<'de> Visitor<'de> for ValueVisitor {
             .map_err(|_| E::custom("integer outside the signed 64-bit range"))
     }
 
-    fn visit_f64<E: de::Error>(self, _: f64) -> Result<Value, E> {
-        Err(E::custom(
-            "floats are not allowed in the AT Protocol data model",
-        ))
+    fn visit_f64<E: de::Error>(self, number: f64) -> Result<Value, E> {
+        // serde_json hands every number spelled with `.` or `e` here. One
+        // that is an exact integer is one, as on the data-model path; above
+        // 2^53 an `f64` no longer says which integer was written.
+        if number.fract() == 0.0 && number.abs() <= MAX_EXACT_F64_INTEGER {
+            #[allow(clippy::cast_possible_truncation)]
+            return Ok(Value::Integer(number as i64));
+        }
+        match (self.mode, Float::new(number)) {
+            (JsonMode::Lenient, Some(number)) => Ok(Value::Float(number)),
+            _ => Err(E::custom(
+                "floats are not allowed in the AT Protocol data model",
+            )),
+        }
     }
 
     fn visit_str<E: de::Error>(self, text: &str) -> Result<Value, E> {
@@ -346,13 +503,13 @@ impl<'de> Visitor<'de> for ValueVisitor {
             };
             entry.insert(access.next_value_seed(child)?);
         }
-        Value::from_json_object(map, false).map_err(de::Error::custom)
+        Value::from_json_object(map, self.mode).map_err(de::Error::custom)
     }
 }
 
 impl<'de> Deserialize<'de> for Value {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        ValueVisitor(0).deserialize(deserializer)
+        ValueVisitor::LENIENT.deserialize(deserializer)
     }
 }
 
@@ -445,7 +602,7 @@ impl<'a> JsonReader<'a> {
                 self.skip_whitespace();
             }
         }
-        Value::from_json_object(fields, true)
+        Value::from_json_object(fields, JsonMode::DataModel)
     }
 
     fn array(&mut self, depth: usize) -> Result<Value, DecodeError> {

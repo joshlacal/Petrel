@@ -155,7 +155,7 @@ impl Preferences {
     fn decode_fields(mut reader: petrel_core::ObjectReader) -> Result<Self, petrel_core::DecodeError> {
         Ok(Self {
             show_in_discover: reader.optional("showInDiscover")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -216,7 +216,7 @@ impl petrel_core::ToValue for PublicationLabels {
 impl PublicationLabels {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.label.defs#selfLabels" => petrel_core::decode_value(value, strict).map(Self::SelfLabels),
+            "com.atproto.label.defs#selfLabels" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::SelfLabels),
             _ => Ok(Self::Unknown(value)),
         }
     }

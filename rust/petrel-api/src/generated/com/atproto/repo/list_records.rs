@@ -196,7 +196,7 @@ impl Record {
             uri: reader.required("uri")?,
             cid: reader.required("cid")?,
             value: reader.required("value")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

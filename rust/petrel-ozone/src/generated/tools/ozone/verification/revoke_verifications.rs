@@ -208,7 +208,7 @@ impl RevokeError {
         Ok(Self {
             uri: reader.required("uri")?,
             error: reader.required("error")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

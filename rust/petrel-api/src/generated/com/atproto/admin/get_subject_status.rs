@@ -160,9 +160,9 @@ impl petrel_core::ToValue for OutputSubject {
 impl OutputSubject {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(value, strict).map(Self::RepoRef),
-            "com.atproto.repo.strongRef" => petrel_core::decode_value(value, strict).map(Self::StrongRef),
-            "com.atproto.admin.defs#repoBlobRef" => petrel_core::decode_value(value, strict).map(Self::RepoBlobRef),
+            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoRef),
+            "com.atproto.repo.strongRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::StrongRef),
+            "com.atproto.admin.defs#repoBlobRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoBlobRef),
             _ => Ok(Self::Unknown(value)),
         }
     }

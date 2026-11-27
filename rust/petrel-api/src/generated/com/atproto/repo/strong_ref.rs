@@ -41,7 +41,7 @@ impl StrongRef {
         Ok(Self {
             uri: reader.required("uri")?,
             cid: reader.required("cid")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

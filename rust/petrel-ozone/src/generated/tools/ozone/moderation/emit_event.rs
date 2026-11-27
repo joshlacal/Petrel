@@ -218,7 +218,7 @@ impl ReportAction {
             all_owned: reader.optional("allOwned")?,
             note: reader.optional("note")?,
             is_automated: reader.optional("isAutomated")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -327,31 +327,31 @@ impl petrel_core::ToValue for InputEvent {
 impl InputEvent {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "tools.ozone.moderation.defs#modEventTakedown" => petrel_core::decode_value(value, strict).map(Self::ModEventTakedown),
-            "tools.ozone.moderation.defs#modEventAcknowledge" => petrel_core::decode_value(value, strict).map(Self::ModEventAcknowledge),
-            "tools.ozone.moderation.defs#modEventEscalate" => petrel_core::decode_value(value, strict).map(Self::ModEventEscalate),
-            "tools.ozone.moderation.defs#modEventComment" => petrel_core::decode_value(value, strict).map(Self::ModEventComment),
-            "tools.ozone.moderation.defs#modEventLabel" => petrel_core::decode_value(value, strict).map(Self::ModEventLabel),
-            "tools.ozone.moderation.defs#modEventReport" => petrel_core::decode_value(value, strict).map(Self::ModEventReport),
-            "tools.ozone.moderation.defs#modEventMute" => petrel_core::decode_value(value, strict).map(Self::ModEventMute),
-            "tools.ozone.moderation.defs#modEventUnmute" => petrel_core::decode_value(value, strict).map(Self::ModEventUnmute),
-            "tools.ozone.moderation.defs#modEventMuteReporter" => petrel_core::decode_value(value, strict).map(Self::ModEventMuteReporter),
-            "tools.ozone.moderation.defs#modEventUnmuteReporter" => petrel_core::decode_value(value, strict).map(Self::ModEventUnmuteReporter),
-            "tools.ozone.moderation.defs#modEventReverseTakedown" => petrel_core::decode_value(value, strict).map(Self::ModEventReverseTakedown),
-            "tools.ozone.moderation.defs#modEventResolveAppeal" => petrel_core::decode_value(value, strict).map(Self::ModEventResolveAppeal),
-            "tools.ozone.moderation.defs#modEventEmail" => petrel_core::decode_value(value, strict).map(Self::ModEventEmail),
-            "tools.ozone.moderation.defs#modEventDivert" => petrel_core::decode_value(value, strict).map(Self::ModEventDivert),
-            "tools.ozone.moderation.defs#modEventTag" => petrel_core::decode_value(value, strict).map(Self::ModEventTag),
-            "tools.ozone.moderation.defs#accountEvent" => petrel_core::decode_value(value, strict).map(Self::AccountEvent),
-            "tools.ozone.moderation.defs#identityEvent" => petrel_core::decode_value(value, strict).map(Self::IdentityEvent),
-            "tools.ozone.moderation.defs#recordEvent" => petrel_core::decode_value(value, strict).map(Self::RecordEvent),
-            "tools.ozone.moderation.defs#modEventPriorityScore" => petrel_core::decode_value(value, strict).map(Self::ModEventPriorityScore),
-            "tools.ozone.moderation.defs#ageAssuranceEvent" => petrel_core::decode_value(value, strict).map(Self::AgeAssuranceEvent),
-            "tools.ozone.moderation.defs#ageAssuranceOverrideEvent" => petrel_core::decode_value(value, strict).map(Self::AgeAssuranceOverrideEvent),
-            "tools.ozone.moderation.defs#ageAssurancePurgeEvent" => petrel_core::decode_value(value, strict).map(Self::AgeAssurancePurgeEvent),
-            "tools.ozone.moderation.defs#revokeAccountCredentialsEvent" => petrel_core::decode_value(value, strict).map(Self::RevokeAccountCredentialsEvent),
-            "tools.ozone.moderation.defs#scheduleTakedownEvent" => petrel_core::decode_value(value, strict).map(Self::ScheduleTakedownEvent),
-            "tools.ozone.moderation.defs#cancelScheduledTakedownEvent" => petrel_core::decode_value(value, strict).map(Self::CancelScheduledTakedownEvent),
+            "tools.ozone.moderation.defs#modEventTakedown" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ModEventTakedown),
+            "tools.ozone.moderation.defs#modEventAcknowledge" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ModEventAcknowledge),
+            "tools.ozone.moderation.defs#modEventEscalate" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ModEventEscalate),
+            "tools.ozone.moderation.defs#modEventComment" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ModEventComment),
+            "tools.ozone.moderation.defs#modEventLabel" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ModEventLabel),
+            "tools.ozone.moderation.defs#modEventReport" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ModEventReport),
+            "tools.ozone.moderation.defs#modEventMute" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ModEventMute),
+            "tools.ozone.moderation.defs#modEventUnmute" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ModEventUnmute),
+            "tools.ozone.moderation.defs#modEventMuteReporter" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ModEventMuteReporter),
+            "tools.ozone.moderation.defs#modEventUnmuteReporter" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ModEventUnmuteReporter),
+            "tools.ozone.moderation.defs#modEventReverseTakedown" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ModEventReverseTakedown),
+            "tools.ozone.moderation.defs#modEventResolveAppeal" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ModEventResolveAppeal),
+            "tools.ozone.moderation.defs#modEventEmail" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ModEventEmail),
+            "tools.ozone.moderation.defs#modEventDivert" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ModEventDivert),
+            "tools.ozone.moderation.defs#modEventTag" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ModEventTag),
+            "tools.ozone.moderation.defs#accountEvent" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::AccountEvent),
+            "tools.ozone.moderation.defs#identityEvent" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::IdentityEvent),
+            "tools.ozone.moderation.defs#recordEvent" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RecordEvent),
+            "tools.ozone.moderation.defs#modEventPriorityScore" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ModEventPriorityScore),
+            "tools.ozone.moderation.defs#ageAssuranceEvent" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::AgeAssuranceEvent),
+            "tools.ozone.moderation.defs#ageAssuranceOverrideEvent" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::AgeAssuranceOverrideEvent),
+            "tools.ozone.moderation.defs#ageAssurancePurgeEvent" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::AgeAssurancePurgeEvent),
+            "tools.ozone.moderation.defs#revokeAccountCredentialsEvent" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RevokeAccountCredentialsEvent),
+            "tools.ozone.moderation.defs#scheduleTakedownEvent" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::ScheduleTakedownEvent),
+            "tools.ozone.moderation.defs#cancelScheduledTakedownEvent" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::CancelScheduledTakedownEvent),
             _ => Ok(Self::Unknown(value)),
         }
     }
@@ -415,8 +415,8 @@ impl petrel_core::ToValue for InputSubject {
 impl InputSubject {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(value, strict).map(Self::RepoRef),
-            "com.atproto.repo.strongRef" => petrel_core::decode_value(value, strict).map(Self::StrongRef),
+            "com.atproto.admin.defs#repoRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::RepoRef),
+            "com.atproto.repo.strongRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::StrongRef),
             _ => Ok(Self::Unknown(value)),
         }
     }

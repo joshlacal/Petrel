@@ -218,7 +218,7 @@ impl SourceRule {
             pattern: reader.required("pattern")?,
             action: reader.required("action")?,
             reason: reader.required("reason")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

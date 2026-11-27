@@ -193,7 +193,7 @@ impl Host {
             seq: reader.optional("seq")?,
             account_count: reader.optional("accountCount")?,
             status: reader.optional("status")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

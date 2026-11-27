@@ -77,7 +77,7 @@ impl Event {
             created_by: reader.required("createdBy")?,
             created_at: reader.required("createdAt")?,
             comment: reader.optional("comment")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }
@@ -191,7 +191,7 @@ impl UrlRule {
             created_by: reader.required("createdBy")?,
             created_at: reader.required("createdAt")?,
             updated_at: reader.required("updatedAt")?,
-            extra_data: reader.finish(),
+            extra_data: reader.finish_preserving_type(),
         })
     }
 }

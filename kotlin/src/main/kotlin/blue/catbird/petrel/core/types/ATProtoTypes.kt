@@ -346,6 +346,54 @@ data class Bytes(val data: ByteArray) {
     override fun hashCode(): Int = data.contentHashCode()
 }
 
+/**
+ * Decodes the base64 of a `$bytes` value the way every AT Protocol
+ * implementation accepts it: padded or unpadded (the official TypeScript PDS
+ * and Petrel Rust emit unpadded), standard or URL-safe alphabet (not mixed),
+ * and ignoring non-zero trailing bits, as RFC 4648 section 3.5 permits and the
+ * interop vector `lexicon/record-data-valid.json` (`"123"`) requires.
+ * `kotlin.io.encoding.Base64.Default` requires padding and zero pad bits, so
+ * it refused every unpadded value. Padding, when present, must be canonical.
+ */
+internal fun decodeAtprotoBase64(text: String): ByteArray {
+    val paddingStart = text.indexOf('=').let { if (it < 0) text.length else it }
+    val payload = text.substring(0, paddingStart)
+    val padding = text.length - paddingStart
+    require(text.substring(paddingStart).all { it == '=' }) { "base64 padding is not at the end" }
+    val canonicalPadding = when (payload.length % 4) {
+        0 -> 0
+        2 -> 2
+        3 -> 1
+        else -> throw IllegalArgumentException("base64 has an impossible length")
+    }
+    require(padding == 0 || padding == canonicalPadding) { "base64 padding is not canonical" }
+    val standard = payload.any { it == '+' || it == '/' }
+    val urlSafe = payload.any { it == '-' || it == '_' }
+    require(!(standard && urlSafe)) { "base64 mixes the standard and URL-safe alphabets" }
+
+    val out = java.io.ByteArrayOutputStream(payload.length * 3 / 4)
+    var buffer = 0
+    var bits = 0
+    for (char in payload) {
+        val sextet = when (char) {
+            in 'A'..'Z' -> char - 'A'
+            in 'a'..'z' -> char - 'a' + 26
+            in '0'..'9' -> char - '0' + 52
+            '+', '-' -> 62
+            '/', '_' -> 63
+            else -> throw IllegalArgumentException("not a base64 character: $char")
+        }
+        buffer = (buffer shl 6) or sextet
+        bits += 6
+        if (bits >= 8) {
+            bits -= 8
+            out.write((buffer shr bits) and 0xff)
+        }
+        buffer = buffer and ((1 shl bits) - 1)
+    }
+    return out.toByteArray()
+}
+
 @OptIn(ExperimentalEncodingApi::class)
 object BytesSerializer : KSerializer<Bytes> {
     override val descriptor: SerialDescriptor =
@@ -398,7 +446,7 @@ object BytesSerializer : KSerializer<Bytes> {
                     "Unexpected JSON shape for Bytes: $element"
                 )
             }
-            return Bytes(Base64.decode(base64))
+            return Bytes(decodeAtprotoBase64(base64))
         }
 
         // Non-JSON (CBOR, etc.) — keep the structured decoding path.
@@ -411,7 +459,7 @@ object BytesSerializer : KSerializer<Bytes> {
                     else -> error("Unexpected index: $index")
                 }
             }
-            Bytes(Base64.decode(base64String))
+            Bytes(decodeAtprotoBase64(base64String))
         }
     }
 }

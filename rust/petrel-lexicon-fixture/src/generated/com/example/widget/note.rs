@@ -129,8 +129,8 @@ impl petrel_core::ToValue for NoteGadgets {
 impl NoteGadgets {
     fn decode_member(value: petrel_core::Value, strict: bool) -> Result<Self, petrel_core::DecodeError> {
         match petrel_core::unknown::type_of(&value)? {
-            "com.example.widget.defs#gadget" => petrel_core::decode_value(value, strict).map(Self::Gadget),
-            "com.example.widget.defs#gadgetRef" => petrel_core::decode_value(value, strict).map(Self::GadgetRef),
+            "com.example.widget.defs#gadget" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::Gadget),
+            "com.example.widget.defs#gadgetRef" => petrel_core::decode_value(petrel_core::unknown::untagged(value), strict).map(Self::GadgetRef),
             _ => Ok(Self::Unknown(value)),
         }
     }
