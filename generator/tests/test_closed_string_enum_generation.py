@@ -202,22 +202,29 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
             import kotlinx.serialization.json.Json
             import kotlin.test.Test
             import kotlin.test.assertEquals
-            import kotlin.test.assertFailsWith
+            import kotlin.test.assertFalse
+            import kotlin.test.assertTrue
 
             {enum_source}
 
             class ClosedEnumGeneratedFixtureTest {{
                 @Test
-                fun roundTripsKnownValuesAndRejectsUnknown() {{
+                fun roundTripsKnownValuesAndKeepsUnknown() {{
                     val json = Json
                     for (wireValue in listOf({literals})) {{
                         val encodedWire = json.encodeToString(wireValue)
                         val decoded = json.decodeFromString<{enum_name}>(encodedWire)
+                        assertFalse(decoded is {enum_name}.Unknown, wireValue)
                         assertEquals(encodedWire, json.encodeToString(decoded))
+                        // Equality is by wire string: Unknown holding a known value
+                        // equals that value's case.
+                        assertEquals<Any>(decoded, {enum_name}.Unknown(wireValue))
+                        assertEquals(decoded.hashCode(), {enum_name}.Unknown(wireValue).hashCode())
                     }}
-                    assertFailsWith<SerializationException> {{
-                        json.decodeFromString<{enum_name}>("\\\"unknown\\\"")
-                    }}
+                    val unknown = json.decodeFromString<{enum_name}>("\\\"unknown\\\"")
+                    assertTrue(unknown is {enum_name}.Unknown)
+                    assertEquals("unknown", unknown.value)
+                    assertEquals("\\\"unknown\\\"", json.encodeToString<{enum_name}>(unknown))
                 }}
             }}
             """
@@ -253,7 +260,7 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def _run_kotlin_named_ref_fixture(self, generated):
-        declarations = generated.split("/**", 1)[0]
+        declarations = generated.split("suspend fun ATProtoClient", 1)[0].rsplit("/**", 1)[0]
         fixture = textwrap.dedent(
             """
             package blue.catbird.petrel.generated
@@ -407,19 +414,25 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
         self.assertIn("public enum InputAction", swift)
         self.assertNotIn("public let action: String", swift)
         self.assertIn("val action: BlueCatbirdMlsFinalizeGroupChangeInputAction", kotlin)
-        self.assertIn("enum class BlueCatbirdMlsFinalizeGroupChangeInputAction", kotlin)
+        self.assertIn("sealed class BlueCatbirdMlsFinalizeGroupChangeInputAction", kotlin)
         self.assertNotIn("val action: String", kotlin)
 
-    def test_closed_enum_declares_exact_wire_cases_and_rejects_unknown(self):
+    def test_open_enum_declares_exact_wire_cases_and_keeps_unknown(self):
         swift = SwiftCodeGenerator(procedure_lexicon()).convert()
         kotlin = KotlinCodeGenerator(procedure_lexicon()).convert()
 
+        # Each wire value maps to exactly one case, in both directions.
         for value in CASES:
-            self.assertEqual(swift.count(f'= "{value}"'), 1)
-            self.assertEqual(kotlin.count(f'@SerialName("{value}")'), 1)
-        self.assertIn("enum InputAction: String, Codable", swift)
-        self.assertNotIn("init(rawValue: String)", swift)
+            self.assertEqual(swift.count(f': return "{value}"'), 1)
+            self.assertEqual(swift.count(f'case "{value}": return .'), 1)
+            self.assertEqual(kotlin.count(f'InputAction("{value}")'), 1)
+            self.assertEqual(kotlin.count(f'"{value}" -> '), 1)
+        self.assertIn("enum InputAction: RawRepresentable, Codable, Hashable", swift)
+        self.assertEqual(swift.count("case unknown(String)"), 1)
+        self.assertIn("default: return .unknown(value)", swift)
         self.assertNotIn("case unexpected", swift)
+        self.assertIn("class Unknown(value: String) : BlueCatbirdMlsFinalizeGroupChangeInputAction(value)", kotlin)
+        self.assertIn("else -> Unknown(value)", kotlin)
         self.assertNotIn("Unexpected", kotlin)
 
     def test_swift_closed_enum_cbor_is_raw_wire_value(self):
@@ -429,7 +442,7 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
         enum_source = generated[enum_start:enum_end if enum_end != -1 else None]
         self.assertIn("return rawValue", enum_source)
 
-    def test_swift_closed_enum_round_trips_all_cases_and_rejects_unknown_at_runtime(self):
+    def test_swift_open_enum_round_trips_all_cases_and_keeps_unknown_at_runtime(self):
         generator = SwiftCodeGenerator(procedure_lexicon())
         generator.convert()
         source = textwrap.dedent(
@@ -451,9 +464,19 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
                 let decoded = try! decoder.decode(InputAction.self, from: data)
                 precondition(String(data: try! encoder.encode(decoded), encoding: .utf8) == "\\\"\\(wireValue)\\\"")
                 precondition((try! decoded.toCBORValue()) as? String == wireValue)
+                if case .unknown = decoded {{ preconditionFailure("known value decoded as unknown") }}
+                precondition(InputAction(rawValue: wireValue) == decoded)
+                // Equality is by wire string: .unknown holding a known value equals its case.
+                precondition(InputAction.unknown(wireValue) == decoded)
+                precondition(InputAction.unknown(wireValue).hashValue == decoded.hashValue)
             }}
             let unknown = Data("\\\"unknown\\\"".utf8)
-            precondition((try? decoder.decode(InputAction.self, from: unknown)) == nil)
+            let decodedUnknown = try! decoder.decode(InputAction.self, from: unknown)
+            precondition(decodedUnknown == .unknown("unknown"))
+            precondition(decodedUnknown.rawValue == "unknown")
+            precondition(try! encoder.encode(decodedUnknown) == unknown)
+            precondition((try! decodedUnknown.toCBORValue()) as? String == "unknown")
+            precondition(InputAction(rawValue: "unknown") == .unknown("unknown"))
             """
         )
         with tempfile.TemporaryDirectory() as directory:
@@ -505,8 +528,8 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
         self.assertEqual(swift.count("public enum OutputHistory"), 1)
         self.assertIn("val action: BlueCatbirdMlsContextsOutputAction", kotlin)
         self.assertIn("val history: List<BlueCatbirdMlsContextsOutputHistory>", kotlin)
-        self.assertEqual(kotlin.count("enum class BlueCatbirdMlsContextsOutputAction"), 1)
-        self.assertEqual(kotlin.count("enum class BlueCatbirdMlsContextsOutputHistory"), 1)
+        self.assertEqual(kotlin.count("sealed class BlueCatbirdMlsContextsOutputAction("), 1)
+        self.assertEqual(kotlin.count("sealed class BlueCatbirdMlsContextsOutputHistory("), 1)
 
     def test_named_and_inline_enums_are_context_qualified_and_emitted_once(self):
         swift = SwiftCodeGenerator(definitions_lexicon()).convert()
@@ -516,8 +539,8 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
         self.assertEqual(swift.count("public enum EnvelopeInlineMode"), 1)
         self.assertIn("public let mode: DefsMode", swift)
         self.assertIn("public let inlineMode: EnvelopeInlineMode", swift)
-        self.assertEqual(kotlin.count("enum class BlueCatbirdMlsDefsDefsMode"), 1)
-        self.assertEqual(kotlin.count("enum class BlueCatbirdMlsDefsEnvelopeInlineMode"), 1)
+        self.assertEqual(kotlin.count("sealed class BlueCatbirdMlsDefsDefsMode("), 1)
+        self.assertEqual(kotlin.count("sealed class BlueCatbirdMlsDefsEnvelopeInlineMode("), 1)
         self.assertIn("val mode: BlueCatbirdMlsDefsDefsMode", kotlin)
         self.assertIn("val inlineMode: BlueCatbirdMlsDefsEnvelopeInlineMode", kotlin)
 
@@ -619,16 +642,16 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
         self.assertIn("public let namedAction: DefsInputAction", swift)
         self.assertEqual(swift.count("public enum InputAction"), 1)
         self.assertEqual(swift.count("public enum DefsInputAction"), 1)
-        self.assertIn('= "inline-only"', swift)
-        self.assertIn('= "named-only"', swift)
+        self.assertIn('case "inline-only": return .', swift)
+        self.assertIn('case "named-only": return .', swift)
 
         prefix = "BlueCatbirdMlsConflict"
         self.assertIn(f"val action: {prefix}InputAction", kotlin)
         self.assertIn(f"val namedAction: {prefix}DefsInputAction", kotlin)
-        self.assertEqual(kotlin.count(f"enum class {prefix}InputAction"), 1)
-        self.assertEqual(kotlin.count(f"enum class {prefix}DefsInputAction"), 1)
-        self.assertIn('@SerialName("inline-only")', kotlin)
-        self.assertIn('@SerialName("named-only")', kotlin)
+        self.assertEqual(kotlin.count(f"sealed class {prefix}InputAction("), 1)
+        self.assertEqual(kotlin.count(f"sealed class {prefix}DefsInputAction("), 1)
+        self.assertIn('"inline-only" -> ', kotlin)
+        self.assertIn('"named-only" -> ', kotlin)
 
     def test_distinct_contexts_that_render_the_same_type_name_fail_explicitly(self):
         with self.assertRaisesRegex(ValueError, "closed enum type name collision"):
@@ -666,8 +689,12 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
                 let data = Data(encodedWire.utf8)
                 let decoded = try! decoder.decode(InputAction.self, from: data)
                 precondition(try! encoder.encode(decoded) == data)
+                if case .unknown = decoded {{ preconditionFailure("known value decoded as unknown") }}
             }}
-            precondition((try? decoder.decode(InputAction.self, from: Data("\\\"unknown\\\"".utf8))) == nil)
+            let unknown = Data("\\\"unknown\\\"".utf8)
+            let decodedUnknown = try! decoder.decode(InputAction.self, from: unknown)
+            precondition(decodedUnknown == .unknown("unknown"))
+            precondition(try! encoder.encode(decodedUnknown) == unknown)
             """
         )
         with tempfile.TemporaryDirectory() as directory:

@@ -1,8 +1,54 @@
-@Serializable
-enum class {{ enum_name }} {
+/**
+{% if known_values %}
+ * A Lexicon `knownValues` string. The Lexicon names the values it knows, but a peer
+ * can send any other: such a value decodes as [Unknown] and is written back unchanged,
+ * instead of failing the object that holds it. Values are equal when their wire
+ * strings are.
+{% else %}
+ * A Lexicon `enum` string. The Lexicon lists every value, but a newer peer can add one
+ * before this build knows it: such a value decodes as [Unknown] and is written back
+ * unchanged, instead of failing the object that holds it. Values are equal when their
+ * wire strings are.
+{% endif %}
+ */
+@Serializable(with = {{ enum_name }}Serializer::class)
+sealed class {{ enum_name }}(val value: String) {
     {% for constant in constants %}
-    @SerialName({{ constant.wire_literal }})
-    {{ constant.identifier }}{% if not loop.last %},
-    {% endif %}
+    object {{ constant.identifier }} : {{ enum_name }}({{ constant.wire_literal }})
     {% endfor %}
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : {{ enum_name }}(value)
+
+    override fun equals(other: Any?): Boolean = other is {{ enum_name }} && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<{{ enum_name }}> by lazy {
+            listOf({% for constant in constants %}{{ constant.identifier }}{% if not loop.last %}, {% endif %}{% endfor %})
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): {{ enum_name }} = when (value) {
+            {% for constant in constants %}
+            {{ constant.wire_literal }} -> {{ constant.identifier }}
+            {% endfor %}
+            else -> Unknown(value)
+        }
+    }
+}
+
+object {{ enum_name }}Serializer : kotlinx.serialization.KSerializer<{{ enum_name }}> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("{{ enum_name }}", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: {{ enum_name }}) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): {{ enum_name }} =
+        {{ enum_name }}.fromValue(decoder.decodeString())
 }

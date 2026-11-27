@@ -125,7 +125,7 @@ class KotlinTemplateManager:
         self.output_template = self.env.get_template('output.jinja')
         self.parameters_template = self.env.get_template('parameters.jinja')
         self.sealed_interface_template = self.env.get_template('sealedInterface.jinja')
-        self.enum_class_template = self.env.get_template('enumClass.jinja')
+        self.enum_class_template = self.env.get_template('closedEnumClass.jinja')
         self.errors_enum_template = self.env.get_template('errorsEnum.jinja')
         self.record_template = self.env.get_template('record.jinja')
         self.message_template = self.env.get_template('message.jinja')

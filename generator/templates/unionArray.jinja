@@ -73,7 +73,7 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
         switch typeValue {
         {%- for ref in refs %}
         case "{{ ref.ref | escapeStringLiteral }}":
-            let value = try {{ ref.swift_ref }}(from: decoder)
+            let value = try {{ ref.swift_ref }}(from: ATProtoUnionMemberDecoder(decoder))
             self = .{{ ref.camel_case_label | lowerCamelCase }}(value)
         {%- endfor %}
         default:
@@ -98,8 +98,8 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
         switch self {
         {%- for ref in refs %}
         case .{{ ref.camel_case_label | lowerCamelCase }}(let value):
-            try container.encode("{{ ref.ref | escapeStringLiteral }}", forKey: .type)
             try value.encode(to: encoder)
+            try container.encode("{{ ref.ref | escapeStringLiteral }}", forKey: .type)
         {%- endfor %}
         {%- if not closed %}
         case .unexpected(let unknownValue):

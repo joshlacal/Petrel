@@ -5,7 +5,13 @@
   Every object-shaped struct the generator emits goes through this macro, so the wire
   rules live in one place:
 
-    ctx.encodes_type     the struct writes its own `$type` (records and named defs)
+    ctx.encodes_type     the struct writes its own `$type` (records). Any other struct
+                         with extra fields keeps a `$type` it was decoded with in the
+                         private `wireTypeTag` and writes it back, so decode then encode
+                         never changes the DAG-CBOR bytes or CID; an absent `$type` is
+                         never added. The tag is not part of equality or hashing. A union
+                         hides its tag from the member it decodes
+                         (ATProtoUnionMemberDecoder) and writes the tag itself.
     ctx.value_semantics  emit hash / isEqual / == (ATProtocolValue conformers)
     ctx.lenient          a wire-optional property that fails to decode becomes nil,
                          unless the decoder runs in strict mode
@@ -103,6 +109,7 @@ if container.contains(.{{ prop.key }}), try !container.decodeNil(forKey: .{{ pro
 {%- endmacro -%}
 
 {%- macro object_members(properties, ctx) %}
+        {%- set keeps_tag = ctx.extra_fields and not ctx.encodes_type %}
         {%- for prop in properties %}
         {%- if prop.boxed %}
         private let _{{ prop.ident_bare }}: IndirectBox<{{ prop.type }}>{% if prop.optional %}?{% endif %}
@@ -124,6 +131,9 @@ if container.contains(.{{ prop.key }}), try !container.decodeNil(forKey: .{{ pro
         /// written back on encode, so re-serializing data never drops them.
         public let {{ ctx.extra_name }}: [String: ATProtocolValueContainer]
         {%- endif %}
+        {%- if keeps_tag %}
+        private let wireTypeTag: String?
+        {%- endif %}
 
         public init(
             {%- for prop in properties %}
@@ -138,6 +148,9 @@ if container.contains(.{{ prop.key }}), try !container.decodeNil(forKey: .{{ pro
             {%- endfor %}
             {%- if ctx.extra_fields %}
             self.{{ ctx.extra_name }} = {{ ctx.extra_name }}
+            {%- endif %}
+            {%- if keeps_tag %}
+            wireTypeTag = nil
             {%- endif %}
         }
 
@@ -191,6 +204,9 @@ if container.contains(.{{ prop.key }}), try !container.decodeNil(forKey: .{{ pro
             {%- if ctx.extra_fields %}
             self.{{ ctx.extra_name }} = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys{% if ctx.keeps_malformed %}, keepingMalformed: malformedFields{% endif %})
             {%- endif %}
+            {%- if keeps_tag %}
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
+            {%- endif %}
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -213,6 +229,9 @@ if container.contains(.{{ prop.key }}), try !container.decodeNil(forKey: .{{ pro
             {%- endfor %}
             {%- if ctx.extra_fields %}
             try ATProtocolValueContainer.encodeExtraFields({{ ctx.extra_name }}, to: encoder{% if ctx.keeps_malformed %}, unlessSet: hasValue(forField:){% endif %})
+            {%- endif %}
+            {%- if keeps_tag %}
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
             {%- endif %}
         }
         {%- if ctx.value_semantics %}
@@ -281,7 +300,7 @@ if container.contains(.{{ prop.key }}), try !container.decodeNil(forKey: .{{ pro
             {%- endif %}
             {%- endfor %}
             {%- if ctx.extra_fields %}
-            return try ATProtocolValueContainer.addingExtraFields({{ ctx.extra_name }}, to: map{% if ctx.keeps_malformed %}, unlessSet: hasValue(forField:){% endif %})
+            return try {% if keeps_tag %}ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: {% endif %}ATProtocolValueContainer.addingExtraFields({{ ctx.extra_name }}, to: map{% if ctx.keeps_malformed %}, unlessSet: hasValue(forField:){% endif %}){% if keeps_tag %}){% endif %}
             {%- else %}
             return map
             {%- endif %}
