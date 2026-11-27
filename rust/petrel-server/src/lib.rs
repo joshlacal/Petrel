@@ -34,3 +34,6 @@ pub use service_auth::{
     ServiceAuthReplayStore, ServiceAuthRequiredClaims, ServiceAuthVerifier,
     ServiceAuthVerifierConfig, VerifiedServiceAuth,
 };
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "ws"))]
+pub mod subscription;
