@@ -1214,3 +1214,79 @@ fn security_hardening_tokens_replay_scoping_and_redacted_debug() {
     assert!(!dbg_verified.contains(&cred_jwt));
     assert!(dbg_verified.contains("[REDACTED]"));
 }
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[test]
+fn named_mac_requests_select_the_requested_profile() {
+    let (sk, pk_did) = generate_p256_keypair().unwrap();
+    let encap = encapsulate_p256(&pk_did).unwrap();
+    let decap = decapsulate_p256(&sk, &encap.key_share).unwrap();
+    let accept = format_accept_signature(MacProfile::Commit, &encap.key_share).unwrap();
+    let space = sample_space();
+    let repo = Did::parse("did:plc:ewvi7nxzyoun6zhxrhs64oiz").unwrap();
+    let rev = Tid::parse("3l2aaaaaaaaac").unwrap();
+    let data = [7u8; 32];
+    // A client may use another RFC 9421 dictionary key and request several profiles.
+    let named_commit = accept.replacen("mac=", "writer=", 1);
+    let named_record = format_accept_signature(MacProfile::Record, &encap.key_share)
+        .unwrap()
+        .replacen("mac=", "entry=", 1);
+    let selection = petrel_spaces::parse_accept_signature_for_profile(
+        &format!("{named_record}, {named_commit}"),
+        MacProfile::Commit,
+    )
+    .unwrap();
+    let named = selection
+        .sign_commit(&decap, &space, &repo, &rev, &data)
+        .unwrap();
+    assert!(named.signature_input.starts_with("writer="));
+    assert!(named.signature.starts_with("writer="));
+    let verified_named = verify_commit_mac(
+        &decap,
+        &named.covered_signature,
+        &named.signature_input,
+        &named.signature,
+    )
+    .unwrap();
+    assert_eq!(verified_named.keyid, encap.key_share);
+    assert_eq!(verified_named.data, data);
+    assert!(
+        petrel_spaces::parse_accept_signature_for_profile(
+            &format!("{accept}, {named_commit}"),
+            MacProfile::Commit
+        )
+        .is_err()
+    );
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[test]
+fn star_enforces_frame_order_size_and_record_shape() {
+    let space = sample_space();
+    let repo = Did::parse("did:plc:ewvi7nxzyoun6zhxrhs64oiz").unwrap();
+    let rev = Tid::parse("3l2aaaaaaaaac").unwrap();
+    let val = sample_record_value("hello");
+    let first_path = "app.bsky.feed.post/1";
+    let second_path = "app.bsky.feed.post/2";
+    let mut unordered = write_star_repo(
+        &space,
+        &repo,
+        &rev,
+        &[(first_path, &val), (second_path, &val)],
+    )
+    .unwrap();
+    let first_idx = unordered
+        .windows(first_path.len())
+        .position(|w| w == first_path.as_bytes())
+        .unwrap();
+    let second_idx = unordered
+        .windows(second_path.len())
+        .position(|w| w == second_path.as_bytes())
+        .unwrap();
+    unordered[first_idx + first_path.len() - 1] = b'2';
+    unordered[second_idx + second_path.len() - 1] = b'1';
+    assert!(read_star_repo(&unordered, unordered.len()).is_err());
+    assert!(write_star_repo(&space, &repo, &rev, &[(first_path, &Value::Integer(1))]).is_err());
+    let large_record = sample_record_value(&"x".repeat(1024 * 1024));
+    assert!(write_star_repo(&space, &repo, &rev, &[(first_path, &large_record)]).is_err());
+}
