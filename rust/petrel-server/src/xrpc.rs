@@ -4,6 +4,9 @@ use petrel_core::{
 
 use crate::support::StrictJson;
 
+/// Fixed client-facing message for [`XrpcServerError::Internal`].
+pub const INTERNAL_ERROR_MESSAGE: &str = "Internal Server Error";
+
 /// Framework-agnostic XRPC handler error capable of producing `{"error": ..., "message": ...}` JSON bodies.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum XrpcServerError<E> {
@@ -23,7 +26,10 @@ pub enum XrpcServerError<E> {
     Forbidden(String),
     /// Route / HTTP method mismatch (`405 MethodNotAllowed`).
     MethodNotAllowed(String),
-    /// Internal or upstream server error (`500 InternalServerError` or `503 UpstreamFailure`).
+    /// Internal or upstream server error (`500 InternalServerError`).
+    ///
+    /// The string is server-side detail: it is logged by the Axum adapter and never sent to
+    /// the client, which receives [`INTERNAL_ERROR_MESSAGE`].
     Internal(String),
 }
 
@@ -85,9 +91,11 @@ impl<E: DeclaredXrpcError> XrpcServerError<E> {
                 error: "MethodNotAllowed".to_owned(),
                 message: Some(msg.clone()),
             },
-            Self::Internal(msg) => XrpcErrorBody {
+            // The detail of an internal error (SQL, upstream URLs, panics) stays server-side;
+            // adapters log it. Clients get a fixed message.
+            Self::Internal(_) => XrpcErrorBody {
                 error: "InternalServerError".to_owned(),
-                message: Some(msg.clone()),
+                message: Some(INTERNAL_ERROR_MESSAGE.to_owned()),
             },
         }
     }
@@ -116,7 +124,10 @@ pub fn decode_xrpc_query<P: FromQueryParams>(raw_query: Option<&str>) -> Result<
 
 /// Strictly decodes JSON XRPC procedure inputs using `StrictJson` + recursive [`FromValue::from_value_strict`].
 ///
-/// Rejects duplicate keys, trailing JSON tokens, and unknown fields anywhere inside nested objects/arrays.
+/// Rejects duplicate keys, trailing JSON tokens, and optional fields that do not decode anywhere
+/// inside nested objects/arrays. Unknown fields (and unknown open-union members) are accepted at
+/// every depth, as ATProto's additive lexicon evolution requires, so an older server keeps
+/// accepting requests from newer clients.
 pub fn decode_xrpc_json_strict<T: FromValue>(bytes: &[u8]) -> Result<T, String> {
     StrictJson::validate(bytes).map_err(|err| err.to_string())?;
     let val: petrel_core::Value =

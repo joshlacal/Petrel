@@ -83,9 +83,17 @@ pub enum ServiceAuthMethodPolicy {
     /// `lxm` must equal this NSID when present; a token without `lxm` is accepted.
     ExactlyIfPresent(String),
     /// `lxm` must be present; the caller compares it itself.
+    ///
+    /// Not bound to any route. Prefer [`Self::MatchRoute`] for XRPC servers.
     Required,
     /// `lxm` is not checked.
     Optional,
+    /// `lxm` must be present and equal to the NSID of the XRPC route being served.
+    ///
+    /// A server adapter (for example `petrel-server`'s Axum integration) resolves this to
+    /// [`Self::Exactly`] from the request's `/xrpc/{nsid}` path. Evaluated directly with
+    /// [`Self::check`], where no route is known, it always fails closed.
+    MatchRoute,
 }
 
 impl ServiceAuthMethodPolicy {
@@ -121,6 +129,10 @@ impl ServiceAuthMethodPolicy {
                 }
             }
             Self::Optional => Ok(()),
+            Self::MatchRoute => Err(ServiceAuthError::LexiconMethodMismatch {
+                expected: None,
+                actual: lexicon_method.map(str::to_owned),
+            }),
         }
     }
 }
