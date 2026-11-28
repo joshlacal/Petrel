@@ -88,6 +88,8 @@ public extension ATProtocolValueContainer {
             return String(value)
         case let .bigNumber(value):
             return value
+        case let .float(value):
+            return String(value)
         case let .object(value):
             return "Object: \(value.description)"
         case let .array(value):
@@ -121,6 +123,8 @@ public extension ATProtocolValueContainer {
         case let .number(value):
             return value
         case let .bigNumber(value):
+            return value
+        case let .float(value):
             return value
         case let .bool(value):
             return value
@@ -161,6 +165,8 @@ public extension ATProtocolValueContainer {
             return a == b
         case let (.bigNumber(a), .bigNumber(b)):
             return a == b
+        case let (.float(a), .float(b)):
+            return a == b
         case let (.bool(a), .bool(b)):
             return a == b
         case (.null, .null):
@@ -191,6 +197,8 @@ public extension ATProtocolValueContainer {
         case let .number(value):
             hasher.combine(value)
         case let .bigNumber(value):
+            hasher.combine(value)
+        case let .float(value):
             hasher.combine(value)
         case let .bool(value):
             hasher.combine(value)
@@ -345,6 +353,7 @@ public struct ATProtocolValueContainerDecoder: Decoder {
         func decode(_ type: Double.Type, forKey key: Key) throws -> Double {
             let val = try getValue(forKey: key)
             if case let .number(n) = val { return Double(n) }
+            if case let .float(f) = val { return Double(f) }
             throw DecodingError.typeMismatch(type, DecodingError.Context(
                 codingPath: nestedPath(key),
                 debugDescription: "Expected Double for \(key.stringValue), got \(val)"
@@ -354,6 +363,7 @@ public struct ATProtocolValueContainerDecoder: Decoder {
         func decode(_ type: Float.Type, forKey key: Key) throws -> Float {
             let val = try getValue(forKey: key)
             if case let .number(n) = val { return Float(n) }
+            if case let .float(f) = val { return Float(f) }
             throw DecodingError.typeMismatch(type, DecodingError.Context(
                 codingPath: nestedPath(key),
                 debugDescription: "Expected Float for \(key.stringValue), got \(val)"
@@ -577,12 +587,14 @@ public struct ATProtocolValueContainerDecoder: Decoder {
         mutating func decode(_ type: Double.Type) throws -> Double {
             let val = try nextValue()
             if case let .number(n) = val { return Double(n) }
+            if case let .float(f) = val { return Double(f) }
             throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: codingPath, debugDescription: "Expected Double, got \(val)"))
         }
 
         mutating func decode(_ type: Float.Type) throws -> Float {
             let val = try nextValue()
             if case let .number(n) = val { return Float(n) }
+            if case let .float(f) = val { return Float(f) }
             throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: codingPath, debugDescription: "Expected Float, got \(val)"))
         }
 
@@ -742,11 +754,13 @@ public struct ATProtocolValueContainerDecoder: Decoder {
         }
         func decode(_ type: Double.Type) throws -> Double {
             if case let .number(n) = decoder.value { return Double(n) }
+            if case let .float(f) = decoder.value { return Double(f) }
             throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: codingPath, debugDescription: "Expected Double, got \(decoder.value)"))
         }
 
         func decode(_ type: Float.Type) throws -> Float {
             if case let .number(n) = decoder.value { return Float(n) }
+            if case let .float(f) = decoder.value { return Float(f) }
             throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: codingPath, debugDescription: "Expected Float, got \(decoder.value)"))
         }
 
@@ -850,7 +864,7 @@ public struct ATProtocolValueContainerDecoder: Decoder {
 // MARK: - Undeclared fields
 
 /// A coding key for any string, used to read and write fields a Lexicon does not declare.
-private struct UndeclaredFieldKey: CodingKey {
+struct UndeclaredFieldKey: CodingKey {
     let stringValue: String
     let intValue: Int? = nil
 

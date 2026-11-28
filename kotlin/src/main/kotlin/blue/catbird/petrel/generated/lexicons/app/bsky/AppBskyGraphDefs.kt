@@ -16,14 +16,53 @@ object AppBskyGraphDefsDefs {
     const val TYPE_IDENTIFIER = "app.bsky.graph.defs"
 }
 
-@Serializable
-enum class AppBskyGraphDefsListPurpose {
-    @SerialName("app.bsky.graph.defs#modlist")
-    APP_BSKY_GRAPH_DEFS_MODLIST,
-    @SerialName("app.bsky.graph.defs#curatelist")
-    APP_BSKY_GRAPH_DEFS_CURATELIST,
-    @SerialName("app.bsky.graph.defs#referencelist")
-    APP_BSKY_GRAPH_DEFS_REFERENCELIST}
+/**
+ * A Lexicon `knownValues` string. The Lexicon names the values it knows, but a peer
+ * can send any other: such a value decodes as [Unknown] and is written back unchanged,
+ * instead of failing the object that holds it. Values are equal when their wire
+ * strings are.
+ */
+@Serializable(with = AppBskyGraphDefsListPurposeSerializer::class)
+sealed class AppBskyGraphDefsListPurpose(val value: String) {
+    object APP_BSKY_GRAPH_DEFS_MODLIST : AppBskyGraphDefsListPurpose("app.bsky.graph.defs#modlist")
+    object APP_BSKY_GRAPH_DEFS_CURATELIST : AppBskyGraphDefsListPurpose("app.bsky.graph.defs#curatelist")
+    object APP_BSKY_GRAPH_DEFS_REFERENCELIST : AppBskyGraphDefsListPurpose("app.bsky.graph.defs#referencelist")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : AppBskyGraphDefsListPurpose(value)
+
+    override fun equals(other: Any?): Boolean = other is AppBskyGraphDefsListPurpose && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<AppBskyGraphDefsListPurpose> by lazy {
+            listOf(APP_BSKY_GRAPH_DEFS_MODLIST, APP_BSKY_GRAPH_DEFS_CURATELIST, APP_BSKY_GRAPH_DEFS_REFERENCELIST)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): AppBskyGraphDefsListPurpose = when (value) {
+            "app.bsky.graph.defs#modlist" -> APP_BSKY_GRAPH_DEFS_MODLIST
+            "app.bsky.graph.defs#curatelist" -> APP_BSKY_GRAPH_DEFS_CURATELIST
+            "app.bsky.graph.defs#referencelist" -> APP_BSKY_GRAPH_DEFS_REFERENCELIST
+            else -> Unknown(value)
+        }
+    }
+}
+
+object AppBskyGraphDefsListPurposeSerializer : kotlinx.serialization.KSerializer<AppBskyGraphDefsListPurpose> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("AppBskyGraphDefsListPurpose", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyGraphDefsListPurpose) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyGraphDefsListPurpose =
+        AppBskyGraphDefsListPurpose.fromValue(decoder.decodeString())
+}
 
     @Serializable
     data class AppBskyGraphDefsListViewBasic(

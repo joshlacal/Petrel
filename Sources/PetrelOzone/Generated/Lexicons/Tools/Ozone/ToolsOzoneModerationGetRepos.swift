@@ -69,10 +69,10 @@ public enum ToolsOzoneModerationGetRepos {
 
             switch typeValue {
             case "tools.ozone.moderation.defs#repoViewDetail":
-                let value = try ToolsOzoneModerationDefs.RepoViewDetail(from: decoder)
+                let value = try ToolsOzoneModerationDefs.RepoViewDetail(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsRepoViewDetail(value)
             case "tools.ozone.moderation.defs#repoViewNotFound":
-                let value = try ToolsOzoneModerationDefs.RepoViewNotFound(from: decoder)
+                let value = try ToolsOzoneModerationDefs.RepoViewNotFound(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsRepoViewNotFound(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -85,11 +85,11 @@ public enum ToolsOzoneModerationGetRepos {
 
             switch self {
             case let .toolsOzoneModerationDefsRepoViewDetail(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#repoViewDetail", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsRepoViewNotFound(value):
-                try container.encode("tools.ozone.moderation.defs#repoViewNotFound", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("tools.ozone.moderation.defs#repoViewNotFound", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

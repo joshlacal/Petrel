@@ -25,6 +25,7 @@ public enum ToolsOzoneInboxDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             src: DID,
@@ -50,6 +51,7 @@ public enum ToolsOzoneInboxDefs {
             self.updatedAt = updatedAt
             self.isRead = isRead
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -111,6 +113,7 @@ public enum ToolsOzoneInboxDefs {
             updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
             isRead = try container.decode(Bool.self, forKey: .isRead)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -126,6 +129,7 @@ public enum ToolsOzoneInboxDefs {
             try container.encode(updatedAt, forKey: .updatedAt)
             try container.encode(isRead, forKey: .isRead)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -227,7 +231,7 @@ public enum ToolsOzoneInboxDefs {
             map = map.adding(key: "updatedAt", value: updatedAtValue)
             let isReadValue = try isRead.toCBORValue()
             map = map.adding(key: "isRead", value: isReadValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "src", "subject", "enforcement", "appeal", "availableActions", "latestAction", "actionCount", "createdAt", "updatedAt", "isRead"]
@@ -276,6 +280,7 @@ public enum ToolsOzoneInboxDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             state: String,
@@ -289,6 +294,7 @@ public enum ToolsOzoneInboxDefs {
             self.expiresAt = expiresAt
             self.labels = labels
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -333,6 +339,7 @@ public enum ToolsOzoneInboxDefs {
                 malformedFields.insert("labels")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -342,6 +349,7 @@ public enum ToolsOzoneInboxDefs {
             try container.encodeIfPresent(expiresAt, forKey: .expiresAt)
             try container.encodeIfPresent(labels, forKey: .labels)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -401,7 +409,7 @@ public enum ToolsOzoneInboxDefs {
                 let labelsValue = try value.toCBORValue()
                 map = map.adding(key: "labels", value: labelsValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "state", "scope", "expiresAt", "labels"]
@@ -440,6 +448,7 @@ public enum ToolsOzoneInboxDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             state: String,
@@ -455,6 +464,7 @@ public enum ToolsOzoneInboxDefs {
             self.outcome = outcome
             self.appealableUntil = appealableUntil
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -511,6 +521,7 @@ public enum ToolsOzoneInboxDefs {
                 malformedFields.insert("appealableUntil")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -521,6 +532,7 @@ public enum ToolsOzoneInboxDefs {
             try container.encodeIfPresent(outcome, forKey: .outcome)
             try container.encodeIfPresent(appealableUntil, forKey: .appealableUntil)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -592,7 +604,7 @@ public enum ToolsOzoneInboxDefs {
                 let appealableUntilValue = try value.toCBORValue()
                 map = map.adding(key: "appealableUntil", value: appealableUntilValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "state", "appealedAt", "resolvedAt", "outcome", "appealableUntil"]
@@ -638,6 +650,7 @@ public enum ToolsOzoneInboxDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             id: Int,
@@ -659,6 +672,7 @@ public enum ToolsOzoneInboxDefs {
             self.labels = labels
             self.policies = policies
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -729,6 +743,7 @@ public enum ToolsOzoneInboxDefs {
                 malformedFields.insert("policies")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -742,6 +757,7 @@ public enum ToolsOzoneInboxDefs {
             try container.encodeIfPresent(labels, forKey: .labels)
             try container.encodeIfPresent(policies, forKey: .policies)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -837,7 +853,7 @@ public enum ToolsOzoneInboxDefs {
                 let policiesValue = try value.toCBORValue()
                 map = map.adding(key: "policies", value: policiesValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "id", "type", "scope", "createdAt", "reversedAt", "expiresAt", "labels", "policies"]
@@ -879,6 +895,7 @@ public enum ToolsOzoneInboxDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             key: String,
@@ -890,6 +907,7 @@ public enum ToolsOzoneInboxDefs {
             self.displayName = displayName
             self.link = link
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -898,6 +916,7 @@ public enum ToolsOzoneInboxDefs {
             displayName = try container.decode(String.self, forKey: .displayName)
             link = try container.decode(URI.self, forKey: .link)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -906,6 +925,7 @@ public enum ToolsOzoneInboxDefs {
             try container.encode(displayName, forKey: .displayName)
             try container.encode(link, forKey: .link)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -941,7 +961,7 @@ public enum ToolsOzoneInboxDefs {
             map = map.adding(key: "displayName", value: displayNameValue)
             let linkValue = try link.toCBORValue()
             map = map.adding(key: "link", value: linkValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "key", "displayName", "link"]
@@ -978,6 +998,7 @@ public enum ToolsOzoneInboxDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             src: DID,
@@ -1009,6 +1030,7 @@ public enum ToolsOzoneInboxDefs {
             self.createdAt = createdAt
             self.updatedAt = updatedAt
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1095,6 +1117,7 @@ public enum ToolsOzoneInboxDefs {
             createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1113,6 +1136,7 @@ public enum ToolsOzoneInboxDefs {
             try container.encode(createdAt, forKey: .createdAt)
             try container.encode(updatedAt, forKey: .updatedAt)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1244,7 +1268,7 @@ public enum ToolsOzoneInboxDefs {
             map = map.adding(key: "createdAt", value: createdAtValue)
             let updatedAtValue = try updatedAt.toCBORValue()
             map = map.adding(key: "updatedAt", value: updatedAtValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "src", "isRead", "subject", "record", "account", "enforcement", "appeal", "availableActions", "actions", "cursor", "reports", "createdAt", "updatedAt"]
@@ -1297,6 +1321,7 @@ public enum ToolsOzoneInboxDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             handle: Handle? = nil,
@@ -1306,6 +1331,7 @@ public enum ToolsOzoneInboxDefs {
             self.handle = handle
             self.profile = profile
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1337,6 +1363,7 @@ public enum ToolsOzoneInboxDefs {
                 malformedFields.insert("profile")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1344,6 +1371,7 @@ public enum ToolsOzoneInboxDefs {
             try container.encodeIfPresent(handle, forKey: .handle)
             try container.encodeIfPresent(profile, forKey: .profile)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1385,7 +1413,7 @@ public enum ToolsOzoneInboxDefs {
                 let profileValue = try value.toCBORValue()
                 map = map.adding(key: "profile", value: profileValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "handle", "profile"]
@@ -1419,6 +1447,7 @@ public enum ToolsOzoneInboxDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             reasonTypes: [String],
@@ -1430,6 +1459,7 @@ public enum ToolsOzoneInboxDefs {
             self.firstReportedOn = firstReportedOn
             self.lastReportedOn = lastReportedOn
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1438,6 +1468,7 @@ public enum ToolsOzoneInboxDefs {
             firstReportedOn = try container.decode(ATProtocolDate.self, forKey: .firstReportedOn)
             lastReportedOn = try container.decode(ATProtocolDate.self, forKey: .lastReportedOn)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1446,6 +1477,7 @@ public enum ToolsOzoneInboxDefs {
             try container.encode(firstReportedOn, forKey: .firstReportedOn)
             try container.encode(lastReportedOn, forKey: .lastReportedOn)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1481,7 +1513,7 @@ public enum ToolsOzoneInboxDefs {
             map = map.adding(key: "firstReportedOn", value: firstReportedOnValue)
             let lastReportedOnValue = try lastReportedOn.toCBORValue()
             map = map.adding(key: "lastReportedOn", value: lastReportedOnValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "reasonTypes", "firstReportedOn", "lastReportedOn"]
@@ -1504,6 +1536,7 @@ public enum ToolsOzoneInboxDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             id: Int,
@@ -1519,6 +1552,7 @@ public enum ToolsOzoneInboxDefs {
             self.isRead = isRead
             self.createdAt = createdAt
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1529,6 +1563,7 @@ public enum ToolsOzoneInboxDefs {
             isRead = try container.decode(Bool.self, forKey: .isRead)
             createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1539,6 +1574,7 @@ public enum ToolsOzoneInboxDefs {
             try container.encode(isRead, forKey: .isRead)
             try container.encode(createdAt, forKey: .createdAt)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1586,7 +1622,7 @@ public enum ToolsOzoneInboxDefs {
             map = map.adding(key: "isRead", value: isReadValue)
             let createdAtValue = try createdAt.toCBORValue()
             map = map.adding(key: "createdAt", value: createdAtValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "id", "reason", "target", "isRead", "createdAt"]
@@ -1613,6 +1649,7 @@ public enum ToolsOzoneInboxDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             reports: Bool,
@@ -1624,6 +1661,7 @@ public enum ToolsOzoneInboxDefs {
             self.account = account
             self.labels = labels
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1632,6 +1670,7 @@ public enum ToolsOzoneInboxDefs {
             account = try container.decode(Bool.self, forKey: .account)
             labels = try container.decode(Bool.self, forKey: .labels)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1640,6 +1679,7 @@ public enum ToolsOzoneInboxDefs {
             try container.encode(account, forKey: .account)
             try container.encode(labels, forKey: .labels)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1675,7 +1715,7 @@ public enum ToolsOzoneInboxDefs {
             map = map.adding(key: "account", value: accountValue)
             let labelsValue = try labels.toCBORValue()
             map = map.adding(key: "labels", value: labelsValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "reports", "account", "labels"]
@@ -1697,6 +1737,7 @@ public enum ToolsOzoneInboxDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             reportId: Int,
@@ -1708,6 +1749,7 @@ public enum ToolsOzoneInboxDefs {
             self.subject = subject
             self.status = status
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1740,6 +1782,7 @@ public enum ToolsOzoneInboxDefs {
                 malformedFields.insert("status")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1748,6 +1791,7 @@ public enum ToolsOzoneInboxDefs {
             try container.encodeIfPresent(subject, forKey: .subject)
             try container.encodeIfPresent(status, forKey: .status)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1795,7 +1839,7 @@ public enum ToolsOzoneInboxDefs {
                 let statusValue = try value.toCBORValue()
                 map = map.adding(key: "status", value: statusValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "reportId", "subject", "status"]
@@ -1829,6 +1873,7 @@ public enum ToolsOzoneInboxDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             appealOutcome: String? = nil,
@@ -1842,6 +1887,7 @@ public enum ToolsOzoneInboxDefs {
             self.actionType = actionType
             self.actionId = actionId
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1886,6 +1932,7 @@ public enum ToolsOzoneInboxDefs {
                 malformedFields.insert("actionId")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1895,6 +1942,7 @@ public enum ToolsOzoneInboxDefs {
             try container.encodeIfPresent(actionType, forKey: .actionType)
             try container.encodeIfPresent(actionId, forKey: .actionId)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1954,7 +2002,7 @@ public enum ToolsOzoneInboxDefs {
                 let actionIdValue = try value.toCBORValue()
                 map = map.adding(key: "actionId", value: actionIdValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "appealOutcome", "subject", "actionType", "actionId"]
@@ -1987,6 +2035,7 @@ public enum ToolsOzoneInboxDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             standing: String,
@@ -1996,6 +2045,7 @@ public enum ToolsOzoneInboxDefs {
             self.standing = standing
             self.previousStanding = previousStanding
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -2016,6 +2066,7 @@ public enum ToolsOzoneInboxDefs {
                 malformedFields.insert("previousStanding")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -2023,6 +2074,7 @@ public enum ToolsOzoneInboxDefs {
             try container.encode(standing, forKey: .standing)
             try container.encodeIfPresent(previousStanding, forKey: .previousStanding)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2058,7 +2110,7 @@ public enum ToolsOzoneInboxDefs {
                 let previousStandingValue = try value.toCBORValue()
                 map = map.adding(key: "previousStanding", value: previousStandingValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "standing", "previousStanding"]
@@ -2099,10 +2151,10 @@ public enum ToolsOzoneInboxDefs {
 
             switch typeValue {
             case "com.atproto.admin.defs#repoRef":
-                let value = try ComAtprotoAdminDefs.RepoRef(from: decoder)
+                let value = try ComAtprotoAdminDefs.RepoRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoAdminDefsRepoRef(value)
             case "com.atproto.repo.strongRef":
-                let value = try ComAtprotoRepoStrongRef(from: decoder)
+                let value = try ComAtprotoRepoStrongRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoRepoStrongRef(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -2115,11 +2167,11 @@ public enum ToolsOzoneInboxDefs {
 
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.admin.defs#repoRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoRepoStrongRef(value):
-                try container.encode("com.atproto.repo.strongRef", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.repo.strongRef", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -2233,10 +2285,10 @@ public enum ToolsOzoneInboxDefs {
 
             switch typeValue {
             case "com.atproto.admin.defs#repoRef":
-                let value = try ComAtprotoAdminDefs.RepoRef(from: decoder)
+                let value = try ComAtprotoAdminDefs.RepoRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoAdminDefsRepoRef(value)
             case "com.atproto.repo.strongRef":
-                let value = try ComAtprotoRepoStrongRef(from: decoder)
+                let value = try ComAtprotoRepoStrongRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoRepoStrongRef(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -2249,11 +2301,11 @@ public enum ToolsOzoneInboxDefs {
 
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.admin.defs#repoRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoRepoStrongRef(value):
-                try container.encode("com.atproto.repo.strongRef", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.repo.strongRef", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -2372,13 +2424,13 @@ public enum ToolsOzoneInboxDefs {
 
             switch typeValue {
             case "tools.ozone.inbox.defs#reportRef":
-                let value = try ToolsOzoneInboxDefs.ReportRef(from: decoder)
+                let value = try ToolsOzoneInboxDefs.ReportRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneInboxDefsReportRef(value)
             case "tools.ozone.inbox.defs#subjectRef":
-                let value = try ToolsOzoneInboxDefs.SubjectRef(from: decoder)
+                let value = try ToolsOzoneInboxDefs.SubjectRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneInboxDefsSubjectRef(value)
             case "tools.ozone.inbox.defs#standingRef":
-                let value = try ToolsOzoneInboxDefs.StandingRef(from: decoder)
+                let value = try ToolsOzoneInboxDefs.StandingRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneInboxDefsStandingRef(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -2391,14 +2443,14 @@ public enum ToolsOzoneInboxDefs {
 
             switch self {
             case let .toolsOzoneInboxDefsReportRef(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.inbox.defs#reportRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneInboxDefsSubjectRef(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.inbox.defs#subjectRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneInboxDefsStandingRef(value):
-                try container.encode("tools.ozone.inbox.defs#standingRef", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("tools.ozone.inbox.defs#standingRef", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -2537,10 +2589,10 @@ public enum ToolsOzoneInboxDefs {
 
             switch typeValue {
             case "com.atproto.admin.defs#repoRef":
-                let value = try ComAtprotoAdminDefs.RepoRef(from: decoder)
+                let value = try ComAtprotoAdminDefs.RepoRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoAdminDefsRepoRef(value)
             case "com.atproto.repo.strongRef":
-                let value = try ComAtprotoRepoStrongRef(from: decoder)
+                let value = try ComAtprotoRepoStrongRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoRepoStrongRef(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -2553,11 +2605,11 @@ public enum ToolsOzoneInboxDefs {
 
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.admin.defs#repoRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoRepoStrongRef(value):
-                try container.encode("com.atproto.repo.strongRef", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.repo.strongRef", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -2671,10 +2723,10 @@ public enum ToolsOzoneInboxDefs {
 
             switch typeValue {
             case "com.atproto.admin.defs#repoRef":
-                let value = try ComAtprotoAdminDefs.RepoRef(from: decoder)
+                let value = try ComAtprotoAdminDefs.RepoRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoAdminDefsRepoRef(value)
             case "com.atproto.repo.strongRef":
-                let value = try ComAtprotoRepoStrongRef(from: decoder)
+                let value = try ComAtprotoRepoStrongRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoRepoStrongRef(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -2687,11 +2739,11 @@ public enum ToolsOzoneInboxDefs {
 
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.admin.defs#repoRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoRepoStrongRef(value):
-                try container.encode("com.atproto.repo.strongRef", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.repo.strongRef", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

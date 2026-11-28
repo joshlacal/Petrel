@@ -95,7 +95,7 @@ class KotlinEnumGenerator:
         self.generate_sealed_interface_for_union(current_struct_name, prop_name, refs, raw_refs=raw_refs)
 
     def generate_enum_class_from_known_values(self, enum_name: str, known_values: List[str], descriptions: dict = None):
-        """Generate an enum class from known values."""
+        """Generate an open sealed class from a named `knownValues` string def."""
         print(f"Generating enum class {enum_name} with values: {known_values}", flush=True)
         if enum_name in self.generated_enum_classes:
             print(f"Skipping {enum_name}, already generated", flush=True)
@@ -116,11 +116,21 @@ class KotlinEnumGenerator:
                 'description': descriptions.get(value, '') if descriptions else ''
             })
 
-        # Render the enum class
+        # A knownValues string is open by definition: the Lexicon names the values it
+        # knows, and a peer may send any other. Render it with the same open sealed
+        # class as an `enum` string, so an unknown value decodes as Unknown instead of
+        # failing the object that holds it. The constant names stay as before.
         template = self.code_generator.template_manager.enum_class_template
         enum_code = template.render(
             enum_name=enum_name,
-            constants=constants
+            constants=[
+                {
+                    'identifier': constant['name'],
+                    'wire_literal': self._kotlin_string_literal(constant['value']),
+                }
+                for constant in constants
+            ],
+            known_values=True,
         )
 
         self.code_generator.enum_classes += enum_code + '\n\n'

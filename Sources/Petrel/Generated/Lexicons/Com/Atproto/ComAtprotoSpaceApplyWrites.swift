@@ -17,6 +17,7 @@ public enum ComAtprotoSpaceApplyWrites {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             collection: NSID,
@@ -28,6 +29,7 @@ public enum ComAtprotoSpaceApplyWrites {
             self.rkey = rkey
             self.value = value
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -49,6 +51,7 @@ public enum ComAtprotoSpaceApplyWrites {
             }
             value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -57,6 +60,7 @@ public enum ComAtprotoSpaceApplyWrites {
             try container.encodeIfPresent(rkey, forKey: .rkey)
             try container.encode(value, forKey: .value)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -98,7 +102,7 @@ public enum ComAtprotoSpaceApplyWrites {
             }
             let valueValue = try value.toCBORValue()
             map = map.adding(key: "value", value: valueValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "collection", "rkey", "value"]
@@ -120,6 +124,7 @@ public enum ComAtprotoSpaceApplyWrites {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             collection: NSID,
@@ -131,6 +136,7 @@ public enum ComAtprotoSpaceApplyWrites {
             self.rkey = rkey
             self.value = value
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -139,6 +145,7 @@ public enum ComAtprotoSpaceApplyWrites {
             rkey = try container.decode(RecordKey.self, forKey: .rkey)
             value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -147,6 +154,7 @@ public enum ComAtprotoSpaceApplyWrites {
             try container.encode(rkey, forKey: .rkey)
             try container.encode(value, forKey: .value)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -182,7 +190,7 @@ public enum ComAtprotoSpaceApplyWrites {
             map = map.adding(key: "rkey", value: rkeyValue)
             let valueValue = try value.toCBORValue()
             map = map.adding(key: "value", value: valueValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "collection", "rkey", "value"]
@@ -203,6 +211,7 @@ public enum ComAtprotoSpaceApplyWrites {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             collection: NSID,
@@ -212,6 +221,7 @@ public enum ComAtprotoSpaceApplyWrites {
             self.collection = collection
             self.rkey = rkey
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -219,6 +229,7 @@ public enum ComAtprotoSpaceApplyWrites {
             collection = try container.decode(NSID.self, forKey: .collection)
             rkey = try container.decode(RecordKey.self, forKey: .rkey)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -226,6 +237,7 @@ public enum ComAtprotoSpaceApplyWrites {
             try container.encode(collection, forKey: .collection)
             try container.encode(rkey, forKey: .rkey)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -255,7 +267,7 @@ public enum ComAtprotoSpaceApplyWrites {
             map = map.adding(key: "collection", value: collectionValue)
             let rkeyValue = try rkey.toCBORValue()
             map = map.adding(key: "rkey", value: rkeyValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "collection", "rkey"]
@@ -275,6 +287,7 @@ public enum ComAtprotoSpaceApplyWrites {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             uri: ATProtocolURI,
@@ -286,6 +299,7 @@ public enum ComAtprotoSpaceApplyWrites {
             self.cid = cid
             self.validationStatus = validationStatus
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -307,6 +321,7 @@ public enum ComAtprotoSpaceApplyWrites {
                 malformedFields.insert("validationStatus")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -315,6 +330,7 @@ public enum ComAtprotoSpaceApplyWrites {
             try container.encode(cid, forKey: .cid)
             try container.encodeIfPresent(validationStatus, forKey: .validationStatus)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -356,7 +372,7 @@ public enum ComAtprotoSpaceApplyWrites {
                 let validationStatusValue = try value.toCBORValue()
                 map = map.adding(key: "validationStatus", value: validationStatusValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "cid", "validationStatus"]
@@ -388,6 +404,7 @@ public enum ComAtprotoSpaceApplyWrites {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             uri: ATProtocolURI,
@@ -399,6 +416,7 @@ public enum ComAtprotoSpaceApplyWrites {
             self.cid = cid
             self.validationStatus = validationStatus
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -420,6 +438,7 @@ public enum ComAtprotoSpaceApplyWrites {
                 malformedFields.insert("validationStatus")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -428,6 +447,7 @@ public enum ComAtprotoSpaceApplyWrites {
             try container.encode(cid, forKey: .cid)
             try container.encodeIfPresent(validationStatus, forKey: .validationStatus)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -469,7 +489,7 @@ public enum ComAtprotoSpaceApplyWrites {
                 let validationStatusValue = try value.toCBORValue()
                 map = map.adding(key: "validationStatus", value: validationStatusValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "cid", "validationStatus"]
@@ -498,20 +518,24 @@ public enum ComAtprotoSpaceApplyWrites {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             _ = encoder.container(keyedBy: CodingKeys.self)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -529,7 +553,7 @@ public enum ComAtprotoSpaceApplyWrites {
 
         public func toCBORValue() throws -> Any {
             let map = OrderedCBORMap()
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type"]
@@ -707,13 +731,13 @@ public enum ComAtprotoSpaceApplyWrites {
 
             switch typeValue {
             case "com.atproto.space.applyWrites#create":
-                let value = try ComAtprotoSpaceApplyWrites.Create(from: decoder)
+                let value = try ComAtprotoSpaceApplyWrites.Create(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoSpaceApplyWritesCreate(value)
             case "com.atproto.space.applyWrites#update":
-                let value = try ComAtprotoSpaceApplyWrites.Update(from: decoder)
+                let value = try ComAtprotoSpaceApplyWrites.Update(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoSpaceApplyWritesUpdate(value)
             case "com.atproto.space.applyWrites#delete":
-                let value = try ComAtprotoSpaceApplyWrites.Delete(from: decoder)
+                let value = try ComAtprotoSpaceApplyWrites.Delete(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoSpaceApplyWritesDelete(value)
             default:
                 throw DecodingError.dataCorruptedError(
@@ -729,14 +753,14 @@ public enum ComAtprotoSpaceApplyWrites {
 
             switch self {
             case let .comAtprotoSpaceApplyWritesCreate(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.space.applyWrites#create", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoSpaceApplyWritesUpdate(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.space.applyWrites#update", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoSpaceApplyWritesDelete(value):
-                try container.encode("com.atproto.space.applyWrites#delete", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.space.applyWrites#delete", forKey: .type)
             }
         }
 
@@ -868,13 +892,13 @@ public enum ComAtprotoSpaceApplyWrites {
 
             switch typeValue {
             case "com.atproto.space.applyWrites#createResult":
-                let value = try ComAtprotoSpaceApplyWrites.CreateResult(from: decoder)
+                let value = try ComAtprotoSpaceApplyWrites.CreateResult(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoSpaceApplyWritesCreateResult(value)
             case "com.atproto.space.applyWrites#updateResult":
-                let value = try ComAtprotoSpaceApplyWrites.UpdateResult(from: decoder)
+                let value = try ComAtprotoSpaceApplyWrites.UpdateResult(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoSpaceApplyWritesUpdateResult(value)
             case "com.atproto.space.applyWrites#deleteResult":
-                let value = try ComAtprotoSpaceApplyWrites.DeleteResult(from: decoder)
+                let value = try ComAtprotoSpaceApplyWrites.DeleteResult(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoSpaceApplyWritesDeleteResult(value)
             default:
                 throw DecodingError.dataCorruptedError(
@@ -890,14 +914,14 @@ public enum ComAtprotoSpaceApplyWrites {
 
             switch self {
             case let .comAtprotoSpaceApplyWritesCreateResult(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.space.applyWrites#createResult", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoSpaceApplyWritesUpdateResult(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.space.applyWrites#updateResult", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoSpaceApplyWritesDeleteResult(value):
-                try container.encode("com.atproto.space.applyWrites#deleteResult", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.space.applyWrites#deleteResult", forKey: .type)
             }
         }
 

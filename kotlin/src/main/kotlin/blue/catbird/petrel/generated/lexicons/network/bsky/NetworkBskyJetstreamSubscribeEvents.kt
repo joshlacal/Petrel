@@ -163,16 +163,55 @@ object NetworkBskyJetstreamSubscribeEventsMessageUnionSerializer : kotlinx.seria
     }
 }
 
-@Serializable
-enum class NetworkBskyJetstreamSubscribeEventsParametersKinds {
-    @SerialName("commit")
-    value_commit,
-    @SerialName("identity")
-    value_identity,
-    @SerialName("account")
-    value_account,
-    @SerialName("sync")
-    value_sync}
+/**
+ * A Lexicon `enum` string. The Lexicon lists every value, but a newer peer can add one
+ * before this build knows it: such a value decodes as [Unknown] and is written back
+ * unchanged, instead of failing the object that holds it. Values are equal when their
+ * wire strings are.
+ */
+@Serializable(with = NetworkBskyJetstreamSubscribeEventsParametersKindsSerializer::class)
+sealed class NetworkBskyJetstreamSubscribeEventsParametersKinds(val value: String) {
+    object value_commit : NetworkBskyJetstreamSubscribeEventsParametersKinds("commit")
+    object value_identity : NetworkBskyJetstreamSubscribeEventsParametersKinds("identity")
+    object value_account : NetworkBskyJetstreamSubscribeEventsParametersKinds("account")
+    object value_sync : NetworkBskyJetstreamSubscribeEventsParametersKinds("sync")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : NetworkBskyJetstreamSubscribeEventsParametersKinds(value)
+
+    override fun equals(other: Any?): Boolean = other is NetworkBskyJetstreamSubscribeEventsParametersKinds && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<NetworkBskyJetstreamSubscribeEventsParametersKinds> by lazy {
+            listOf(value_commit, value_identity, value_account, value_sync)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): NetworkBskyJetstreamSubscribeEventsParametersKinds = when (value) {
+            "commit" -> value_commit
+            "identity" -> value_identity
+            "account" -> value_account
+            "sync" -> value_sync
+            else -> Unknown(value)
+        }
+    }
+}
+
+object NetworkBskyJetstreamSubscribeEventsParametersKindsSerializer : kotlinx.serialization.KSerializer<NetworkBskyJetstreamSubscribeEventsParametersKinds> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("NetworkBskyJetstreamSubscribeEventsParametersKinds", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: NetworkBskyJetstreamSubscribeEventsParametersKinds) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): NetworkBskyJetstreamSubscribeEventsParametersKinds =
+        NetworkBskyJetstreamSubscribeEventsParametersKinds.fromValue(decoder.decodeString())
+}
 
     /**
      * A single record mutation (create, update, or delete).

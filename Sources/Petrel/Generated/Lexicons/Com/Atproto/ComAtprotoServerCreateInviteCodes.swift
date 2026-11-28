@@ -15,6 +15,7 @@ public enum ComAtprotoServerCreateInviteCodes {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             account: String,
@@ -24,6 +25,7 @@ public enum ComAtprotoServerCreateInviteCodes {
             self.account = account
             self.codes = codes
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -31,6 +33,7 @@ public enum ComAtprotoServerCreateInviteCodes {
             account = try container.decode(String.self, forKey: .account)
             codes = try container.decode([String].self, forKey: .codes)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -38,6 +41,7 @@ public enum ComAtprotoServerCreateInviteCodes {
             try container.encode(account, forKey: .account)
             try container.encode(codes, forKey: .codes)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -67,7 +71,7 @@ public enum ComAtprotoServerCreateInviteCodes {
             map = map.adding(key: "account", value: accountValue)
             let codesValue = try codes.toCBORValue()
             map = map.adding(key: "codes", value: codesValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "account", "codes"]

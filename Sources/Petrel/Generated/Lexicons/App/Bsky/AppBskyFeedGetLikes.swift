@@ -16,6 +16,7 @@ public enum AppBskyFeedGetLikes {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             indexedAt: ATProtocolDate,
@@ -27,6 +28,7 @@ public enum AppBskyFeedGetLikes {
             self.createdAt = createdAt
             self.actor = actor
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -35,6 +37,7 @@ public enum AppBskyFeedGetLikes {
             createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             actor = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .actor)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -43,6 +46,7 @@ public enum AppBskyFeedGetLikes {
             try container.encode(createdAt, forKey: .createdAt)
             try container.encode(actor, forKey: .actor)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -78,7 +82,7 @@ public enum AppBskyFeedGetLikes {
             map = map.adding(key: "createdAt", value: createdAtValue)
             let actorValue = try actor.toCBORValue()
             map = map.adding(key: "actor", value: actorValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "indexedAt", "createdAt", "actor"]

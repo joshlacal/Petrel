@@ -18,6 +18,7 @@ public enum ComAtprotoModerationCreateReport {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             name: String,
@@ -27,6 +28,7 @@ public enum ComAtprotoModerationCreateReport {
             self.name = name
             self.meta = meta
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -47,6 +49,7 @@ public enum ComAtprotoModerationCreateReport {
                 malformedFields.insert("meta")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -54,6 +57,7 @@ public enum ComAtprotoModerationCreateReport {
             try container.encode(name, forKey: .name)
             try container.encodeIfPresent(meta, forKey: .meta)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -89,7 +93,7 @@ public enum ComAtprotoModerationCreateReport {
                 let metaValue = try value.toCBORValue()
                 map = map.adding(key: "meta", value: metaValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "name", "meta"]
@@ -275,10 +279,10 @@ public enum ComAtprotoModerationCreateReport {
 
             switch typeValue {
             case "com.atproto.admin.defs#repoRef":
-                let value = try ComAtprotoAdminDefs.RepoRef(from: decoder)
+                let value = try ComAtprotoAdminDefs.RepoRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoAdminDefsRepoRef(value)
             case "com.atproto.repo.strongRef":
-                let value = try ComAtprotoRepoStrongRef(from: decoder)
+                let value = try ComAtprotoRepoStrongRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoRepoStrongRef(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -291,11 +295,11 @@ public enum ComAtprotoModerationCreateReport {
 
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.admin.defs#repoRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoRepoStrongRef(value):
-                try container.encode("com.atproto.repo.strongRef", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.repo.strongRef", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -409,10 +413,10 @@ public enum ComAtprotoModerationCreateReport {
 
             switch typeValue {
             case "com.atproto.admin.defs#repoRef":
-                let value = try ComAtprotoAdminDefs.RepoRef(from: decoder)
+                let value = try ComAtprotoAdminDefs.RepoRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoAdminDefsRepoRef(value)
             case "com.atproto.repo.strongRef":
-                let value = try ComAtprotoRepoStrongRef(from: decoder)
+                let value = try ComAtprotoRepoStrongRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoRepoStrongRef(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -425,11 +429,11 @@ public enum ComAtprotoModerationCreateReport {
 
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.admin.defs#repoRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoRepoStrongRef(value):
-                try container.encode("com.atproto.repo.strongRef", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.repo.strongRef", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

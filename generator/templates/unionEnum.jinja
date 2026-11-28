@@ -59,7 +59,7 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
         switch typeValue {
         {%- for variant in variants %}
         case "{{ variant | escapeStringLiteral }}":
-            let value = try {{ variant | convertRefToSwift }}(from: decoder)
+            let value = try {{ variant | convertRefToSwift }}(from: ATProtoUnionMemberDecoder(decoder))
             self = .{{ variant | convertRefToSwift | lowerCamelCase }}(value)
         {%- endfor %}
         default:
@@ -84,8 +84,8 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
         switch self {
         {%- for variant in variants %}
         case .{{ variant | convertRefToSwift | lowerCamelCase }}(let value):
-            try container.encode("{{ variant | escapeStringLiteral }}", forKey: .type)
             try value.encode(to: encoder)
+            try container.encode("{{ variant | escapeStringLiteral }}", forKey: .type)
         {%- endfor %}
         {%- if not closed %}
         case .unexpected(let container):

@@ -1370,7 +1370,14 @@ class GeneratorProjectionPublicationTests(unittest.TestCase):
             value_container,
         )
         self.assertIn("container.decode(UInt64.self)", value_container)
-        self.assertNotIn("container.decode(Double.self)", value_container)
+        # A fractional number is read as a Double only on the lenient path (.float);
+        # strict decoding refuses it before the Double decode is reached.
+        self.assertEqual(value_container.count("container.decode(Double.self)"), 1)
+        self.assertIn(
+            "guard !decoder.isATProtoStrictDecoding,\n"
+            "              let floatValue = try? container.decode(Double.self),",
+            value_container,
+        )
         self.assertNotIn("try? decoder.container", value_container)
         self.assertIn("case \"$link\":", value_container)
         self.assertIn("case \"$bytes\":", value_container)

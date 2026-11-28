@@ -340,9 +340,13 @@ class PermissionedDataGenerationTests(unittest.TestCase):
         # check moved to value(forHTTPHeaderField:); that line is the only change.
         # Re-pinned for re-audit r-5: lenient objects keep a malformed optional value in
         # extraFields (malformedFields, keepingMalformed:, unlessSet:, hasValue(forField:)).
+        # Re-pinned for Swift/Kotlin wire parity with Rust (Petrel#108): non-record
+        # objects keep a decoded nested `$type` in the private wireTypeTag, and the
+        # union decodes its member through ATProtoUnionMemberDecoder and writes its own
+        # tag after the member's; those lines are the only change.
         self.assertEqual(
             hashlib.sha256(ordinary.encode("utf-8")).hexdigest(),
-            "cb3c2b49653c949785ea72b7f5a2a7b21f30ccf5b7419c23ea369e3abbf5e0c2",
+            "2dc7c7baf3a08eb6ccd59ede30eda4adb66979d5ae1eefffc108508f33f0a051",
         )
 
     def test_server_contract_flag_false_preserves_direct_input_bytes(self):

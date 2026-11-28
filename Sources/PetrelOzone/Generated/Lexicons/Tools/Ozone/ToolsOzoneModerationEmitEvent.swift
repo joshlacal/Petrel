@@ -27,6 +27,7 @@ public enum ToolsOzoneModerationEmitEvent {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             ids: [Int]? = nil,
@@ -44,6 +45,7 @@ public enum ToolsOzoneModerationEmitEvent {
             self.note = note
             self.isAutomated = isAutomated
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -123,6 +125,7 @@ public enum ToolsOzoneModerationEmitEvent {
                 malformedFields.insert("isAutomated")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -134,6 +137,7 @@ public enum ToolsOzoneModerationEmitEvent {
             try container.encodeIfPresent(note, forKey: .note)
             try container.encodeIfPresent(isAutomated, forKey: .isAutomated)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -223,7 +227,7 @@ public enum ToolsOzoneModerationEmitEvent {
                 let isAutomatedValue = try value.toCBORValue()
                 map = map.adding(key: "isAutomated", value: isAutomatedValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "ids", "types", "all", "allOwned", "note", "isAutomated"]
@@ -492,79 +496,79 @@ public enum ToolsOzoneModerationEmitEvent {
 
             switch typeValue {
             case "tools.ozone.moderation.defs#modEventTakedown":
-                let value = try ToolsOzoneModerationDefs.ModEventTakedown(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ModEventTakedown(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsModEventTakedown(value)
             case "tools.ozone.moderation.defs#modEventAcknowledge":
-                let value = try ToolsOzoneModerationDefs.ModEventAcknowledge(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ModEventAcknowledge(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsModEventAcknowledge(value)
             case "tools.ozone.moderation.defs#modEventEscalate":
-                let value = try ToolsOzoneModerationDefs.ModEventEscalate(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ModEventEscalate(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsModEventEscalate(value)
             case "tools.ozone.moderation.defs#modEventComment":
-                let value = try ToolsOzoneModerationDefs.ModEventComment(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ModEventComment(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsModEventComment(value)
             case "tools.ozone.moderation.defs#modEventLabel":
-                let value = try ToolsOzoneModerationDefs.ModEventLabel(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ModEventLabel(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsModEventLabel(value)
             case "tools.ozone.moderation.defs#modEventReport":
-                let value = try ToolsOzoneModerationDefs.ModEventReport(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ModEventReport(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsModEventReport(value)
             case "tools.ozone.moderation.defs#modEventMute":
-                let value = try ToolsOzoneModerationDefs.ModEventMute(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ModEventMute(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsModEventMute(value)
             case "tools.ozone.moderation.defs#modEventUnmute":
-                let value = try ToolsOzoneModerationDefs.ModEventUnmute(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ModEventUnmute(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsModEventUnmute(value)
             case "tools.ozone.moderation.defs#modEventMuteReporter":
-                let value = try ToolsOzoneModerationDefs.ModEventMuteReporter(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ModEventMuteReporter(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsModEventMuteReporter(value)
             case "tools.ozone.moderation.defs#modEventUnmuteReporter":
-                let value = try ToolsOzoneModerationDefs.ModEventUnmuteReporter(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ModEventUnmuteReporter(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsModEventUnmuteReporter(value)
             case "tools.ozone.moderation.defs#modEventReverseTakedown":
-                let value = try ToolsOzoneModerationDefs.ModEventReverseTakedown(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ModEventReverseTakedown(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsModEventReverseTakedown(value)
             case "tools.ozone.moderation.defs#modEventResolveAppeal":
-                let value = try ToolsOzoneModerationDefs.ModEventResolveAppeal(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ModEventResolveAppeal(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsModEventResolveAppeal(value)
             case "tools.ozone.moderation.defs#modEventEmail":
-                let value = try ToolsOzoneModerationDefs.ModEventEmail(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ModEventEmail(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsModEventEmail(value)
             case "tools.ozone.moderation.defs#modEventDivert":
-                let value = try ToolsOzoneModerationDefs.ModEventDivert(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ModEventDivert(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsModEventDivert(value)
             case "tools.ozone.moderation.defs#modEventTag":
-                let value = try ToolsOzoneModerationDefs.ModEventTag(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ModEventTag(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsModEventTag(value)
             case "tools.ozone.moderation.defs#accountEvent":
-                let value = try ToolsOzoneModerationDefs.AccountEvent(from: decoder)
+                let value = try ToolsOzoneModerationDefs.AccountEvent(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsAccountEvent(value)
             case "tools.ozone.moderation.defs#identityEvent":
-                let value = try ToolsOzoneModerationDefs.IdentityEvent(from: decoder)
+                let value = try ToolsOzoneModerationDefs.IdentityEvent(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsIdentityEvent(value)
             case "tools.ozone.moderation.defs#recordEvent":
-                let value = try ToolsOzoneModerationDefs.RecordEvent(from: decoder)
+                let value = try ToolsOzoneModerationDefs.RecordEvent(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsRecordEvent(value)
             case "tools.ozone.moderation.defs#modEventPriorityScore":
-                let value = try ToolsOzoneModerationDefs.ModEventPriorityScore(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ModEventPriorityScore(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsModEventPriorityScore(value)
             case "tools.ozone.moderation.defs#ageAssuranceEvent":
-                let value = try ToolsOzoneModerationDefs.AgeAssuranceEvent(from: decoder)
+                let value = try ToolsOzoneModerationDefs.AgeAssuranceEvent(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsAgeAssuranceEvent(value)
             case "tools.ozone.moderation.defs#ageAssuranceOverrideEvent":
-                let value = try ToolsOzoneModerationDefs.AgeAssuranceOverrideEvent(from: decoder)
+                let value = try ToolsOzoneModerationDefs.AgeAssuranceOverrideEvent(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsAgeAssuranceOverrideEvent(value)
             case "tools.ozone.moderation.defs#ageAssurancePurgeEvent":
-                let value = try ToolsOzoneModerationDefs.AgeAssurancePurgeEvent(from: decoder)
+                let value = try ToolsOzoneModerationDefs.AgeAssurancePurgeEvent(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsAgeAssurancePurgeEvent(value)
             case "tools.ozone.moderation.defs#revokeAccountCredentialsEvent":
-                let value = try ToolsOzoneModerationDefs.RevokeAccountCredentialsEvent(from: decoder)
+                let value = try ToolsOzoneModerationDefs.RevokeAccountCredentialsEvent(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsRevokeAccountCredentialsEvent(value)
             case "tools.ozone.moderation.defs#scheduleTakedownEvent":
-                let value = try ToolsOzoneModerationDefs.ScheduleTakedownEvent(from: decoder)
+                let value = try ToolsOzoneModerationDefs.ScheduleTakedownEvent(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsScheduleTakedownEvent(value)
             case "tools.ozone.moderation.defs#cancelScheduledTakedownEvent":
-                let value = try ToolsOzoneModerationDefs.CancelScheduledTakedownEvent(from: decoder)
+                let value = try ToolsOzoneModerationDefs.CancelScheduledTakedownEvent(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsCancelScheduledTakedownEvent(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -577,80 +581,80 @@ public enum ToolsOzoneModerationEmitEvent {
 
             switch self {
             case let .toolsOzoneModerationDefsModEventTakedown(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#modEventTakedown", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventAcknowledge(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#modEventAcknowledge", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventEscalate(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#modEventEscalate", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventComment(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#modEventComment", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventLabel(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#modEventLabel", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventReport(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#modEventReport", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventMute(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#modEventMute", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventUnmute(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#modEventUnmute", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventMuteReporter(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#modEventMuteReporter", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventUnmuteReporter(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#modEventUnmuteReporter", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventReverseTakedown(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#modEventReverseTakedown", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventResolveAppeal(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#modEventResolveAppeal", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventEmail(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#modEventEmail", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventDivert(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#modEventDivert", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventTag(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#modEventTag", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsAccountEvent(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#accountEvent", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsIdentityEvent(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#identityEvent", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsRecordEvent(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#recordEvent", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventPriorityScore(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#modEventPriorityScore", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsAgeAssuranceEvent(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#ageAssuranceEvent", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsAgeAssuranceOverrideEvent(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#ageAssuranceOverrideEvent", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsAgeAssurancePurgeEvent(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#ageAssurancePurgeEvent", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsRevokeAccountCredentialsEvent(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#revokeAccountCredentialsEvent", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsScheduleTakedownEvent(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#scheduleTakedownEvent", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsCancelScheduledTakedownEvent(value):
-                try container.encode("tools.ozone.moderation.defs#cancelScheduledTakedownEvent", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("tools.ozone.moderation.defs#cancelScheduledTakedownEvent", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -1339,10 +1343,10 @@ public enum ToolsOzoneModerationEmitEvent {
 
             switch typeValue {
             case "com.atproto.admin.defs#repoRef":
-                let value = try ComAtprotoAdminDefs.RepoRef(from: decoder)
+                let value = try ComAtprotoAdminDefs.RepoRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoAdminDefsRepoRef(value)
             case "com.atproto.repo.strongRef":
-                let value = try ComAtprotoRepoStrongRef(from: decoder)
+                let value = try ComAtprotoRepoStrongRef(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoRepoStrongRef(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -1355,11 +1359,11 @@ public enum ToolsOzoneModerationEmitEvent {
 
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.admin.defs#repoRef", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoRepoStrongRef(value):
-                try container.encode("com.atproto.repo.strongRef", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.repo.strongRef", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

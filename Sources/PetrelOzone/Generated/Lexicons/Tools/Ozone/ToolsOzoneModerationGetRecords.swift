@@ -69,10 +69,10 @@ public enum ToolsOzoneModerationGetRecords {
 
             switch typeValue {
             case "tools.ozone.moderation.defs#recordViewDetail":
-                let value = try ToolsOzoneModerationDefs.RecordViewDetail(from: decoder)
+                let value = try ToolsOzoneModerationDefs.RecordViewDetail(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsRecordViewDetail(value)
             case "tools.ozone.moderation.defs#recordViewNotFound":
-                let value = try ToolsOzoneModerationDefs.RecordViewNotFound(from: decoder)
+                let value = try ToolsOzoneModerationDefs.RecordViewNotFound(from: ATProtoUnionMemberDecoder(decoder))
                 self = .toolsOzoneModerationDefsRecordViewNotFound(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -85,11 +85,11 @@ public enum ToolsOzoneModerationGetRecords {
 
             switch self {
             case let .toolsOzoneModerationDefsRecordViewDetail(value):
+                try value.encode(to: encoder)
                 try container.encode("tools.ozone.moderation.defs#recordViewDetail", forKey: .type)
-                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsRecordViewNotFound(value):
-                try container.encode("tools.ozone.moderation.defs#recordViewNotFound", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("tools.ozone.moderation.defs#recordViewNotFound", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

@@ -73,13 +73,13 @@ public enum ChatBskyGroupGetJoinLinkPreviews {
 
             switch typeValue {
             case "chat.bsky.group.defs#joinLinkPreviewView":
-                let value = try ChatBskyGroupDefs.JoinLinkPreviewView(from: decoder)
+                let value = try ChatBskyGroupDefs.JoinLinkPreviewView(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyGroupDefsJoinLinkPreviewView(value)
             case "chat.bsky.group.defs#disabledJoinLinkPreviewView":
-                let value = try ChatBskyGroupDefs.DisabledJoinLinkPreviewView(from: decoder)
+                let value = try ChatBskyGroupDefs.DisabledJoinLinkPreviewView(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyGroupDefsDisabledJoinLinkPreviewView(value)
             case "chat.bsky.group.defs#invalidJoinLinkPreviewView":
-                let value = try ChatBskyGroupDefs.InvalidJoinLinkPreviewView(from: decoder)
+                let value = try ChatBskyGroupDefs.InvalidJoinLinkPreviewView(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyGroupDefsInvalidJoinLinkPreviewView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -92,14 +92,14 @@ public enum ChatBskyGroupGetJoinLinkPreviews {
 
             switch self {
             case let .chatBskyGroupDefsJoinLinkPreviewView(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.group.defs#joinLinkPreviewView", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyGroupDefsDisabledJoinLinkPreviewView(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.group.defs#disabledJoinLinkPreviewView", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyGroupDefsInvalidJoinLinkPreviewView(value):
-                try container.encode("chat.bsky.group.defs#invalidJoinLinkPreviewView", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("chat.bsky.group.defs#invalidJoinLinkPreviewView", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

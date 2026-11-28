@@ -15,6 +15,7 @@ public enum AppBskyEmbedDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             width: Int,
@@ -24,6 +25,7 @@ public enum AppBskyEmbedDefs {
             self.width = width
             self.height = height
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -31,6 +33,7 @@ public enum AppBskyEmbedDefs {
             width = try container.decode(Int.self, forKey: .width)
             height = try container.decode(Int.self, forKey: .height)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -38,6 +41,7 @@ public enum AppBskyEmbedDefs {
             try container.encode(width, forKey: .width)
             try container.encode(height, forKey: .height)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -67,7 +71,7 @@ public enum AppBskyEmbedDefs {
             map = map.adding(key: "width", value: widthValue)
             let heightValue = try height.toCBORValue()
             map = map.adding(key: "height", value: heightValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "width", "height"]

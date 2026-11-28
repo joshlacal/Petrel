@@ -88,9 +88,19 @@ struct ATProtocolValueContainerKeyDecodingTests {
             "values": expected, "present": .null,
         ]))
         // Test dynamic containers directly, rather than a typed numeric probe.
-        for number in ["9223372036854775808", "-9223372036854775809", "18446744073709551615", "1.5"] {
+        for number in ["9223372036854775808", "-9223372036854775809", "18446744073709551615"] {
             for document in [number, "[null,\(number)]", "{\"value\":\(number)}"] {
                 #expect(throws: (any Error).self) { try decode(document) }
+            }
+        }
+        // A fractional number is kept as `.float` by lenient decoding (a peer may write
+        // one in an untyped position) and refused by strict decoding.
+        #expect(try decode("1.5") == .float(1.5))
+        #expect(try decode("[null,1.5]") == .array([.null, .float(1.5)]))
+        #expect(try decode(#"{"value":1.5}"#) == .object(["value": .float(1.5)]))
+        for document in ["1.5", "[null,1.5]", #"{"value":1.5}"#] {
+            #expect(throws: (any Error).self) {
+                try decode(document, using: ATProtoDecoding.strictJSONDecoder())
             }
         }
     }

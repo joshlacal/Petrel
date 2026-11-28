@@ -84,11 +84,62 @@ public enum ToolsOzoneInboxListActionedSubjects {
         }
     }
 
-    public enum ParametersFilter: String, Codable, ATProtocolCodable, ATProtocolValue, Sendable {
-        case value_all = "all"
-        case value_pending = "pending"
-        case value_resolved = "resolved"
-        case value_unread = "unread"
+    /// A Lexicon `enum` string. The Lexicon lists every value, but a newer peer can add one
+    /// before this build knows it: such a value decodes as `.unknown` and is written back
+    /// unchanged, instead of failing the object that holds it.
+    public enum ParametersFilter: RawRepresentable, Codable, Hashable, ATProtocolCodable, ATProtocolValue, Sendable {
+        case value_all
+        case value_pending
+        case value_resolved
+        case value_unread
+        /// A value this build does not know (a newer peer added it), kept verbatim.
+        case unknown(String)
+
+        /// Never returns `nil`: a value this build does not know is `.unknown`. The
+        /// initializer stays failable to keep the shape of `RawRepresentable`.
+        public init?(rawValue: String) {
+            self = Self.parse(rawValue)
+        }
+
+        public var rawValue: String {
+            switch self {
+            case .value_all: return "all"
+            case .value_pending: return "pending"
+            case .value_resolved: return "resolved"
+            case .value_unread: return "unread"
+            case let .unknown(value): return value
+            }
+        }
+
+        private static func parse(_ value: String) -> Self {
+            switch value {
+            case "all": return .value_all
+            case "pending": return .value_pending
+            case "resolved": return .value_resolved
+            case "unread": return .value_unread
+            default: return .unknown(value)
+            }
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            self = try Self.parse(container.decode(String.self))
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
+
+        /// Values are equal when their wire strings are, so `.unknown` holding a known
+        /// value equals that value's case.
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.rawValue == rhs.rawValue
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(rawValue)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let otherValue = other as? ParametersFilter else { return false }
@@ -100,9 +151,56 @@ public enum ToolsOzoneInboxListActionedSubjects {
         }
     }
 
-    public enum ParametersSortField: String, Codable, ATProtocolCodable, ATProtocolValue, Sendable {
-        case value_createdAt = "createdAt"
-        case value_updatedAt = "updatedAt"
+    /// A Lexicon `enum` string. The Lexicon lists every value, but a newer peer can add one
+    /// before this build knows it: such a value decodes as `.unknown` and is written back
+    /// unchanged, instead of failing the object that holds it.
+    public enum ParametersSortField: RawRepresentable, Codable, Hashable, ATProtocolCodable, ATProtocolValue, Sendable {
+        case value_createdAt
+        case value_updatedAt
+        /// A value this build does not know (a newer peer added it), kept verbatim.
+        case unknown(String)
+
+        /// Never returns `nil`: a value this build does not know is `.unknown`. The
+        /// initializer stays failable to keep the shape of `RawRepresentable`.
+        public init?(rawValue: String) {
+            self = Self.parse(rawValue)
+        }
+
+        public var rawValue: String {
+            switch self {
+            case .value_createdAt: return "createdAt"
+            case .value_updatedAt: return "updatedAt"
+            case let .unknown(value): return value
+            }
+        }
+
+        private static func parse(_ value: String) -> Self {
+            switch value {
+            case "createdAt": return .value_createdAt
+            case "updatedAt": return .value_updatedAt
+            default: return .unknown(value)
+            }
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            self = try Self.parse(container.decode(String.self))
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
+
+        /// Values are equal when their wire strings are, so `.unknown` holding a known
+        /// value equals that value's case.
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.rawValue == rhs.rawValue
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(rawValue)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let otherValue = other as? ParametersSortField else { return false }
@@ -114,9 +212,56 @@ public enum ToolsOzoneInboxListActionedSubjects {
         }
     }
 
-    public enum ParametersSortDirection: String, Codable, ATProtocolCodable, ATProtocolValue, Sendable {
-        case value_asc = "asc"
-        case value_desc = "desc"
+    /// A Lexicon `enum` string. The Lexicon lists every value, but a newer peer can add one
+    /// before this build knows it: such a value decodes as `.unknown` and is written back
+    /// unchanged, instead of failing the object that holds it.
+    public enum ParametersSortDirection: RawRepresentable, Codable, Hashable, ATProtocolCodable, ATProtocolValue, Sendable {
+        case value_asc
+        case value_desc
+        /// A value this build does not know (a newer peer added it), kept verbatim.
+        case unknown(String)
+
+        /// Never returns `nil`: a value this build does not know is `.unknown`. The
+        /// initializer stays failable to keep the shape of `RawRepresentable`.
+        public init?(rawValue: String) {
+            self = Self.parse(rawValue)
+        }
+
+        public var rawValue: String {
+            switch self {
+            case .value_asc: return "asc"
+            case .value_desc: return "desc"
+            case let .unknown(value): return value
+            }
+        }
+
+        private static func parse(_ value: String) -> Self {
+            switch value {
+            case "asc": return .value_asc
+            case "desc": return .value_desc
+            default: return .unknown(value)
+            }
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            self = try Self.parse(container.decode(String.self))
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
+
+        /// Values are equal when their wire strings are, so `.unknown` holding a known
+        /// value equals that value's case.
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.rawValue == rhs.rawValue
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(rawValue)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let otherValue = other as? ParametersSortDirection else { return false }

@@ -163,22 +163,25 @@ class KotlinStrictRefByteStabilityTests(unittest.TestCase):
         # Re-pinned for re-audit r-5 (all four): lenient objects keep a malformed optional
         # value in extraFields (malformedFields, keepingMalformed:, unlessSet:,
         # hasValue(forField:)); no other line changed.
+        # Re-pinned (all four) for Swift/Kotlin wire parity with Rust (Petrel#108): every
+        # non-record object with extraFields keeps a decoded nested `$type` in the private
+        # wireTypeTag (decodeTypeTag / encodeTypeTag / addingTypeTag); no other line changed.
         expected = {
             "blue.catbird.test.ordinaryObject": (
-                "44c43e3dc58b6d5b1980d4f7a1ae09670ddbea922e3a9116b42f0a8cc03a7ef9"
+                "7a0394093a26e34d4a14f62470fb95f736710783436ee278278d7d73195423b0"
             ),
             # Re-pinned by the sdk-green generator pass: typed XRPC errors on every endpoint,
             # undeclared-field round trip (extraFields) and the shared object template.
             # Re-pinned again when the output Content-Type check moved to
             # value(forHTTPHeaderField:) (case-insensitive); that line is the only change.
             "blue.catbird.test.ordinaryProcedure": (
-                "3bbeee19de2026f67a82c2f2c3068f0a6951ab8a65d8c6e8b787cef39f004431"
+                "2c7ca1d0c755a682f4c0f0d8b89264c6235de85cb0c76659fa629525ccc9018a"
             ),
             "blue.catbird.test.ordinaryRecord": (
-                "538cb0bfa62f7f07c9d7478233ccde6c31c0d12ab4a6dfffe5ee65774f5fc2ee"
+                "fbdd23fb7fae0add2811df93558d1b5dce28ff59600712430b56fcf3bd2578e0"
             ),
             "blue.catbird.test.ordinarySubscription": (
-                "3c73629ea5b22d22e1a405e377e5c57e7341cd085d8bac60806fefe4126493eb"
+                "7910aa0c4b9bd459be103a8b50c5aae35d1ae7149e5616093ce34f13256ace13"
             ),
         }
         for lexicon in ordinary_lexicons():

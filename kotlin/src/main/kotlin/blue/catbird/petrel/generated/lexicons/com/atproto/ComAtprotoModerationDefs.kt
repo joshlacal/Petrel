@@ -16,108 +16,186 @@ object ComAtprotoModerationDefsDefs {
     const val TYPE_IDENTIFIER = "com.atproto.moderation.defs"
 }
 
-@Serializable
-enum class ComAtprotoModerationDefsReasonType {
-    @SerialName("com.atproto.moderation.defs#reasonSpam")
-    COM_ATPROTO_MODERATION_DEFS_REASONSPAM,
-    @SerialName("com.atproto.moderation.defs#reasonViolation")
-    COM_ATPROTO_MODERATION_DEFS_REASONVIOLATION,
-    @SerialName("com.atproto.moderation.defs#reasonMisleading")
-    COM_ATPROTO_MODERATION_DEFS_REASONMISLEADING,
-    @SerialName("com.atproto.moderation.defs#reasonSexual")
-    COM_ATPROTO_MODERATION_DEFS_REASONSEXUAL,
-    @SerialName("com.atproto.moderation.defs#reasonRude")
-    COM_ATPROTO_MODERATION_DEFS_REASONRUDE,
-    @SerialName("com.atproto.moderation.defs#reasonOther")
-    COM_ATPROTO_MODERATION_DEFS_REASONOTHER,
-    @SerialName("com.atproto.moderation.defs#reasonAppeal")
-    COM_ATPROTO_MODERATION_DEFS_REASONAPPEAL,
-    @SerialName("tools.ozone.report.defs#reasonAppeal")
-    TOOLS_OZONE_REPORT_DEFS_REASONAPPEAL,
-    @SerialName("tools.ozone.report.defs#reasonOther")
-    TOOLS_OZONE_REPORT_DEFS_REASONOTHER,
-    @SerialName("tools.ozone.report.defs#reasonViolenceAnimal")
-    TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEANIMAL,
-    @SerialName("tools.ozone.report.defs#reasonViolenceThreats")
-    TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCETHREATS,
-    @SerialName("tools.ozone.report.defs#reasonViolenceGraphicContent")
-    TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEGRAPHICCONTENT,
-    @SerialName("tools.ozone.report.defs#reasonViolenceGlorification")
-    TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEGLORIFICATION,
-    @SerialName("tools.ozone.report.defs#reasonViolenceExtremistContent")
-    TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEEXTREMISTCONTENT,
-    @SerialName("tools.ozone.report.defs#reasonViolenceTrafficking")
-    TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCETRAFFICKING,
-    @SerialName("tools.ozone.report.defs#reasonViolenceOther")
-    TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEOTHER,
-    @SerialName("tools.ozone.report.defs#reasonSexualAbuseContent")
-    TOOLS_OZONE_REPORT_DEFS_REASONSEXUALABUSECONTENT,
-    @SerialName("tools.ozone.report.defs#reasonSexualNCII")
-    TOOLS_OZONE_REPORT_DEFS_REASONSEXUALNCII,
-    @SerialName("tools.ozone.report.defs#reasonSexualDeepfake")
-    TOOLS_OZONE_REPORT_DEFS_REASONSEXUALDEEPFAKE,
-    @SerialName("tools.ozone.report.defs#reasonSexualAnimal")
-    TOOLS_OZONE_REPORT_DEFS_REASONSEXUALANIMAL,
-    @SerialName("tools.ozone.report.defs#reasonSexualUnlabeled")
-    TOOLS_OZONE_REPORT_DEFS_REASONSEXUALUNLABELED,
-    @SerialName("tools.ozone.report.defs#reasonSexualOther")
-    TOOLS_OZONE_REPORT_DEFS_REASONSEXUALOTHER,
-    @SerialName("tools.ozone.report.defs#reasonChildSafetyCSAM")
-    TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYCSAM,
-    @SerialName("tools.ozone.report.defs#reasonChildSafetyGroom")
-    TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYGROOM,
-    @SerialName("tools.ozone.report.defs#reasonChildSafetyPrivacy")
-    TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYPRIVACY,
-    @SerialName("tools.ozone.report.defs#reasonChildSafetyHarassment")
-    TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYHARASSMENT,
-    @SerialName("tools.ozone.report.defs#reasonChildSafetyOther")
-    TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYOTHER,
-    @SerialName("tools.ozone.report.defs#reasonHarassmentTroll")
-    TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTTROLL,
-    @SerialName("tools.ozone.report.defs#reasonHarassmentTargeted")
-    TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTTARGETED,
-    @SerialName("tools.ozone.report.defs#reasonHarassmentHateSpeech")
-    TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTHATESPEECH,
-    @SerialName("tools.ozone.report.defs#reasonHarassmentDoxxing")
-    TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTDOXXING,
-    @SerialName("tools.ozone.report.defs#reasonHarassmentOther")
-    TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTOTHER,
-    @SerialName("tools.ozone.report.defs#reasonMisleadingBot")
-    TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGBOT,
-    @SerialName("tools.ozone.report.defs#reasonMisleadingImpersonation")
-    TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGIMPERSONATION,
-    @SerialName("tools.ozone.report.defs#reasonMisleadingSpam")
-    TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGSPAM,
-    @SerialName("tools.ozone.report.defs#reasonMisleadingScam")
-    TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGSCAM,
-    @SerialName("tools.ozone.report.defs#reasonMisleadingElections")
-    TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGELECTIONS,
-    @SerialName("tools.ozone.report.defs#reasonMisleadingOther")
-    TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGOTHER,
-    @SerialName("tools.ozone.report.defs#reasonRuleSiteSecurity")
-    TOOLS_OZONE_REPORT_DEFS_REASONRULESITESECURITY,
-    @SerialName("tools.ozone.report.defs#reasonRuleProhibitedSales")
-    TOOLS_OZONE_REPORT_DEFS_REASONRULEPROHIBITEDSALES,
-    @SerialName("tools.ozone.report.defs#reasonRuleBanEvasion")
-    TOOLS_OZONE_REPORT_DEFS_REASONRULEBANEVASION,
-    @SerialName("tools.ozone.report.defs#reasonRuleOther")
-    TOOLS_OZONE_REPORT_DEFS_REASONRULEOTHER,
-    @SerialName("tools.ozone.report.defs#reasonSelfHarmContent")
-    TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMCONTENT,
-    @SerialName("tools.ozone.report.defs#reasonSelfHarmED")
-    TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMED,
-    @SerialName("tools.ozone.report.defs#reasonSelfHarmStunts")
-    TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMSTUNTS,
-    @SerialName("tools.ozone.report.defs#reasonSelfHarmSubstances")
-    TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMSUBSTANCES,
-    @SerialName("tools.ozone.report.defs#reasonSelfHarmOther")
-    TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMOTHER}
+/**
+ * A Lexicon `knownValues` string. The Lexicon names the values it knows, but a peer
+ * can send any other: such a value decodes as [Unknown] and is written back unchanged,
+ * instead of failing the object that holds it. Values are equal when their wire
+ * strings are.
+ */
+@Serializable(with = ComAtprotoModerationDefsReasonTypeSerializer::class)
+sealed class ComAtprotoModerationDefsReasonType(val value: String) {
+    object COM_ATPROTO_MODERATION_DEFS_REASONSPAM : ComAtprotoModerationDefsReasonType("com.atproto.moderation.defs#reasonSpam")
+    object COM_ATPROTO_MODERATION_DEFS_REASONVIOLATION : ComAtprotoModerationDefsReasonType("com.atproto.moderation.defs#reasonViolation")
+    object COM_ATPROTO_MODERATION_DEFS_REASONMISLEADING : ComAtprotoModerationDefsReasonType("com.atproto.moderation.defs#reasonMisleading")
+    object COM_ATPROTO_MODERATION_DEFS_REASONSEXUAL : ComAtprotoModerationDefsReasonType("com.atproto.moderation.defs#reasonSexual")
+    object COM_ATPROTO_MODERATION_DEFS_REASONRUDE : ComAtprotoModerationDefsReasonType("com.atproto.moderation.defs#reasonRude")
+    object COM_ATPROTO_MODERATION_DEFS_REASONOTHER : ComAtprotoModerationDefsReasonType("com.atproto.moderation.defs#reasonOther")
+    object COM_ATPROTO_MODERATION_DEFS_REASONAPPEAL : ComAtprotoModerationDefsReasonType("com.atproto.moderation.defs#reasonAppeal")
+    object TOOLS_OZONE_REPORT_DEFS_REASONAPPEAL : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonAppeal")
+    object TOOLS_OZONE_REPORT_DEFS_REASONOTHER : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonOther")
+    object TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEANIMAL : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonViolenceAnimal")
+    object TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCETHREATS : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonViolenceThreats")
+    object TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEGRAPHICCONTENT : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonViolenceGraphicContent")
+    object TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEGLORIFICATION : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonViolenceGlorification")
+    object TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEEXTREMISTCONTENT : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonViolenceExtremistContent")
+    object TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCETRAFFICKING : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonViolenceTrafficking")
+    object TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEOTHER : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonViolenceOther")
+    object TOOLS_OZONE_REPORT_DEFS_REASONSEXUALABUSECONTENT : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonSexualAbuseContent")
+    object TOOLS_OZONE_REPORT_DEFS_REASONSEXUALNCII : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonSexualNCII")
+    object TOOLS_OZONE_REPORT_DEFS_REASONSEXUALDEEPFAKE : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonSexualDeepfake")
+    object TOOLS_OZONE_REPORT_DEFS_REASONSEXUALANIMAL : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonSexualAnimal")
+    object TOOLS_OZONE_REPORT_DEFS_REASONSEXUALUNLABELED : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonSexualUnlabeled")
+    object TOOLS_OZONE_REPORT_DEFS_REASONSEXUALOTHER : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonSexualOther")
+    object TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYCSAM : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonChildSafetyCSAM")
+    object TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYGROOM : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonChildSafetyGroom")
+    object TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYPRIVACY : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonChildSafetyPrivacy")
+    object TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYHARASSMENT : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonChildSafetyHarassment")
+    object TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYOTHER : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonChildSafetyOther")
+    object TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTTROLL : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonHarassmentTroll")
+    object TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTTARGETED : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonHarassmentTargeted")
+    object TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTHATESPEECH : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonHarassmentHateSpeech")
+    object TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTDOXXING : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonHarassmentDoxxing")
+    object TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTOTHER : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonHarassmentOther")
+    object TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGBOT : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonMisleadingBot")
+    object TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGIMPERSONATION : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonMisleadingImpersonation")
+    object TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGSPAM : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonMisleadingSpam")
+    object TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGSCAM : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonMisleadingScam")
+    object TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGELECTIONS : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonMisleadingElections")
+    object TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGOTHER : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonMisleadingOther")
+    object TOOLS_OZONE_REPORT_DEFS_REASONRULESITESECURITY : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonRuleSiteSecurity")
+    object TOOLS_OZONE_REPORT_DEFS_REASONRULEPROHIBITEDSALES : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonRuleProhibitedSales")
+    object TOOLS_OZONE_REPORT_DEFS_REASONRULEBANEVASION : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonRuleBanEvasion")
+    object TOOLS_OZONE_REPORT_DEFS_REASONRULEOTHER : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonRuleOther")
+    object TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMCONTENT : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonSelfHarmContent")
+    object TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMED : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonSelfHarmED")
+    object TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMSTUNTS : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonSelfHarmStunts")
+    object TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMSUBSTANCES : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonSelfHarmSubstances")
+    object TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMOTHER : ComAtprotoModerationDefsReasonType("tools.ozone.report.defs#reasonSelfHarmOther")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : ComAtprotoModerationDefsReasonType(value)
 
-@Serializable
-enum class ComAtprotoModerationDefsSubjectType {
-    @SerialName("account")
-    ACCOUNT,
-    @SerialName("record")
-    RECORD,
-    @SerialName("chat")
-    CHAT}
+    override fun equals(other: Any?): Boolean = other is ComAtprotoModerationDefsReasonType && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<ComAtprotoModerationDefsReasonType> by lazy {
+            listOf(COM_ATPROTO_MODERATION_DEFS_REASONSPAM, COM_ATPROTO_MODERATION_DEFS_REASONVIOLATION, COM_ATPROTO_MODERATION_DEFS_REASONMISLEADING, COM_ATPROTO_MODERATION_DEFS_REASONSEXUAL, COM_ATPROTO_MODERATION_DEFS_REASONRUDE, COM_ATPROTO_MODERATION_DEFS_REASONOTHER, COM_ATPROTO_MODERATION_DEFS_REASONAPPEAL, TOOLS_OZONE_REPORT_DEFS_REASONAPPEAL, TOOLS_OZONE_REPORT_DEFS_REASONOTHER, TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEANIMAL, TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCETHREATS, TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEGRAPHICCONTENT, TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEGLORIFICATION, TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEEXTREMISTCONTENT, TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCETRAFFICKING, TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEOTHER, TOOLS_OZONE_REPORT_DEFS_REASONSEXUALABUSECONTENT, TOOLS_OZONE_REPORT_DEFS_REASONSEXUALNCII, TOOLS_OZONE_REPORT_DEFS_REASONSEXUALDEEPFAKE, TOOLS_OZONE_REPORT_DEFS_REASONSEXUALANIMAL, TOOLS_OZONE_REPORT_DEFS_REASONSEXUALUNLABELED, TOOLS_OZONE_REPORT_DEFS_REASONSEXUALOTHER, TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYCSAM, TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYGROOM, TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYPRIVACY, TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYHARASSMENT, TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYOTHER, TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTTROLL, TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTTARGETED, TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTHATESPEECH, TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTDOXXING, TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTOTHER, TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGBOT, TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGIMPERSONATION, TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGSPAM, TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGSCAM, TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGELECTIONS, TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGOTHER, TOOLS_OZONE_REPORT_DEFS_REASONRULESITESECURITY, TOOLS_OZONE_REPORT_DEFS_REASONRULEPROHIBITEDSALES, TOOLS_OZONE_REPORT_DEFS_REASONRULEBANEVASION, TOOLS_OZONE_REPORT_DEFS_REASONRULEOTHER, TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMCONTENT, TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMED, TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMSTUNTS, TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMSUBSTANCES, TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMOTHER)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): ComAtprotoModerationDefsReasonType = when (value) {
+            "com.atproto.moderation.defs#reasonSpam" -> COM_ATPROTO_MODERATION_DEFS_REASONSPAM
+            "com.atproto.moderation.defs#reasonViolation" -> COM_ATPROTO_MODERATION_DEFS_REASONVIOLATION
+            "com.atproto.moderation.defs#reasonMisleading" -> COM_ATPROTO_MODERATION_DEFS_REASONMISLEADING
+            "com.atproto.moderation.defs#reasonSexual" -> COM_ATPROTO_MODERATION_DEFS_REASONSEXUAL
+            "com.atproto.moderation.defs#reasonRude" -> COM_ATPROTO_MODERATION_DEFS_REASONRUDE
+            "com.atproto.moderation.defs#reasonOther" -> COM_ATPROTO_MODERATION_DEFS_REASONOTHER
+            "com.atproto.moderation.defs#reasonAppeal" -> COM_ATPROTO_MODERATION_DEFS_REASONAPPEAL
+            "tools.ozone.report.defs#reasonAppeal" -> TOOLS_OZONE_REPORT_DEFS_REASONAPPEAL
+            "tools.ozone.report.defs#reasonOther" -> TOOLS_OZONE_REPORT_DEFS_REASONOTHER
+            "tools.ozone.report.defs#reasonViolenceAnimal" -> TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEANIMAL
+            "tools.ozone.report.defs#reasonViolenceThreats" -> TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCETHREATS
+            "tools.ozone.report.defs#reasonViolenceGraphicContent" -> TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEGRAPHICCONTENT
+            "tools.ozone.report.defs#reasonViolenceGlorification" -> TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEGLORIFICATION
+            "tools.ozone.report.defs#reasonViolenceExtremistContent" -> TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEEXTREMISTCONTENT
+            "tools.ozone.report.defs#reasonViolenceTrafficking" -> TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCETRAFFICKING
+            "tools.ozone.report.defs#reasonViolenceOther" -> TOOLS_OZONE_REPORT_DEFS_REASONVIOLENCEOTHER
+            "tools.ozone.report.defs#reasonSexualAbuseContent" -> TOOLS_OZONE_REPORT_DEFS_REASONSEXUALABUSECONTENT
+            "tools.ozone.report.defs#reasonSexualNCII" -> TOOLS_OZONE_REPORT_DEFS_REASONSEXUALNCII
+            "tools.ozone.report.defs#reasonSexualDeepfake" -> TOOLS_OZONE_REPORT_DEFS_REASONSEXUALDEEPFAKE
+            "tools.ozone.report.defs#reasonSexualAnimal" -> TOOLS_OZONE_REPORT_DEFS_REASONSEXUALANIMAL
+            "tools.ozone.report.defs#reasonSexualUnlabeled" -> TOOLS_OZONE_REPORT_DEFS_REASONSEXUALUNLABELED
+            "tools.ozone.report.defs#reasonSexualOther" -> TOOLS_OZONE_REPORT_DEFS_REASONSEXUALOTHER
+            "tools.ozone.report.defs#reasonChildSafetyCSAM" -> TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYCSAM
+            "tools.ozone.report.defs#reasonChildSafetyGroom" -> TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYGROOM
+            "tools.ozone.report.defs#reasonChildSafetyPrivacy" -> TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYPRIVACY
+            "tools.ozone.report.defs#reasonChildSafetyHarassment" -> TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYHARASSMENT
+            "tools.ozone.report.defs#reasonChildSafetyOther" -> TOOLS_OZONE_REPORT_DEFS_REASONCHILDSAFETYOTHER
+            "tools.ozone.report.defs#reasonHarassmentTroll" -> TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTTROLL
+            "tools.ozone.report.defs#reasonHarassmentTargeted" -> TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTTARGETED
+            "tools.ozone.report.defs#reasonHarassmentHateSpeech" -> TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTHATESPEECH
+            "tools.ozone.report.defs#reasonHarassmentDoxxing" -> TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTDOXXING
+            "tools.ozone.report.defs#reasonHarassmentOther" -> TOOLS_OZONE_REPORT_DEFS_REASONHARASSMENTOTHER
+            "tools.ozone.report.defs#reasonMisleadingBot" -> TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGBOT
+            "tools.ozone.report.defs#reasonMisleadingImpersonation" -> TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGIMPERSONATION
+            "tools.ozone.report.defs#reasonMisleadingSpam" -> TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGSPAM
+            "tools.ozone.report.defs#reasonMisleadingScam" -> TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGSCAM
+            "tools.ozone.report.defs#reasonMisleadingElections" -> TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGELECTIONS
+            "tools.ozone.report.defs#reasonMisleadingOther" -> TOOLS_OZONE_REPORT_DEFS_REASONMISLEADINGOTHER
+            "tools.ozone.report.defs#reasonRuleSiteSecurity" -> TOOLS_OZONE_REPORT_DEFS_REASONRULESITESECURITY
+            "tools.ozone.report.defs#reasonRuleProhibitedSales" -> TOOLS_OZONE_REPORT_DEFS_REASONRULEPROHIBITEDSALES
+            "tools.ozone.report.defs#reasonRuleBanEvasion" -> TOOLS_OZONE_REPORT_DEFS_REASONRULEBANEVASION
+            "tools.ozone.report.defs#reasonRuleOther" -> TOOLS_OZONE_REPORT_DEFS_REASONRULEOTHER
+            "tools.ozone.report.defs#reasonSelfHarmContent" -> TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMCONTENT
+            "tools.ozone.report.defs#reasonSelfHarmED" -> TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMED
+            "tools.ozone.report.defs#reasonSelfHarmStunts" -> TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMSTUNTS
+            "tools.ozone.report.defs#reasonSelfHarmSubstances" -> TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMSUBSTANCES
+            "tools.ozone.report.defs#reasonSelfHarmOther" -> TOOLS_OZONE_REPORT_DEFS_REASONSELFHARMOTHER
+            else -> Unknown(value)
+        }
+    }
+}
+
+object ComAtprotoModerationDefsReasonTypeSerializer : kotlinx.serialization.KSerializer<ComAtprotoModerationDefsReasonType> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("ComAtprotoModerationDefsReasonType", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoModerationDefsReasonType) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoModerationDefsReasonType =
+        ComAtprotoModerationDefsReasonType.fromValue(decoder.decodeString())
+}
+
+/**
+ * A Lexicon `knownValues` string. The Lexicon names the values it knows, but a peer
+ * can send any other: such a value decodes as [Unknown] and is written back unchanged,
+ * instead of failing the object that holds it. Values are equal when their wire
+ * strings are.
+ */
+@Serializable(with = ComAtprotoModerationDefsSubjectTypeSerializer::class)
+sealed class ComAtprotoModerationDefsSubjectType(val value: String) {
+    object ACCOUNT : ComAtprotoModerationDefsSubjectType("account")
+    object RECORD : ComAtprotoModerationDefsSubjectType("record")
+    object CHAT : ComAtprotoModerationDefsSubjectType("chat")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : ComAtprotoModerationDefsSubjectType(value)
+
+    override fun equals(other: Any?): Boolean = other is ComAtprotoModerationDefsSubjectType && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<ComAtprotoModerationDefsSubjectType> by lazy {
+            listOf(ACCOUNT, RECORD, CHAT)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): ComAtprotoModerationDefsSubjectType = when (value) {
+            "account" -> ACCOUNT
+            "record" -> RECORD
+            "chat" -> CHAT
+            else -> Unknown(value)
+        }
+    }
+}
+
+object ComAtprotoModerationDefsSubjectTypeSerializer : kotlinx.serialization.KSerializer<ComAtprotoModerationDefsSubjectType> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("ComAtprotoModerationDefsSubjectType", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoModerationDefsSubjectType) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoModerationDefsSubjectType =
+        ComAtprotoModerationDefsSubjectType.fromValue(decoder.decodeString())
+}

@@ -54,6 +54,9 @@ struct CatalogRecordVectorTests {
     private static let constraintOnlyVectors: Set<String> = [
         "wrong const value",
         "integer not in enum",
+        // A generated `enum` string is open (a newer peer may add a value), so this
+        // decodes as `.unknown`; the PetrelLexicon validator still reports it.
+        "out of enum string",
         "out of integer range",
         "string too short",
         "string too long",

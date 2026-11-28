@@ -6,6 +6,12 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
     case string(String)
     case number(Int)
     case bigNumber(String)
+    /// A fractional (or out-of-range) JSON number in an untyped position. Only lenient
+    /// JSON decoding produces it, so a body from a peer that writes one still decodes;
+    /// strict decoding refuses it, and it has no DAG-CBOR form, so encoding it to
+    /// DAG-CBOR or computing a CID throws `DAGCBORError.floatingPointNotAllowed`. A
+    /// number with an exact integer value (`1.0`, `2e2`) reads as `.number`.
+    case float(Double)
     case object([String: ATProtocolValueContainer])
     case array([ATProtocolValueContainer])
     case bool(Bool)
@@ -97,8 +103,8 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         if let boolValue = try decodeIfTypeMatches(Bool.self, from: container) {
             return .bool(boolValue)
         }
-        if let intValue = try decodeSignedInteger(from: container) {
-            return .number(intValue)
+        if let number = try decodeNumber(from: container, decoder: decoder) {
+            return number
         }
         if let stringValue = try decodeIfTypeMatches(String.self, from: container) {
             return .string(stringValue)
@@ -126,11 +132,12 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         }
     }
 
-    private static func decodeSignedInteger(
-        from container: SingleValueDecodingContainer
-    ) throws -> Int? {
+    private static func decodeNumber(
+        from container: SingleValueDecodingContainer,
+        decoder: Decoder
+    ) throws -> ATProtocolValueContainer? {
         do {
-            return try container.decode(Int.self)
+            return try .number(container.decode(Int.self))
         } catch let integerError as DecodingError {
             switch integerError {
             case .typeMismatch:
@@ -140,18 +147,55 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 do {
                     unsignedValue = try container.decode(UInt64.self)
                 } catch is DecodingError {
+                    if let floatValue = lenientFloat(from: container, decoder: decoder) {
+                        return floatValue
+                    }
                     throw integerError
                 }
-                throw DecodingError.dataCorruptedError(
-                    in: container,
-                    debugDescription: "Unsigned integer \(unsignedValue) exceeds the signed 64-bit integer range"
-                )
+                throw unsignedOverflow(unsignedValue, in: container)
             case .keyNotFound, .valueNotFound:
                 throw integerError
             @unknown default:
                 throw integerError
             }
+        } catch {
+            // Foundation's JSONDecoder reports a number that is not an integer with its
+            // own (non-`DecodingError`) error type.
+            if let unsignedValue = try? container.decode(UInt64.self) {
+                throw unsignedOverflow(unsignedValue, in: container)
+            }
+            if let floatValue = lenientFloat(from: container, decoder: decoder) {
+                return floatValue
+            }
+            throw error
         }
+    }
+
+    /// A fractional number: lenient decoding keeps it as `.float`, strict decoding
+    /// refuses it (`nil`). An integral value outside the signed 64-bit range is an
+    /// integer overflow, not a float, and is refused too.
+    private static func lenientFloat(
+        from container: SingleValueDecodingContainer,
+        decoder: Decoder
+    ) -> ATProtocolValueContainer? {
+        guard !decoder.isATProtoStrictDecoding,
+              let floatValue = try? container.decode(Double.self),
+              floatValue.isFinite,
+              floatValue != floatValue.rounded(.towardZero)
+        else {
+            return nil
+        }
+        return .float(floatValue)
+    }
+
+    private static func unsignedOverflow(
+        _ value: UInt64,
+        in container: SingleValueDecodingContainer
+    ) -> DecodingError {
+        DecodingError.dataCorruptedError(
+            in: container,
+            debugDescription: "Unsigned integer \(value) exceeds the signed 64-bit integer range"
+        )
     }
 
     private static func decodeObjectValue(
@@ -304,6 +348,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         case let (.bigNumber(a), .bigNumber(b)):
             return a == b
 
+        case let (.float(a), .float(b)):
+            return a == b
+
         case let (.bool(a), .bool(b)):
             return a == b
 
@@ -380,6 +427,8 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             return .number(Int(uint8))
         case let bool as Bool:
             return .bool(bool)
+        case let double as Double:
+            return .float(double)
         case is NSNull:
             return .null
         case let link as ATProtoLink:
@@ -571,6 +620,8 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             try container.encode(intValue)
         case .bigNumber(let bigNumberString):
             try container.encode(bigNumberString)
+        case .float(let floatValue):
+            try container.encode(floatValue)
         case .bool(let boolValue):
             try container.encode(boolValue)
         case .null:
@@ -652,6 +703,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             return number
         case .bigNumber(let string):
             return string
+        case .float(let value):
+            // DAGCBOR refuses a Double, so a float cannot reach a DAG-CBOR block or CID.
+            return value
         case .object(let dict):
             var map = OrderedCBORMap()
             // Sort keys to maintain consistent ordering

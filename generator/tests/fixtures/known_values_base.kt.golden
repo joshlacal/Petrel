@@ -15,11 +15,50 @@ object BlueCatbirdGoldenDefsDefs {
     const val TYPE_IDENTIFIER = "blue.catbird.golden.defs"
 }
 
-@Serializable
-enum class BlueCatbirdGoldenDefsMode {
-    @SerialName("alpha")
-    ALPHA,
-    @SerialName("beta-value")
-    BETA_VALUE,
-    @SerialName("app.bsky.test#token")
-    APP_BSKY_TEST_TOKEN}
+/**
+ * A Lexicon `knownValues` string. The Lexicon names the values it knows, but a peer
+ * can send any other: such a value decodes as [Unknown] and is written back unchanged,
+ * instead of failing the object that holds it. Values are equal when their wire
+ * strings are.
+ */
+@Serializable(with = BlueCatbirdGoldenDefsModeSerializer::class)
+sealed class BlueCatbirdGoldenDefsMode(val value: String) {
+    object ALPHA : BlueCatbirdGoldenDefsMode("alpha")
+    object BETA_VALUE : BlueCatbirdGoldenDefsMode("beta-value")
+    object APP_BSKY_TEST_TOKEN : BlueCatbirdGoldenDefsMode("app.bsky.test#token")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : BlueCatbirdGoldenDefsMode(value)
+
+    override fun equals(other: Any?): Boolean = other is BlueCatbirdGoldenDefsMode && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<BlueCatbirdGoldenDefsMode> by lazy {
+            listOf(ALPHA, BETA_VALUE, APP_BSKY_TEST_TOKEN)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): BlueCatbirdGoldenDefsMode = when (value) {
+            "alpha" -> ALPHA
+            "beta-value" -> BETA_VALUE
+            "app.bsky.test#token" -> APP_BSKY_TEST_TOKEN
+            else -> Unknown(value)
+        }
+    }
+}
+
+object BlueCatbirdGoldenDefsModeSerializer : kotlinx.serialization.KSerializer<BlueCatbirdGoldenDefsMode> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("BlueCatbirdGoldenDefsMode", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: BlueCatbirdGoldenDefsMode) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): BlueCatbirdGoldenDefsMode =
+        BlueCatbirdGoldenDefsMode.fromValue(decoder.decodeString())
+}

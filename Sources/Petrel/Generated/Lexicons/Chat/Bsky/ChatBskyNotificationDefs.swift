@@ -14,6 +14,7 @@ public enum ChatBskyNotificationDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             chat: ChatPreference,
@@ -23,6 +24,7 @@ public enum ChatBskyNotificationDefs {
             self.chat = chat
             self.chatRequest = chatRequest
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -30,6 +32,7 @@ public enum ChatBskyNotificationDefs {
             chat = try container.decode(ChatPreference.self, forKey: .chat)
             chatRequest = try container.decode(ChatPreference.self, forKey: .chatRequest)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -37,6 +40,7 @@ public enum ChatBskyNotificationDefs {
             try container.encode(chat, forKey: .chat)
             try container.encode(chatRequest, forKey: .chatRequest)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -66,7 +70,7 @@ public enum ChatBskyNotificationDefs {
             map = map.adding(key: "chat", value: chatValue)
             let chatRequestValue = try chatRequest.toCBORValue()
             map = map.adding(key: "chatRequest", value: chatRequestValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "chat", "chatRequest"]
@@ -85,6 +89,7 @@ public enum ChatBskyNotificationDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             include: String,
@@ -94,6 +99,7 @@ public enum ChatBskyNotificationDefs {
             self.include = include
             self.push = push
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -101,6 +107,7 @@ public enum ChatBskyNotificationDefs {
             include = try container.decode(String.self, forKey: .include)
             push = try container.decode(Bool.self, forKey: .push)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -108,6 +115,7 @@ public enum ChatBskyNotificationDefs {
             try container.encode(include, forKey: .include)
             try container.encode(push, forKey: .push)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -137,7 +145,7 @@ public enum ChatBskyNotificationDefs {
             map = map.adding(key: "include", value: includeValue)
             let pushValue = try push.toCBORValue()
             map = map.adding(key: "push", value: pushValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "include", "push"]

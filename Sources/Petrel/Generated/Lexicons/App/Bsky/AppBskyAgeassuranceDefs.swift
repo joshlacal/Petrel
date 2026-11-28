@@ -17,6 +17,7 @@ public enum AppBskyAgeassuranceDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             lastInitiatedAt: ATProtocolDate? = nil,
@@ -28,6 +29,7 @@ public enum AppBskyAgeassuranceDefs {
             self.status = status
             self.access = access
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -49,6 +51,7 @@ public enum AppBskyAgeassuranceDefs {
             status = try container.decode(AppBskyAgeassuranceDefs.Status.self, forKey: .status)
             access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -57,6 +60,7 @@ public enum AppBskyAgeassuranceDefs {
             try container.encode(status, forKey: .status)
             try container.encode(access, forKey: .access)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -98,7 +102,7 @@ public enum AppBskyAgeassuranceDefs {
             map = map.adding(key: "status", value: statusValue)
             let accessValue = try access.toCBORValue()
             map = map.adding(key: "access", value: accessValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "lastInitiatedAt", "status", "access"]
@@ -130,6 +134,7 @@ public enum AppBskyAgeassuranceDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             accountCreatedAt: ATProtocolDate? = nil,
@@ -137,6 +142,7 @@ public enum AppBskyAgeassuranceDefs {
         ) {
             self.accountCreatedAt = accountCreatedAt
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -156,12 +162,14 @@ public enum AppBskyAgeassuranceDefs {
                 malformedFields.insert("accountCreatedAt")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encodeIfPresent(accountCreatedAt, forKey: .accountCreatedAt)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -191,7 +199,7 @@ public enum AppBskyAgeassuranceDefs {
                 let accountCreatedAtValue = try value.toCBORValue()
                 map = map.adding(key: "accountCreatedAt", value: accountCreatedAtValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "accountCreatedAt"]
@@ -218,6 +226,7 @@ public enum AppBskyAgeassuranceDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             regions: [AppBskyAgeassuranceDefs.ConfigRegion],
@@ -225,18 +234,21 @@ public enum AppBskyAgeassuranceDefs {
         ) {
             self.regions = regions
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             regions = try container.decode([AppBskyAgeassuranceDefs.ConfigRegion].self, forKey: .regions)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(regions, forKey: .regions)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -260,7 +272,7 @@ public enum AppBskyAgeassuranceDefs {
             var map = OrderedCBORMap()
             let regionsValue = try regions.toCBORValue()
             map = map.adding(key: "regions", value: regionsValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "regions"]
@@ -289,6 +301,7 @@ public enum AppBskyAgeassuranceDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             platforms: [String]? = nil,
@@ -306,6 +319,7 @@ public enum AppBskyAgeassuranceDefs {
             self.additionalVerificationMethods = additionalVerificationMethods
             self.rules = rules
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -352,6 +366,7 @@ public enum AppBskyAgeassuranceDefs {
             }
             rules = try container.decode([ConfigRegionRulesUnion].self, forKey: .rules)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -363,6 +378,7 @@ public enum AppBskyAgeassuranceDefs {
             try container.encodeIfPresent(additionalVerificationMethods, forKey: .additionalVerificationMethods)
             try container.encode(rules, forKey: .rules)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -434,7 +450,7 @@ public enum AppBskyAgeassuranceDefs {
             }
             let rulesValue = try rules.toCBORValue()
             map = map.adding(key: "rules", value: rulesValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "platforms", "countryCode", "regionCode", "minAccessAge", "additionalVerificationMethods", "rules"]
@@ -471,6 +487,7 @@ public enum AppBskyAgeassuranceDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             access: AppBskyAgeassuranceDefs.Access,
@@ -478,18 +495,21 @@ public enum AppBskyAgeassuranceDefs {
         ) {
             self.access = access
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(access, forKey: .access)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -513,7 +533,7 @@ public enum AppBskyAgeassuranceDefs {
             var map = OrderedCBORMap()
             let accessValue = try access.toCBORValue()
             map = map.adding(key: "access", value: accessValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "access"]
@@ -533,6 +553,7 @@ public enum AppBskyAgeassuranceDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             age: Int,
@@ -542,6 +563,7 @@ public enum AppBskyAgeassuranceDefs {
             self.age = age
             self.access = access
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -549,6 +571,7 @@ public enum AppBskyAgeassuranceDefs {
             age = try container.decode(Int.self, forKey: .age)
             access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -556,6 +579,7 @@ public enum AppBskyAgeassuranceDefs {
             try container.encode(age, forKey: .age)
             try container.encode(access, forKey: .access)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -585,7 +609,7 @@ public enum AppBskyAgeassuranceDefs {
             map = map.adding(key: "age", value: ageValue)
             let accessValue = try access.toCBORValue()
             map = map.adding(key: "access", value: accessValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "age", "access"]
@@ -606,6 +630,7 @@ public enum AppBskyAgeassuranceDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             age: Int,
@@ -615,6 +640,7 @@ public enum AppBskyAgeassuranceDefs {
             self.age = age
             self.access = access
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -622,6 +648,7 @@ public enum AppBskyAgeassuranceDefs {
             age = try container.decode(Int.self, forKey: .age)
             access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -629,6 +656,7 @@ public enum AppBskyAgeassuranceDefs {
             try container.encode(age, forKey: .age)
             try container.encode(access, forKey: .access)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -658,7 +686,7 @@ public enum AppBskyAgeassuranceDefs {
             map = map.adding(key: "age", value: ageValue)
             let accessValue = try access.toCBORValue()
             map = map.adding(key: "access", value: accessValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "age", "access"]
@@ -679,6 +707,7 @@ public enum AppBskyAgeassuranceDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             age: Int,
@@ -688,6 +717,7 @@ public enum AppBskyAgeassuranceDefs {
             self.age = age
             self.access = access
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -695,6 +725,7 @@ public enum AppBskyAgeassuranceDefs {
             age = try container.decode(Int.self, forKey: .age)
             access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -702,6 +733,7 @@ public enum AppBskyAgeassuranceDefs {
             try container.encode(age, forKey: .age)
             try container.encode(access, forKey: .access)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -731,7 +763,7 @@ public enum AppBskyAgeassuranceDefs {
             map = map.adding(key: "age", value: ageValue)
             let accessValue = try access.toCBORValue()
             map = map.adding(key: "access", value: accessValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "age", "access"]
@@ -752,6 +784,7 @@ public enum AppBskyAgeassuranceDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             age: Int,
@@ -761,6 +794,7 @@ public enum AppBskyAgeassuranceDefs {
             self.age = age
             self.access = access
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -768,6 +802,7 @@ public enum AppBskyAgeassuranceDefs {
             age = try container.decode(Int.self, forKey: .age)
             access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -775,6 +810,7 @@ public enum AppBskyAgeassuranceDefs {
             try container.encode(age, forKey: .age)
             try container.encode(access, forKey: .access)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -804,7 +840,7 @@ public enum AppBskyAgeassuranceDefs {
             map = map.adding(key: "age", value: ageValue)
             let accessValue = try access.toCBORValue()
             map = map.adding(key: "access", value: accessValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "age", "access"]
@@ -825,6 +861,7 @@ public enum AppBskyAgeassuranceDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             date: ATProtocolDate,
@@ -834,6 +871,7 @@ public enum AppBskyAgeassuranceDefs {
             self.date = date
             self.access = access
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -841,6 +879,7 @@ public enum AppBskyAgeassuranceDefs {
             date = try container.decode(ATProtocolDate.self, forKey: .date)
             access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -848,6 +887,7 @@ public enum AppBskyAgeassuranceDefs {
             try container.encode(date, forKey: .date)
             try container.encode(access, forKey: .access)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -877,7 +917,7 @@ public enum AppBskyAgeassuranceDefs {
             map = map.adding(key: "date", value: dateValue)
             let accessValue = try access.toCBORValue()
             map = map.adding(key: "access", value: accessValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "date", "access"]
@@ -898,6 +938,7 @@ public enum AppBskyAgeassuranceDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             date: ATProtocolDate,
@@ -907,6 +948,7 @@ public enum AppBskyAgeassuranceDefs {
             self.date = date
             self.access = access
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -914,6 +956,7 @@ public enum AppBskyAgeassuranceDefs {
             date = try container.decode(ATProtocolDate.self, forKey: .date)
             access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -921,6 +964,7 @@ public enum AppBskyAgeassuranceDefs {
             try container.encode(date, forKey: .date)
             try container.encode(access, forKey: .access)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -950,7 +994,7 @@ public enum AppBskyAgeassuranceDefs {
             map = map.adding(key: "date", value: dateValue)
             let accessValue = try access.toCBORValue()
             map = map.adding(key: "access", value: accessValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "date", "access"]
@@ -990,6 +1034,7 @@ public enum AppBskyAgeassuranceDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             createdAt: ATProtocolDate,
@@ -1017,6 +1062,7 @@ public enum AppBskyAgeassuranceDefs {
             self.completeIp = completeIp
             self.completeUa = completeUa
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -1101,6 +1147,7 @@ public enum AppBskyAgeassuranceDefs {
                 malformedFields.insert("completeUa")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1117,6 +1164,7 @@ public enum AppBskyAgeassuranceDefs {
             try container.encodeIfPresent(completeIp, forKey: .completeIp)
             try container.encodeIfPresent(completeUa, forKey: .completeUa)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1236,7 +1284,7 @@ public enum AppBskyAgeassuranceDefs {
                 let completeUaValue = try value.toCBORValue()
                 map = map.adding(key: "completeUa", value: completeUaValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "createdAt", "attemptId", "status", "access", "countryCode", "regionCode", "email", "initIp", "initUa", "completeIp", "completeUa"]
@@ -1418,25 +1466,25 @@ public enum AppBskyAgeassuranceDefs {
 
             switch typeValue {
             case "app.bsky.ageassurance.defs#configRegionRuleDefault":
-                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleDefault(from: decoder)
+                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleDefault(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyAgeassuranceDefsConfigRegionRuleDefault(value)
             case "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge":
-                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfDeclaredOverAge(from: decoder)
+                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfDeclaredOverAge(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(value)
             case "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge":
-                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfDeclaredUnderAge(from: decoder)
+                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfDeclaredUnderAge(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(value)
             case "app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge":
-                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredOverAge(from: decoder)
+                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredOverAge(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(value)
             case "app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge":
-                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredUnderAge(from: decoder)
+                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredUnderAge(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(value)
             case "app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan":
-                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountNewerThan(from: decoder)
+                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountNewerThan(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(value)
             case "app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan":
-                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountOlderThan(from: decoder)
+                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountOlderThan(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -1449,26 +1497,26 @@ public enum AppBskyAgeassuranceDefs {
 
             switch self {
             case let .appBskyAgeassuranceDefsConfigRegionRuleDefault(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.ageassurance.defs#configRegionRuleDefault", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(value):
-                try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

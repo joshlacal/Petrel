@@ -115,13 +115,13 @@ public enum ComAtprotoSpaceGetSpace {
 
             switch typeValue {
             case "com.atproto.personalspace.policy":
-                let value = try ComAtprotoPersonalspacePolicy(from: decoder)
+                let value = try ComAtprotoPersonalspacePolicy(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoPersonalspacePolicy(value)
             case "com.atproto.memberspace.policy":
-                let value = try ComAtprotoMemberspacePolicy(from: decoder)
+                let value = try ComAtprotoMemberspacePolicy(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoMemberspacePolicy(value)
             case "com.atproto.managedspace.policy":
-                let value = try ComAtprotoManagedspacePolicy(from: decoder)
+                let value = try ComAtprotoManagedspacePolicy(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comAtprotoManagedspacePolicy(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -134,14 +134,14 @@ public enum ComAtprotoSpaceGetSpace {
 
             switch self {
             case let .comAtprotoPersonalspacePolicy(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.personalspace.policy", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoMemberspacePolicy(value):
+                try value.encode(to: encoder)
                 try container.encode("com.atproto.memberspace.policy", forKey: .type)
-                try value.encode(to: encoder)
             case let .comAtprotoManagedspacePolicy(value):
-                try container.encode("com.atproto.managedspace.policy", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.atproto.managedspace.policy", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

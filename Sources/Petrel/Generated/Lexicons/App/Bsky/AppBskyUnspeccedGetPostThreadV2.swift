@@ -17,6 +17,7 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             uri: ATProtocolURI,
@@ -28,6 +29,7 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
             self.depth = depth
             self.value = value
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -36,6 +38,7 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
             depth = try container.decode(Int.self, forKey: .depth)
             value = try container.decode(ThreadItemValueUnion.self, forKey: .value)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -44,6 +47,7 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
             try container.encode(depth, forKey: .depth)
             try container.encode(value, forKey: .value)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -79,7 +83,7 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
             map = map.adding(key: "depth", value: depthValue)
             let valueValue = try value.toCBORValue()
             map = map.adding(key: "value", value: valueValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "depth", "value"]
@@ -204,16 +208,16 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
 
             switch typeValue {
             case "app.bsky.unspecced.defs#threadItemPost":
-                let value = try AppBskyUnspeccedDefs.ThreadItemPost(from: decoder)
+                let value = try AppBskyUnspeccedDefs.ThreadItemPost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyUnspeccedDefsThreadItemPost(value)
             case "app.bsky.unspecced.defs#threadItemNoUnauthenticated":
-                let value = try AppBskyUnspeccedDefs.ThreadItemNoUnauthenticated(from: decoder)
+                let value = try AppBskyUnspeccedDefs.ThreadItemNoUnauthenticated(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyUnspeccedDefsThreadItemNoUnauthenticated(value)
             case "app.bsky.unspecced.defs#threadItemNotFound":
-                let value = try AppBskyUnspeccedDefs.ThreadItemNotFound(from: decoder)
+                let value = try AppBskyUnspeccedDefs.ThreadItemNotFound(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyUnspeccedDefsThreadItemNotFound(value)
             case "app.bsky.unspecced.defs#threadItemBlocked":
-                let value = try AppBskyUnspeccedDefs.ThreadItemBlocked(from: decoder)
+                let value = try AppBskyUnspeccedDefs.ThreadItemBlocked(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyUnspeccedDefsThreadItemBlocked(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -226,17 +230,17 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
 
             switch self {
             case let .appBskyUnspeccedDefsThreadItemPost(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.unspecced.defs#threadItemPost", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyUnspeccedDefsThreadItemNoUnauthenticated(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.unspecced.defs#threadItemNoUnauthenticated", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyUnspeccedDefsThreadItemNotFound(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.unspecced.defs#threadItemNotFound", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyUnspeccedDefsThreadItemBlocked(value):
-                try container.encode("app.bsky.unspecced.defs#threadItemBlocked", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.unspecced.defs#threadItemBlocked", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

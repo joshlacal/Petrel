@@ -16,6 +16,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
   the new form. Added `ATProtocolURI.spaceURIPrefix` and `ATProtocolURI.fromLegacySpaceURI(_:)`
   (Kotlin: `SpaceRef.SPACE_URI_PREFIX`, `SpaceRef.fromLegacySpaceUri`); the old form will be
   dropped before the beta.
+- **Source-breaking.** Lexicon string enums are open in Swift and Kotlin: a value the lexicon does
+  not list decodes to `.unknown` (Kotlin: `Unknown`) and re-encodes as written, instead of
+  failing the decode. An exhaustive `switch` over a lexicon enum needs a `.unknown` arm or a
+  `default`, and `init?(rawValue:)` no longer returns nil for an unlisted value. In Kotlin the
+  affected types change from `enum class` to `sealed class`.
+- **Source-breaking.** `ATProtocolValueContainer` gains a `.float` case, so a number with a
+  fraction in an unknown record no longer fails the decode. An exhaustive `switch` over the
+  container needs a `.float` arm. Recorded in `api-breakage-allowlist.txt`.
+- A nested object's `$type` is kept through decode and re-encode.
 
 ### Fixed
 

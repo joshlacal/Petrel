@@ -16,15 +16,54 @@ object ComAtprotoSyncDefsDefs {
     const val TYPE_IDENTIFIER = "com.atproto.sync.defs"
 }
 
-@Serializable
-enum class ComAtprotoSyncDefsHostStatus {
-    @SerialName("active")
-    ACTIVE,
-    @SerialName("idle")
-    IDLE,
-    @SerialName("offline")
-    OFFLINE,
-    @SerialName("throttled")
-    THROTTLED,
-    @SerialName("banned")
-    BANNED}
+/**
+ * A Lexicon `knownValues` string. The Lexicon names the values it knows, but a peer
+ * can send any other: such a value decodes as [Unknown] and is written back unchanged,
+ * instead of failing the object that holds it. Values are equal when their wire
+ * strings are.
+ */
+@Serializable(with = ComAtprotoSyncDefsHostStatusSerializer::class)
+sealed class ComAtprotoSyncDefsHostStatus(val value: String) {
+    object ACTIVE : ComAtprotoSyncDefsHostStatus("active")
+    object IDLE : ComAtprotoSyncDefsHostStatus("idle")
+    object OFFLINE : ComAtprotoSyncDefsHostStatus("offline")
+    object THROTTLED : ComAtprotoSyncDefsHostStatus("throttled")
+    object BANNED : ComAtprotoSyncDefsHostStatus("banned")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : ComAtprotoSyncDefsHostStatus(value)
+
+    override fun equals(other: Any?): Boolean = other is ComAtprotoSyncDefsHostStatus && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<ComAtprotoSyncDefsHostStatus> by lazy {
+            listOf(ACTIVE, IDLE, OFFLINE, THROTTLED, BANNED)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): ComAtprotoSyncDefsHostStatus = when (value) {
+            "active" -> ACTIVE
+            "idle" -> IDLE
+            "offline" -> OFFLINE
+            "throttled" -> THROTTLED
+            "banned" -> BANNED
+            else -> Unknown(value)
+        }
+    }
+}
+
+object ComAtprotoSyncDefsHostStatusSerializer : kotlinx.serialization.KSerializer<ComAtprotoSyncDefsHostStatus> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("ComAtprotoSyncDefsHostStatus", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoSyncDefsHostStatus) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoSyncDefsHostStatus =
+        ComAtprotoSyncDefsHostStatus.fromValue(decoder.decodeString())
+}

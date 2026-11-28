@@ -15,6 +15,7 @@ public enum AppBskyBookmarkDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             subject: ComAtprotoRepoStrongRef,
@@ -22,18 +23,21 @@ public enum AppBskyBookmarkDefs {
         ) {
             self.subject = subject
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             subject = try container.decode(ComAtprotoRepoStrongRef.self, forKey: .subject)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(subject, forKey: .subject)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -57,7 +61,7 @@ public enum AppBskyBookmarkDefs {
             var map = OrderedCBORMap()
             let subjectValue = try subject.toCBORValue()
             map = map.adding(key: "subject", value: subjectValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "subject"]
@@ -77,6 +81,7 @@ public enum AppBskyBookmarkDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             subject: ComAtprotoRepoStrongRef,
@@ -88,6 +93,7 @@ public enum AppBskyBookmarkDefs {
             self.createdAt = createdAt
             self.item = item
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -109,6 +115,7 @@ public enum AppBskyBookmarkDefs {
             }
             item = try container.decode(BookmarkViewItemUnion.self, forKey: .item)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -117,6 +124,7 @@ public enum AppBskyBookmarkDefs {
             try container.encodeIfPresent(createdAt, forKey: .createdAt)
             try container.encode(item, forKey: .item)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -158,7 +166,7 @@ public enum AppBskyBookmarkDefs {
             }
             let itemValue = try item.toCBORValue()
             map = map.adding(key: "item", value: itemValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "subject", "createdAt", "item"]
@@ -206,13 +214,13 @@ public enum AppBskyBookmarkDefs {
 
             switch typeValue {
             case "app.bsky.feed.defs#blockedPost":
-                let value = try AppBskyFeedDefs.BlockedPost(from: decoder)
+                let value = try AppBskyFeedDefs.BlockedPost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsBlockedPost(value)
             case "app.bsky.feed.defs#notFoundPost":
-                let value = try AppBskyFeedDefs.NotFoundPost(from: decoder)
+                let value = try AppBskyFeedDefs.NotFoundPost(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsNotFoundPost(value)
             case "app.bsky.feed.defs#postView":
-                let value = try AppBskyFeedDefs.PostView(from: decoder)
+                let value = try AppBskyFeedDefs.PostView(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyFeedDefsPostView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -225,14 +233,14 @@ public enum AppBskyBookmarkDefs {
 
             switch self {
             case let .appBskyFeedDefsBlockedPost(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.feed.defs#blockedPost", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyFeedDefsNotFoundPost(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.feed.defs#notFoundPost", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyFeedDefsPostView(value):
-                try container.encode("app.bsky.feed.defs#postView", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.feed.defs#postView", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

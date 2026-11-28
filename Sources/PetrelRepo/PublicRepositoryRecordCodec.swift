@@ -149,6 +149,8 @@ public enum PublicRepositoryRecordCodec {
             }
             return .integer(value)
         case .bigNumber: throw PublicRepositoryDomainError.invalidRecordInteger
+        // The data model has no floats; a record that holds one has no DAG-CBOR form.
+        case .float: throw PublicRepositoryDomainError.invalidRecordInteger
         case let .object(fields):
             return try convertObject(fields, depth: depth + 1, limits: limits)
         case let .array(values):

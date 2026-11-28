@@ -25,6 +25,7 @@ public enum AppBskyNotificationListNotifications {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             uri: ATProtocolURI,
@@ -50,6 +51,7 @@ public enum AppBskyNotificationListNotifications {
             self.indexedAt = indexedAt
             self.labels = labels
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -100,6 +102,7 @@ public enum AppBskyNotificationListNotifications {
                 malformedFields.insert("labels")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -115,6 +118,7 @@ public enum AppBskyNotificationListNotifications {
             try container.encode(indexedAt, forKey: .indexedAt)
             try container.encodeIfPresent(labels, forKey: .labels)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -210,7 +214,7 @@ public enum AppBskyNotificationListNotifications {
                 let labelsValue = try value.toCBORValue()
                 map = map.adding(key: "labels", value: labelsValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "cid", "author", "reason", "reasonSubject", "record", "starterPack", "isRead", "indexedAt", "labels"]

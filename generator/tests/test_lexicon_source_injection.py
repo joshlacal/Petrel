@@ -392,8 +392,11 @@ class LexiconSourceInjectionTests(unittest.TestCase):
         }, self.cycle_detector)
         kt_enum_gen = KotlinEnumGenerator(kt_gen)
         kt_enum_gen.generate_enum_class_from_known_values("TestKtLiteralEnum", [adversarial_str])
-        self.assertNotIn(f'@SerialName("{adversarial_str}")', kt_gen.enum_classes)
-        self.assertIn(r'@SerialName("test\"payload\\(1+1)\$foo\${bar.baz()}")', kt_gen.enum_classes)
+        # The open sealed class writes each wire value twice (the constant and the
+        # fromValue mapping); both must be the escaped literal, never the raw string.
+        self.assertNotIn(f'"{adversarial_str}"', kt_gen.enum_classes)
+        self.assertIn(r'TestKtLiteralEnum("test\"payload\\(1+1)\$foo\${bar.baz()}")', kt_gen.enum_classes)
+        self.assertIn(r'"test\"payload\\(1+1)\$foo\${bar.baz()}" -> ', kt_gen.enum_classes)
 
         # 4. Kotlin property with $
         dollar_prop_lexicon = {

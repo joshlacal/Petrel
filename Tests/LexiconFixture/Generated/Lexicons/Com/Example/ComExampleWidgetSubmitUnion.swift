@@ -30,10 +30,10 @@ public enum ComExampleWidgetSubmitUnion {
 
             switch typeValue {
             case "com.example.widget.defs#gadget":
-                let value = try ComExampleWidgetDefs.Gadget(from: decoder)
+                let value = try ComExampleWidgetDefs.Gadget(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comExampleWidgetDefsGadget(value)
             case "com.example.widget.note":
-                let value = try ComExampleWidgetNote(from: decoder)
+                let value = try ComExampleWidgetNote(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comExampleWidgetNote(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -46,11 +46,11 @@ public enum ComExampleWidgetSubmitUnion {
 
             switch self {
             case let .comExampleWidgetDefsGadget(value):
+                try value.encode(to: encoder)
                 try container.encode("com.example.widget.defs#gadget", forKey: .type)
-                try value.encode(to: encoder)
             case let .comExampleWidgetNote(value):
-                try container.encode("com.example.widget.note", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.example.widget.note", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

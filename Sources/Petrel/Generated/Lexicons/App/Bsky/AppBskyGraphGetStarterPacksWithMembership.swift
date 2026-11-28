@@ -16,6 +16,7 @@ public enum AppBskyGraphGetStarterPacksWithMembership {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             starterPack: AppBskyGraphDefs.StarterPackView,
@@ -25,6 +26,7 @@ public enum AppBskyGraphGetStarterPacksWithMembership {
             self.starterPack = starterPack
             self.listItem = listItem
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -45,6 +47,7 @@ public enum AppBskyGraphGetStarterPacksWithMembership {
                 malformedFields.insert("listItem")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -52,6 +55,7 @@ public enum AppBskyGraphGetStarterPacksWithMembership {
             try container.encode(starterPack, forKey: .starterPack)
             try container.encodeIfPresent(listItem, forKey: .listItem)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -87,7 +91,7 @@ public enum AppBskyGraphGetStarterPacksWithMembership {
                 let listItemValue = try value.toCBORValue()
                 map = map.adding(key: "listItem", value: listItemValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "starterPack", "listItem"]

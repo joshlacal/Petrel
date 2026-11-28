@@ -16,6 +16,7 @@ public enum AppBskyUnspeccedGetTaggedSuggestions {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             tag: String,
@@ -27,6 +28,7 @@ public enum AppBskyUnspeccedGetTaggedSuggestions {
             self.subjectType = subjectType
             self.subject = subject
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -35,6 +37,7 @@ public enum AppBskyUnspeccedGetTaggedSuggestions {
             subjectType = try container.decode(String.self, forKey: .subjectType)
             subject = try container.decode(URI.self, forKey: .subject)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -43,6 +46,7 @@ public enum AppBskyUnspeccedGetTaggedSuggestions {
             try container.encode(subjectType, forKey: .subjectType)
             try container.encode(subject, forKey: .subject)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -78,7 +82,7 @@ public enum AppBskyUnspeccedGetTaggedSuggestions {
             map = map.adding(key: "subjectType", value: subjectTypeValue)
             let subjectValue = try subject.toCBORValue()
             map = map.adding(key: "subject", value: subjectValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "tag", "subjectType", "subject"]

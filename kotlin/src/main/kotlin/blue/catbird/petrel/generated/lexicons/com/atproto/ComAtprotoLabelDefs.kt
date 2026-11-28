@@ -16,24 +16,63 @@ object ComAtprotoLabelDefsDefs {
     const val TYPE_IDENTIFIER = "com.atproto.label.defs"
 }
 
-@Serializable
-enum class ComAtprotoLabelDefsLabelValue {
-    @SerialName("!hide")
-    _HIDE,
-    @SerialName("!warn")
-    _WARN,
-    @SerialName("!no-unauthenticated")
-    _NO_UNAUTHENTICATED,
-    @SerialName("porn")
-    PORN,
-    @SerialName("sexual")
-    SEXUAL,
-    @SerialName("nudity")
-    NUDITY,
-    @SerialName("graphic-media")
-    GRAPHIC_MEDIA,
-    @SerialName("bot")
-    BOT}
+/**
+ * A Lexicon `knownValues` string. The Lexicon names the values it knows, but a peer
+ * can send any other: such a value decodes as [Unknown] and is written back unchanged,
+ * instead of failing the object that holds it. Values are equal when their wire
+ * strings are.
+ */
+@Serializable(with = ComAtprotoLabelDefsLabelValueSerializer::class)
+sealed class ComAtprotoLabelDefsLabelValue(val value: String) {
+    object _HIDE : ComAtprotoLabelDefsLabelValue("!hide")
+    object _WARN : ComAtprotoLabelDefsLabelValue("!warn")
+    object _NO_UNAUTHENTICATED : ComAtprotoLabelDefsLabelValue("!no-unauthenticated")
+    object PORN : ComAtprotoLabelDefsLabelValue("porn")
+    object SEXUAL : ComAtprotoLabelDefsLabelValue("sexual")
+    object NUDITY : ComAtprotoLabelDefsLabelValue("nudity")
+    object GRAPHIC_MEDIA : ComAtprotoLabelDefsLabelValue("graphic-media")
+    object BOT : ComAtprotoLabelDefsLabelValue("bot")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : ComAtprotoLabelDefsLabelValue(value)
+
+    override fun equals(other: Any?): Boolean = other is ComAtprotoLabelDefsLabelValue && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<ComAtprotoLabelDefsLabelValue> by lazy {
+            listOf(_HIDE, _WARN, _NO_UNAUTHENTICATED, PORN, SEXUAL, NUDITY, GRAPHIC_MEDIA, BOT)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): ComAtprotoLabelDefsLabelValue = when (value) {
+            "!hide" -> _HIDE
+            "!warn" -> _WARN
+            "!no-unauthenticated" -> _NO_UNAUTHENTICATED
+            "porn" -> PORN
+            "sexual" -> SEXUAL
+            "nudity" -> NUDITY
+            "graphic-media" -> GRAPHIC_MEDIA
+            "bot" -> BOT
+            else -> Unknown(value)
+        }
+    }
+}
+
+object ComAtprotoLabelDefsLabelValueSerializer : kotlinx.serialization.KSerializer<ComAtprotoLabelDefsLabelValue> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("ComAtprotoLabelDefsLabelValue", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoLabelDefsLabelValue) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoLabelDefsLabelValue =
+        ComAtprotoLabelDefsLabelValue.fromValue(decoder.decodeString())
+}
 
     /**
      * Metadata tag on an atproto resource (eg, repo or record).

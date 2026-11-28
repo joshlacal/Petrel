@@ -16,6 +16,7 @@ public enum IoMySite4everDeepNestedNsSubmitThing {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             name: String,
@@ -25,6 +26,7 @@ public enum IoMySite4everDeepNestedNsSubmitThing {
             self.name = name
             self.count = count
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -45,6 +47,7 @@ public enum IoMySite4everDeepNestedNsSubmitThing {
                 malformedFields.insert("count")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -52,6 +55,7 @@ public enum IoMySite4everDeepNestedNsSubmitThing {
             try container.encode(name, forKey: .name)
             try container.encodeIfPresent(count, forKey: .count)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -87,7 +91,7 @@ public enum IoMySite4everDeepNestedNsSubmitThing {
                 let countValue = try value.toCBORValue()
                 map = map.adding(key: "count", value: countValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "name", "count"]
@@ -132,10 +136,10 @@ public enum IoMySite4everDeepNestedNsSubmitThing {
 
             switch typeValue {
             case "io.my-site.4ever.deep.nested.ns.submitThing#thing":
-                let value = try IoMySite4everDeepNestedNsSubmitThing.Thing(from: decoder)
+                let value = try IoMySite4everDeepNestedNsSubmitThing.Thing(from: ATProtoUnionMemberDecoder(decoder))
                 self = .ioMySite4everDeepNestedNsSubmitThingThing(value)
             case "com.example.widget.defs#gadget":
-                let value = try ComExampleWidgetDefs.Gadget(from: decoder)
+                let value = try ComExampleWidgetDefs.Gadget(from: ATProtoUnionMemberDecoder(decoder))
                 self = .comExampleWidgetDefsGadget(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -148,11 +152,11 @@ public enum IoMySite4everDeepNestedNsSubmitThing {
 
             switch self {
             case let .ioMySite4everDeepNestedNsSubmitThingThing(value):
+                try value.encode(to: encoder)
                 try container.encode("io.my-site.4ever.deep.nested.ns.submitThing#thing", forKey: .type)
-                try value.encode(to: encoder)
             case let .comExampleWidgetDefsGadget(value):
-                try container.encode("com.example.widget.defs#gadget", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("com.example.widget.defs#gadget", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

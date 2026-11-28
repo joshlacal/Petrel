@@ -12,6 +12,7 @@ public struct ChatBskyEmbedJoinLink: ATProtocolCodable, ATProtocolValue {
     /// Wire fields this Lexicon revision does not declare. They are kept on decode and
     /// written back on encode, so re-serializing data never drops them.
     public let extraFields: [String: ATProtocolValueContainer]
+    private let wireTypeTag: String?
 
     public init(
         code: String,
@@ -19,18 +20,21 @@ public struct ChatBskyEmbedJoinLink: ATProtocolCodable, ATProtocolValue {
     ) {
         self.code = code
         self.extraFields = extraFields
+        wireTypeTag = nil
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         code = try container.decode(String.self, forKey: .code)
         extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+        wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(code, forKey: .code)
         try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+        try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -54,7 +58,7 @@ public struct ChatBskyEmbedJoinLink: ATProtocolCodable, ATProtocolValue {
         var map = OrderedCBORMap()
         let codeValue = try code.toCBORValue()
         map = map.adding(key: "code", value: codeValue)
-        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+        return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
     }
 
     private static let knownFieldKeys: Swift.Set<String> = ["$type", "code"]
@@ -70,6 +74,7 @@ public struct ChatBskyEmbedJoinLink: ATProtocolCodable, ATProtocolValue {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             joinLinkPreview: ViewJoinLinkPreviewUnion,
@@ -77,18 +82,21 @@ public struct ChatBskyEmbedJoinLink: ATProtocolCodable, ATProtocolValue {
         ) {
             self.joinLinkPreview = joinLinkPreview
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             joinLinkPreview = try container.decode(ViewJoinLinkPreviewUnion.self, forKey: .joinLinkPreview)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(joinLinkPreview, forKey: .joinLinkPreview)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -112,7 +120,7 @@ public struct ChatBskyEmbedJoinLink: ATProtocolCodable, ATProtocolValue {
             var map = OrderedCBORMap()
             let joinLinkPreviewValue = try joinLinkPreview.toCBORValue()
             map = map.adding(key: "joinLinkPreview", value: joinLinkPreviewValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "joinLinkPreview"]
@@ -147,13 +155,13 @@ public struct ChatBskyEmbedJoinLink: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "chat.bsky.group.defs#joinLinkPreviewView":
-                let value = try ChatBskyGroupDefs.JoinLinkPreviewView(from: decoder)
+                let value = try ChatBskyGroupDefs.JoinLinkPreviewView(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyGroupDefsJoinLinkPreviewView(value)
             case "chat.bsky.group.defs#disabledJoinLinkPreviewView":
-                let value = try ChatBskyGroupDefs.DisabledJoinLinkPreviewView(from: decoder)
+                let value = try ChatBskyGroupDefs.DisabledJoinLinkPreviewView(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyGroupDefsDisabledJoinLinkPreviewView(value)
             case "chat.bsky.group.defs#invalidJoinLinkPreviewView":
-                let value = try ChatBskyGroupDefs.InvalidJoinLinkPreviewView(from: decoder)
+                let value = try ChatBskyGroupDefs.InvalidJoinLinkPreviewView(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyGroupDefsInvalidJoinLinkPreviewView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -166,14 +174,14 @@ public struct ChatBskyEmbedJoinLink: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .chatBskyGroupDefsJoinLinkPreviewView(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.group.defs#joinLinkPreviewView", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyGroupDefsDisabledJoinLinkPreviewView(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.group.defs#disabledJoinLinkPreviewView", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyGroupDefsInvalidJoinLinkPreviewView(value):
-                try container.encode("chat.bsky.group.defs#invalidJoinLinkPreviewView", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("chat.bsky.group.defs#invalidJoinLinkPreviewView", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

@@ -1024,12 +1024,51 @@ object AppBskyActorDefsStatusViewEmbedUnionSerializer : kotlinx.serialization.KS
     }
 }
 
-@Serializable
-enum class AppBskyActorDefsMutedWordTarget {
-    @SerialName("content")
-    CONTENT,
-    @SerialName("tag")
-    TAG}
+/**
+ * A Lexicon `knownValues` string. The Lexicon names the values it knows, but a peer
+ * can send any other: such a value decodes as [Unknown] and is written back unchanged,
+ * instead of failing the object that holds it. Values are equal when their wire
+ * strings are.
+ */
+@Serializable(with = AppBskyActorDefsMutedWordTargetSerializer::class)
+sealed class AppBskyActorDefsMutedWordTarget(val value: String) {
+    object CONTENT : AppBskyActorDefsMutedWordTarget("content")
+    object TAG : AppBskyActorDefsMutedWordTarget("tag")
+    /** A value this build does not know (a newer peer added it), kept verbatim. */
+    class Unknown(value: String) : AppBskyActorDefsMutedWordTarget(value)
+
+    override fun equals(other: Any?): Boolean = other is AppBskyActorDefsMutedWordTarget && other.value == value
+
+    override fun hashCode(): Int = value.hashCode()
+
+    override fun toString(): String = value
+
+    companion object {
+        /** The values this build knows, in Lexicon order. */
+        val knownValues: List<AppBskyActorDefsMutedWordTarget> by lazy {
+            listOf(CONTENT, TAG)
+        }
+
+        /** The value for a wire string; one this build does not know is [Unknown]. */
+        fun fromValue(value: String): AppBskyActorDefsMutedWordTarget = when (value) {
+            "content" -> CONTENT
+            "tag" -> TAG
+            else -> Unknown(value)
+        }
+    }
+}
+
+object AppBskyActorDefsMutedWordTargetSerializer : kotlinx.serialization.KSerializer<AppBskyActorDefsMutedWordTarget> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("AppBskyActorDefsMutedWordTarget", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyActorDefsMutedWordTarget) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyActorDefsMutedWordTarget =
+        AppBskyActorDefsMutedWordTarget.fromValue(decoder.decodeString())
+}
 
     @Serializable
     data class AppBskyActorDefsProfileViewBasic(

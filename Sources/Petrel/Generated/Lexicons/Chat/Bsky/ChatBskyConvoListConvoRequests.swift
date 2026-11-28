@@ -91,10 +91,10 @@ public enum ChatBskyConvoListConvoRequests {
 
             switch typeValue {
             case "chat.bsky.convo.defs#convoView":
-                let value = try ChatBskyConvoDefs.ConvoView(from: decoder)
+                let value = try ChatBskyConvoDefs.ConvoView(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyConvoDefsConvoView(value)
             case "chat.bsky.group.defs#joinRequestConvoView":
-                let value = try ChatBskyGroupDefs.JoinRequestConvoView(from: decoder)
+                let value = try ChatBskyGroupDefs.JoinRequestConvoView(from: ATProtoUnionMemberDecoder(decoder))
                 self = .chatBskyGroupDefsJoinRequestConvoView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -107,11 +107,11 @@ public enum ChatBskyConvoListConvoRequests {
 
             switch self {
             case let .chatBskyConvoDefsConvoView(value):
+                try value.encode(to: encoder)
                 try container.encode("chat.bsky.convo.defs#convoView", forKey: .type)
-                try value.encode(to: encoder)
             case let .chatBskyGroupDefsJoinRequestConvoView(value):
-                try container.encode("chat.bsky.group.defs#joinRequestConvoView", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("chat.bsky.group.defs#joinRequestConvoView", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

@@ -5,6 +5,13 @@ Swift prelude. The container is a real (if small) JSON value, so a compiled test
 assert that undeclared wire fields survive a decode/encode round trip.
 """
 
+import pathlib
+
+_UNION_MEMBER_DECODER_SOURCE = (
+    pathlib.Path(__file__).resolve().parents[2]
+    / "Sources/Petrel/Core/Types/ATProtoUnionMemberDecoder.swift"
+)
+
 # Requires the prelude to declare `OrderedCBORMap` with `adding(key:value:)`.
 CONTAINER_STUB = """
 public indirect enum ATProtocolValueContainer: Codable, Hashable {
@@ -149,3 +156,16 @@ extension KeyedDecodingContainer {
     }
 }
 """
+
+# The real nested-`$type` runtime (ATProtoUnionMemberDecoder plus the
+# decodeTypeTag / encodeTypeTag / addingTypeTag helpers), spliced in verbatim so the
+# compiled tests exercise the same tag handling Petrel ships.
+CONTAINER_STUB += """
+struct UndeclaredFieldKey: CodingKey {
+    let stringValue: String
+    let intValue: Int? = nil
+    init(_ stringValue: String) { self.stringValue = stringValue }
+    init?(stringValue: String) { self.stringValue = stringValue }
+    init?(intValue _: Int) { nil }
+}
+""" + _UNION_MEMBER_DECODER_SOURCE.read_text().replace("import Foundation\n", "")

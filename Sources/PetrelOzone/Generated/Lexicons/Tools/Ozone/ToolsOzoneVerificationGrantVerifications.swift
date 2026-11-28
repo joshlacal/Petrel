@@ -22,6 +22,7 @@ public enum ToolsOzoneVerificationGrantVerifications {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             subject: DID,
@@ -35,6 +36,7 @@ public enum ToolsOzoneVerificationGrantVerifications {
             self.displayName = displayName
             self.createdAt = createdAt
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -57,6 +59,7 @@ public enum ToolsOzoneVerificationGrantVerifications {
                 malformedFields.insert("createdAt")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -66,6 +69,7 @@ public enum ToolsOzoneVerificationGrantVerifications {
             try container.encode(displayName, forKey: .displayName)
             try container.encodeIfPresent(createdAt, forKey: .createdAt)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -113,7 +117,7 @@ public enum ToolsOzoneVerificationGrantVerifications {
                 let createdAtValue = try value.toCBORValue()
                 map = map.adding(key: "createdAt", value: createdAtValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "subject", "handle", "displayName", "createdAt"]
@@ -149,6 +153,7 @@ public enum ToolsOzoneVerificationGrantVerifications {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             error: String,
@@ -158,6 +163,7 @@ public enum ToolsOzoneVerificationGrantVerifications {
             self.error = error
             self.subject = subject
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -165,6 +171,7 @@ public enum ToolsOzoneVerificationGrantVerifications {
             error = try container.decode(String.self, forKey: .error)
             subject = try container.decode(DID.self, forKey: .subject)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -172,6 +179,7 @@ public enum ToolsOzoneVerificationGrantVerifications {
             try container.encode(error, forKey: .error)
             try container.encode(subject, forKey: .subject)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -201,7 +209,7 @@ public enum ToolsOzoneVerificationGrantVerifications {
             map = map.adding(key: "error", value: errorValue)
             let subjectValue = try subject.toCBORValue()
             map = map.adding(key: "subject", value: subjectValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "error", "subject"]

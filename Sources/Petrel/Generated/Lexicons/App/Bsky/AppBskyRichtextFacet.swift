@@ -12,6 +12,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
     /// Wire fields this Lexicon revision does not declare. They are kept on decode and
     /// written back on encode, so re-serializing data never drops them.
     public let extraFields: [String: ATProtocolValueContainer]
+    private let wireTypeTag: String?
 
     public init(
         index: ByteSlice,
@@ -21,6 +22,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         self.index = index
         self.features = features
         self.extraFields = extraFields
+        wireTypeTag = nil
     }
 
     public init(from decoder: Decoder) throws {
@@ -28,6 +30,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         index = try container.decode(ByteSlice.self, forKey: .index)
         features = try container.decode([AppBskyRichtextFacetFeaturesUnion].self, forKey: .features)
         extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+        wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -35,6 +38,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         try container.encode(index, forKey: .index)
         try container.encode(features, forKey: .features)
         try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+        try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -64,7 +68,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "index", value: indexValue)
         let featuresValue = try features.toCBORValue()
         map = map.adding(key: "features", value: featuresValue)
-        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+        return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
     }
 
     private static let knownFieldKeys: Swift.Set<String> = ["$type", "index", "features"]
@@ -82,6 +86,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             did: DID,
@@ -89,18 +94,21 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         ) {
             self.did = did
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             did = try container.decode(DID.self, forKey: .did)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(did, forKey: .did)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -124,7 +132,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             var map = OrderedCBORMap()
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "did"]
@@ -142,6 +150,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             uri: URI,
@@ -149,18 +158,21 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         ) {
             self.uri = uri
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             uri = try container.decode(URI.self, forKey: .uri)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(uri, forKey: .uri)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -184,7 +196,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             var map = OrderedCBORMap()
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri"]
@@ -202,6 +214,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             tag: String,
@@ -209,18 +222,21 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         ) {
             self.tag = tag
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             tag = try container.decode(String.self, forKey: .tag)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(tag, forKey: .tag)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -244,7 +260,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             var map = OrderedCBORMap()
             let tagValue = try tag.toCBORValue()
             map = map.adding(key: "tag", value: tagValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "tag"]
@@ -263,6 +279,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             byteStart: Int,
@@ -272,6 +289,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             self.byteStart = byteStart
             self.byteEnd = byteEnd
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -279,6 +297,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             byteStart = try container.decode(Int.self, forKey: .byteStart)
             byteEnd = try container.decode(Int.self, forKey: .byteEnd)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -286,6 +305,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             try container.encode(byteStart, forKey: .byteStart)
             try container.encode(byteEnd, forKey: .byteEnd)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -315,7 +335,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             map = map.adding(key: "byteStart", value: byteStartValue)
             let byteEndValue = try byteEnd.toCBORValue()
             map = map.adding(key: "byteEnd", value: byteEndValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "byteStart", "byteEnd"]
@@ -351,13 +371,13 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
 
             switch typeValue {
             case "app.bsky.richtext.facet#mention":
-                let value = try AppBskyRichtextFacet.Mention(from: decoder)
+                let value = try AppBskyRichtextFacet.Mention(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyRichtextFacetMention(value)
             case "app.bsky.richtext.facet#link":
-                let value = try AppBskyRichtextFacet.Link(from: decoder)
+                let value = try AppBskyRichtextFacet.Link(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyRichtextFacetLink(value)
             case "app.bsky.richtext.facet#tag":
-                let value = try AppBskyRichtextFacet.Tag(from: decoder)
+                let value = try AppBskyRichtextFacet.Tag(from: ATProtoUnionMemberDecoder(decoder))
                 self = .appBskyRichtextFacetTag(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -370,14 +390,14 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .appBskyRichtextFacetMention(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.richtext.facet#mention", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyRichtextFacetLink(value):
+                try value.encode(to: encoder)
                 try container.encode("app.bsky.richtext.facet#link", forKey: .type)
-                try value.encode(to: encoder)
             case let .appBskyRichtextFacetTag(value):
-                try container.encode("app.bsky.richtext.facet#tag", forKey: .type)
                 try value.encode(to: encoder)
+                try container.encode("app.bsky.richtext.facet#tag", forKey: .type)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }

@@ -15,6 +15,7 @@ public enum SiteStandardThemeColor {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             b: Int,
@@ -26,6 +27,7 @@ public enum SiteStandardThemeColor {
             self.g = g
             self.r = r
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -34,6 +36,7 @@ public enum SiteStandardThemeColor {
             g = try container.decode(Int.self, forKey: .g)
             r = try container.decode(Int.self, forKey: .r)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -42,6 +45,7 @@ public enum SiteStandardThemeColor {
             try container.encode(g, forKey: .g)
             try container.encode(r, forKey: .r)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -77,7 +81,7 @@ public enum SiteStandardThemeColor {
             map = map.adding(key: "g", value: gValue)
             let rValue = try r.toCBORValue()
             map = map.adding(key: "r", value: rValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "b", "g", "r"]
@@ -99,6 +103,7 @@ public enum SiteStandardThemeColor {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             a: Int,
@@ -112,6 +117,7 @@ public enum SiteStandardThemeColor {
             self.g = g
             self.r = r
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -121,6 +127,7 @@ public enum SiteStandardThemeColor {
             g = try container.decode(Int.self, forKey: .g)
             r = try container.decode(Int.self, forKey: .r)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -130,6 +137,7 @@ public enum SiteStandardThemeColor {
             try container.encode(g, forKey: .g)
             try container.encode(r, forKey: .r)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -171,7 +179,7 @@ public enum SiteStandardThemeColor {
             map = map.adding(key: "g", value: gValue)
             let rValue = try r.toCBORValue()
             map = map.adding(key: "r", value: rValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "a", "b", "g", "r"]

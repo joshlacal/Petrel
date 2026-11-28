@@ -17,6 +17,7 @@ public enum ComAtprotoServerCreateAppPassword {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             name: String,
@@ -30,6 +31,7 @@ public enum ComAtprotoServerCreateAppPassword {
             self.createdAt = createdAt
             self.privileged = privileged
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -52,6 +54,7 @@ public enum ComAtprotoServerCreateAppPassword {
                 malformedFields.insert("privileged")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -61,6 +64,7 @@ public enum ComAtprotoServerCreateAppPassword {
             try container.encode(createdAt, forKey: .createdAt)
             try container.encodeIfPresent(privileged, forKey: .privileged)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -108,7 +112,7 @@ public enum ComAtprotoServerCreateAppPassword {
                 let privilegedValue = try value.toCBORValue()
                 map = map.adding(key: "privileged", value: privilegedValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "name", "password", "createdAt", "privileged"]

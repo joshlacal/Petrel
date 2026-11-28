@@ -75,8 +75,13 @@ struct ATProtocolValueContainerDecodingTests {
             }
         }
 
+        // Lenient JSON keeps a fractional number as `.float`; it has no DAG-CBOR form,
+        // and strict decoding refuses it.
+        let fractional = try JSONDecoder().decode(ATProtocolValueContainer.self, from: Data("1.5".utf8))
+        #expect(fractional == .float(1.5))
+        #expect(throws: DAGCBORError.floatingPointNotAllowed) { try fractional.encodedDAGCBOR() }
         #expect(throws: (any Error).self) {
-            try JSONDecoder().decode(
+            try ATProtoDecoding.strictJSONDecoder().decode(
                 ATProtocolValueContainer.self,
                 from: Data("1.5".utf8)
             )

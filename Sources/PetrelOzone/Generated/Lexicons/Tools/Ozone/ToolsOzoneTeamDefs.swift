@@ -20,6 +20,7 @@ public enum ToolsOzoneTeamDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             did: DID,
@@ -39,6 +40,7 @@ public enum ToolsOzoneTeamDefs {
             self.lastUpdatedBy = lastUpdatedBy
             self.role = role
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -108,6 +110,7 @@ public enum ToolsOzoneTeamDefs {
             }
             role = try container.decode(String.self, forKey: .role)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -120,6 +123,7 @@ public enum ToolsOzoneTeamDefs {
             try container.encodeIfPresent(lastUpdatedBy, forKey: .lastUpdatedBy)
             try container.encode(role, forKey: .role)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -209,7 +213,7 @@ public enum ToolsOzoneTeamDefs {
             }
             let roleValue = try role.toCBORValue()
             map = map.adding(key: "role", value: roleValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "did", "disabled", "profile", "createdAt", "updatedAt", "lastUpdatedBy", "role"]

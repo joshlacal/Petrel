@@ -15,6 +15,7 @@ public enum ToolsOzoneSignatureDefs {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             property: String,
@@ -24,6 +25,7 @@ public enum ToolsOzoneSignatureDefs {
             self.property = property
             self.value = value
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -31,6 +33,7 @@ public enum ToolsOzoneSignatureDefs {
             property = try container.decode(String.self, forKey: .property)
             value = try container.decode(String.self, forKey: .value)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -38,6 +41,7 @@ public enum ToolsOzoneSignatureDefs {
             try container.encode(property, forKey: .property)
             try container.encode(value, forKey: .value)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -67,7 +71,7 @@ public enum ToolsOzoneSignatureDefs {
             map = map.adding(key: "property", value: propertyValue)
             let valueValue = try value.toCBORValue()
             map = map.adding(key: "value", value: valueValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "property", "value"]

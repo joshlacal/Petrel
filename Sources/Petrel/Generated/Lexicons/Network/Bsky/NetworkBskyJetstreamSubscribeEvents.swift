@@ -30,6 +30,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             seq: Int,
@@ -53,6 +54,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             self.record = record
             self.cid = cid
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -91,6 +93,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
                 malformedFields.insert("cid")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -105,6 +108,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             try container.encodeIfPresent(record, forKey: .record)
             try container.encodeIfPresent(cid, forKey: .cid)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -188,7 +192,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
                 let cidValue = try value.toCBORValue()
                 map = map.adding(key: "cid", value: cidValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "seq", "did", "time", "rev", "operation", "collection", "rkey", "record", "cid"]
@@ -236,6 +240,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             seq: Int,
@@ -249,6 +254,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             self.time = time
             self.identity = identity
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -258,6 +264,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             time = try container.decode(ATProtocolDate.self, forKey: .time)
             identity = try container.decode(ComAtprotoSyncSubscribeRepos.Identity.self, forKey: .identity)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -267,6 +274,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             try container.encode(time, forKey: .time)
             try container.encode(identity, forKey: .identity)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -308,7 +316,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             map = map.adding(key: "time", value: timeValue)
             let identityValue = try identity.toCBORValue()
             map = map.adding(key: "identity", value: identityValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "seq", "did", "time", "identity"]
@@ -334,6 +342,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             seq: Int,
@@ -347,6 +356,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             self.time = time
             self.account = account
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -356,6 +366,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             time = try container.decode(ATProtocolDate.self, forKey: .time)
             account = try container.decode(ComAtprotoSyncSubscribeRepos.Account.self, forKey: .account)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -365,6 +376,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             try container.encode(time, forKey: .time)
             try container.encode(account, forKey: .account)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -406,7 +418,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             map = map.adding(key: "time", value: timeValue)
             let accountValue = try account.toCBORValue()
             map = map.adding(key: "account", value: accountValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "seq", "did", "time", "account"]
@@ -432,6 +444,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             seq: Int,
@@ -445,6 +458,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             self.time = time
             self.sync = sync
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -454,6 +468,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             time = try container.decode(ATProtocolDate.self, forKey: .time)
             sync = try container.decode(ComAtprotoSyncSubscribeRepos.Sync.self, forKey: .sync)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -463,6 +478,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             try container.encode(time, forKey: .time)
             try container.encode(sync, forKey: .sync)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -504,7 +520,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             map = map.adding(key: "time", value: timeValue)
             let syncValue = try sync.toCBORValue()
             map = map.adding(key: "sync", value: syncValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "seq", "did", "time", "sync"]
@@ -526,6 +542,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
+        private let wireTypeTag: String?
 
         public init(
             name: String,
@@ -535,6 +552,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             self.name = name
             self.message = message
             self.extraFields = extraFields
+            wireTypeTag = nil
         }
 
         public init(from decoder: Decoder) throws {
@@ -555,6 +573,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
                 malformedFields.insert("message")
             }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+            wireTypeTag = try ATProtocolValueContainer.decodeTypeTag(from: decoder)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -562,6 +581,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             try container.encode(name, forKey: .name)
             try container.encodeIfPresent(message, forKey: .message)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+            try ATProtocolValueContainer.encodeTypeTag(wireTypeTag, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -597,7 +617,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
                 let messageValue = try value.toCBORValue()
                 map = map.adding(key: "message", value: messageValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+            return try ATProtocolValueContainer.addingTypeTag(wireTypeTag, to: ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:)))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "name", "message"]
@@ -742,11 +762,62 @@ public enum NetworkBskyJetstreamSubscribeEvents {
         }
     }
 
-    public enum ParametersKinds: String, Codable, ATProtocolCodable, ATProtocolValue, Sendable {
-        case value_commit = "commit"
-        case value_identity = "identity"
-        case value_account = "account"
-        case value_sync = "sync"
+    /// A Lexicon `enum` string. The Lexicon lists every value, but a newer peer can add one
+    /// before this build knows it: such a value decodes as `.unknown` and is written back
+    /// unchanged, instead of failing the object that holds it.
+    public enum ParametersKinds: RawRepresentable, Codable, Hashable, ATProtocolCodable, ATProtocolValue, Sendable {
+        case value_commit
+        case value_identity
+        case value_account
+        case value_sync
+        /// A value this build does not know (a newer peer added it), kept verbatim.
+        case unknown(String)
+
+        /// Never returns `nil`: a value this build does not know is `.unknown`. The
+        /// initializer stays failable to keep the shape of `RawRepresentable`.
+        public init?(rawValue: String) {
+            self = Self.parse(rawValue)
+        }
+
+        public var rawValue: String {
+            switch self {
+            case .value_commit: return "commit"
+            case .value_identity: return "identity"
+            case .value_account: return "account"
+            case .value_sync: return "sync"
+            case let .unknown(value): return value
+            }
+        }
+
+        private static func parse(_ value: String) -> Self {
+            switch value {
+            case "commit": return .value_commit
+            case "identity": return .value_identity
+            case "account": return .value_account
+            case "sync": return .value_sync
+            default: return .unknown(value)
+            }
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            self = try Self.parse(container.decode(String.self))
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
+
+        /// Values are equal when their wire strings are, so `.unknown` holding a known
+        /// value equals that value's case.
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.rawValue == rhs.rawValue
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(rawValue)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let otherValue = other as? ParametersKinds else { return false }
