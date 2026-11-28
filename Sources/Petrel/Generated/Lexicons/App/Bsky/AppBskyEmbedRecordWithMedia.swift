@@ -351,7 +351,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-    public enum ViewMediaUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+    public indirect enum ViewMediaUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case appBskyEmbedImagesView(AppBskyEmbedImages.View)
         case appBskyEmbedVideoView(AppBskyEmbedVideo.View)
         case appBskyEmbedGalleryView(AppBskyEmbedGallery.View)

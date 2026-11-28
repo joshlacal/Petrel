@@ -223,38 +223,65 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.external#view"
 
         public let external: ViewExternal
+        /// Hydrated modality-specific data for the external embed, when available.
+        public let data: ViewDataUnion?
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
             external: ViewExternal,
+            data: ViewDataUnion? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.external = external
+            self.data = data
             self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             external = try container.decode(ViewExternal.self, forKey: .external)
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            do {
+                data = try container.decodeIfPresent(ViewDataUnion.self, forKey: .data, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'data' — degrading to nil: \(error)")
+                data = nil
+                malformedFields.insert("data")
+            }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(external, forKey: .external)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try container.encodeIfPresent(data, forKey: .data)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(external)
+            if let value = data {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
             if external != other.external {
+                return false
+            }
+            if data != other.data {
                 return false
             }
             return extraFields == other.extraFields
@@ -268,13 +295,28 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             var map = OrderedCBORMap()
             let externalValue = try external.toCBORValue()
             map = map.adding(key: "external", value: externalValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            if let value = data {
+                let dataValue = try value.toCBORValue()
+                map = map.adding(key: "data", value: dataValue)
+            }
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "external"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "external", "data"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "external": return true
+            case "data": return data != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case external
+            case data
         }
     }
 
@@ -1060,6 +1102,8 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
     public struct ViewArticle: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.external#viewArticle"
 
+        /// Best-effort provider domain for cosmetic attribution, such as pckt.blog. Not verified provenance.
+        public let providerId: String?
         public let uri: URI
         public let title: String
         public let description: String
@@ -1071,6 +1115,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         public let image: URI?
         public let publisher: ViewArticlePublication?
         public let readingTime: Int?
+        public let viewer: ViewArticleViewerState?
         public let likeCount: Int?
         /// Available profile previews. Selected deterministically by DID; not a ranking.
         public let likers: [AppBskyActorDefs.ProfileViewBasic]?
@@ -1079,6 +1124,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
+            providerId: String? = nil,
             uri: URI,
             title: String,
             description: String,
@@ -1090,10 +1136,12 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             image: URI? = nil,
             publisher: ViewArticlePublication? = nil,
             readingTime: Int? = nil,
+            viewer: ViewArticleViewerState? = nil,
             likeCount: Int? = nil,
             likers: [AppBskyActorDefs.ProfileViewBasic]? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
+            self.providerId = providerId
             self.uri = uri
             self.title = title
             self.description = description
@@ -1105,6 +1153,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             self.image = image
             self.publisher = publisher
             self.readingTime = readingTime
+            self.viewer = viewer
             self.likeCount = likeCount
             self.likers = likers
             self.extraFields = extraFields
@@ -1114,6 +1163,18 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             var malformedFields: Swift.Set<String> = []
+            do {
+                providerId = try container.decodeIfPresent(String.self, forKey: .providerId, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'providerId' — degrading to nil: \(error)")
+                providerId = nil
+                malformedFields.insert("providerId")
+            }
             uri = try container.decode(URI.self, forKey: .uri)
             title = try container.decode(String.self, forKey: .title)
             description = try container.decode(String.self, forKey: .description)
@@ -1214,6 +1275,18 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
                 malformedFields.insert("readingTime")
             }
             do {
+                viewer = try container.decodeIfPresent(ViewArticleViewerState.self, forKey: .viewer, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'viewer' — degrading to nil: \(error)")
+                viewer = nil
+                malformedFields.insert("viewer")
+            }
+            do {
                 likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
@@ -1242,6 +1315,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(providerId, forKey: .providerId)
             try container.encode(uri, forKey: .uri)
             try container.encode(title, forKey: .title)
             try container.encode(description, forKey: .description)
@@ -1253,12 +1327,18 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             try container.encodeIfPresent(image, forKey: .image)
             try container.encodeIfPresent(publisher, forKey: .publisher)
             try container.encodeIfPresent(readingTime, forKey: .readingTime)
+            try container.encodeIfPresent(viewer, forKey: .viewer)
             try container.encodeIfPresent(likeCount, forKey: .likeCount)
             try container.encodeIfPresent(likers, forKey: .likers)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
+            if let value = providerId {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(uri)
             hasher.combine(title)
             hasher.combine(description)
@@ -1302,6 +1382,11 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             } else {
                 hasher.combine(nil as Int?)
             }
+            if let value = viewer {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             if let value = likeCount {
                 hasher.combine(value)
             } else {
@@ -1317,6 +1402,9 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
+            if providerId != other.providerId {
+                return false
+            }
             if uri != other.uri {
                 return false
             }
@@ -1350,6 +1438,9 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             if readingTime != other.readingTime {
                 return false
             }
+            if viewer != other.viewer {
+                return false
+            }
             if likeCount != other.likeCount {
                 return false
             }
@@ -1365,6 +1456,10 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
+            if let value = providerId {
+                let providerIdValue = try value.toCBORValue()
+                map = map.adding(key: "providerId", value: providerIdValue)
+            }
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
             let titleValue = try title.toCBORValue()
@@ -1403,6 +1498,10 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
                 let readingTimeValue = try value.toCBORValue()
                 map = map.adding(key: "readingTime", value: readingTimeValue)
             }
+            if let value = viewer {
+                let viewerValue = try value.toCBORValue()
+                map = map.adding(key: "viewer", value: viewerValue)
+            }
             if let value = likeCount {
                 let likeCountValue = try value.toCBORValue()
                 map = map.adding(key: "likeCount", value: likeCountValue)
@@ -1414,12 +1513,13 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "title", "description", "createdAt", "updatedAt", "labels", "associatedRefs", "associatedProfiles", "image", "publisher", "readingTime", "likeCount", "likers"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "providerId", "uri", "title", "description", "createdAt", "updatedAt", "labels", "associatedRefs", "associatedProfiles", "image", "publisher", "readingTime", "viewer", "likeCount", "likers"]
 
         /// Whether this value writes the wire field `name` itself. An extra field of the
         /// same name (a malformed value kept from decoding) is written only when it is not.
         private func hasValue(forField name: String) -> Bool {
             switch name {
+            case "providerId": return providerId != nil
             case "uri": return true
             case "title": return true
             case "description": return true
@@ -1431,6 +1531,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             case "image": return image != nil
             case "publisher": return publisher != nil
             case "readingTime": return readingTime != nil
+            case "viewer": return viewer != nil
             case "likeCount": return likeCount != nil
             case "likers": return likers != nil
             default: return false
@@ -1438,6 +1539,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         }
 
         private enum CodingKeys: String, CodingKey {
+            case providerId
             case uri
             case title
             case description
@@ -1449,14 +1551,106 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             case image
             case publisher
             case readingTime
+            case viewer
             case likeCount
             case likers
+        }
+    }
+
+    /// Metadata about the requesting account's relationship with the subject article. Only has meaningful content for authed requests.
+    public struct ViewArticleViewerState: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.embed.external#viewArticleViewerState"
+
+        /// The requesting account's site.standard.graph.recommend record for this article, if recommended.
+        public let like: ATProtocolURI?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            like: ATProtocolURI? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.like = like
+            self.extraFields = extraFields
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
+            do {
+                like = try container.decodeIfPresent(ATProtocolURI.self, forKey: .like, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'like' — degrading to nil: \(error)")
+                like = nil
+                malformedFields.insert("like")
+            }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(like, forKey: .like)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            if let value = like {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(extraFields)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if like != other.like {
+                return false
+            }
+            return extraFields == other.extraFields
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            if let value = like {
+                let likeValue = try value.toCBORValue()
+                map = map.adding(key: "like", value: likeValue)
+            }
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+        }
+
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "like"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "like": return like != nil
+            default: return false
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case like
         }
     }
 
     public struct ViewArticlePublication: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.external#viewArticlePublication"
 
+        /// Best-effort provider domain for cosmetic attribution, such as pckt.blog. Not verified provenance.
+        public let providerId: String?
         public let uri: URI
         public let title: String
         public let description: String
@@ -1468,6 +1662,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         public let logo: URI?
         public let image: URI?
         public let theme: ViewArticlePublicationTheme?
+        public let viewer: ViewArticlePublicationViewerState?
         public let subscriptionCount: Int?
         /// Available profile previews. Selected deterministically by DID; not a ranking.
         public let subscribers: [AppBskyActorDefs.ProfileViewBasic]?
@@ -1476,6 +1671,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
+            providerId: String? = nil,
             uri: URI,
             title: String,
             description: String,
@@ -1487,10 +1683,12 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             logo: URI? = nil,
             image: URI? = nil,
             theme: ViewArticlePublicationTheme? = nil,
+            viewer: ViewArticlePublicationViewerState? = nil,
             subscriptionCount: Int? = nil,
             subscribers: [AppBskyActorDefs.ProfileViewBasic]? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
+            self.providerId = providerId
             self.uri = uri
             self.title = title
             self.description = description
@@ -1502,6 +1700,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             self.logo = logo
             self.image = image
             self.theme = theme
+            self.viewer = viewer
             self.subscriptionCount = subscriptionCount
             self.subscribers = subscribers
             self.extraFields = extraFields
@@ -1511,6 +1710,18 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             var malformedFields: Swift.Set<String> = []
+            do {
+                providerId = try container.decodeIfPresent(String.self, forKey: .providerId, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'providerId' — degrading to nil: \(error)")
+                providerId = nil
+                malformedFields.insert("providerId")
+            }
             uri = try container.decode(URI.self, forKey: .uri)
             title = try container.decode(String.self, forKey: .title)
             description = try container.decode(String.self, forKey: .description)
@@ -1611,6 +1822,18 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
                 malformedFields.insert("theme")
             }
             do {
+                viewer = try container.decodeIfPresent(ViewArticlePublicationViewerState.self, forKey: .viewer, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'viewer' — degrading to nil: \(error)")
+                viewer = nil
+                malformedFields.insert("viewer")
+            }
+            do {
                 subscriptionCount = try container.decodeIfPresent(Int.self, forKey: .subscriptionCount, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
@@ -1639,6 +1862,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(providerId, forKey: .providerId)
             try container.encode(uri, forKey: .uri)
             try container.encode(title, forKey: .title)
             try container.encode(description, forKey: .description)
@@ -1650,12 +1874,18 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             try container.encodeIfPresent(logo, forKey: .logo)
             try container.encodeIfPresent(image, forKey: .image)
             try container.encodeIfPresent(theme, forKey: .theme)
+            try container.encodeIfPresent(viewer, forKey: .viewer)
             try container.encodeIfPresent(subscriptionCount, forKey: .subscriptionCount)
             try container.encodeIfPresent(subscribers, forKey: .subscribers)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
+            if let value = providerId {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(uri)
             hasher.combine(title)
             hasher.combine(description)
@@ -1699,6 +1929,11 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             } else {
                 hasher.combine(nil as Int?)
             }
+            if let value = viewer {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             if let value = subscriptionCount {
                 hasher.combine(value)
             } else {
@@ -1714,6 +1949,9 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
+            if providerId != other.providerId {
+                return false
+            }
             if uri != other.uri {
                 return false
             }
@@ -1747,6 +1985,9 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             if theme != other.theme {
                 return false
             }
+            if viewer != other.viewer {
+                return false
+            }
             if subscriptionCount != other.subscriptionCount {
                 return false
             }
@@ -1762,6 +2003,10 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
+            if let value = providerId {
+                let providerIdValue = try value.toCBORValue()
+                map = map.adding(key: "providerId", value: providerIdValue)
+            }
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
             let titleValue = try title.toCBORValue()
@@ -1800,6 +2045,10 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
                 let themeValue = try value.toCBORValue()
                 map = map.adding(key: "theme", value: themeValue)
             }
+            if let value = viewer {
+                let viewerValue = try value.toCBORValue()
+                map = map.adding(key: "viewer", value: viewerValue)
+            }
             if let value = subscriptionCount {
                 let subscriptionCountValue = try value.toCBORValue()
                 map = map.adding(key: "subscriptionCount", value: subscriptionCountValue)
@@ -1811,12 +2060,13 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "title", "description", "createdAt", "updatedAt", "labels", "associatedRefs", "associatedProfiles", "logo", "image", "theme", "subscriptionCount", "subscribers"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "providerId", "uri", "title", "description", "createdAt", "updatedAt", "labels", "associatedRefs", "associatedProfiles", "logo", "image", "theme", "viewer", "subscriptionCount", "subscribers"]
 
         /// Whether this value writes the wire field `name` itself. An extra field of the
         /// same name (a malformed value kept from decoding) is written only when it is not.
         private func hasValue(forField name: String) -> Bool {
             switch name {
+            case "providerId": return providerId != nil
             case "uri": return true
             case "title": return true
             case "description": return true
@@ -1828,6 +2078,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             case "logo": return logo != nil
             case "image": return image != nil
             case "theme": return theme != nil
+            case "viewer": return viewer != nil
             case "subscriptionCount": return subscriptionCount != nil
             case "subscribers": return subscribers != nil
             default: return false
@@ -1835,6 +2086,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         }
 
         private enum CodingKeys: String, CodingKey {
+            case providerId
             case uri
             case title
             case description
@@ -1846,8 +2098,98 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             case logo
             case image
             case theme
+            case viewer
             case subscriptionCount
             case subscribers
+        }
+    }
+
+    /// Metadata about the requesting account's relationship with the subject publication. Only has meaningful content for authed requests.
+    public struct ViewArticlePublicationViewerState: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.embed.external#viewArticlePublicationViewerState"
+
+        /// The requesting account's site.standard.graph.subscription record for this publication, if subscribed.
+        public let subscription: ATProtocolURI?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            subscription: ATProtocolURI? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.subscription = subscription
+            self.extraFields = extraFields
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
+            do {
+                subscription = try container.decodeIfPresent(ATProtocolURI.self, forKey: .subscription, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'subscription' — degrading to nil: \(error)")
+                subscription = nil
+                malformedFields.insert("subscription")
+            }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(subscription, forKey: .subscription)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            if let value = subscription {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(extraFields)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if subscription != other.subscription {
+                return false
+            }
+            return extraFields == other.extraFields
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            if let value = subscription {
+                let subscriptionValue = try value.toCBORValue()
+                map = map.adding(key: "subscription", value: subscriptionValue)
+            }
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+        }
+
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "subscription"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "subscription": return subscription != nil
+            default: return false
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case subscription
         }
     }
 
@@ -2035,6 +2377,8 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
     public struct ViewGallery: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.external#viewGallery"
 
+        /// Best-effort provider domain for cosmetic attribution, such as grain.social. Not verified provenance.
+        public let providerId: String?
         public let uri: URI
         public let title: String
         public let description: String
@@ -2045,6 +2389,9 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         public let associatedProfiles: [AppBskyActorDefs.ProfileViewBasic]?
         /// The media items in the gallery. Each item may be of a different type, but all types must be supported by the client.
         public let items: [ViewGalleryItemsUnion]
+        /// Total number of gallery item backlinks, independent of the items included in this view.
+        public let photoCount: Int?
+        public let viewer: ViewGalleryViewerState?
         public let likeCount: Int?
         /// Available profile previews. Selected deterministically by DID; not a ranking.
         public let likers: [AppBskyActorDefs.ProfileViewBasic]?
@@ -2053,6 +2400,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
+            providerId: String? = nil,
             uri: URI,
             title: String,
             description: String,
@@ -2062,10 +2410,13 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             associatedRefs: [ComAtprotoRepoStrongRef]? = nil,
             associatedProfiles: [AppBskyActorDefs.ProfileViewBasic]? = nil,
             items: [ViewGalleryItemsUnion],
+            photoCount: Int? = nil,
+            viewer: ViewGalleryViewerState? = nil,
             likeCount: Int? = nil,
             likers: [AppBskyActorDefs.ProfileViewBasic]? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
+            self.providerId = providerId
             self.uri = uri
             self.title = title
             self.description = description
@@ -2075,6 +2426,8 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             self.associatedRefs = associatedRefs
             self.associatedProfiles = associatedProfiles
             self.items = items
+            self.photoCount = photoCount
+            self.viewer = viewer
             self.likeCount = likeCount
             self.likers = likers
             self.extraFields = extraFields
@@ -2084,6 +2437,18 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             var malformedFields: Swift.Set<String> = []
+            do {
+                providerId = try container.decodeIfPresent(String.self, forKey: .providerId, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'providerId' — degrading to nil: \(error)")
+                providerId = nil
+                malformedFields.insert("providerId")
+            }
             uri = try container.decode(URI.self, forKey: .uri)
             title = try container.decode(String.self, forKey: .title)
             description = try container.decode(String.self, forKey: .description)
@@ -2149,6 +2514,30 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             }
             items = try container.decode([ViewGalleryItemsUnion].self, forKey: .items)
             do {
+                photoCount = try container.decodeIfPresent(Int.self, forKey: .photoCount, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'photoCount' — degrading to nil: \(error)")
+                photoCount = nil
+                malformedFields.insert("photoCount")
+            }
+            do {
+                viewer = try container.decodeIfPresent(ViewGalleryViewerState.self, forKey: .viewer, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'viewer' — degrading to nil: \(error)")
+                viewer = nil
+                malformedFields.insert("viewer")
+            }
+            do {
                 likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
@@ -2177,6 +2566,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(providerId, forKey: .providerId)
             try container.encode(uri, forKey: .uri)
             try container.encode(title, forKey: .title)
             try container.encode(description, forKey: .description)
@@ -2186,12 +2576,19 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             try container.encodeIfPresent(associatedRefs, forKey: .associatedRefs)
             try container.encodeIfPresent(associatedProfiles, forKey: .associatedProfiles)
             try container.encode(items, forKey: .items)
+            try container.encodeIfPresent(photoCount, forKey: .photoCount)
+            try container.encodeIfPresent(viewer, forKey: .viewer)
             try container.encodeIfPresent(likeCount, forKey: .likeCount)
             try container.encodeIfPresent(likers, forKey: .likers)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
+            if let value = providerId {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(uri)
             hasher.combine(title)
             hasher.combine(description)
@@ -2221,6 +2618,16 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
                 hasher.combine(nil as Int?)
             }
             hasher.combine(items)
+            if let value = photoCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = viewer {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             if let value = likeCount {
                 hasher.combine(value)
             } else {
@@ -2236,6 +2643,9 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
+            if providerId != other.providerId {
+                return false
+            }
             if uri != other.uri {
                 return false
             }
@@ -2263,6 +2673,12 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             if items != other.items {
                 return false
             }
+            if photoCount != other.photoCount {
+                return false
+            }
+            if viewer != other.viewer {
+                return false
+            }
             if likeCount != other.likeCount {
                 return false
             }
@@ -2278,6 +2694,10 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
+            if let value = providerId {
+                let providerIdValue = try value.toCBORValue()
+                map = map.adding(key: "providerId", value: providerIdValue)
+            }
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
             let titleValue = try title.toCBORValue()
@@ -2306,6 +2726,14 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             }
             let itemsValue = try items.toCBORValue()
             map = map.adding(key: "items", value: itemsValue)
+            if let value = photoCount {
+                let photoCountValue = try value.toCBORValue()
+                map = map.adding(key: "photoCount", value: photoCountValue)
+            }
+            if let value = viewer {
+                let viewerValue = try value.toCBORValue()
+                map = map.adding(key: "viewer", value: viewerValue)
+            }
             if let value = likeCount {
                 let likeCountValue = try value.toCBORValue()
                 map = map.adding(key: "likeCount", value: likeCountValue)
@@ -2317,12 +2745,13 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "title", "description", "createdAt", "updatedAt", "labels", "associatedRefs", "associatedProfiles", "items", "likeCount", "likers"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "providerId", "uri", "title", "description", "createdAt", "updatedAt", "labels", "associatedRefs", "associatedProfiles", "items", "photoCount", "viewer", "likeCount", "likers"]
 
         /// Whether this value writes the wire field `name` itself. An extra field of the
         /// same name (a malformed value kept from decoding) is written only when it is not.
         private func hasValue(forField name: String) -> Bool {
             switch name {
+            case "providerId": return providerId != nil
             case "uri": return true
             case "title": return true
             case "description": return true
@@ -2332,6 +2761,8 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             case "associatedRefs": return associatedRefs != nil
             case "associatedProfiles": return associatedProfiles != nil
             case "items": return true
+            case "photoCount": return photoCount != nil
+            case "viewer": return viewer != nil
             case "likeCount": return likeCount != nil
             case "likers": return likers != nil
             default: return false
@@ -2339,6 +2770,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         }
 
         private enum CodingKeys: String, CodingKey {
+            case providerId
             case uri
             case title
             case description
@@ -2348,8 +2780,99 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             case associatedRefs
             case associatedProfiles
             case items
+            case photoCount
+            case viewer
             case likeCount
             case likers
+        }
+    }
+
+    /// Metadata about the requesting account's relationship with the subject gallery. Only has meaningful content for authed requests.
+    public struct ViewGalleryViewerState: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.embed.external#viewGalleryViewerState"
+
+        /// The requesting account's social.grain.favorite record for this gallery, if favorited.
+        public let like: ATProtocolURI?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            like: ATProtocolURI? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.like = like
+            self.extraFields = extraFields
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
+            do {
+                like = try container.decodeIfPresent(ATProtocolURI.self, forKey: .like, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'like' — degrading to nil: \(error)")
+                like = nil
+                malformedFields.insert("like")
+            }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(like, forKey: .like)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            if let value = like {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(extraFields)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if like != other.like {
+                return false
+            }
+            return extraFields == other.extraFields
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            if let value = like {
+                let likeValue = try value.toCBORValue()
+                map = map.adding(key: "like", value: likeValue)
+            }
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+        }
+
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "like"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "like": return like != nil
+            default: return false
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case like
         }
     }
 
@@ -2502,6 +3025,8 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
     public struct ViewLivestream: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.external#viewLivestream"
 
+        /// Best-effort provider domain for cosmetic attribution, such as stream.place. Not verified provenance.
+        public let providerId: String?
         public let uri: URI
         public let title: String
         public let description: String
@@ -2515,11 +3040,14 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         public let active: Bool
         public let startedAt: ATProtocolDate?
         public let endedAt: ATProtocolDate?
+        /// When the livestream last reported that it was live. A livestream without endedAt is considered active until two minutes after its last heartbeat; clients can apply the same window to tell whether a cached view is still live.
+        public let lastSeenAt: ATProtocolDate?
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
+            providerId: String? = nil,
             uri: URI,
             title: String,
             description: String,
@@ -2532,8 +3060,10 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             active: Bool,
             startedAt: ATProtocolDate? = nil,
             endedAt: ATProtocolDate? = nil,
+            lastSeenAt: ATProtocolDate? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
+            self.providerId = providerId
             self.uri = uri
             self.title = title
             self.description = description
@@ -2546,6 +3076,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             self.active = active
             self.startedAt = startedAt
             self.endedAt = endedAt
+            self.lastSeenAt = lastSeenAt
             self.extraFields = extraFields
         }
 
@@ -2553,6 +3084,18 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             var malformedFields: Swift.Set<String> = []
+            do {
+                providerId = try container.decodeIfPresent(String.self, forKey: .providerId, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'providerId' — degrading to nil: \(error)")
+                providerId = nil
+                malformedFields.insert("providerId")
+            }
             uri = try container.decode(URI.self, forKey: .uri)
             title = try container.decode(String.self, forKey: .title)
             description = try container.decode(String.self, forKey: .description)
@@ -2653,11 +3196,24 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
                 endedAt = nil
                 malformedFields.insert("endedAt")
             }
+            do {
+                lastSeenAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastSeenAt, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'lastSeenAt' — degrading to nil: \(error)")
+                lastSeenAt = nil
+                malformedFields.insert("lastSeenAt")
+            }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(providerId, forKey: .providerId)
             try container.encode(uri, forKey: .uri)
             try container.encode(title, forKey: .title)
             try container.encode(description, forKey: .description)
@@ -2670,10 +3226,16 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             try container.encode(active, forKey: .active)
             try container.encodeIfPresent(startedAt, forKey: .startedAt)
             try container.encodeIfPresent(endedAt, forKey: .endedAt)
+            try container.encodeIfPresent(lastSeenAt, forKey: .lastSeenAt)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
+            if let value = providerId {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(uri)
             hasher.combine(title)
             hasher.combine(description)
@@ -2718,11 +3280,19 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             } else {
                 hasher.combine(nil as Int?)
             }
+            if let value = lastSeenAt {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
+            if providerId != other.providerId {
+                return false
+            }
             if uri != other.uri {
                 return false
             }
@@ -2759,6 +3329,9 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             if endedAt != other.endedAt {
                 return false
             }
+            if lastSeenAt != other.lastSeenAt {
+                return false
+            }
             return extraFields == other.extraFields
         }
 
@@ -2768,6 +3341,10 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
+            if let value = providerId {
+                let providerIdValue = try value.toCBORValue()
+                map = map.adding(key: "providerId", value: providerIdValue)
+            }
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
             let titleValue = try title.toCBORValue()
@@ -2808,15 +3385,20 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
                 let endedAtValue = try value.toCBORValue()
                 map = map.adding(key: "endedAt", value: endedAtValue)
             }
+            if let value = lastSeenAt {
+                let lastSeenAtValue = try value.toCBORValue()
+                map = map.adding(key: "lastSeenAt", value: lastSeenAtValue)
+            }
             return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "title", "description", "createdAt", "updatedAt", "labels", "associatedRefs", "associatedProfiles", "image", "active", "startedAt", "endedAt"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "providerId", "uri", "title", "description", "createdAt", "updatedAt", "labels", "associatedRefs", "associatedProfiles", "image", "active", "startedAt", "endedAt", "lastSeenAt"]
 
         /// Whether this value writes the wire field `name` itself. An extra field of the
         /// same name (a malformed value kept from decoding) is written only when it is not.
         private func hasValue(forField name: String) -> Bool {
             switch name {
+            case "providerId": return providerId != nil
             case "uri": return true
             case "title": return true
             case "description": return true
@@ -2829,11 +3411,13 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             case "active": return true
             case "startedAt": return startedAt != nil
             case "endedAt": return endedAt != nil
+            case "lastSeenAt": return lastSeenAt != nil
             default: return false
             }
         }
 
         private enum CodingKeys: String, CodingKey {
+            case providerId
             case uri
             case title
             case description
@@ -2846,6 +3430,213 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             case active
             case startedAt
             case endedAt
+            case lastSeenAt
+        }
+    }
+
+    public indirect enum ViewDataUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+        case appBskyEmbedExternalViewArticle(AppBskyEmbedExternal.ViewArticle)
+        case appBskyEmbedExternalViewArticlePublication(AppBskyEmbedExternal.ViewArticlePublication)
+        case appBskyEmbedExternalViewGallery(AppBskyEmbedExternal.ViewGallery)
+        case appBskyEmbedExternalViewLivestream(AppBskyEmbedExternal.ViewLivestream)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
+        case unexpected(ATProtocolValueContainer)
+        public init(_ value: AppBskyEmbedExternal.ViewArticle) {
+            self = .appBskyEmbedExternalViewArticle(value)
+        }
+
+        public init(_ value: AppBskyEmbedExternal.ViewArticlePublication) {
+            self = .appBskyEmbedExternalViewArticlePublication(value)
+        }
+
+        public init(_ value: AppBskyEmbedExternal.ViewGallery) {
+            self = .appBskyEmbedExternalViewGallery(value)
+        }
+
+        public init(_ value: AppBskyEmbedExternal.ViewLivestream) {
+            self = .appBskyEmbedExternalViewLivestream(value)
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
+
+            switch typeValue {
+            case "app.bsky.embed.external#viewArticle":
+                let value = try AppBskyEmbedExternal.ViewArticle(from: decoder)
+                self = .appBskyEmbedExternalViewArticle(value)
+            case "app.bsky.embed.external#viewArticlePublication":
+                let value = try AppBskyEmbedExternal.ViewArticlePublication(from: decoder)
+                self = .appBskyEmbedExternalViewArticlePublication(value)
+            case "app.bsky.embed.external#viewGallery":
+                let value = try AppBskyEmbedExternal.ViewGallery(from: decoder)
+                self = .appBskyEmbedExternalViewGallery(value)
+            case "app.bsky.embed.external#viewLivestream":
+                let value = try AppBskyEmbedExternal.ViewLivestream(from: decoder)
+                self = .appBskyEmbedExternalViewLivestream(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .appBskyEmbedExternalViewArticle(value):
+                try container.encode("app.bsky.embed.external#viewArticle", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyEmbedExternalViewArticlePublication(value):
+                try container.encode("app.bsky.embed.external#viewArticlePublication", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyEmbedExternalViewGallery(value):
+                try container.encode("app.bsky.embed.external#viewGallery", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyEmbedExternalViewLivestream(value):
+                try container.encode("app.bsky.embed.external#viewLivestream", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .appBskyEmbedExternalViewArticle(value):
+                hasher.combine("app.bsky.embed.external#viewArticle")
+                hasher.combine(value)
+            case let .appBskyEmbedExternalViewArticlePublication(value):
+                hasher.combine("app.bsky.embed.external#viewArticlePublication")
+                hasher.combine(value)
+            case let .appBskyEmbedExternalViewGallery(value):
+                hasher.combine("app.bsky.embed.external#viewGallery")
+                hasher.combine(value)
+            case let .appBskyEmbedExternalViewLivestream(value):
+                hasher.combine("app.bsky.embed.external#viewLivestream")
+                hasher.combine(value)
+            case let .unexpected(container):
+                hasher.combine("unexpected")
+                hasher.combine(container)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public static func == (lhs: ViewDataUnion, rhs: ViewDataUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .appBskyEmbedExternalViewArticle(lhsValue),
+                .appBskyEmbedExternalViewArticle(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyEmbedExternalViewArticlePublication(lhsValue),
+                .appBskyEmbedExternalViewArticlePublication(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyEmbedExternalViewGallery(lhsValue),
+                .appBskyEmbedExternalViewGallery(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyEmbedExternalViewLivestream(lhsValue),
+                .appBskyEmbedExternalViewLivestream(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? ViewDataUnion else { return false }
+            return self == other
+        }
+
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // Create an ordered map to maintain field order
+            var map = OrderedCBORMap()
+
+            switch self {
+            case let .appBskyEmbedExternalViewArticle(value):
+                map = map.adding(key: "$type", value: "app.bsky.embed.external#viewArticle")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .appBskyEmbedExternalViewArticlePublication(value):
+                map = map.adding(key: "$type", value: "app.bsky.embed.external#viewArticlePublication")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .appBskyEmbedExternalViewGallery(value):
+                map = map.adding(key: "$type", value: "app.bsky.embed.external#viewGallery")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .appBskyEmbedExternalViewLivestream(value):
+                map = map.adding(key: "$type", value: "app.bsky.embed.external#viewLivestream")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .unexpected(container):
+                return try container.toCBORValue()
+            }
         }
     }
 

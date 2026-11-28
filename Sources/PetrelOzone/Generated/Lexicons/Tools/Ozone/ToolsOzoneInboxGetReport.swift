@@ -21,6 +21,10 @@ public enum ToolsOzoneInboxGetReport {
         public let subject: ReportViewSubjectUnion
         /// Raw record JSON for the subject, when the subject is a record and the record is available.
         public let record: ATProtocolValueContainer?
+        /// Current status of the reported account or record owner, independent of the report's resolution.
+        public let accountStatus: AccountStatus?
+        /// Current status of a reported record, when known.
+        public let subjectStatus: RecordStatus?
         public let status: String
         public let createdAt: ATProtocolDate
         public let updatedAt: ATProtocolDate
@@ -35,6 +39,8 @@ public enum ToolsOzoneInboxGetReport {
             reason: String? = nil,
             subject: ReportViewSubjectUnion,
             record: ATProtocolValueContainer? = nil,
+            accountStatus: AccountStatus? = nil,
+            subjectStatus: RecordStatus? = nil,
             status: String,
             createdAt: ATProtocolDate,
             updatedAt: ATProtocolDate,
@@ -46,6 +52,8 @@ public enum ToolsOzoneInboxGetReport {
             self.reason = reason
             self.subject = subject
             self.record = record
+            self.accountStatus = accountStatus
+            self.subjectStatus = subjectStatus
             self.status = status
             self.createdAt = createdAt
             self.updatedAt = updatedAt
@@ -84,6 +92,30 @@ public enum ToolsOzoneInboxGetReport {
                 record = nil
                 malformedFields.insert("record")
             }
+            do {
+                accountStatus = try container.decodeIfPresent(AccountStatus.self, forKey: .accountStatus, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'accountStatus' — degrading to nil: \(error)")
+                accountStatus = nil
+                malformedFields.insert("accountStatus")
+            }
+            do {
+                subjectStatus = try container.decodeIfPresent(RecordStatus.self, forKey: .subjectStatus, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'subjectStatus' — degrading to nil: \(error)")
+                subjectStatus = nil
+                malformedFields.insert("subjectStatus")
+            }
             status = try container.decode(String.self, forKey: .status)
             createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
@@ -98,6 +130,8 @@ public enum ToolsOzoneInboxGetReport {
             try container.encodeIfPresent(reason, forKey: .reason)
             try container.encode(subject, forKey: .subject)
             try container.encodeIfPresent(record, forKey: .record)
+            try container.encodeIfPresent(accountStatus, forKey: .accountStatus)
+            try container.encodeIfPresent(subjectStatus, forKey: .subjectStatus)
             try container.encode(status, forKey: .status)
             try container.encode(createdAt, forKey: .createdAt)
             try container.encode(updatedAt, forKey: .updatedAt)
@@ -115,6 +149,16 @@ public enum ToolsOzoneInboxGetReport {
             }
             hasher.combine(subject)
             if let value = record {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = accountStatus {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = subjectStatus {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -143,6 +187,12 @@ public enum ToolsOzoneInboxGetReport {
                 return false
             }
             if record != other.record {
+                return false
+            }
+            if accountStatus != other.accountStatus {
+                return false
+            }
+            if subjectStatus != other.subjectStatus {
                 return false
             }
             if status != other.status {
@@ -179,6 +229,14 @@ public enum ToolsOzoneInboxGetReport {
                 let recordValue = try value.toCBORValue()
                 map = map.adding(key: "record", value: recordValue)
             }
+            if let value = accountStatus {
+                let accountStatusValue = try value.toCBORValue()
+                map = map.adding(key: "accountStatus", value: accountStatusValue)
+            }
+            if let value = subjectStatus {
+                let subjectStatusValue = try value.toCBORValue()
+                map = map.adding(key: "subjectStatus", value: subjectStatusValue)
+            }
             let statusValue = try status.toCBORValue()
             map = map.adding(key: "status", value: statusValue)
             let createdAtValue = try createdAt.toCBORValue()
@@ -188,7 +246,7 @@ public enum ToolsOzoneInboxGetReport {
             return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "src", "id", "reasonType", "reason", "subject", "record", "status", "createdAt", "updatedAt"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "src", "id", "reasonType", "reason", "subject", "record", "accountStatus", "subjectStatus", "status", "createdAt", "updatedAt"]
 
         /// Whether this value writes the wire field `name` itself. An extra field of the
         /// same name (a malformed value kept from decoding) is written only when it is not.
@@ -200,6 +258,8 @@ public enum ToolsOzoneInboxGetReport {
             case "reason": return reason != nil
             case "subject": return true
             case "record": return record != nil
+            case "accountStatus": return accountStatus != nil
+            case "subjectStatus": return subjectStatus != nil
             case "status": return true
             case "createdAt": return true
             case "updatedAt": return true
@@ -214,9 +274,215 @@ public enum ToolsOzoneInboxGetReport {
             case reason
             case subject
             case record
+            case accountStatus
+            case subjectStatus
             case status
             case createdAt
             case updatedAt
+        }
+    }
+
+    public struct AccountStatus: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "tools.ozone.inbox.getReport#accountStatus"
+
+        /// Current enforcement by this moderation service.
+        public let enforcement: String
+        /// Last known account hosting state, omitted when unknown.
+        public let hosting: String?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            enforcement: String,
+            hosting: String? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.enforcement = enforcement
+            self.hosting = hosting
+            self.extraFields = extraFields
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
+            enforcement = try container.decode(String.self, forKey: .enforcement)
+            do {
+                hosting = try container.decodeIfPresent(String.self, forKey: .hosting, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'hosting' — degrading to nil: \(error)")
+                hosting = nil
+                malformedFields.insert("hosting")
+            }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(enforcement, forKey: .enforcement)
+            try container.encodeIfPresent(hosting, forKey: .hosting)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(enforcement)
+            if let value = hosting {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(extraFields)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if enforcement != other.enforcement {
+                return false
+            }
+            if hosting != other.hosting {
+                return false
+            }
+            return extraFields == other.extraFields
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            let enforcementValue = try enforcement.toCBORValue()
+            map = map.adding(key: "enforcement", value: enforcementValue)
+            if let value = hosting {
+                let hostingValue = try value.toCBORValue()
+                map = map.adding(key: "hosting", value: hostingValue)
+            }
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+        }
+
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "enforcement", "hosting"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "enforcement": return true
+            case "hosting": return hosting != nil
+            default: return false
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case enforcement
+            case hosting
+        }
+    }
+
+    public struct RecordStatus: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "tools.ozone.inbox.getReport#recordStatus"
+
+        /// Whether this moderation service has taken down the record.
+        public let takendown: Bool
+        /// Whether the record has been deleted by its repository, omitted when unknown.
+        public let deleted: Bool?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            takendown: Bool,
+            deleted: Bool? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.takendown = takendown
+            self.deleted = deleted
+            self.extraFields = extraFields
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
+            takendown = try container.decode(Bool.self, forKey: .takendown)
+            do {
+                deleted = try container.decodeIfPresent(Bool.self, forKey: .deleted, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'deleted' — degrading to nil: \(error)")
+                deleted = nil
+                malformedFields.insert("deleted")
+            }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(takendown, forKey: .takendown)
+            try container.encodeIfPresent(deleted, forKey: .deleted)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(takendown)
+            if let value = deleted {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(extraFields)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if takendown != other.takendown {
+                return false
+            }
+            if deleted != other.deleted {
+                return false
+            }
+            return extraFields == other.extraFields
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            let takendownValue = try takendown.toCBORValue()
+            map = map.adding(key: "takendown", value: takendownValue)
+            if let value = deleted {
+                let deletedValue = try value.toCBORValue()
+                map = map.adding(key: "deleted", value: deletedValue)
+            }
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+        }
+
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "takendown", "deleted"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "takendown": return true
+            case "deleted": return deleted != nil
+            default: return false
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case takendown
+            case deleted
         }
     }
 

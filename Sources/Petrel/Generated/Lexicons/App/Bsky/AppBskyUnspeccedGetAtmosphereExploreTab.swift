@@ -3,7 +3,7 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.unspecced.getAtmosphereExploreTab
 
-/// Get Atmosphere Explore content. Articles are recommended when algorithmic recommendations are enabled for the request, and curated otherwise; other sections are curated. Authentication is optional; authenticated requests include viewer-specific profile state.
+/// Get Atmosphere Explore content. Articles and photo galleries are recommended when their algorithmic recommendations are enabled for the request, and curated otherwise; other sections are curated. Curated content is selected using the x-atproto-bsky-geo-country, x-atproto-bsky-geo-region, and x-atproto-bsky-topics request headers. Authentication is optional; authenticated requests include viewer-specific profile state.
 public enum AppBskyUnspeccedGetAtmosphereExploreTab {
     public static let typeIdentifier = "app.bsky.unspecced.getAtmosphereExploreTab"
 
@@ -414,7 +414,12 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
     public struct ArticleItem: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.unspecced.getAtmosphereExploreTab#articleItem"
 
+        /// Deprecated. Retained for compatibility; always false.
         public let featured: Bool
+        /// The Bluesky post associated with the article, as declared by its author. The referenced post may not be available.
+        public let bskyPostRef: ComAtprotoRepoStrongRef?
+        /// The hydrated Bluesky post associated with the article, as declared by its author. Omitted when the post is unavailable to the viewer.
+        public let viewBskyPost: AppBskyFeedDefs.PostView?
         public let view: AppBskyEmbedExternal.ViewArticle
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
@@ -422,30 +427,72 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
 
         public init(
             featured: Bool,
+            bskyPostRef: ComAtprotoRepoStrongRef? = nil,
+            viewBskyPost: AppBskyFeedDefs.PostView? = nil,
             view: AppBskyEmbedExternal.ViewArticle,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.featured = featured
+            self.bskyPostRef = bskyPostRef
+            self.viewBskyPost = viewBskyPost
             self.view = view
             self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             featured = try container.decode(Bool.self, forKey: .featured)
+            do {
+                bskyPostRef = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .bskyPostRef, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'bskyPostRef' — degrading to nil: \(error)")
+                bskyPostRef = nil
+                malformedFields.insert("bskyPostRef")
+            }
+            do {
+                viewBskyPost = try container.decodeIfPresent(AppBskyFeedDefs.PostView.self, forKey: .viewBskyPost, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'viewBskyPost' — degrading to nil: \(error)")
+                viewBskyPost = nil
+                malformedFields.insert("viewBskyPost")
+            }
             view = try container.decode(AppBskyEmbedExternal.ViewArticle.self, forKey: .view)
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(featured, forKey: .featured)
+            try container.encodeIfPresent(bskyPostRef, forKey: .bskyPostRef)
+            try container.encodeIfPresent(viewBskyPost, forKey: .viewBskyPost)
             try container.encode(view, forKey: .view)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(featured)
+            if let value = bskyPostRef {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = viewBskyPost {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(view)
             hasher.combine(extraFields)
         }
@@ -453,6 +500,12 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
             if featured != other.featured {
+                return false
+            }
+            if bskyPostRef != other.bskyPostRef {
+                return false
+            }
+            if viewBskyPost != other.viewBskyPost {
                 return false
             }
             if view != other.view {
@@ -469,15 +522,37 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             var map = OrderedCBORMap()
             let featuredValue = try featured.toCBORValue()
             map = map.adding(key: "featured", value: featuredValue)
+            if let value = bskyPostRef {
+                let bskyPostRefValue = try value.toCBORValue()
+                map = map.adding(key: "bskyPostRef", value: bskyPostRefValue)
+            }
+            if let value = viewBskyPost {
+                let viewBskyPostValue = try value.toCBORValue()
+                map = map.adding(key: "viewBskyPost", value: viewBskyPostValue)
+            }
             let viewValue = try view.toCBORValue()
             map = map.adding(key: "view", value: viewValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "featured", "view"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "featured", "bskyPostRef", "viewBskyPost", "view"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "featured": return true
+            case "bskyPostRef": return bskyPostRef != nil
+            case "viewBskyPost": return viewBskyPost != nil
+            case "view": return true
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case featured
+            case bskyPostRef
+            case viewBskyPost
             case view
         }
     }
@@ -485,6 +560,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
     public struct PublicationItem: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.unspecced.getAtmosphereExploreTab#publicationItem"
 
+        /// Deprecated. Retained for compatibility; always false.
         public let featured: Bool
         public let view: AppBskyEmbedExternal.ViewArticlePublication
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
@@ -556,6 +632,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
     public struct GalleryItem: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.unspecced.getAtmosphereExploreTab#galleryItem"
 
+        /// Deprecated. Retained for compatibility; always false.
         public let featured: Bool
         public let view: AppBskyEmbedExternal.ViewGallery
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
@@ -627,7 +704,12 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
     public struct LivestreamItem: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.unspecced.getAtmosphereExploreTab#livestreamItem"
 
+        /// Deprecated. Retained for compatibility; always false.
         public let featured: Bool
+        /// The Bluesky post that announced the livestream, as declared by its author. The referenced post may not be available.
+        public let bskyPostRef: ComAtprotoRepoStrongRef?
+        /// The hydrated Bluesky post that announced the livestream, as declared by its author. Omitted when the post is unavailable to the viewer.
+        public let viewBskyPost: AppBskyFeedDefs.PostView?
         public let view: AppBskyEmbedExternal.ViewLivestream
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
@@ -635,30 +717,72 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
 
         public init(
             featured: Bool,
+            bskyPostRef: ComAtprotoRepoStrongRef? = nil,
+            viewBskyPost: AppBskyFeedDefs.PostView? = nil,
             view: AppBskyEmbedExternal.ViewLivestream,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.featured = featured
+            self.bskyPostRef = bskyPostRef
+            self.viewBskyPost = viewBskyPost
             self.view = view
             self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             featured = try container.decode(Bool.self, forKey: .featured)
+            do {
+                bskyPostRef = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .bskyPostRef, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'bskyPostRef' — degrading to nil: \(error)")
+                bskyPostRef = nil
+                malformedFields.insert("bskyPostRef")
+            }
+            do {
+                viewBskyPost = try container.decodeIfPresent(AppBskyFeedDefs.PostView.self, forKey: .viewBskyPost, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'viewBskyPost' — degrading to nil: \(error)")
+                viewBskyPost = nil
+                malformedFields.insert("viewBskyPost")
+            }
             view = try container.decode(AppBskyEmbedExternal.ViewLivestream.self, forKey: .view)
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(featured, forKey: .featured)
+            try container.encodeIfPresent(bskyPostRef, forKey: .bskyPostRef)
+            try container.encodeIfPresent(viewBskyPost, forKey: .viewBskyPost)
             try container.encode(view, forKey: .view)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(featured)
+            if let value = bskyPostRef {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = viewBskyPost {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(view)
             hasher.combine(extraFields)
         }
@@ -666,6 +790,12 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
             if featured != other.featured {
+                return false
+            }
+            if bskyPostRef != other.bskyPostRef {
+                return false
+            }
+            if viewBskyPost != other.viewBskyPost {
                 return false
             }
             if view != other.view {
@@ -682,15 +812,37 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             var map = OrderedCBORMap()
             let featuredValue = try featured.toCBORValue()
             map = map.adding(key: "featured", value: featuredValue)
+            if let value = bskyPostRef {
+                let bskyPostRefValue = try value.toCBORValue()
+                map = map.adding(key: "bskyPostRef", value: bskyPostRefValue)
+            }
+            if let value = viewBskyPost {
+                let viewBskyPostValue = try value.toCBORValue()
+                map = map.adding(key: "viewBskyPost", value: viewBskyPostValue)
+            }
             let viewValue = try view.toCBORValue()
             map = map.adding(key: "view", value: viewValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "featured", "view"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "featured", "bskyPostRef", "viewBskyPost", "view"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "featured": return true
+            case "bskyPostRef": return bskyPostRef != nil
+            case "viewBskyPost": return viewBskyPost != nil
+            case "view": return true
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case featured
+            case bskyPostRef
+            case viewBskyPost
             case view
         }
     }
@@ -968,12 +1120,18 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         public let id: String?
         public let title: String?
         public let description: String?
+        /// The profile avatar when available, otherwise the editorial logo.
         public let logo: URI?
+        /// The profile banner when available, otherwise the editorial background image.
         public let backgroundImage: URI?
+        /// Deprecated. Retained for compatibility.
         public let overlayColor: String?
+        /// Deprecated. Retained for compatibility.
         public let textColor: String?
         public let url: URI?
         public let category: String?
+        /// The app's optional Bluesky account profile. Omitted when no profile is configured or the profile is unavailable.
+        public let profile: AppBskyActorDefs.ProfileViewDetailed?
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
@@ -988,6 +1146,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             textColor: String? = nil,
             url: URI? = nil,
             category: String? = nil,
+            profile: AppBskyActorDefs.ProfileViewDetailed? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.id = id
@@ -999,6 +1158,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             self.textColor = textColor
             self.url = url
             self.category = category
+            self.profile = profile
             self.extraFields = extraFields
         }
 
@@ -1114,6 +1274,18 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 category = nil
                 malformedFields.insert("category")
             }
+            do {
+                profile = try container.decodeIfPresent(AppBskyActorDefs.ProfileViewDetailed.self, forKey: .profile, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'profile' — degrading to nil: \(error)")
+                profile = nil
+                malformedFields.insert("profile")
+            }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
@@ -1128,6 +1300,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             try container.encodeIfPresent(textColor, forKey: .textColor)
             try container.encodeIfPresent(url, forKey: .url)
             try container.encodeIfPresent(category, forKey: .category)
+            try container.encodeIfPresent(profile, forKey: .profile)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
@@ -1177,6 +1350,11 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             } else {
                 hasher.combine(nil as Int?)
             }
+            if let value = profile {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(extraFields)
         }
 
@@ -1207,6 +1385,9 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 return false
             }
             if category != other.category {
+                return false
+            }
+            if profile != other.profile {
                 return false
             }
             return extraFields == other.extraFields
@@ -1254,10 +1435,14 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 let categoryValue = try value.toCBORValue()
                 map = map.adding(key: "category", value: categoryValue)
             }
+            if let value = profile {
+                let profileValue = try value.toCBORValue()
+                map = map.adding(key: "profile", value: profileValue)
+            }
             return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "id", "title", "description", "logo", "backgroundImage", "overlayColor", "textColor", "url", "category"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "id", "title", "description", "logo", "backgroundImage", "overlayColor", "textColor", "url", "category", "profile"]
 
         /// Whether this value writes the wire field `name` itself. An extra field of the
         /// same name (a malformed value kept from decoding) is written only when it is not.
@@ -1272,6 +1457,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             case "textColor": return textColor != nil
             case "url": return url != nil
             case "category": return category != nil
+            case "profile": return profile != nil
             default: return false
             }
         }
@@ -1286,22 +1472,17 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             case textColor
             case url
             case category
+            case profile
         }
     }
 
     public struct Parameters: Parametrizable {
         public let langs: [LanguageCodeContainer]?
-        public let countryCode: String?
-        public let regionCode: String?
 
         public init(
-            langs: [LanguageCodeContainer]? = nil,
-            countryCode: String? = nil,
-            regionCode: String? = nil
+            langs: [LanguageCodeContainer]? = nil
         ) {
             self.langs = langs
-            self.countryCode = countryCode
-            self.regionCode = regionCode
         }
     }
 
@@ -1392,7 +1573,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
 public extension ATProtoClient.App.Bsky.Unspecced {
     // MARK: - getAtmosphereExploreTab
 
-    /// Get Atmosphere Explore content. Articles are recommended when algorithmic recommendations are enabled for the request, and curated otherwise; other sections are curated. Authentication is optional; authenticated requests include viewer-specific profile state.
+    /// Get Atmosphere Explore content. Articles and photo galleries are recommended when their algorithmic recommendations are enabled for the request, and curated otherwise; other sections are curated. Curated content is selected using the x-atproto-bsky-geo-country, x-atproto-bsky-geo-region, and x-atproto-bsky-topics request headers. Authentication is optional; authenticated requests include viewer-specific profile state.
     ///
     /// - Parameter input: The input parameters for the request
     /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
